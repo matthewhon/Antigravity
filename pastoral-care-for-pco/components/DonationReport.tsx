@@ -18,7 +18,7 @@ interface DonationReportProps {
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label';
+type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label';
 
 interface FilterState {
     startDate: string;
@@ -424,6 +424,56 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return { labelData, overallTotal };
     }, [filteredDonations]);
 
+    // 5b. Giving by Fund — total given, donor count, tx count, avg gift, % share, and bucket breakdown per fund
+    const givingByFundData = useMemo(() => {
+        const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#f43f5e', '#ec4899', '#14b8a6', '#3b82f6', '#10b981'];
+
+        const overallTotal = filteredDonations.reduce((s, d) => s + d.amount, 0);
+        const allFundNames = Array.from(new Set(filteredDonations.map(d => d.fundName))).sort();
+
+        const fundData = allFundNames.map((fundName, idx) => {
+            const color = COLORS[idx % COLORS.length];
+
+            const fundDonations = filteredDonations.filter(d => d.fundName === fundName);
+            const totalGiven = fundDonations.reduce((s, d) => s + d.amount, 0);
+            const donorCount = new Set(fundDonations.map(d => d.donorId)).size;
+            const txCount = fundDonations.length;
+            const avgGift = txCount > 0 ? totalGiven / txCount : 0;
+            const pctOfTotal = overallTotal > 0 ? (totalGiven / overallTotal) * 100 : 0;
+
+            const bucketTotals: Record<string, number> = {};
+            buckets.forEach((b: string) => { bucketTotals[b] = 0; });
+            fundDonations.forEach(d => {
+                const bkKey = getBucketKey(parseISO(d.date), filters.interval);
+                if (bucketTotals[bkKey] !== undefined) {
+                    bucketTotals[bkKey] += d.amount;
+                }
+            });
+
+            return {
+                fundName,
+                color,
+                totalGiven,
+                donorCount,
+                txCount,
+                avgGift,
+                pctOfTotal,
+                bucketTotals,
+            };
+        }).sort((a, b) => b.totalGiven - a.totalGiven);
+
+        // Chart data for buckets across funds
+        const chartData = buckets.map((bk: string) => {
+            const row: Record<string, any> = { bucket: getBucketLabel(bk, filters.interval) };
+            fundData.forEach(f => {
+                row[f.fundName] = f.bucketTotals[bk] || 0;
+            });
+            return row;
+        });
+
+        return { fundData, overallTotal, chartData };
+    }, [filteredDonations, buckets, filters.interval]);
+
     // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
     const avgGivingByQuarter = useMemo(() => {
         const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
@@ -590,6 +640,19 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             });
             csv = [header.join(','), ...rows].join('\n');
             filename = `giving_by_label_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'giving_by_fund') {
+            const header = ['Fund Name', 'Total Given', 'Share (%)', 'Givers', 'Transactions', 'Avg Gift ($)', ...buckets.map((b: string) => getBucketLabel(b, filters.interval)).map(escapeCsv)];
+            const rows = givingByFundData.fundData.map(f => [
+                escapeCsv(f.fundName),
+                f.totalGiven.toFixed(2),
+                f.pctOfTotal.toFixed(1) + '%',
+                f.donorCount,
+                f.txCount,
+                f.avgGift.toFixed(2),
+                ...buckets.map((b: string) => (f.bucketTotals[b] || 0).toFixed(2))
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `giving_by_fund_${format(new Date(), 'yyyy-MM-dd')}.csv`;
         }
 
         if (!csv) return;
@@ -752,10 +815,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             {/* ── Tab Bar ────────────────────────────────────────────────────── */}
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl w-fit border border-slate-200 dark:border-slate-700">
                 {([
-                    { id: 'donors',        label: '👤 Donor Report' },
-                    { id: 'age_trends',    label: '🎂 Age Demographics' },
-                    { id: 'status_trends', label: '🏷️ Giving By Status' },
-                    { id: 'avg_giving',    label: '📊 Avg Giving by Fund' },
+                    { id: 'donors',          label: '👤 Donor Report' },
+                    { id: 'giving_by_fund',  label: '🏛️ Giving by Fund' },
+                    { id: 'age_trends',      label: '🎂 Age Demographics' },
+                    { id: 'status_trends',   label: '🏷️ Giving By Status' },
+                    { id: 'avg_giving',      label: '📊 Avg Giving by Fund' },
                     { id: 'giving_by_label', label: '🏷️ Giving by Label' },
                 ] as { id: ReportTab; label: string }[]).map(tab => (
                     <button
@@ -1323,6 +1387,189 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                             );
                                         })}
                                 </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── Giving By Fund Report ────────────────────────────────────────── */}
+            {activeTab === 'giving_by_fund' && (() => {
+                const { fundData, overallTotal, chartData } = givingByFundData;
+                const hasFunds = fundData.length > 0;
+
+                return (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm p-8 space-y-8">
+                            {/* Header */}
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Giving by Fund</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
+                                        Total giving per fund · {filters.interval} buckets
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
+                                </div>
+                                {hasFunds && (
+                                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Given (All Funds)</p>
+                                        <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                                            ${overallTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                            {fundData.length} Fund{fundData.length === 1 ? '' : 's'} · {filteredDonations.length} Gifts
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {!hasFunds ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
+                                    <span className="text-4xl opacity-20">🏛️</span>
+                                    <p className="text-xs font-bold text-slate-400">No fund giving data available for the selected filters</p>
+                                    <p className="text-[10px] text-slate-400">Adjust the date range or filters above to view giving by fund.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Fund Metrics Summary Cards */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {fundData.slice(0, 4).map(f => (
+                                            <div key={f.fundName} className="p-5 rounded-2xl bg-slate-50/60 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate flex items-center gap-2">
+                                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                                        {f.fundName}
+                                                    </span>
+                                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-mono">
+                                                        {f.pctOfTotal.toFixed(1)}%
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                                                        ${f.totalGiven.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                    <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 font-medium">
+                                                        <span>{f.donorCount} Giver{f.donorCount === 1 ? '' : 's'}</span>
+                                                        <span>Avg ${f.avgGift.toLocaleString(undefined, { maximumFractionDigits: 0 })}/gift</span>
+                                                    </div>
+                                                </div>
+                                                <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${f.pctOfTotal}%`, backgroundColor: f.color }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Stacked Bar Chart */}
+                                    <div className="space-y-4 pt-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Fund Giving Over Time</h4>
+                                        <div className="h-72">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                                <BarChart data={chartData} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} />
+                                                    <YAxis
+                                                        axisLine={false} tickLine={false}
+                                                        tick={{ fontSize: 9, fill: axisColor }}
+                                                        tickFormatter={(v: number) => `$${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
+                                                    />
+                                                    <Tooltip
+                                                        contentStyle={TOOLTIP_STYLE}
+                                                        itemStyle={{ color: '#fff' }}
+                                                        cursor={{ fill: '#f8fafc' }}
+                                                        formatter={(value: number, name: string) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name]}
+                                                    />
+                                                    <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 700, paddingBottom: '16px' }} />
+                                                    {fundData.map((f, i) => (
+                                                        <Bar
+                                                            key={f.fundName}
+                                                            dataKey={f.fundName}
+                                                            stackId="fund"
+                                                            fill={f.color}
+                                                            radius={i === fundData.length - 1 ? [4,4,0,0] : [0,0,0,0]}
+                                                        />
+                                                    ))}
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    {/* Detailed Breakdown Table */}
+                                    <div className="space-y-4 pt-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Detailed Fund Breakdown</h4>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                                                        <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Fund Name</th>
+                                                        <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Total Given</th>
+                                                        <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">% of Total</th>
+                                                        <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Givers</th>
+                                                        <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Avg Gift</th>
+                                                        {buckets.map(b => (
+                                                            <th key={b} className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">
+                                                                {getBucketLabel(b, filters.interval)}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                                    {fundData.map(f => (
+                                                        <tr key={f.fundName} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                            <td className="p-3 text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2 whitespace-nowrap">
+                                                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                                                {f.fundName}
+                                                            </td>
+                                                            <td className="p-3 text-xs font-black text-slate-900 dark:text-white text-right font-mono">
+                                                                ${f.totalGiven.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </td>
+                                                            <td className="p-3 text-xs font-bold text-indigo-600 dark:text-indigo-400 text-right font-mono">
+                                                                {f.pctOfTotal.toFixed(1)}%
+                                                            </td>
+                                                            <td className="p-3 text-xs text-slate-600 dark:text-slate-300 text-right font-mono">
+                                                                {f.donorCount}
+                                                            </td>
+                                                            <td className="p-3 text-xs text-slate-600 dark:text-slate-300 text-right font-mono">
+                                                                ${f.avgGift.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </td>
+                                                            {buckets.map(b => {
+                                                                const amount = f.bucketTotals[b] || 0;
+                                                                return (
+                                                                    <td key={b} className="p-3 text-xs font-mono text-slate-500 dark:text-slate-400 text-right">
+                                                                        {amount > 0 ? `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold bg-slate-50/80 dark:bg-slate-900/60">
+                                                        <td className="p-3 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wide">Total</td>
+                                                        <td className="p-3 text-xs font-black text-emerald-600 dark:text-emerald-400 text-right font-mono">
+                                                            ${overallTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="p-3 text-xs font-black text-indigo-600 dark:text-indigo-400 text-right font-mono">100.0%</td>
+                                                        <td className="p-3 text-xs font-bold text-slate-700 dark:text-slate-300 text-right font-mono">
+                                                            {new Set(filteredDonations.map(d => d.donorId)).size}
+                                                        </td>
+                                                        <td className="p-3 text-xs font-bold text-slate-700 dark:text-slate-300 text-right font-mono">
+                                                            ${filteredDonations.length > 0 ? (overallTotal / filteredDonations.length).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                                        </td>
+                                                        {buckets.map(b => {
+                                                            const bucketTotal = fundData.reduce((s, f) => s + (f.bucketTotals[b] || 0), 0);
+                                                            return (
+                                                                <td key={b} className="p-3 text-xs font-black text-emerald-600 dark:text-emerald-400 text-right font-mono">
+                                                                    ${bucketTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
