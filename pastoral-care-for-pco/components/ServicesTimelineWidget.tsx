@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ServicesDashboardData, DetailedDonation, PcoRegistrationEvent } from '../types';
+import { ServicesDashboardData, DetailedDonation, PcoRegistrationEvent, OutreachSession, OutreachSlot, AttendanceRecord } from '../types';
 import { firestore } from '../services/firestoreService';
 
 interface ServicesTimelineWidgetProps {
@@ -17,6 +17,9 @@ interface ServicesTimelineWidgetProps {
      * rather than the whole timeline being hidden.
      */
     showGiving?: boolean;
+    outreachSessions?: OutreachSession[];
+    outreachSlots?: OutreachSlot[];
+    attendanceData?: AttendanceRecord[];
     /** Only supplied when hosted in the legacy widget grid. */
     onRemove?: () => void;
 }
@@ -50,6 +53,11 @@ export interface EventEntry {
     isUpcoming?: boolean;
 }
 
+export interface OutreachSummary {
+    totalReached: number;
+    sessionNames: string[];
+}
+
 interface DayEntry {
     /** Calendar date key — used purely for aligning with service plans */
     dateKey: string;
@@ -61,12 +69,14 @@ interface DayEntry {
         name: string;
         time: string;
         volunteersScheduled: number;
+        attendance?: number;
         isUpcoming?: boolean;
     }[];
     events: EventEntry[];
     totalHeadcount: number;
     /** Batches that fall on this calendar date */
     batches: BatchEntry[];
+    outreachSummary?: OutreachSummary | null;
     isGivingOnly: boolean;
     isToday: boolean;
     isUpcoming: boolean;
@@ -200,6 +210,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
     registrationEvents,
     churchId: propChurchId,
     showGiving = true,
+    outreachSessions = [],
+    outreachSlots = [],
+    attendanceData = [],
     onRemove,
 }) => {
     const [fetchedEvents, setFetchedEvents] = useState<PcoRegistrationEvent[]>([]);
@@ -363,6 +376,54 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             });
         });
 
+        // ── 3b. Attach per-service attendance numbers ────────────────────────────
+        Object.entries(plansByDate).forEach(([dateKey, servicesOnDate]) => {
+            if (servicesOnDate.length === 0) return;
+            const totalHc = headcountByDate[dateKey] || 0;
+            if (totalHc <= 0) return;
+
+            const attRec = (attendanceData || []).find(a => (a.date || '').slice(0, 10) === dateKey);
+            const trendRec = checkTrends.find(t => (t.isoDate || t.date || '').slice(0, 10) === dateKey);
+            const eventBreakdowns: any[] = attRec?.events || trendRec?.events || [];
+            const customBreakdowns: any[] = attRec?.customHeadcounts || trendRec?.customHeadcounts || [];
+
+            if (servicesOnDate.length === 1) {
+                servicesOnDate[0].attendance = totalHc;
+            } else {
+                let assignedTotal = 0;
+                servicesOnDate.forEach(svc => {
+                    const sName = svc.name.toLowerCase();
+                    const sTime = svc.time.toLowerCase();
+
+                    const matchEvt = eventBreakdowns.find(e => {
+                        const eName = (e.name || '').toLowerCase();
+                        return eName.includes(sName) || sName.includes(eName) || (sTime && eName.includes(sTime));
+                    });
+                    if (matchEvt) {
+                        svc.attendance = matchEvt.total || matchEvt.headcount || 0;
+                        assignedTotal += svc.attendance;
+                        return;
+                    }
+
+                    const matchCust = customBreakdowns.find(c => {
+                        const cName = (c.name || '').toLowerCase();
+                        return cName.includes(sName) || sName.includes(cName) || (sTime && cName.includes(sTime));
+                    });
+                    if (matchCust) {
+                        svc.attendance = matchCust.total || 0;
+                        assignedTotal += svc.attendance;
+                    }
+                });
+
+                const unassigned = servicesOnDate.filter(s => s.attendance === undefined);
+                const remaining = Math.max(0, totalHc - assignedTotal);
+                if (unassigned.length > 0 && remaining > 0) {
+                    const share = Math.round(remaining / unassigned.length);
+                    unassigned.forEach(s => { s.attendance = share; });
+                }
+            }
+        });
+
         // ── 4. Group Registration & Calendar Events by date ──────────────────────
         const eventsByDate: Record<string, EventEntry[]> = {};
         allEvents.forEach(ev => {
@@ -392,11 +453,35 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             });
         });
 
-        // ── 5. Merge all dates from plans + batches + events ─────────────────────
+        // ── 4b. Group Outreach Contacts by date ──────────────────────────────────
+        const outreachByDate: Record<string, { totalReached: number; sessionNames: Set<string> }> = {};
+        const sessionNameMap = new Map<string, string>();
+        (outreachSessions || []).forEach(s => {
+            if (s.id && s.name) sessionNameMap.set(s.id, s.name);
+        });
+        (outreachSlots || []).forEach(slot => {
+            if (!slot || slot.status !== 'contacted') return;
+            const timestamp = slot.completedAt || slot.assignedAt;
+            if (!timestamp) return;
+            const slotDate = new Date(timestamp);
+            if (isNaN(slotDate.getTime())) return;
+            const key = toLocalDateKey(slotDate);
+            if (key < pastLimitKey || key > upcomingLimitKey) return;
+
+            if (!outreachByDate[key]) {
+                outreachByDate[key] = { totalReached: 0, sessionNames: new Set<string>() };
+            }
+            outreachByDate[key].totalReached += 1;
+            const sName = sessionNameMap.get(slot.sessionId) || 'Outreach Session';
+            outreachByDate[key].sessionNames.add(sName);
+        });
+
+        // ── 5. Merge all dates from plans + batches + events + outreach ─────────
         const allDateKeys = Array.from(new Set<string>([
             ...Object.keys(plansByDate),
             ...Object.keys(batchesByDate),
             ...Object.keys(eventsByDate),
+            ...Object.keys(outreachByDate),
             todayKey,
         ])).sort().reverse();
 
@@ -418,6 +503,11 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 else if (diffDays > 1 && diffDays <= 7) relativeLabel = `In ${diffDays} days (${d.toLocaleDateString(undefined, { weekday: 'short' })})`;
             }
 
+            const outreachInfo = outreachByDate[key];
+            const outreachSummary: OutreachSummary | null = outreachInfo
+                ? { totalReached: outreachInfo.totalReached, sessionNames: Array.from(outreachInfo.sessionNames) }
+                : null;
+
             return {
                 dateKey: key,
                 dayOfWeek: d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
@@ -427,15 +517,16 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 events,
                 totalHeadcount: headcountByDate[key] || 0,
                 batches,
-                isGivingOnly: services.length === 0 && events.length === 0,
+                outreachSummary,
+                isGivingOnly: services.length === 0 && events.length === 0 && !outreachSummary,
                 isToday,
                 isUpcoming,
                 relativeLabel,
             };
         });
-    }, [servicesData, visibleDonations, allEvents, rollupToSundays]);
+    }, [servicesData, visibleDonations, allEvents, rollupToSundays, outreachSessions, outreachSlots, attendanceData]);
 
-    const isEmpty = days.length === 0 || days.every(d => d.services.length === 0 && d.events.length === 0 && d.batches.length === 0);
+    const isEmpty = days.length === 0 || days.every(d => d.services.length === 0 && d.events.length === 0 && d.batches.length === 0 && !d.outreachSummary);
 
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col group relative overflow-hidden">
@@ -498,8 +589,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                             const hasBatches = day.batches.length > 0;
                             const hasEvents = day.events.length > 0;
                             const hasServices = day.services.length > 0;
+                            const hasOutreach = !!(day.outreachSummary && day.outreachSummary.totalReached > 0);
 
-                            if (!hasBatches && !hasEvents && !hasServices && !day.isToday) return null;
+                            if (!hasBatches && !hasEvents && !hasServices && !hasOutreach && !day.isToday) return null;
 
                             const dotCls = day.isToday
                                 ? 'bg-indigo-600 ring-4 ring-indigo-200 dark:ring-indigo-800 shadow shadow-indigo-400 z-20'
@@ -507,7 +599,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                     ? 'bg-purple-500 ring-2 ring-purple-200 dark:ring-purple-900'
                                     : day.isGivingOnly
                                         ? 'bg-emerald-400 dark:bg-emerald-600'
-                                        : 'bg-slate-300 dark:bg-slate-600';
+                                        : day.outreachSummary
+                                            ? 'bg-sky-400 dark:bg-sky-600'
+                                            : 'bg-slate-300 dark:bg-slate-600';
 
                             return (
                                 <React.Fragment key={day.dateKey}>
@@ -579,6 +673,33 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 </div>
                                             )}
 
+                                            {/* Outreach Contact Card */}
+                                            {hasOutreach && day.outreachSummary && (
+                                                <div className="rounded-xl border border-sky-100 dark:border-sky-800/40 bg-sky-50/70 dark:bg-sky-900/10 p-3 space-y-1.5">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-xs">📞</span>
+                                                            <span className="text-xs font-bold text-sky-900 dark:text-sky-300 truncate">
+                                                                Outreach Contact
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] font-black text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-800/40 font-mono">
+                                                            {day.outreachSummary.totalReached} {day.outreachSummary.totalReached === 1 ? 'person' : 'people'} reached
+                                                        </span>
+                                                    </div>
+                                                    {day.outreachSummary.sessionNames.length > 0 && (
+                                                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                                            <span className="font-semibold text-slate-400 dark:text-slate-500 text-[9px] uppercase tracking-wider">Sessions:</span>
+                                                            {day.outreachSummary.sessionNames.map(name => (
+                                                                <span key={name} className="px-1.5 py-0.5 rounded bg-sky-100/70 dark:bg-sky-800/40 text-sky-800 dark:text-sky-300 font-semibold text-[9px]">
+                                                                    {name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             {/* Service rows */}
                                             {hasServices && (
                                                 <div className="space-y-1.5">
@@ -596,8 +717,13 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                                         {svc.time}
                                                                     </span>
                                                                 )}
+                                                                {svc.attendance !== undefined && svc.attendance > 0 && (
+                                                                    <span className="px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 font-bold whitespace-nowrap">
+                                                                        👥 {svc.attendance.toLocaleString()}
+                                                                    </span>
+                                                                )}
                                                                 {svc.volunteersScheduled > 0 && (
-                                                                    <span className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-black">
+                                                                    <span className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-black whitespace-nowrap">
                                                                         🙋 {svc.volunteersScheduled}
                                                                     </span>
                                                                 )}
@@ -614,7 +740,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                         <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[11px]">
                                                             <span>👥</span>
                                                             <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
-                                                            <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
+                                                            <span className="text-violet-400 dark:text-violet-500 font-medium">total attended</span>
                                                         </span>
                                                     ) : (
                                                         <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[11px] text-slate-400">
@@ -652,6 +778,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500" /> 🎟️ Events</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> ⛪ Services</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 💰 Giving</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> 📞 Outreach</span>
                     <span className="ml-auto text-indigo-400">Planning Center Registrations + Services</span>
                 </div>
             )}

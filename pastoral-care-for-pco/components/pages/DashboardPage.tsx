@@ -138,6 +138,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             onGenerateInsights={onGenerateInsights}
             churchName={church.name}
             isPastorAIEnabled={isPastorAIEnabled}
+            outreachSessions={outreachSessions}
+            outreachSlots={outreachSlots}
         />
     );
 };

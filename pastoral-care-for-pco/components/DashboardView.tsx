@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import {
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData,
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord,
-    PcoFund, DetailedDonation, ServicesTeam, RiskChangeRecord, StatusChangeRecord
+    PcoFund, DetailedDonation, ServicesTeam, RiskChangeRecord, StatusChangeRecord,
+    OutreachSession, OutreachSlot
 } from '../types';
 import { DashboardOverview } from '../services/dashboardService';
 import { DashboardPreferences } from '../types';
@@ -66,6 +67,8 @@ interface DashboardViewProps {
     isPastorAIEnabled?: boolean;
     /** Hide the setup checklist once onboarding is finished. */
     showOnboarding?: boolean;
+    outreachSessions?: OutreachSession[];
+    outreachSlots?: OutreachSlot[];
 }
 
 const DEFAULT_SECTION_ORDER = [
@@ -104,6 +107,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     campusName,
     isPastorAIEnabled = true,
     showOnboarding = true,
+    outreachSessions,
+    outreachSlots,
 }) => {
     const [showAI, setShowAI] = useState<boolean>(() => {
         try {
@@ -189,7 +194,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <ServicesTimelineWidget
                     servicesData={servicesData}
                     donations={donations}
+                    attendanceData={attendanceData}
                     showGiving={maySeeGiving}
+                    outreachSessions={outreachSessions}
+                    outreachSlots={outreachSlots}
                 />
             </Section>
         ),
