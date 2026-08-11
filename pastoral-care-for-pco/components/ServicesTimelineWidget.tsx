@@ -83,6 +83,23 @@ interface DayEntry {
     relativeLabel?: string | null;
 }
 
+/** Parses time string like "9:00 AM", "11:30 am", "09:00" or ISO string into minutes from midnight */
+const parseTimeToMinutes = (timeStr?: string | null): number | null => {
+    if (!timeStr) return null;
+    if (timeStr.includes('T')) {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+    }
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    if (!match) return null;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3]?.toLowerCase();
+    if (ampm === 'pm' && hours < 12) hours += 12;
+    if (ampm === 'am' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+};
+
 /** Formats a Date to local YYYY-MM-DD without UTC-midnight shift */
 const toLocalDateKey = (d: Date): string => {
     const y = d.getFullYear();
@@ -390,34 +407,77 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             if (servicesOnDate.length === 1) {
                 servicesOnDate[0].attendance = totalHc;
             } else {
-                let assignedTotal = 0;
-                servicesOnDate.forEach(svc => {
-                    const sName = svc.name.toLowerCase();
-                    const sTime = svc.time.toLowerCase();
+                // Sort services on date chronologically by start time
+                const sortedServices = [...servicesOnDate].sort((a, b) => {
+                    const tA = parseTimeToMinutes(a.time) ?? 0;
+                    const tB = parseTimeToMinutes(b.time) ?? 0;
+                    return tA - tB;
+                });
 
-                    const matchEvt = eventBreakdowns.find(e => {
-                        const eName = (e.name || '').toLowerCase();
-                        return eName.includes(sName) || sName.includes(eName) || (sTime && eName.includes(sTime));
-                    });
-                    if (matchEvt) {
-                        svc.attendance = matchEvt.total || matchEvt.headcount || 0;
-                        assignedTotal += svc.attendance;
-                        return;
+                const sortedEvents = [...eventBreakdowns].sort((a, b) => {
+                    const tA = parseTimeToMinutes(a.startsAt || a.time) ?? 0;
+                    const tB = parseTimeToMinutes(b.startsAt || b.time) ?? 0;
+                    return tA - tB;
+                });
+
+                const usedEventIndices = new Set<number>();
+                let assignedTotal = 0;
+
+                sortedServices.forEach((svc, svcIdx) => {
+                    const svcMins = parseTimeToMinutes(svc.time);
+                    let matchedEventIdx = -1;
+
+                    // 1. Match by start time (within 45 minutes)
+                    if (svcMins !== null && sortedEvents.length > 0) {
+                        matchedEventIdx = sortedEvents.findIndex((e, idx) => {
+                            if (usedEventIndices.has(idx)) return false;
+                            const eMins = parseTimeToMinutes(e.startsAt || e.time);
+                            if (eMins === null) return false;
+                            return Math.abs(svcMins - eMins) <= 45;
+                        });
                     }
 
-                    const matchCust = customBreakdowns.find(c => {
-                        const cName = (c.name || '').toLowerCase();
-                        return cName.includes(sName) || sName.includes(cName) || (sTime && cName.includes(sTime));
-                    });
-                    if (matchCust) {
-                        svc.attendance = matchCust.total || 0;
+                    // 2. Match by name substring
+                    if (matchedEventIdx === -1 && sortedEvents.length > 0) {
+                        const sName = svc.name.toLowerCase();
+                        matchedEventIdx = sortedEvents.findIndex((e, idx) => {
+                            if (usedEventIndices.has(idx)) return false;
+                            const eName = (e.name || '').toLowerCase();
+                            return eName.includes(sName) || sName.includes(eName);
+                        });
+                    }
+
+                    // 3. Match by ordinal index position if service count equals event breakdown count
+                    if (matchedEventIdx === -1 && sortedServices.length === sortedEvents.length) {
+                        if (!usedEventIndices.has(svcIdx)) {
+                            matchedEventIdx = svcIdx;
+                        }
+                    }
+
+                    if (matchedEventIdx !== -1) {
+                        usedEventIndices.add(matchedEventIdx);
+                        const evt = sortedEvents[matchedEventIdx];
+                        svc.attendance = evt.total || evt.headcount || 0;
                         assignedTotal += svc.attendance;
+                    } else {
+                        // Check custom headcounts as backup
+                        const sName = svc.name.toLowerCase();
+                        const sTime = svc.time.toLowerCase();
+                        const matchCust = customBreakdowns.find(c => {
+                            const cName = (c.name || '').toLowerCase();
+                            return cName.includes(sName) || sName.includes(cName) || (sTime && cName.includes(sTime));
+                        });
+                        if (matchCust && matchCust.total > 0) {
+                            svc.attendance = matchCust.total;
+                            assignedTotal += svc.attendance;
+                        }
                     }
                 });
 
+                // Fallback for any remaining unassigned services if no distinct breakdown was found
                 const unassigned = servicesOnDate.filter(s => s.attendance === undefined);
                 const remaining = Math.max(0, totalHc - assignedTotal);
-                if (unassigned.length > 0 && remaining > 0) {
+                if (unassigned.length > 0 && remaining > 0 && assignedTotal === 0) {
                     const share = Math.round(remaining / unassigned.length);
                     unassigned.forEach(s => { s.attendance = share; });
                 }
