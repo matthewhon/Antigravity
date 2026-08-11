@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardOverview } from '../../services/dashboardService';
-import { Card, Section, SectionControls, fmtCurrency, fmtNumber } from './DashboardPrimitives';
+import { Card, Meter, Section, SectionControls, fmtCurrency, fmtNumber } from './DashboardPrimitives';
 
 /**
  * One compact band per ministry area the user can read.
@@ -15,6 +15,8 @@ interface BandFigure {
     value: string;
     /** Muted styling for a figure that's contextual rather than headline. */
     subtle?: boolean;
+    /** A ratio against a limit renders as a meter rather than a bare number. */
+    meter?: number;
 }
 
 interface Band {
@@ -24,7 +26,7 @@ interface Band {
     figures: BandFigure[];
 }
 
-const pct = (n: number) => `${n}%`;
+
 const dateShort = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—';
 
@@ -61,7 +63,7 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
             figures: [
                 { label: 'Active groups', value: fmtNumber(areas.groups.activeGroups) },
                 { label: 'People in a group', value: fmtNumber(areas.groups.peopleInGroups) },
-                { label: 'Connection rate', value: pct(areas.groups.connectionRate) },
+                { label: 'Connection rate', value: '', meter: areas.groups.connectionRate },
                 { label: 'Avg attendance', value: fmtNumber(areas.groups.avgAttendance) },
             ],
         });
@@ -73,7 +75,7 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
             figures: [
                 { label: 'Last Sunday', value: fmtNumber(areas.services.lastSunday) },
                 { label: 'Volunteers', value: fmtNumber(areas.services.volunteers) },
-                { label: 'Fill rate', value: pct(areas.services.fillRate) },
+                { label: 'Fill rate', value: '', meter: areas.services.fillRate },
                 { label: 'Next service', value: dateShort(areas.services.nextServiceDate), subtle: true },
             ],
         });
@@ -92,10 +94,10 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
             figures.push({ label: 'Emails · 30 days', value: fmtNumber(c.emailRecipients) });
         }
         if (c.outreachContactRate !== null) {
-            figures.push({ label: 'Outreach reached', value: pct(c.outreachContactRate) });
+            figures.push({ label: 'Outreach reached', value: '', meter: c.outreachContactRate });
         }
         if (c.groupCareCoverage !== null) {
-            figures.push({ label: 'Group care', value: pct(c.groupCareCoverage) });
+            figures.push({ label: 'Group care', value: '', meter: c.groupCareCoverage });
         }
         if (figures.length > 0) {
             bands.push({ id: 'comms', title: 'Communications', href: '/tools/sms/inbox', figures });
@@ -116,7 +118,11 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
     return bands;
 };
 
-export const AreaBands: React.FC<{ areas: DashboardOverview['areas'] } & SectionControls> = ({ areas, ...controls }) => {
+interface AreaBandsProps extends SectionControls {
+    areas: DashboardOverview['areas'];
+}
+
+export const AreaBands: React.FC<AreaBandsProps> = ({ areas, ...controls }: AreaBandsProps) => {
     const bands = buildBands(areas);
     if (bands.length === 0) return null;
 
@@ -140,7 +146,9 @@ export const AreaBands: React.FC<{ areas: DashboardOverview['areas'] } & Section
                             className="grid gap-6"
                             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}
                         >
-                            {band.figures.map(f => (
+                            {band.figures.map((f, i) => f.meter !== undefined ? (
+                                <Meter key={f.label} value={f.meter} label={f.label} slot={i} />
+                            ) : (
                                 <div key={f.label}>
                                     <p
                                         className={

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AttentionRow, Severity } from '../../services/dashboardService';
-import { Card, Section, SectionControls, fmtNumber } from './DashboardPrimitives';
+import { Card, MagnitudeBar, Section, SectionControls, fmtNumber } from './DashboardPrimitives';
 
 /**
  * The section that makes the page worth opening daily.
@@ -26,7 +26,13 @@ const SEVERITY_STYLES: Record<Severity, { dot: string; count: string }> = {
     },
 };
 
-export const NeedsAttention: React.FC<{ rows: AttentionRow[] } & SectionControls> = ({ rows, ...controls }) => (
+interface NeedsAttentionProps extends SectionControls {
+    rows: AttentionRow[];
+}
+
+export const NeedsAttention: React.FC<NeedsAttentionProps> = ({ rows, ...controls }: NeedsAttentionProps) => {
+    const maxCount = rows.reduce((m, r) => Math.max(m, r.count), 0);
+    return (
     <Section title="Needs attention" {...controls}>
         <Card className="px-8 py-3 print:px-4">
             {rows.length === 0 ? (
@@ -45,16 +51,24 @@ export const NeedsAttention: React.FC<{ rows: AttentionRow[] } & SectionControls
                 <ul className="divide-y divide-slate-50 dark:divide-slate-700/60">
                     {rows.map(row => {
                         const style = SEVERITY_STYLES[row.severity];
+                        const tone = row.severity === 'critical' ? 'critical'
+                            : row.severity === 'warn' ? 'warning' : 'neutral';
                         return (
                             <li key={row.id}>
                                 <Link
                                     to={row.href}
                                     className="flex items-center justify-between gap-4 py-4 group focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-xl"
                                 >
-                                    <span className="flex items-center gap-3 min-w-0">
-                                        <span aria-hidden="true" className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
-                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-                                            {row.label}
+                                    <span className="flex flex-col gap-2 min-w-0 flex-1">
+                                        <span className="flex items-center gap-3 min-w-0">
+                                            <span aria-hidden="true" className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+                                                {row.label}
+                                            </span>
+                                        </span>
+                                        {/* Relative magnitude — gives the list a shape to scan. */}
+                                        <span className="block max-w-[280px] ml-5">
+                                            <MagnitudeBar value={row.count} max={maxCount} tone={tone} />
                                         </span>
                                     </span>
                                     <span className="flex items-center gap-3 flex-shrink-0">
@@ -76,4 +90,5 @@ export const NeedsAttention: React.FC<{ rows: AttentionRow[] } & SectionControls
             )}
         </Card>
     </Section>
-);
+    );
+};

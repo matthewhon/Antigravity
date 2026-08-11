@@ -11,11 +11,15 @@ import { Card, EmptyNote, Section, SectionControls, Sparkline, fmtValue } from '
  * without a magnitude is only half the story.
  */
 
-const SERIES_COLOR: Record<string, string> = {
-    attendance: 'indigo',
-    giving: 'emerald',
-    new_people: 'violet',
-    group_attendance: 'cyan',
+/**
+ * Fixed slot per series so colour follows the entity, not its position in a
+ * filtered list — a role that hides Giving must not repaint the survivors.
+ */
+const SERIES_SLOT: Record<string, number> = {
+    attendance: 0,
+    giving: 1,
+    new_people: 2,
+    group_attendance: 3,
 };
 
 const changeAcross = (points: TrendSeries['points']): number | null => {
@@ -26,7 +30,11 @@ const changeAcross = (points: TrendSeries['points']): number | null => {
     return Math.round(((last - first) / first) * 100);
 };
 
-export const TrendStrip: React.FC<{ series: TrendSeries[] } & SectionControls> = ({ series, ...controls }) => (
+interface TrendStripProps extends SectionControls {
+    series: TrendSeries[];
+}
+
+export const TrendStrip: React.FC<TrendStripProps> = ({ series, ...controls }: TrendStripProps) => (
     <Section title="Trends" caption="last 12 weeks" {...controls}>
         {series.length === 0 ? (
             <Card className="px-8 py-6">
@@ -62,7 +70,7 @@ export const TrendStrip: React.FC<{ series: TrendSeries[] } & SectionControls> =
                                     </span>
                                 )}
                             </div>
-                            <Sparkline points={s.points} color={SERIES_COLOR[s.id] || 'indigo'} />
+                            <Sparkline points={s.points} slot={SERIES_SLOT[s.id] ?? 0} isCurrency={s.isCurrency} showEndDot height={56} />
                             <p className="text-[10px] font-medium text-slate-300 dark:text-slate-600 mt-1">
                                 latest week
                             </p>

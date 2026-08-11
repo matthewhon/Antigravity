@@ -8,7 +8,11 @@ import { Card, DeltaChip, EmptyNote, Section, SectionControls, fmtValue } from '
  * Rows arrive pre-filtered by role, so a user without Giving simply has fewer
  * lines rather than blanked-out ones.
  */
-export const WeekComparison: React.FC<{ rows: DeltaRow[] } & SectionControls> = ({ rows, ...controls }) => (
+interface WeekComparisonProps extends SectionControls {
+    rows: DeltaRow[];
+}
+
+export const WeekComparison: React.FC<WeekComparisonProps> = ({ rows, ...controls }: WeekComparisonProps) => (
     <Section title="This week" caption="vs. the previous seven days" {...controls}>
         <Card className="px-8 py-3 print:px-4">
             {rows.length === 0 ? (

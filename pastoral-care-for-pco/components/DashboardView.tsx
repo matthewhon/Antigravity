@@ -161,7 +161,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     // The giving half of the timeline is gated: if this user's overview carries
     // no giving band and no giving pulse figure, they may not see batch amounts.
-    const maySeeGiving = overview.pulse.givingMtd !== null || !!overview.areas.giving;
+    const maySeeGiving = !!overview.areas.giving || overview.pulse.some(p => p.id === 'giving');
 
     const ctl = (id: string) => ({
         isCollapsed: isCollapsed(id),

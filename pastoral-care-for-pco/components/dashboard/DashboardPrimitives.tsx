@@ -1,6 +1,7 @@
 import React from 'react';
-import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts';
+import { Area, AreaChart, ReferenceDot, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { EYEBROW } from '../SharedUI';
+import { ChartMode, GRID, MARK, STATUS, SURFACE, TRACK, seriesColor } from '../../constants/chartTokens';
 
 /**
  * Shared building blocks for the dashboard overview page.
@@ -56,7 +57,7 @@ interface SectionProps extends SectionControls {
 
 export const Section: React.FC<SectionProps> = ({
     title, caption, action, onToggleCollapse, isCollapsed = false, children,
-}) => {
+}: SectionProps) => {
     const heading = (
         <div className="flex items-baseline gap-3 flex-wrap">
             <h3 className={EYEBROW}>{title}</h3>
@@ -145,56 +146,237 @@ export const DeltaChip: React.FC<{
     );
 };
 
-// ─── Sparkline ────────────────────────────────────────────────────────────────
-
-const SPARK_COLORS: Record<string, string> = {
-    indigo: '#6366f1',
-    emerald: '#10b981',
-    amber: '#f59e0b',
-    violet: '#8b5cf6',
-    cyan: '#06b6d4',
-    rose: '#f43f5e',
-};
+// ─── Theme detection ──────────────────────────────────────────────────────────
 
 /**
- * A small filled trend line. Deliberately axis-free — it reads as a shape, and
- * the exact figures live in the number beside it.
+ * Charts need their palette as values, not classes, so they can't lean on
+ * Tailwind's `dark:` variants. Dark mode gets its own validated steps.
  */
-export const Sparkline: React.FC<{
+export const useChartMode = (): ChartMode => {
+    const [mode, setMode] = React.useState<ChartMode>(() =>
+        typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+            ? 'dark' : 'light'
+    );
+
+    React.useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const root = document.documentElement;
+        const sync = () => setMode(root.classList.contains('dark') ? 'dark' : 'light');
+        sync();
+        const observer = new MutationObserver(sync);
+        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    return mode;
+};
+
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+
+interface SparklineProps {
     points: { weekStart: string; value: number }[];
-    color?: keyof typeof SPARK_COLORS | string;
+    /** Slot in the fixed categorical order. */
+    slot?: number;
     height?: number;
-}> = ({ points, color = 'indigo', height = 44 }) => {
-    const stroke = SPARK_COLORS[color] || SPARK_COLORS.indigo;
+    /** Emphasised end marker — the "you are here" of a trend line. */
+    showEndDot?: boolean;
+    isCurrency?: boolean;
+}
+
+/**
+ * A small filled trend line: 2px stroke, 10% area wash, and an end-dot with a
+ * surface ring so it stays legible where it meets the line. Deliberately
+ * axis-free — the magnitude lives in the number beside it.
+ */
+export const Sparkline: React.FC<SparklineProps> = ({
+    points, slot = 0, height = 44, showEndDot = false, isCurrency,
+}: SparklineProps) => {
+    const mode = useChartMode();
+    const stroke = seriesColor(mode, slot);
     const gradientId = React.useId();
 
     if (points.length === 0) {
-        return <div style={{ height }} className="flex items-end text-[11px] text-slate-300 dark:text-slate-600">No data</div>;
+        return (
+            <div style={{ height }} className="flex items-end text-[11px] text-slate-300 dark:text-slate-600">
+                No data
+            </div>
+        );
     }
 
+    const last = points[points.length - 1];
+
     return (
-        <div style={{ height }} aria-hidden="true">
+        <div style={{ height }}>
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={points} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <AreaChart data={points} margin={{ top: 4, right: 5, bottom: 0, left: 0 }}>
                     <defs>
                         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={stroke} stopOpacity={0.28} />
+                            <stop offset="0%" stopColor={stroke} stopOpacity={MARK.areaOpacity * 2.8} />
                             <stop offset="100%" stopColor={stroke} stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    {/* Domain from 0 so a flat series doesn't render as a dramatic swing. */}
+                    {/* From 0 so a flat series doesn't render as a dramatic swing. */}
                     <YAxis hide domain={[0, 'dataMax']} />
+                    <Tooltip
+                        cursor={{ stroke: GRID[mode], strokeWidth: 1 }}
+                        content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const p = payload[0].payload as { weekStart: string; value: number };
+                            return (
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shadow-lg">
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        week of {p.weekStart}
+                                    </p>
+                                    <p className="text-sm font-black tabular-nums text-slate-900 dark:text-white">
+                                        {fmtValue(p.value, isCurrency)}
+                                    </p>
+                                </div>
+                            );
+                        }}
+                    />
                     <Area
                         type="monotone"
                         dataKey="value"
                         stroke={stroke}
-                        strokeWidth={2}
+                        strokeWidth={MARK.lineWidth}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
                         fill={`url(#${gradientId})`}
                         isAnimationActive={false}
                         dot={false}
+                        activeDot={{ r: MARK.dotRadius + 1, fill: stroke, stroke: SURFACE[mode], strokeWidth: MARK.dotRingWidth }}
                     />
+                    {showEndDot && (
+                        <ReferenceDot
+                            x={last.weekStart}
+                            y={last.value}
+                            r={MARK.dotRadius}
+                            fill={stroke}
+                            stroke={SURFACE[mode]}
+                            strokeWidth={MARK.dotRingWidth}
+                            isFront
+                        />
+                    )}
                 </AreaChart>
             </ResponsiveContainer>
+        </div>
+    );
+};
+
+// ─── Meter ────────────────────────────────────────────────────────────────────
+
+/**
+ * A single ratio against a limit — the right form for a rate, where a pie of
+ * two slices would be wrong. Same-hue track, value labelled directly.
+ */
+export const Meter: React.FC<{ value: number; label: string; slot?: number }> = ({
+    value, label, slot = 0,
+}) => {
+    const mode = useChartMode();
+    const pct = Math.max(0, Math.min(100, value));
+    return (
+        <div>
+            <div className="flex items-baseline justify-between gap-2">
+                <p className="text-2xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white">
+                    {pct}%
+                </p>
+            </div>
+            <div
+                className="mt-2 h-1.5 w-full rounded-full overflow-hidden"
+                style={{ background: TRACK[mode] }}
+                role="img"
+                aria-label={`${label}: ${pct} percent`}
+            >
+                <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${pct}%`, background: seriesColor(mode, slot) }}
+                />
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-1.5">
+                {label}
+            </p>
+        </div>
+    );
+};
+
+// ─── Magnitude bar ────────────────────────────────────────────────────────────
+
+/**
+ * Relative magnitude within a list, in the status hue for its severity. Gives a
+ * severity-ordered list a shape to scan as well as numbers to read.
+ */
+export const MagnitudeBar: React.FC<{
+    value: number;
+    max: number;
+    tone: 'good' | 'warning' | 'critical' | 'neutral';
+}> = ({ value, max, tone }) => {
+    const mode = useChartMode();
+    const pct = max > 0 ? Math.max(3, Math.round((value / max) * 100)) : 0;
+    return (
+        <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: TRACK[mode] }} aria-hidden="true">
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: STATUS[mode][tone] }} />
+        </div>
+    );
+};
+
+// ─── Status bar (part-to-whole) ───────────────────────────────────────────────
+
+interface StatusSegment {
+    label: string;
+    count: number;
+    tone: 'good' | 'warning' | 'critical';
+}
+
+/**
+ * A horizontal stacked bar for classes that mean good→bad, so they wear status
+ * colours rather than categorical ones. Segments are separated by a 2px gap in
+ * the surface colour, and every segment carries a labelled legend key — colour
+ * is never the only channel.
+ */
+export const StatusBar: React.FC<{ title: string; segments: StatusSegment[] }> = ({ title, segments }) => {
+    const mode = useChartMode();
+    const total = segments.reduce((sum, s) => sum + s.count, 0);
+    if (total === 0) return null;
+
+    return (
+        <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+                {title}
+            </p>
+            <div
+                className="flex w-full h-3 rounded-full overflow-hidden"
+                style={{ gap: MARK.surfaceGap, background: TRACK[mode] }}
+                role="img"
+                aria-label={segments.map(s => `${s.label} ${s.count}`).join(', ')}
+            >
+                {segments.filter(s => s.count > 0).map(s => (
+                    <div
+                        key={s.label}
+                        style={{ width: `${(s.count / total) * 100}%`, background: STATUS[mode][s.tone] }}
+                        title={`${s.label}: ${s.count.toLocaleString()}`}
+                    />
+                ))}
+            </div>
+            <div className="flex gap-5 mt-3 flex-wrap">
+                {segments.map(s => (
+                    <span key={s.label} className="inline-flex items-center gap-2">
+                        <span
+                            aria-hidden="true"
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: STATUS[mode][s.tone] }}
+                        />
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                            {s.label}
+                        </span>
+                        <span className="text-[11px] font-black tabular-nums text-slate-900 dark:text-white">
+                            {fmtNumber(s.count)}
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+                            {Math.round((s.count / total) * 100)}%
+                        </span>
+                    </span>
+                ))}
+            </div>
         </div>
     );
 };

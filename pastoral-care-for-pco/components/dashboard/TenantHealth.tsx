@@ -8,10 +8,12 @@ import { Card, Section, SectionControls, fmtAgo, fmtNumber } from './DashboardPr
  * Sync freshness leads because a silently failing sync is the failure mode that
  * makes every other number on this page quietly wrong.
  */
-export const TenantHealth: React.FC<{
+interface TenantHealthProps extends SectionControls {
     health: NonNullable<DashboardOverview['tenantHealth']>;
     pcoConnected: boolean;
-} & SectionControls> = ({ health, pcoConnected, ...controls }) => {
+}
+
+export const TenantHealth: React.FC<TenantHealthProps> = ({ health, pcoConnected, ...controls }: TenantHealthProps) => {
     const syncAge = health.lastSyncAt ? Date.now() - health.lastSyncAt : null;
     const syncStale = syncAge === null || syncAge > 24 * 60 * 60 * 1000;
 

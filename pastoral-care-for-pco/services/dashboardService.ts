@@ -62,6 +62,19 @@ export interface DeltaRow {
     isCurrency?: boolean;
 }
 
+export interface PulseStat {
+    id: string;
+    label: string;
+    value: number;
+    isCurrency?: boolean;
+    /** Weekly points for the tile's sparkline, when the measure has a history. */
+    series?: { weekStart: string; value: number }[];
+    /** Previous-period value for the delta chip, when comparable. */
+    previous?: number;
+    /** False where a rise is the bad direction. */
+    higherIsBetter?: boolean;
+}
+
 export interface TrendSeries {
     id: string;
     label: string;
@@ -78,13 +91,16 @@ export interface DashboardOverview {
         /** True past 24h without a completed sync — the quiet-failure tell. */
         isStale: boolean;
     };
-    pulse: {
-        activePeople: number | null;
-        lastSundayAttendance: number | null;
-        givingMtd: number | null;
-        activeGroups: number | null;
-        volunteersServing: number | null;
-    };
+    /**
+     * Headline stats as tiles. A stat the user may not see is absent from the
+     * array rather than null, so the shape itself answers "what do they get".
+     */
+    pulse: PulseStat[];
+    /**
+     * Part-to-whole engagement split. These classes mean good/bad, so they wear
+     * status colours rather than categorical ones.
+     */
+    engagement: { label: string; count: number; tone: 'good' | 'warning' | 'critical' }[];
     needsAttention: AttentionRow[];
     thisWeek: DeltaRow[];
     trends: TrendSeries[];
@@ -239,15 +255,63 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
 
     const activeGroupCount = groups.filter(g => !g.archivedAt).length;
 
-    const pulse: DashboardOverview['pulse'] = {
-        // Church-wide vitals are open tier — no module role required.
-        activePeople: church.activePeopleCount ?? null,
-        lastSundayAttendance: lastSundayAttendance(attendance, now),
-        activeGroups: activeGroupCount,
-        volunteersServing: servicesData?.stats.uniqueVolunteers ?? null,
-        // Money is gated.
-        givingMtd: canGiving ? givingMtd : null,
-    };
+    const WEEKS = 12;
+    const attendanceSeries = weeklySeries(
+        attendance.map(a => ({ date: a.date, value: a.count || 0 })), WEEKS, now);
+    const givingSeries = weeklySeries(
+        donations.map(d => ({ date: d.date, value: d.amount || 0 })), WEEKS, now);
+    const newPeopleSeries = weeklySeries(
+        people.map(p => ({ date: p.createdAt, value: 1 })), WEEKS, now);
+    const groupAttendanceSeries = weeklySeries(
+        groups.flatMap(g => (g.attendanceHistory || []).map(h => ({ date: h.date, value: h.count || 0 }))),
+        WEEKS, now);
+
+    /** Second-to-last weekly point — the comparison for a tile's delta chip. */
+    const priorWeek = (series: { value: number }[]) =>
+        series.length >= 2 ? series[series.length - 2].value : undefined;
+
+    const lastSunday = lastSundayAttendance(attendance, now);
+
+    const pulse: PulseStat[] = [];
+
+    // Church-wide vitals are open tier — no module role required.
+    if (church.activePeopleCount !== undefined && church.activePeopleCount !== null) {
+        pulse.push({ id: 'active', label: 'Active people · 60d', value: church.activePeopleCount });
+    }
+    if (lastSunday !== null) {
+        pulse.push({
+            id: 'attendance', label: 'Last Sunday', value: lastSunday,
+            series: attendanceSeries, previous: priorWeek(attendanceSeries),
+        });
+    }
+    // Money is gated.
+    if (canGiving) {
+        pulse.push({
+            id: 'giving', label: 'Giving this month', value: givingMtd, isCurrency: true,
+            series: givingSeries, previous: priorWeek(givingSeries),
+        });
+    }
+    pulse.push({ id: 'groups', label: 'Active groups', value: activeGroupCount });
+    if (servicesData?.stats.uniqueVolunteers !== undefined) {
+        pulse.push({ id: 'volunteers', label: 'Volunteers serving', value: servicesData.stats.uniqueVolunteers });
+    }
+
+    // ── Engagement split ─────────────────────────────────────────────────────
+    // Healthy / At Risk / Disconnected mean good-to-bad, so these are status
+    // classes, not categorical series. Gated with People.
+    const engagement: DashboardOverview['engagement'] = [];
+    if (canPeople) {
+        const counts = { Healthy: 0, 'At Risk': 0, Disconnected: 0 } as Record<string, number>;
+        people.forEach(p => {
+            const cat = p.historicRiskCategory;
+            if (cat && counts[cat] !== undefined) counts[cat]++;
+        });
+        if (counts.Healthy + counts['At Risk'] + counts.Disconnected > 0) {
+            engagement.push({ label: 'Healthy', count: counts.Healthy, tone: 'good' });
+            engagement.push({ label: 'At risk', count: counts['At Risk'], tone: 'warning' });
+            engagement.push({ label: 'Disconnected', count: counts.Disconnected, tone: 'critical' });
+        }
+    }
 
     // ── Needs Attention ──────────────────────────────────────────────────────
     const needsAttention: AttentionRow[] = [];
@@ -368,32 +432,17 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
     }
 
     // ── Trends (12 weeks) ────────────────────────────────────────────────────
-    const WEEKS = 12;
+    // Series were computed above for the pulse tiles; reuse rather than rebuild.
     const trends: TrendSeries[] = [];
-
-    trends.push({
-        id: 'attendance',
-        label: 'Attendance',
-        points: weeklySeries(attendance.map(a => ({ date: a.date, value: a.count || 0 })), WEEKS, now),
-    });
+    trends.push({ id: 'attendance', label: 'Attendance', points: attendanceSeries });
     if (canGiving) {
-        trends.push({
-            id: 'giving',
-            label: 'Giving',
-            isCurrency: true,
-            points: weeklySeries(donations.map(d => ({ date: d.date, value: d.amount || 0 })), WEEKS, now),
-        });
+        trends.push({ id: 'giving', label: 'Giving', isCurrency: true, points: givingSeries });
     }
     if (canPeople) {
-        trends.push({
-            id: 'new_people',
-            label: 'New people',
-            points: weeklySeries(people.map(p => ({ date: p.createdAt, value: 1 })), WEEKS, now),
-        });
+        trends.push({ id: 'new_people', label: 'New people', points: newPeopleSeries });
     }
     if (canGroups) {
-        const groupPoints = groups.flatMap(g => (g.attendanceHistory || []).map(h => ({ date: h.date, value: h.count || 0 })));
-        trends.push({ id: 'group_attendance', label: 'Group attendance', points: weeklySeries(groupPoints, WEEKS, now) });
+        trends.push({ id: 'group_attendance', label: 'Group attendance', points: groupAttendanceSeries });
     }
 
     // ── Area bands ───────────────────────────────────────────────────────────
@@ -434,7 +483,7 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
             .filter(Boolean)
             .sort();
         areas.services = {
-            lastSunday: pulse.lastSundayAttendance ?? 0,
+            lastSunday: lastSunday ?? 0,
             volunteers: servicesData.stats.uniqueVolunteers,
             fillRate: Math.round(servicesData.stats.fillRate || 0),
             nextServiceDate: upcoming[0] || null,
@@ -498,6 +547,7 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
         generatedAt: nowMs,
         freshness: { lastSyncAt, ageMs, isStale: ageMs === null || ageMs > DAY },
         pulse,
+        engagement,
         needsAttention,
         thisWeek,
         trends,
