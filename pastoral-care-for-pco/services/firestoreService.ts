@@ -1035,6 +1035,48 @@ class FirestoreService {
       } catch (e) { this.handleFirestoreError(e); }
   }
 
+  // --- SMS usage & conversations (dashboard roll-ups) ---
+
+  /**
+   * Usage records since `sinceMs`, for message volume and spend.
+   *
+   * Both directions write here — outbound from smsSend/twilioSend, inbound from
+   * smsInbound/twilioInbound — so this gives sent AND received counts without
+   * ever touching the `messages` subcollections, which carry no churchId.
+   *
+   * Inbound docs set `direction: 'inbound'`; outbound docs currently omit the
+   * field, so absence means outbound.
+   */
+  async getSmsUsageRecords(churchId: string, sinceMs: number): Promise<import('../types').SmsUsageRecord[]> {
+      try {
+          // Same churchId + createdAt range shape the SMS quota check already uses.
+          const q = query(
+              collection(db, 'smsUsageRecords'),
+              where('churchId', '==', churchId),
+              where('createdAt', '>=', sinceMs)
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as import('../types').SmsUsageRecord);
+      } catch (e) {
+          console.error('[FirestoreService] getSmsUsageRecords failed:', e);
+          return [];
+      }
+  }
+
+  /** Every conversation for a church — inbox health counts. */
+  async getSmsConversations(churchId: string): Promise<import('../types').SmsConversation[]> {
+      try {
+          const q = query(collection(db, 'smsConversations'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => d.data() as import('../types').SmsConversation)
+              .sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+      } catch (e) {
+          console.error('[FirestoreService] getSmsConversations failed:', e);
+          return [];
+      }
+  }
+
   // --- SMS Opt-Outs ---
 
   async getSmsOptOuts(churchId: string): Promise<import('../types').SmsOptOut[]> {

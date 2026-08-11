@@ -40,6 +40,59 @@ export interface GroupRiskSettings {
     };
 }
 
+/**
+ * Thresholds for the dashboard's "Needs Attention" section.
+ *
+ * Church-configurable because "overdue" means different things to a 60-person
+ * church and a 3,000-person one. Each row can also be switched off — a church
+ * that doesn't run outreach sessions shouldn't be nagged about them forever.
+ *
+ * Lapsed donors deliberately has no window of its own; it reuses
+ * `DonorLifecycleSettings.lapsedWindowDays` so the two can't drift apart.
+ */
+export interface NeedsAttentionSettings {
+    /** Per-row on/off. A row absent from this map is treated as enabled. */
+    enabled: {
+        riskChanges: boolean;
+        unansweredTexts: boolean;
+        groupAttendanceGap: boolean;
+        openPositions: boolean;
+        lapsedDonors: boolean;
+        pendingOutreach: boolean;
+        neverContacted: boolean;
+    };
+    /** Flag people who moved to At Risk within this many days. */
+    riskChangeWindowDays: number;
+    /** Flag inbound texts with no outbound reply after this many hours. */
+    unansweredTextHours: number;
+    /** Flag groups with no attendance logged for this many weeks. */
+    groupAttendanceGapWeeks: number;
+    /** Look this many days ahead for unfilled serving positions. */
+    openPositionsLookaheadDays: number;
+    /** Flag outreach/group-care slots left pending for this many hours. */
+    pendingOutreachHours: number;
+    /** Row count at which a row renders amber, then red. */
+    severity: { warn: number; critical: number };
+}
+
+export const DEFAULT_NEEDS_ATTENTION_SETTINGS: NeedsAttentionSettings = {
+    enabled: {
+        riskChanges: true,
+        unansweredTexts: true,
+        groupAttendanceGap: true,
+        openPositions: true,
+        lapsedDonors: true,
+        pendingOutreach: true,
+        neverContacted: true,
+    },
+    riskChangeWindowDays: 7,
+    unansweredTextHours: 24,
+    groupAttendanceGapWeeks: 3,
+    openPositionsLookaheadDays: 7,
+    pendingOutreachHours: 48,
+    severity: { warn: 5, critical: 15 },
+};
+
 export interface DonorLifecycleSettings {
     newDonorDays: number;
     activeWindowDays: number;
@@ -78,6 +131,7 @@ export interface Church {
     churchRiskSettings?: ChurchRiskSettings;
     groupRiskSettings?: GroupRiskSettings;
     donorLifecycleSettings?: DonorLifecycleSettings;
+    needsAttentionSettings?: NeedsAttentionSettings;
     subscription?: { status: string, planId: string, currentPeriodEnd?: number, customerId?: string };
     /** Number of unique people active in the last 60 days (gave, served, checked-in, or attended a group). */
     activePeopleCount?: number;

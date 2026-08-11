@@ -43,9 +43,10 @@ export const StatValue: React.FC<TextProps> = ({ children, className = '' }) => 
 );
 
 interface WidgetWrapperProps {
-    title: string; 
-    onRemove: () => void; 
-    children: React.ReactNode; 
+    title: string;
+    /** Omitted outside the widget grid — the ✕ is hidden rather than left dead. */
+    onRemove?: () => void;
+    children: React.ReactNode;
     source?: string;
     headerControl?: React.ReactNode;
     locationName?: string;
@@ -68,9 +69,11 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ title, onRemove, c
       </div>
       <div className="flex items-center gap-3 print:hidden">
           {headerControl}
-          <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
+          {onRemove && (
+            <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          )}
       </div>
     </div>
     <div className="flex-1">

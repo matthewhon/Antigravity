@@ -1,8 +1,10 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { 
-  PcoPerson, PcoGroup, AttendanceRecord, DetailedDonation, PcoFund, 
+import {
+  PcoPerson, PcoGroup, AttendanceRecord, DetailedDonation, PcoFund,
   BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord, ServicesDashboardData,
-  User, Church, SystemSettings, PcoCheckInRecord, PcoCampus
+  User, Church, SystemSettings, PcoCheckInRecord, PcoCampus,
+  SmsConversation, SmsUsageRecord, EmailCampaign, EmailUnsubscribe,
+  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot
 } from '../types';
 
 interface TenantDataState {
@@ -27,6 +29,21 @@ interface TenantDataState {
   campuses: PcoCampus[];
   selectedCampusId: string;
   setSelectedCampusId: (id: string) => void;
+
+  /**
+   * Dashboard overview sources. Each is empty for users whose roles don't permit
+   * that area — App gates the fetch itself, so the rows never reach the browser.
+   * An empty array here means "not permitted or genuinely none", and the
+   * dashboard's own gate decides which.
+   */
+  smsConversations: SmsConversation[];
+  smsUsage: SmsUsageRecord[];
+  emailCampaigns: EmailCampaign[];
+  emailUnsubscribes: EmailUnsubscribe[];
+  outreachSessions: OutreachSession[];
+  outreachSlots: OutreachSlot[];
+  groupCareSessions: GroupCareSession[];
+  groupCareSlots: GroupCareSlot[];
   
   // Also pass the setters if components need to update raw data locally before a sync
   setPeople: (data: PcoPerson[]) => void;

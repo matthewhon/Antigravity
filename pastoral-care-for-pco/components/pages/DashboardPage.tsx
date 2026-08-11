@@ -10,17 +10,16 @@ import {
 } from '../../hooks/useDashboardData';
 import { computeActivePeopleCount, ACTIVE_WINDOW_DAYS } from '../../services/activePeopleService';
 import { firestore } from '../../services/firestoreService';
+import { calculateDashboardOverview } from '../../services/dashboardService';
+import { getSectionOrder } from '../../constants/dashboardSections';
 
 /** How old (ms) a cached activePeopleCount can be before auto-refreshing. */
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface DashboardPageProps {
-    onUpdateWidgets: (widgets: string[]) => void;
     onConnectPco: () => void;
-    allowedWidgetIds?: string[];
     globalInsights: string;
     isGeneratingInsights: boolean;
-    onUpdateTheme: (theme: 'traditional' | 'dark') => void;
     onGenerateInsights: () => void;
     givingFilter: any;
     givingDateRange: any;
@@ -28,12 +27,15 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-    onUpdateWidgets, onConnectPco, allowedWidgetIds, globalInsights,
-    isGeneratingInsights, onUpdateTheme, onGenerateInsights, givingFilter, givingDateRange, censusData
+    onConnectPco, globalInsights,
+    isGeneratingInsights, onGenerateInsights, givingFilter, givingDateRange, censusData
 }) => {
-    const { 
-        user, church, widgets, people, groups, attendance, donations, 
-        funds, budgets, teams, recentRiskChanges, recentStatusChanges, servicesData 
+    const {
+        user, church, people, groups, attendance, donations,
+        funds, budgets, teams, recentRiskChanges, recentStatusChanges, servicesData,
+        campuses, selectedCampusId,
+        smsConversations, smsUsage, emailCampaigns, emailUnsubscribes,
+        outreachSessions, outreachSlots, groupCareSessions, groupCareSlots
     } = useTenantData();
 
     // Local state so the widget updates immediately after computation without
@@ -81,17 +83,45 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const isStarterPlan = church.subscription?.status === 'active' && church.subscription?.planId === 'starter';
     const isPastorAIEnabled = !isStarterPlan;
 
+    // One pass builds every figure on the page, with the role gate applied at
+    // computation time — a value this user may not see never enters the object.
+    const overview = calculateDashboardOverview({
+        user,
+        church: { ...church, activePeopleCount: activePeopleCount ?? church.activePeopleCount },
+        access: { isStarterPlan },
+        peopleData: peopleDashboardData,
+        givingAnalytics: givingAnalyticsData,
+        groupsData: groupsDashboardData,
+        servicesData,
+        attendance,
+        donations,
+        people,
+        groups,
+        recentRiskChanges,
+        smsConversations,
+        smsUsage,
+        emailCampaigns,
+        emailUnsubscribes,
+        outreachSessions,
+        outreachSlots,
+        groupCareSessions,
+        groupCareSlots,
+    });
+
+    const campusName = campuses.find(c => c.pcoId === selectedCampusId)?.name ?? null;
+
     return (
-        <DashboardView 
+        <DashboardView
             user={user}
+            overview={overview}
+            sectionOrder={getSectionOrder(user.roles as string[])}
+            campusName={campusName}
             peopleData={peopleDashboardData}
             givingAnalytics={givingAnalyticsData}
             groupsData={groupsDashboardData}
             servicesData={servicesData}
             attendanceData={attendanceChartData}
             censusData={censusData}
-            visibleWidgets={widgets}
-            onUpdateWidgets={onUpdateWidgets}
             budgets={budgets}
             funds={funds}
             donations={donations}
@@ -100,15 +130,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             recentStatusChanges={recentStatusChanges}
             pcoConnected={church.pcoConnected}
             onConnectPco={onConnectPco}
-            allowedWidgetIds={allowedWidgetIds}
             globalInsights={globalInsights}
             isGeneratingInsights={isGeneratingInsights}
-            onUpdateTheme={onUpdateTheme}
-            churchRiskSettings={church.churchRiskSettings}
-            groupRiskSettings={church.groupRiskSettings}
             onGenerateInsights={onGenerateInsights}
             churchName={church.name}
-            activePeopleCount={activePeopleCount}
             isPastorAIEnabled={isPastorAIEnabled}
         />
     );

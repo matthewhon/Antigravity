@@ -6,7 +6,14 @@ interface ServicesTimelineWidgetProps {
     servicesData: ServicesDashboardData | null;
     /** All raw donations (unfiltered) — used to build per-batch giving totals */
     donations: DetailedDonation[];
-    onRemove: () => void;
+    /**
+     * Composite role gate. Services and dates are open to every user, but giving
+     * batches are not — when false the day cells render without their BatchCards
+     * rather than the whole timeline being hidden.
+     */
+    showGiving?: boolean;
+    /** Only supplied when hosted in the legacy widget grid. */
+    onRemove?: () => void;
 }
 
 interface FundEntry {
@@ -111,8 +118,12 @@ const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ bat
 export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
     servicesData,
     donations,
+    showGiving = true,
     onRemove,
 }) => {
+    // Drop giving before any batch grouping runs, so no amount reaches the DOM
+    // for a user without the role.
+    const visibleDonations = showGiving ? donations : [];
     const days = useMemo<DayEntry[]>(() => {
         const now = new Date();
         const todayKey = toLocalDateKey(now);
@@ -129,7 +140,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             totalAmount: number;
         }> = {};
 
-        donations.forEach(d => {
+        visibleDonations.forEach(d => {
             const dateKey = (d.date || '').slice(0, 10);
             if (dateKey.length !== 10 || dateKey > todayKey) return;
 
@@ -278,20 +289,22 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 isToday: key === todayKey,
             };
         });
-    }, [servicesData, donations]);
+    }, [servicesData, visibleDonations]);
 
     const isEmpty = days.length === 0;
 
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col group relative overflow-hidden">
-            {/* Remove */}
-            <button
-                onClick={onRemove}
-                className="absolute top-5 right-5 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-10"
-                aria-label="Remove widget"
-            >
-                ✕
-            </button>
+            {/* Remove — only when hosted in the legacy widget grid */}
+            {onRemove && (
+                <button
+                    onClick={onRemove}
+                    className="absolute top-5 right-5 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                    aria-label="Remove widget"
+                >
+                    ✕
+                </button>
+            )}
 
             {/* Glow */}
             <div className="absolute -right-12 -top-12 w-48 h-48 bg-indigo-50/40 dark:bg-indigo-900/10 rounded-full blur-3xl pointer-events-none" />

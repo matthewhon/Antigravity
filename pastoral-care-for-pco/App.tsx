@@ -37,7 +37,7 @@ import GuidedTour, { TourStep } from './components/GuidedTour';
 const FIRST_RUN_TOUR_STEPS: TourStep[] = [
     {
         title: 'Welcome to your dashboard 👋',
-        body: "This is your home base — a quick pulse on your whole church. Let's take 30 seconds to show you around.",
+        body: "This is your home base — a quick pulse on your whole church. Let's take 20 seconds to show you around.",
     },
     {
         target: 'setup-guide',
@@ -47,17 +47,7 @@ const FIRST_RUN_TOUR_STEPS: TourStep[] = [
     {
         target: 'connect-pco',
         title: 'Connect Planning Center',
-        body: 'Most widgets fill with real numbers once Planning Center is connected. This button stays here until you do.',
-    },
-    {
-        target: 'dashboard-widgets',
-        title: 'These are your widgets',
-        body: "Each card is a widget. Drag any card to rearrange it, and hover to remove one you don't need.",
-    },
-    {
-        target: 'customize-layout',
-        title: 'Add or remove widgets',
-        body: "Not sure which widgets you need? Open this to browse the full library — every widget has a description — or hit “Reset to recommended” for the set we suggest for your role.",
+        body: 'Your numbers fill in once Planning Center is connected. This button stays here until you do.',
     },
     {
         target: 'ai-toggle',
@@ -67,11 +57,11 @@ const FIRST_RUN_TOUR_STEPS: TourStep[] = [
     {
         target: 'main-nav',
         title: 'Explore every ministry',
-        body: 'Use the navigation to dive into People, Groups, Services, Giving, and Care. Each has its own dashboards you can customize the same way.',
+        body: 'Use the navigation to dive into People, Groups, Services, Giving, and Care. Each has its own dashboards you can customize.',
     },
     {
         title: "You're all set ✨",
-        body: 'Every layout is yours to change anytime with “Customize Layout.” Welcome aboard!',
+        body: 'Your dashboard shows what you have access to — it changes with your role. Welcome aboard!',
     },
 ];
 import { PublicPollView } from './components/PublicPollView';
@@ -92,13 +82,16 @@ import {
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
-  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord, PcoCampus
+  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord, PcoCampus,
+  SmsConversation, SmsUsageRecord, EmailCampaign, EmailUnsubscribe,
+  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';
 import { fetchCensusDataForTenant } from './services/censusService';
 import { generateGlobalInsights, generateGeoInsights, generateLayoutSuggestion } from './services/geminiService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './services/riskService';
+import { hasModuleAccess, canReadArea, isAdmin, DashboardArea } from './services/permissionService';
 
 const App: React.FC = () => {
   // Auth & User State
@@ -178,6 +171,16 @@ const App: React.FC = () => {
   const [recentStatusChanges, setRecentStatusChanges] = useState<StatusChangeRecord[]>([]);
   const [checkIns, setCheckIns] = useState<PcoCheckInRecord[]>([]);
   const [campuses, setCampuses] = useState<PcoCampus[]>([]);
+
+  // Dashboard overview sources — each only populated if the user may read it.
+  const [smsConversations, setSmsConversations] = useState<SmsConversation[]>([]);
+  const [smsUsage, setSmsUsage] = useState<SmsUsageRecord[]>([]);
+  const [emailCampaigns, setEmailCampaigns] = useState<EmailCampaign[]>([]);
+  const [emailUnsubscribes, setEmailUnsubscribes] = useState<EmailUnsubscribe[]>([]);
+  const [outreachSessions, setOutreachSessions] = useState<OutreachSession[]>([]);
+  const [outreachSlots, setOutreachSlots] = useState<OutreachSlot[]>([]);
+  const [groupCareSessions, setGroupCareSessions] = useState<GroupCareSession[]>([]);
+  const [groupCareSlots, setGroupCareSlots] = useState<GroupCareSlot[]>([]);
   const [selectedCampusId, setSelectedCampusId] = useState<string>('all');
 
   // Initialize selected campus from localStorage or allowed restrictions
@@ -540,6 +543,52 @@ const App: React.FC = () => {
       setRecentStatusChanges(sc);
       setCheckIns(ci);
       setCampuses(camp);
+
+      // Dashboard-only sources, fetched alongside so every existing call site
+      // refreshes them too. Non-fatal — the overview degrades to what it has.
+      if (user) {
+          loadDashboardData(churchId, user).catch(e =>
+              console.warn('[Dashboard] overview data load failed:', e?.message)
+          );
+      }
+  };
+
+  /**
+   * Loads the extra collections the dashboard overview needs.
+   *
+   * Each fetch is gated on the same read predicate the overview uses, so a user
+   * who can't see an area never pulls its data into the browser at all. That's
+   * both the cheaper path and a genuine narrowing of exposure — computation-time
+   * gating alone would still ship the rows to the client.
+   */
+  const loadDashboardData = async (churchId: string, u: User) => {
+      const opts = {
+          isStarterPlan,
+          communicationEnabled: systemSettings?.enabledModules?.communication !== false,
+      };
+      const may = (area: DashboardArea) => canReadArea(u, area, opts);
+      const since30d = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const [convs, usage, campaigns, unsubs, oSessions, oSlots, gcSessions, gcSlots] = await Promise.all([
+          may('messaging') ? firestore.getSmsConversations(churchId)          : Promise.resolve([]),
+          // Admins also need usage for the Tenant Health band's quota figures.
+          may('messaging') || isAdmin(u) ? firestore.getSmsUsageRecords(churchId, since30d) : Promise.resolve([]),
+          may('email')     ? firestore.getEmailCampaigns(churchId)            : Promise.resolve([]),
+          may('email')     ? firestore.getEmailUnsubscribes(churchId)         : Promise.resolve([]),
+          may('outreach')  ? firestore.getOutreachSessions(churchId)          : Promise.resolve([]),
+          may('outreach')  ? firestore.getAllChurchOutreachSlots(churchId)    : Promise.resolve([]),
+          may('outreach')  ? firestore.getGroupCareSessions(churchId)         : Promise.resolve([]),
+          may('outreach')  ? firestore.getChurchGroupCareSlots(churchId)      : Promise.resolve([]),
+      ]);
+
+      setSmsConversations(convs);
+      setSmsUsage(usage);
+      setEmailCampaigns(campaigns);
+      setEmailUnsubscribes(unsubs);
+      setOutreachSessions(oSessions);
+      setOutreachSlots(oSlots);
+      setGroupCareSessions(gcSessions);
+      setGroupCareSlots(gcSlots);
   };
 
   const loadServicesData = async (churchId: string, filter: ServicesFilter) => {
@@ -559,84 +608,24 @@ const App: React.FC = () => {
   const isGrowthPlan  = church?.subscription?.status === 'active' && church?.subscription?.planId === 'growth';
 
 
-  const hasPermission = (v: string) => {
-      if (!user) return false;
-      
-      // ── Starter plan gate: pastor-ai overrides role (applies to everyone, including admins) ──
-      if (isStarterPlan && v === 'pastor-ai') return false;
-
-      // Check if module is enabled
-      if (v === 'communication' && systemSettings?.enabledModules?.communication === false) return false;
-
-      if (user.roles.includes('System Administration') || user.roles.includes('Church Admin')) return true;
-      if (v === 'dashboard') return true;
-      if (v === 'settings') return user.roles.includes('Church Admin');
-      if (v === 'pastoral') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-membership') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-community') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-calendar') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-reports') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastor-ai') return user.roles.includes('Pastor AI') || user.roles.includes('Pastor');
-
-      // ── Starter plan gate: block Calling (pastoral-contact), Polls, Workflows, Forms, Notes ──
-      // (SMS routes remain accessible so ToolsView can show the upgrade prompt)
-      if (isStarterPlan) {
-          if (v === 'pastoral-contact' || v === 'pastoral-group-care') return false;
-          if (v === 'tools-polls') return false;
-          if (v === 'tools-workflows') return false;
-          if (v === 'tools-forms') return false;
-          if (v === 'tools-notes') return false;
-          if (v === 'tools-bulletin') return false;
-      }
-      
-      // ── pastoral-contact role check (non-Starter) ──
-      if (v === 'pastoral-contact' || v === 'pastoral-group-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care') || user.roles.includes('Groups');
-      
-      const roleMap: Record<string, string> = {
-          'people': 'People',
-          'people-households': 'People',
-          'people-risk': 'People',
-          'people-reports': 'People',
-          'groups': 'Groups',
-          'groups-reports': 'Groups',
-          'services': 'Services',
-          'services-attendance': 'Services',
-          'services-teams': 'Services',
-          'services-plans': 'Services',
-          'services-reminders': 'Services',
-          'giving': 'Giving',
-          'giving-donor': 'Giving',
-          'giving-budgets': 'Giving',
-          'giving-donations': 'Giving',
-          'giving-reports': 'Giving',
-          'finance': 'Finance',
-          'metrics': 'Metrics',
-          'metrics-input': 'Metrics',
-          'metrics-settings': 'Metrics',
-          'messaging': 'Messaging',
-          'tools-sms': 'Messaging',
-          'tools-sms-inbox': 'Messaging',
-          'tools-sms-campaigns': 'Messaging',
-          'tools-sms-workflows': 'Messaging',
-          'tools-sms-keywords': 'Messaging',
-          'tools-sms-analytics': 'Messaging',
-          'tools-sms-agent': 'Messaging',
-          'tools-sms-permissions': 'Messaging',
-          'tools-emails': 'Email',
-          'tools-polls': 'Polls',
-          'tools-workflows': 'Workflows',
-          'tools-notes': 'Notes',
-          'tools-files': 'Files',
-          'tools-forms': 'People',
-      };
-      
-      if (v === 'tools') return true; 
-      if (v.startsWith('tools-') && !roleMap[v]) return true; // All other tools sub-pages: allow all church users
-
-      const requiredRole = roleMap[v];
-      return requiredRole ? user.roles.includes(requiredRole as any) : false;
+  /**
+   * Access options shared by the routing gate and the dashboard's read gate,
+   * so both resolve from the same plan and module state.
+   */
+  const accessOptions = {
+      isStarterPlan,
+      communicationEnabled: systemSettings?.enabledModules?.communication !== false,
   };
+
+  /** Can the current user navigate to this view? Drives routing and the sidebar. */
+  const hasPermission = (v: string) => hasModuleAccess(user, v, accessOptions);
+
+  /**
+   * Can the current user see a read-only dashboard summary of this area?
+   * Wider than `hasPermission` — it also grants Pastor, matching that role's
+   * "full read access to dashboards" description. Never used for routing.
+   */
+  const canRead = (area: DashboardArea) => canReadArea(user, area, accessOptions);
 
 
   const handleNavigate = (newView: string) => {
@@ -1118,6 +1107,8 @@ const App: React.FC = () => {
             people: visiblePeople, groups: visibleGroups, attendance: visibleAttendance, donations: visibleDonations, funds, budgets, teams: visibleTeams,
             recentRiskChanges: visibleRecentRiskChanges, recentStatusChanges: visibleRecentStatusChanges, servicesData: visibleServicesData, checkIns: visibleCheckIns,
             campuses, selectedCampusId, setSelectedCampusId: handleSelectCampus,
+            smsConversations, smsUsage, emailCampaigns, emailUnsubscribes,
+            outreachSessions, outreachSlots, groupCareSessions, groupCareSlots,
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData, setCheckIns
         }}>
@@ -1145,13 +1136,10 @@ const App: React.FC = () => {
             >
             <Routes>
                 <Route path="/" element={
-                    <DashboardPage 
-                        onUpdateWidgets={handleUpdateWidgets}
+                    <DashboardPage
                         onConnectPco={() => { setSettingsTab('Planning Center'); handleNavigate('settings'); }}
-                        allowedWidgetIds={safeEnabledWidgets}
                         globalInsights={globalInsights}
                         isGeneratingInsights={isGeneratingInsights}
-                        onUpdateTheme={handleUpdateUserTheme}
                         onGenerateInsights={handleGenerateAIInsights}
                         givingFilter={givingFilter}
                         givingDateRange={givingDateRange}
