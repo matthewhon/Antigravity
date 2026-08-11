@@ -103,6 +103,7 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                     style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
                 >
                     {series.map(s => {
+                        const isGiving = s.id === 'giving';
                         const windowedPoints = s.points.slice(-selectedOption.weeks);
                         const hasPoints = windowedPoints.length > 0;
                         const lastPoint = hasPoints ? windowedPoints[windowedPoints.length - 1] : null;
@@ -117,7 +118,11 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                         const pct = changeAcross(evalPoints);
 
                         const periodTotal = windowedPoints.reduce((sum, p) => sum + p.value, 0);
+                        const periodCount = windowedPoints.reduce((sum, p) => sum + (p.count || 0), 0);
                         const avgPerWeek = windowedPoints.length > 0 ? periodTotal / windowedPoints.length : 0;
+                        const avgGiftSize = periodCount > 0 ? Math.round(periodTotal / periodCount) : 0;
+
+                        const heroValue = isGiving ? Math.round(avgPerWeek) : displayPoint.value;
 
                         return (
                             <Card key={s.id} className="p-6 print:p-3 flex flex-col justify-between">
@@ -132,7 +137,12 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                                     </div>
                                     <div className="flex items-baseline gap-2 mt-2 mb-3">
                                         <p className="text-2xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white">
-                                            {fmtValue(displayPoint.value, s.isCurrency)}
+                                            {fmtValue(heroValue, s.isCurrency)}
+                                            {isGiving && (
+                                                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-sans ml-1">
+                                                    / wk
+                                                </span>
+                                            )}
                                         </p>
                                         {pct !== null && pct !== 0 && (
                                             <span
@@ -152,8 +162,17 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                                 <div>
                                     <Sparkline points={windowedPoints} slot={SERIES_SLOT[s.id] ?? 0} isCurrency={s.isCurrency} showEndDot height={56} />
                                     <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
-                                        <span>{isCurrentWeekEmpty ? 'latest completed week' : 'latest week'}</span>
-                                        <span>avg {fmtValue(Math.round(avgPerWeek), s.isCurrency)}/wk</span>
+                                        {isGiving ? (
+                                            <>
+                                                <span>Avg gift: {fmtValue(avgGiftSize, true)}</span>
+                                                <span>Latest wk: {fmtValue(displayPoint.value, true)}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>{isCurrentWeekEmpty ? 'latest completed week' : 'latest week'}</span>
+                                                <span>avg {fmtValue(Math.round(avgPerWeek), s.isCurrency)}/wk</span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </Card>

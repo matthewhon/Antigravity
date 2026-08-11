@@ -465,10 +465,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         }).sort((a, b) => b.totalGiven - a.totalGiven);
 
         // Chart data for buckets across funds
-        const chartData = buckets.map((bk: string) => {
+        const chartData = buckets.map((bk: any) => {
             const row: Record<string, any> = { bucket: getBucketLabel(bk, filters.interval) };
             fundData.forEach(f => {
-                row[f.fundName] = f.bucketTotals[bk] || 0;
+                row[f.fundName as string] = f.bucketTotals[bk as string] || 0;
             });
             return row;
         });

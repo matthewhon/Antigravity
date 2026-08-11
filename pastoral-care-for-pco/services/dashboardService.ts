@@ -79,7 +79,7 @@ export interface TrendSeries {
     id: string;
     label: string;
     /** Oldest → newest, one point per week. */
-    points: { weekStart: string; value: number }[];
+    points: { weekStart: string; value: number; count?: number }[];
     isCurrency?: boolean;
 }
 
@@ -190,25 +190,32 @@ const weekStartKey = (d: Date): string => {
 
 /** Buckets values into the last `weeks` calendar weeks, oldest → newest. */
 const weeklySeries = (
-    entries: { date: string | number; value: number }[],
+    entries: { date: string | number; value: number; count?: number }[],
     weeks: number,
     now: Date
-): { weekStart: string; value: number }[] => {
-    const buckets = new Map<string, number>();
+): { weekStart: string; value: number; count: number }[] => {
+    const buckets = new Map<string, { value: number; count: number }>();
     const keys: string[] = [];
     for (let i = weeks - 1; i >= 0; i--) {
         const d = new Date(now.getTime() - i * WEEK);
         const k = weekStartKey(d);
-        if (!buckets.has(k)) { buckets.set(k, 0); keys.push(k); }
+        if (!buckets.has(k)) { buckets.set(k, { value: 0, count: 0 }); keys.push(k); }
     }
     const earliest = keys[0];
     entries.forEach(e => {
         const key = dayKey(e.date);
         if (!key || key < earliest) return;
         const wk = weekStartKey(new Date(`${key}T12:00:00`));
-        if (buckets.has(wk)) buckets.set(wk, buckets.get(wk)! + e.value);
+        if (buckets.has(wk)) {
+            const b = buckets.get(wk)!;
+            b.value += e.value;
+            b.count += (e.count ?? 1);
+        }
     });
-    return keys.map(k => ({ weekStart: k, value: buckets.get(k) || 0 }));
+    return keys.map(k => {
+        const b = buckets.get(k) || { value: 0, count: 0 };
+        return { weekStart: k, value: b.value, count: b.count };
+    });
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -259,7 +266,7 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
     const attendanceSeries = weeklySeries(
         attendance.map(a => ({ date: a.date, value: a.count || 0 })), WEEKS, now);
     const givingSeries = weeklySeries(
-        donations.map(d => ({ date: d.date, value: d.amount || 0 })), WEEKS, now);
+        donations.map(d => ({ date: d.date, value: d.amount || 0, count: 1 })), WEEKS, now);
     const newPeopleSeries = weeklySeries(
         people.map(p => ({ date: p.createdAt, value: 1 })), WEEKS, now);
     const groupAttendanceSeries = weeklySeries(
