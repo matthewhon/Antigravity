@@ -1,11 +1,16 @@
 
-import React, { useMemo, useState } from 'react';
-import { ServicesDashboardData, DetailedDonation } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ServicesDashboardData, DetailedDonation, PcoRegistrationEvent } from '../types';
+import { firestore } from '../services/firestoreService';
 
 interface ServicesTimelineWidgetProps {
     servicesData: ServicesDashboardData | null;
     /** All raw donations (unfiltered) — used to build per-batch giving totals */
     donations: DetailedDonation[];
+    /** Synced PCO Registrations & Calendar events */
+    registrationEvents?: PcoRegistrationEvent[];
+    /** Church ID for auto-fetching registrations from Firestore if not provided */
+    churchId?: string;
     /**
      * Composite role gate. Services and dates are open to every user, but giving
      * batches are not — when false the day cells render without their BatchCards
@@ -31,6 +36,20 @@ interface BatchEntry {
     fundBreakdown: FundEntry[]; // sorted by amount desc
 }
 
+export interface EventEntry {
+    id: string;
+    name: string;
+    type: 'registration' | 'calendar';
+    startsAt?: string | null;
+    endsAt?: string | null;
+    signupCount?: number;
+    signupLimit?: number | null;
+    campusName?: string | null;
+    publicUrl?: string | null;
+    description?: string | null;
+    isUpcoming?: boolean;
+}
+
 interface DayEntry {
     /** Calendar date key — used purely for aligning with service plans */
     dateKey: string;
@@ -42,12 +61,16 @@ interface DayEntry {
         name: string;
         time: string;
         volunteersScheduled: number;
+        isUpcoming?: boolean;
     }[];
+    events: EventEntry[];
     totalHeadcount: number;
     /** Batches that fall on this calendar date */
     batches: BatchEntry[];
     isGivingOnly: boolean;
     isToday: boolean;
+    isUpcoming: boolean;
+    relativeLabel?: string | null;
 }
 
 /** Formats a Date to local YYYY-MM-DD without UTC-midnight shift */
@@ -58,8 +81,64 @@ const toLocalDateKey = (d: Date): string => {
     return `${y}-${m}-${day}`;
 };
 
+/** Finds the Sunday date key (YYYY-MM-DD) for a given date string */
+const getSundayForDateKey = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    const dayOfWeek = d.getDay(); // 0 = Sunday
+    if (dayOfWeek === 0) return dateStr;
+    const daysUntilSunday = 7 - dayOfWeek;
+    const sunday = new Date(d.getTime() + daysUntilSunday * 24 * 60 * 60 * 1000);
+    return toLocalDateKey(sunday);
+};
+
 const fmtAmt = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+/** Registration / Calendar Event card */
+const EventCard: React.FC<{ event: EventEntry }> = ({ event }) => {
+    return (
+        <div className="rounded-xl border border-purple-100 dark:border-purple-800/40 bg-purple-50/70 dark:bg-purple-900/10 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs">🎟️</span>
+                    <span className="text-xs font-bold text-purple-900 dark:text-purple-300 truncate">
+                        {event.name}
+                    </span>
+                </div>
+                {event.startsAt && (
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 shrink-0 font-mono">
+                        {new Date(event.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {event.campusName && (
+                        <span className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-semibold text-[9px]">
+                            {event.campusName}
+                        </span>
+                    )}
+                    <span className="font-semibold text-purple-800 dark:text-purple-300">
+                        {event.signupCount || 0} registered
+                        {event.signupLimit ? ` / ${event.signupLimit} max` : ''}
+                    </span>
+                </div>
+                {event.publicUrl && (
+                    <a
+                        href={event.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 font-bold underline"
+                    >
+                        View Event →
+                    </a>
+                )}
+            </div>
+        </div>
+    );
+};
 
 /** Batch card — always shows fund breakdown inline */
 const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ batch }) => {
@@ -118,21 +197,45 @@ const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ bat
 export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
     servicesData,
     donations,
+    registrationEvents,
+    churchId: propChurchId,
     showGiving = true,
     onRemove,
 }) => {
+    const [fetchedEvents, setFetchedEvents] = useState<PcoRegistrationEvent[]>([]);
+    const [rollupToSundays, setRollupToSundays] = useState<boolean>(true);
+
+    useEffect(() => {
+        if (registrationEvents && registrationEvents.length > 0) {
+            setFetchedEvents(registrationEvents);
+            return;
+        }
+        const cId = propChurchId || donations[0]?.churchId || localStorage.getItem('currentChurchId') || localStorage.getItem('churchId');
+        if (cId) {
+            firestore.getRegistrations(cId).then(events => {
+                if (events && events.length > 0) {
+                    setFetchedEvents(events);
+                }
+            }).catch(() => {});
+        }
+    }, [donations, propChurchId, registrationEvents]);
+
     // Drop giving before any batch grouping runs, so no amount reaches the DOM
     // for a user without the role.
     const visibleDonations = showGiving ? donations : [];
+    const allEvents = registrationEvents && registrationEvents.length > 0 ? registrationEvents : fetchedEvents;
+
     const days = useMemo<DayEntry[]>(() => {
         const now = new Date();
         const todayKey = toLocalDateKey(now);
 
-        // ── 1. Group donations by PCO batch ──────────────────────────────────────
-        // Priority:
-        //   1. batchId  — use the PCO Giving batch ID (populated after next sync)
-        //   2. paymentSource — group by payment method per date (Check / Online / Cash …)
-        //      This gives meaningful separate cards even before batchId is populated.
+        const upcomingLimitDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const upcomingLimitKey = toLocalDateKey(upcomingLimitDate);
+
+        const pastLimitDate = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000);
+        const pastLimitKey = toLocalDateKey(pastLimitDate);
+
+        // ── 1. Group donations by PCO batch or Sunday Rollup ─────────────────────
         const batchMap: Record<string, {
             batchName: string;
             date: string;
@@ -141,52 +244,44 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         }> = {};
 
         visibleDonations.forEach(d => {
-            const dateKey = (d.date || '').slice(0, 10);
-            if (dateKey.length !== 10 || dateKey > todayKey) return;
+            const rawDateKey = (d.date || '').slice(0, 10);
+            if (rawDateKey.length !== 10) return;
+
+            const targetDateKey = rollupToSundays ? getSundayForDateKey(rawDateKey) : rawDateKey;
+            if (targetDateKey > upcomingLimitKey || targetDateKey < pastLimitKey) return;
 
             let batchKey: string;
             let batchName: string;
 
-            if (d.batchId) {
-                // Real PCO batch — use batch ID as the key
+            if (rollupToSundays) {
+                batchKey = `sunday_rollup_${targetDateKey}`;
+                batchName = `Weekly Offering (${targetDateKey})`;
+            } else if (d.batchId) {
                 batchKey = `batch_${d.batchId}`;
                 batchName = d.batchName || `Batch ${d.batchId}`;
             } else {
-                // No batch ID yet — group by paymentSource per date so we get
-                // separate cards for "Check", "Online", "Cash", etc.
                 const src = (d.paymentSource || 'Unknown').trim();
-                batchKey = `date_${dateKey}_src_${src}`;
+                batchKey = `date_${targetDateKey}_src_${src}`;
                 batchName = src;
             }
 
             if (!batchMap[batchKey]) {
                 batchMap[batchKey] = {
                     batchName,
-                    date: dateKey,
+                    date: targetDateKey,
                     funds: {},
                     totalAmount: 0,
                 };
             }
 
             const entry = batchMap[batchKey];
-
-            // Keep the earliest date in case donations span multiple days (rare)
-            if (dateKey < entry.date) entry.date = dateKey;
-
-            // Prefer a real batchName once we have one
-            if (d.batchId && d.batchName && !entry.batchName.startsWith('Batch ')) {
-                entry.batchName = d.batchName;
-            }
-
             entry.totalAmount += d.amount;
-
             const fundName = d.fundName || 'General';
             if (!entry.funds[fundName]) entry.funds[fundName] = { amount: 0, donorCount: 0 };
             entry.funds[fundName].amount += d.amount;
             entry.funds[fundName].donorCount += 1;
         });
 
-        // Convert batchMap → BatchEntry[], grouped by date
         const batchesByDate: Record<string, BatchEntry[]> = {};
         Object.entries(batchMap).forEach(([batchKey, v]) => {
             const be: BatchEntry = {
@@ -202,7 +297,6 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             batchesByDate[v.date].push(be);
         });
 
-        // Sort batches within each date by totalAmount desc
         Object.values(batchesByDate).forEach(arr =>
             arr.sort((a, b) => b.totalAmount - a.totalAmount)
         );
@@ -223,17 +317,26 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             headcountByDate[key] = (headcountByDate[key] || 0) + total;
         });
 
-        // ── 3. Group past service plans by calendar date ─────────────────────────
+        // ── 3. Group Service Plans (Past + Future) by date ───────────────────────
         const plansByDate: Record<string, DayEntry['services']> = {};
+        const combinedPlans = [
+            ...(servicesData?.futurePlans || []),
+            ...(servicesData?.recentPlans || []),
+            ...(servicesData?.plans || []),
+        ];
+        const seenPlanIds = new Set<string>();
 
-        (servicesData?.recentPlans || []).forEach(plan => {
+        combinedPlans.forEach(plan => {
+            if (!plan || !plan.id || seenPlanIds.has(plan.id)) return;
+            seenPlanIds.add(plan.id);
+
             const planDate =
                 plan.planTimes && plan.planTimes.length > 0
                     ? new Date(plan.planTimes[0].startsAt)
                     : new Date(plan.sortDate);
 
             const key = toLocalDateKey(planDate);
-            if (key > todayKey) return;
+            if (key < pastLimitKey || key > upcomingLimitKey) return;
 
             if (!plansByDate[key]) plansByDate[key] = [];
 
@@ -256,26 +359,64 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 name: plan.serviceTypeName || plan.seriesTitle || 'Service',
                 time: timeStr,
                 volunteersScheduled: volunteers,
+                isUpcoming: key > todayKey,
             });
         });
 
-        // ── 4. Merge all dates from plans + batches ──────────────────────────────
-        const allDateKeys = new Set<string>([
+        // ── 4. Group Registration & Calendar Events by date ──────────────────────
+        const eventsByDate: Record<string, EventEntry[]> = {};
+        allEvents.forEach(ev => {
+            if (!ev) return;
+            const dateStr = ev.startsAt || ev.openAt || '';
+            if (!dateStr) return;
+            const evDate = new Date(dateStr);
+            if (isNaN(evDate.getTime())) return;
+
+            const key = toLocalDateKey(evDate);
+            if (key < pastLimitKey || key > upcomingLimitKey) return;
+
+            if (!eventsByDate[key]) eventsByDate[key] = [];
+
+            eventsByDate[key].push({
+                id: ev.id || ev.pcoId,
+                name: ev.name || 'Registration Event',
+                type: 'registration',
+                startsAt: ev.startsAt,
+                endsAt: ev.endsAt,
+                signupCount: ev.signupCount || ev.totalAttendees || 0,
+                signupLimit: ev.signupLimit,
+                campusName: ev.campusName,
+                publicUrl: ev.publicUrl,
+                description: ev.description,
+                isUpcoming: key > todayKey,
+            });
+        });
+
+        // ── 5. Merge all dates from plans + batches + events ─────────────────────
+        const allDateKeys = Array.from(new Set<string>([
             ...Object.keys(plansByDate),
             ...Object.keys(batchesByDate),
-        ]);
+            ...Object.keys(eventsByDate),
+            todayKey,
+        ])).sort().reverse();
 
-        // ── 5. 15 most-recent past days, newest first ────────────────────────────
-        const recentKeys = Array.from(allDateKeys)
-            .filter(k => k <= todayKey)
-            .sort()
-            .reverse()
-            .slice(0, 15);
-
-        return recentKeys.map(key => {
+        return allDateKeys.map(key => {
             const d = new Date(key + 'T12:00:00');
             const services = plansByDate[key] || [];
             const batches = batchesByDate[key] || [];
+            const events = eventsByDate[key] || [];
+            const isUpcoming = key > todayKey;
+            const isToday = key === todayKey;
+
+            let relativeLabel: string | null = null;
+            if (isToday) {
+                relativeLabel = 'TODAY';
+            } else {
+                const todayObj = new Date(todayKey + 'T12:00:00');
+                const diffDays = Math.round((d.getTime() - todayObj.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) relativeLabel = 'Tomorrow';
+                else if (diffDays > 1 && diffDays <= 7) relativeLabel = `In ${diffDays} days (${d.toLocaleDateString(undefined, { weekday: 'short' })})`;
+            }
 
             return {
                 dateKey: key,
@@ -283,15 +424,18 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 dayNum: String(d.getDate()),
                 monthAbbr: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
                 services,
+                events,
                 totalHeadcount: headcountByDate[key] || 0,
                 batches,
-                isGivingOnly: services.length === 0,
-                isToday: key === todayKey,
+                isGivingOnly: services.length === 0 && events.length === 0,
+                isToday,
+                isUpcoming,
+                relativeLabel,
             };
         });
-    }, [servicesData, visibleDonations]);
+    }, [servicesData, visibleDonations, allEvents, rollupToSundays]);
 
-    const isEmpty = days.length === 0;
+    const isEmpty = days.length === 0 || days.every(d => d.services.length === 0 && d.events.length === 0 && d.batches.length === 0);
 
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col group relative overflow-hidden">
@@ -310,140 +454,192 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             <div className="absolute -right-12 -top-12 w-48 h-48 bg-indigo-50/40 dark:bg-indigo-900/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between mb-5">
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-5">
                 <div>
                     <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">
                         Church Timeline
                     </h4>
-                    <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-wide mt-0.5">
-                        Last 15 Days · Services &amp; Giving Batches · Most Recent First
+                    <p className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wide mt-0.5">
+                        Next 7 Days &amp; Past Activity · Services, Events &amp; Giving
                     </p>
                 </div>
-                <span className="text-lg">🗓️</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setRollupToSundays(prev => !prev)}
+                        className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all border ${
+                            rollupToSundays
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                        }`}
+                        title="Toggle between Sunday weekly rollups and exact donation dates"
+                    >
+                        {rollupToSundays ? '📅 Sunday Giving Rollup' : '📅 Exact Donation Dates'}
+                    </button>
+                    <span className="text-lg">🗓️</span>
+                </div>
             </div>
 
             {isEmpty ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
                     <div className="text-4xl mb-3 grayscale opacity-20">📅</div>
-                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Recent Activity</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[160px]">
-                        Sync Planning Center services and giving to populate this timeline.
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Timeline Events</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[180px]">
+                        Sync Planning Center services, registrations, and giving to populate this timeline.
                     </p>
                 </div>
             ) : (
-                <div className="relative z-10 flex-1">
+                <div className="relative z-10 flex-1 max-h-[600px] overflow-y-auto pr-1 space-y-4">
                     {/* Spine */}
-                    <div className="absolute left-[22px] top-3 bottom-3 w-0.5 bg-gradient-to-b from-indigo-400 via-violet-300 to-indigo-100 dark:from-indigo-600 dark:via-violet-700/60 dark:to-indigo-900/20 rounded-full" />
+                    <div className="absolute left-[22px] top-3 bottom-3 w-0.5 bg-gradient-to-b from-purple-400 via-indigo-400 to-slate-200 dark:from-purple-600 dark:via-indigo-600 dark:to-slate-800 rounded-full pointer-events-none" />
 
                     <div className="space-y-4">
-                        {days.map((day, idx) => {
-                            const isFirst = idx === 0;
+                        {days.map((day) => {
                             const hasBatches = day.batches.length > 0;
-                            const dotCls = isFirst
-                                ? 'bg-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-800 shadow shadow-indigo-300 dark:shadow-indigo-700'
-                                : day.isGivingOnly
-                                    ? 'bg-emerald-400 dark:bg-emerald-600'
-                                    : 'bg-slate-300 dark:bg-slate-600';
+                            const hasEvents = day.events.length > 0;
+                            const hasServices = day.services.length > 0;
+
+                            if (!hasBatches && !hasEvents && !hasServices && !day.isToday) return null;
+
+                            const dotCls = day.isToday
+                                ? 'bg-indigo-600 ring-4 ring-indigo-200 dark:ring-indigo-800 shadow shadow-indigo-400 z-20'
+                                : day.isUpcoming
+                                    ? 'bg-purple-500 ring-2 ring-purple-200 dark:ring-purple-900'
+                                    : day.isGivingOnly
+                                        ? 'bg-emerald-400 dark:bg-emerald-600'
+                                        : 'bg-slate-300 dark:bg-slate-600';
 
                             return (
-                                <div key={day.dateKey} className="flex items-start gap-4">
-                                    {/* Dot */}
-                                    <div className="shrink-0">
-                                        <div className={`w-[11px] h-[11px] rounded-full mt-2 border-2 border-white dark:border-slate-800 z-10 relative ${dotCls}`} />
-                                    </div>
+                                <React.Fragment key={day.dateKey}>
+                                    {/* Today divider pin */}
+                                    {day.isToday && (
+                                        <div className="flex items-center gap-3 my-2 pl-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
+                                                📍 TODAY — {day.monthAbbr} {day.dayNum}
+                                            </span>
+                                            <div className="h-px bg-indigo-200 dark:bg-indigo-800/60 flex-1" />
+                                        </div>
+                                    )}
 
-                                    {/* Date badge */}
-                                    <div className={`shrink-0 w-10 flex flex-col items-center rounded-xl py-1 border ${
-                                        isFirst
-                                            ? 'bg-indigo-500 border-indigo-500'
-                                            : day.isGivingOnly
-                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
-                                                : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/40'
-                                    }`}>
-                                        <span className={`text-[7px] font-black uppercase tracking-wide ${
-                                            isFirst ? 'text-indigo-200' : day.isGivingOnly ? 'text-emerald-500' : 'text-rose-500'
+                                    <div className="flex items-start gap-4">
+                                        {/* Dot */}
+                                        <div className="shrink-0">
+                                            <div className={`w-[11px] h-[11px] rounded-full mt-2 border-2 border-white dark:border-slate-800 z-10 relative ${dotCls}`} />
+                                        </div>
+
+                                        {/* Date badge */}
+                                        <div className={`shrink-0 w-10 flex flex-col items-center rounded-xl py-1 border ${
+                                            day.isToday
+                                                ? 'bg-indigo-600 border-indigo-600'
+                                                : day.isUpcoming
+                                                    ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/40'
+                                                    : day.isGivingOnly
+                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
+                                                        : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/40'
                                         }`}>
-                                            {day.monthAbbr}
-                                        </span>
-                                        <span className={`text-base font-black leading-none ${isFirst ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                                            {day.dayNum}
-                                        </span>
-                                        <span className={`text-[7px] font-bold uppercase ${isFirst ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            {day.dayOfWeek}
-                                        </span>
-                                    </div>
+                                            <span className={`text-[7px] font-black uppercase tracking-wide ${
+                                                day.isToday ? 'text-indigo-200' : day.isUpcoming ? 'text-purple-600 dark:text-purple-400' : day.isGivingOnly ? 'text-emerald-500' : 'text-rose-500'
+                                            }`}>
+                                                {day.monthAbbr}
+                                            </span>
+                                            <span className={`text-base font-black leading-none ${day.isToday ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                                {day.dayNum}
+                                            </span>
+                                            <span className={`text-[7px] font-bold uppercase ${day.isToday ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                {day.dayOfWeek}
+                                            </span>
+                                        </div>
 
-                                    {/* Card */}
-                                    <div className={`flex-1 min-w-0 rounded-2xl border p-3 transition-all ${
-                                        isFirst
-                                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                            : day.isGivingOnly
-                                                ? 'bg-emerald-50/60 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
-                                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
-                                    }`}>
-                                        {/* Service rows */}
-                                        {!day.isGivingOnly && (
-                                            <div className="space-y-1 mb-2.5">
-                                                {day.services.map(svc => (
-                                                    <div key={svc.id} className="flex items-center justify-between gap-2">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                                                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">
-                                                                {svc.name}
-                                                            </span>
+                                        {/* Card */}
+                                        <div className={`flex-1 min-w-0 rounded-2xl border p-3 transition-all space-y-3 ${
+                                            day.isToday
+                                                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/80 shadow-xs'
+                                                : day.isUpcoming
+                                                    ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30'
+                                                    : day.isGivingOnly
+                                                        ? 'bg-emerald-50/60 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
+                                                        : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
+                                        }`}>
+                                            {/* Relative timing badge */}
+                                            {day.relativeLabel && !day.isToday && (
+                                                <div className="flex items-center justify-between border-b border-purple-100 dark:border-purple-900/30 pb-1.5">
+                                                    <span className="text-[9px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded-md">
+                                                        UPCOMING · {day.relativeLabel}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* Registration / Calendar Events */}
+                                            {hasEvents && (
+                                                <div className="space-y-2">
+                                                    {day.events.map(ev => (
+                                                        <EventCard key={ev.id} event={ev} />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Service rows */}
+                                            {hasServices && (
+                                                <div className="space-y-1.5">
+                                                    {day.services.map(svc => (
+                                                        <div key={svc.id} className="flex items-center justify-between gap-2 bg-white/60 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <span className="text-xs">⛪</span>
+                                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                                                    {svc.name}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 font-mono text-[10px]">
+                                                                {svc.time && (
+                                                                    <span className="text-slate-400 font-medium whitespace-nowrap">
+                                                                        {svc.time}
+                                                                    </span>
+                                                                )}
+                                                                {svc.volunteersScheduled > 0 && (
+                                                                    <span className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-black">
+                                                                        🙋 {svc.volunteersScheduled}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        {svc.time && (
-                                                            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-                                                                {svc.time}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                                    ))}
+                                                </div>
+                                            )}
 
-                                        {/* Headcount + volunteer stat pills */}
-                                        {!day.isGivingOnly && (
-                                            <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                                                {day.totalHeadcount > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[11px]">
-                                                        <span>👥</span>
-                                                        <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
-                                                        <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[11px] text-slate-400">
-                                                        <span>👥</span>
-                                                        <span>No headcount</span>
-                                                    </span>
-                                                )}
-                                                {(() => {
-                                                    const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
-                                                    return v > 0 ? (
-                                                        <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[11px]">
-                                                            <span>🙋</span>
-                                                            <span className="font-black text-amber-700 dark:text-amber-400">{v}</span>
-                                                            <span className="text-amber-400 dark:text-amber-500 font-medium">volunteers</span>
+                                            {/* Past Headcount + volunteer stat pills */}
+                                            {!day.isUpcoming && hasServices && (
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {day.totalHeadcount > 0 ? (
+                                                        <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[11px]">
+                                                            <span>👥</span>
+                                                            <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
+                                                            <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
                                                         </span>
-                                                    ) : null;
-                                                })()}
-                                            </div>
-                                        )}
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[11px] text-slate-400">
+                                                            <span>👥</span>
+                                                            <span>No headcount</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
 
-                                        {/* Giving batches — one card per batch */}
-                                        {hasBatches && (
-                                            <div className="space-y-1.5">
-                                                {day.batches.map(batch => (
-                                                    <BatchCard
-                                                        key={batch.batchKey}
-                                                        batch={batch}
-                                                        isServiceDay={!day.isGivingOnly}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
+                                            {/* Giving batches — one card per batch */}
+                                            {hasBatches && (
+                                                <div className="space-y-1.5">
+                                                    {day.batches.map(batch => (
+                                                        <BatchCard
+                                                            key={batch.batchKey}
+                                                            batch={batch}
+                                                            isServiceDay={hasServices}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </React.Fragment>
                             );
                         })}
                     </div>
@@ -453,10 +649,10 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             {/* Legend */}
             {!isEmpty && (
                 <div className="relative z-10 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-400" /> Headcount</span>
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Giving</span>
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Volunteers</span>
-                    <span className="ml-auto text-indigo-400">PCO Services + Giving</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500" /> 🎟️ Events</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> ⛪ Services</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 💰 Giving</span>
+                    <span className="ml-auto text-indigo-400">Planning Center Registrations + Services</span>
                 </div>
             )}
         </div>
