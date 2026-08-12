@@ -2260,11 +2260,11 @@ const SmsInbox: React.FC<{
         setLoadingMsgs(true);
         const q = query(
             collection(firebaseDb, 'smsConversations', activeConv.id, 'messages'),
-            orderBy('createdAt', 'asc'),
+            orderBy('createdAt', 'desc'),
             limit(100)
         );
         const unsub = onSnapshot(q, snap => {
-            setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsMessage)));
+            setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsMessage)).reverse());
             setLoadingMsgs(false);
         });
         // Mark as read
