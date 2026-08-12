@@ -253,7 +253,6 @@ export const reconcileSmsConversations = async (churchId: string): Promise<void>
 
         const convSnap = await db.collection('smsConversations')
             .where('churchId', '==', churchId)
-            .where('personId', '!=', null)
             .get();
 
         if (convSnap.empty) {
@@ -347,18 +346,20 @@ export const reconcileSmsConversations = async (churchId: string): Promise<void>
                     );
                 }
             } else {
-                batch.update(convDoc.ref, {
-                    personId:     null,
-                    personName:   null,
-                    personAvatar: null,
-                });
-                batchSize++;
-                clearedCount++;
-                logger.info(
-                    `SMS reconcile: cleared stale person link on conversation ${convDoc.id} ` +
-                    `(phone ${phone} no longer matched to any PCO person)`,
-                    'sync', { churchId, convId: convDoc.id }, churchId
-                );
+                if (conv.personId !== null || conv.personName !== null || conv.personAvatar !== null) {
+                    batch.update(convDoc.ref, {
+                        personId:     null,
+                        personName:   null,
+                        personAvatar: null,
+                    });
+                    batchSize++;
+                    clearedCount++;
+                    logger.info(
+                        `SMS reconcile: cleared stale person link on conversation ${convDoc.id} ` +
+                        `(phone ${phone} no longer matched to any PCO person)`,
+                        'sync', { churchId, convId: convDoc.id }, churchId
+                    );
+                }
             }
 
             if (batchSize >= MAX_BATCH) await flush();
