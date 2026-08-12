@@ -123,7 +123,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
         date:       now.toISOString().split('T')[0],
         type:       noteType,
         content:    noteContent.trim(),
-        followUpDate: noteFollowUp || undefined,
+        followUpDate: noteFollowUp || null,
         isCompleted: false,
         tags: [],
       } as any;
