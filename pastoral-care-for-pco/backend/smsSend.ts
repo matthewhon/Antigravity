@@ -336,8 +336,9 @@ export async function sendIndividualInternal(params: {
     personId?: string | null;
     /** Display name of the recipient (used in the PCO note body). */
     personName?: string | null;
+    preventIdentityOverwrite?: boolean;
 }) {
-    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId, attachVcard, personId, personName } = params;
+    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId, attachVcard, personId, personName, preventIdentityOverwrite } = params;
 
     const to = normaliseE164(toPhone);
 
@@ -472,9 +473,14 @@ export async function sendIndividualInternal(params: {
         convPatch.inboxId       = resolvedNumberId;
         convPatch.toPhoneNumber = fromNumber;
     }
-    if (resolvedPersonId) convPatch.personId = resolvedPersonId;
-    if (resolvedPersonName) convPatch.personName = resolvedPersonName;
-    if (resolvedPersonAvatar) convPatch.personAvatar = resolvedPersonAvatar;
+    const convSnap = await convRef.get();
+    const existingData = convSnap.data() || {};
+    
+    if (!preventIdentityOverwrite) {
+        if (resolvedPersonId && !existingData.personId) convPatch.personId = resolvedPersonId;
+        if (resolvedPersonName && !existingData.personName) convPatch.personName = resolvedPersonName;
+        if (resolvedPersonAvatar && !existingData.personAvatar) convPatch.personAvatar = resolvedPersonAvatar;
+    }
 
     await convRef.set(convPatch, { merge: true });
 
@@ -568,11 +574,12 @@ export async function sendBulkInternal(params: {
     /** Legacy alias — still accepted */
     twilioNumberId?: string | null;
     attachVcard?:  boolean;
+    preventIdentityOverwrite?: boolean;
 }): Promise<{ sent: number; failed: number; optedOut: number; skipped: number; errors: { phone: string; error: string }[] }> {
     const {
         db, churchId, campaignId, phones, body,
         mediaUrls = [], sentBy, sentByName, personMap = {},
-        smsNumberId, twilioNumberId, attachVcard,
+        smsNumberId, twilioNumberId, attachVcard, preventIdentityOverwrite
     } = params as any;
 
     const log    = createServerLogger(db);
@@ -691,10 +698,13 @@ export async function sendBulkInternal(params: {
                     convPatch.inboxId = numberId;
                     convPatch.toPhoneNumber = fromNumber;
                 }
-                if (pInfo) {
-                    if (pInfo.pcoPersonId) convPatch.personId = pInfo.pcoPersonId;
-                    if (pInfo.personName) convPatch.personName = pInfo.personName;
-                    if (pInfo.avatar) convPatch.personAvatar = pInfo.avatar;
+                const convSnap = await convRef.get();
+                const existingData = convSnap.exists ? convSnap.data() || {} : {};
+
+                if (pInfo && !preventIdentityOverwrite) {
+                    if (pInfo.pcoPersonId && !existingData.personId) convPatch.personId = pInfo.pcoPersonId;
+                    if (pInfo.personName && !existingData.personName) convPatch.personName = pInfo.personName;
+                    if (pInfo.avatar && !existingData.personAvatar) convPatch.personAvatar = pInfo.avatar;
                 }
 
                 await convRef.set(convPatch, { merge: true });

@@ -856,6 +856,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                             mediaUrls:      step.mediaUrls || [],
                             personMap:      pMap,
                             twilioNumberId: wf.twilioNumberId || null,
+                            preventIdentityOverwrite: true,
                         });
                         log.info(`[WorkflowExecutor] Sent staff_sms to ${staffPhones.length} staff members`, 'system', { enrollId }, churchId);
                     } else {

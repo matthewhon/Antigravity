@@ -270,11 +270,36 @@ export const reconcileSmsConversations = async (churchId: string): Promise<void>
         for (const doc of peopleSnap.docs) {
             const p = doc.data();
             if (p.e164Phone) {
-                phoneMap.set(p.e164Phone, {
-                    personId: p.id,
-                    personName: p.name || '',
-                    personAvatar: p.avatar || null,
-                });
+                const existing = phoneMap.get(p.e164Phone);
+                if (existing) {
+                    let newName = '';
+                    const name1 = existing.personName;
+                    const name2 = p.name || '';
+                    if (name1 && name2) {
+                        const parts1 = name1.split(' ');
+                        const parts2 = name2.split(' ');
+                        const last1 = parts1.length > 1 ? parts1[parts1.length - 1] : '';
+                        const last2 = parts2.length > 1 ? parts2[parts2.length - 1] : '';
+                        
+                        if (last1 && last1 === last2) {
+                            const first1 = parts1.slice(0, -1).join(' ');
+                            const first2 = parts2.slice(0, -1).join(' ');
+                            newName = `${first1} & ${first2} ${last1}`;
+                        } else {
+                            newName = `${name1} & ${name2}`;
+                        }
+                    } else {
+                        newName = name1 || name2;
+                    }
+                    existing.personName = newName;
+                    // Keep the first personId and personAvatar
+                } else {
+                    phoneMap.set(p.e164Phone, {
+                        personId: p.id,
+                        personName: p.name || '',
+                        personAvatar: p.avatar || null,
+                    });
+                }
             }
         }
 
