@@ -2033,9 +2033,18 @@ const SmsInbox: React.FC<{
     isDefaultNumber?: boolean;
     allowedNumberIds?: string[];
     defaultNumberId?: string | null;
-}> = ({ churchId, currentUser, church, activeNumber, twilioNumberId, isDefaultNumber, allowedNumberIds = [], defaultNumberId = null }) => {
+    /** When set, auto-opens this conversation (from a push notification deep-link). */
+    deepLinkConversationId?: string | null;
+    /** Called once the deep-link conversation has been opened so the ID can be cleared. */
+    onDeepLinkConversationOpened?: () => void;
+}> = ({ churchId, currentUser, church, activeNumber, twilioNumberId, isDefaultNumber, allowedNumberIds = [], defaultNumberId = null, deepLinkConversationId, onDeepLinkConversationOpened }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [activeConv, setActiveConv] = useState<SmsConversation | null>(null);
+    // Mirror activeConv in a ref so the Firestore snapshot callback (closure) can
+    // read its latest value without a stale closure — used to guard the deep-link
+    // auto-open so it only fires once.
+    const activeConvRef = useRef<SmsConversation | null>(null);
+    useEffect(() => { activeConvRef.current = activeConv; }, [activeConv]);
     const [messages, setMessages] = useState<SmsMessage[]>([]);
     const [replyBody, setReplyBody] = useState('');
     const [showReplyEmojis, setShowReplyEmojis] = useState(false);
@@ -2143,10 +2152,21 @@ const SmsInbox: React.FC<{
 
                 return true;
             });
-            setConversations(filtered);
+        setConversations(filtered);
+
+            // Auto-open the conversation referenced by a push notification deep-link.
+            // We do this inside the snapshot callback so it runs once the list is
+            // populated — even when the app cold-starts from a tapped notification.
+            if (deepLinkConversationId && !activeConvRef.current) {
+                const target = filtered.find(c => c.id === deepLinkConversationId);
+                if (target) {
+                    setActiveConv(target);
+                    onDeepLinkConversationOpened?.();
+                }
+            }
         });
         return unsub;
-    }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles, limitCount]);
+    }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles, limitCount, deepLinkConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Search all conversations (including non-recent ones) by querying the people collection and fetching matches
     useEffect(() => {
@@ -8996,9 +9016,13 @@ interface MessagingModuleProps {
     hideNumberSelector?: boolean;
     activeNumberId?: string | null;
     onActiveNumberIdChange?: (id: string | null) => void;
+    /** Conversation ID to auto-open when arriving via a push notification deep-link. */
+    deepLinkConversationId?: string | null;
+    /** Called by SmsInbox once it has acted on the deep-link so the parent can clear it. */
+    onDeepLinkConversationOpened?: () => void;
 }
 
-const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange }) => {
+const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange, deepLinkConversationId, onDeepLinkConversationOpened }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
@@ -9478,6 +9502,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 isDefaultNumber={activeNumber?.isDefault ?? false}
                                 allowedNumberIds={visibleNumbers.map(n => n.id)}
                                 defaultNumberId={twilioNumbers.find(n => n.isDefault)?.id}
+                                deepLinkConversationId={deepLinkConversationId}
+                                onDeepLinkConversationOpened={onDeepLinkConversationOpened}
                             />
                         )}
                     </div>

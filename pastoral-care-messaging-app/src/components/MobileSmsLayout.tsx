@@ -184,10 +184,19 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     onSyncPeople,
     isSyncing = false,
 }) => {
-    // ── Deep-link: read tab and number from URL query params ──────────────────
-    const params   = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab') as SmsTab | null;
-    const numParam = params.get('numberId');
+    // ── Deep-link: parse tab/numberId/conversationId from the hash fragment ───
+    // HashRouter stores params *inside* the hash (e.g. `#/?tab=inbox&numberId=...`)
+    // so window.location.search is always empty on the native iOS build.
+    // We must parse the query string that lives after the `?` inside the hash.
+    function readHashParams() {
+        const hash = window.location.hash; // e.g. "#/?tab=inbox&numberId=abc"
+        const qIdx = hash.indexOf('?');
+        return new URLSearchParams(qIdx >= 0 ? hash.slice(qIdx + 1) : '');
+    }
+    const initialParams  = readHashParams();
+    const tabParam       = initialParams.get('tab') as SmsTab | null;
+    const numParam       = initialParams.get('numberId');
+    const convParam      = initialParams.get('conversationId');
 
     // ── Tab state ─────────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<SmsTab>(() => {
@@ -196,7 +205,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     });
 
     const [pressedTab, setPressedTab] = useState<SmsTab | null>(null);
-    
+
+    // ── Deep-link conversation ID (from notification tap) ─────────────────────
+    // Passed down to MessagingModule so SmsInbox can auto-open the right thread.
+    const [deepLinkConversationId, setDeepLinkConversationId] = useState<string | null>(convParam);
+
     // Responsive states
     const [isTablet, setIsTablet] = useState(() => window.innerWidth >= 640);
     const [showEmailModal, setShowEmailModal] = useState(false);
@@ -209,6 +222,31 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // ── React to push notification deep-links while app is already running ─────
+    // When the user taps a notification and the app is already in foreground/
+    // background-resumed, usePushNotifications fires a 'pushDeepLink' custom event.
+    // We handle it here to switch tab, switch number, and open the conversation.
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { tab, numberId, conversationId } = (e as CustomEvent).detail as {
+                tab?: string; numberId?: string; conversationId?: string;
+            };
+            if (tab && TABS.some(t => t.id === tab)) {
+                setActiveTab(tab as SmsTab);
+                sessionStorage.setItem(SESSION_TAB_KEY, tab);
+            }
+            if (numberId) {
+                setActiveNumberId(numberId);
+                sessionStorage.setItem(SESSION_KEY, numberId);
+            }
+            if (conversationId) {
+                setDeepLinkConversationId(conversationId);
+            }
+        };
+        window.addEventListener('pushDeepLink', handler);
+        return () => window.removeEventListener('pushDeepLink', handler);
     }, []);
 
     const handleTabChange = (tab: SmsTab) => {
@@ -442,6 +480,8 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                     controlledTab={activeTab}
                     initialNumberId={activeNumberId}
                     hideNumberSelector={true}
+                    deepLinkConversationId={deepLinkConversationId}
+                    onDeepLinkConversationOpened={() => setDeepLinkConversationId(null)}
                 />
             </main>
 

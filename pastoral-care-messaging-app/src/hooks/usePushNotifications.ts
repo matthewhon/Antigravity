@@ -62,12 +62,19 @@ function showInAppToast(title: string, body: string) {
 function navigateToInbox(data?: Record<string, string>) {
     const numberId = data?.numberId;
     const conversationId = data?.conversationId;
-    let hash = '#/?tab=inbox';
-    if (numberId) hash += `&numberId=${encodeURIComponent(numberId)}`;
-    if (conversationId) hash += `&conversationId=${encodeURIComponent(conversationId)}`;
-    // HashRouter: set the hash directly so React Router picks it up
-    window.location.hash = hash.replace('#/', '');
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    // HashRouter treats `window.location.hash` as the path after `#`.
+    // Assigning to `.hash` automatically prepends `#`, so we provide `/?...`
+    // which results in the full URL fragment `#/?tab=inbox&...`.
+    let hashPath = '/?tab=inbox';
+    if (numberId) hashPath += `&numberId=${encodeURIComponent(numberId)}`;
+    if (conversationId) hashPath += `&conversationId=${encodeURIComponent(conversationId)}`;
+    window.location.hash = hashPath;
+
+    // Fire a custom event so MobileSmsLayout can re-read the new params
+    // even when the component is already mounted (app was in background/foreground).
+    window.dispatchEvent(new CustomEvent('pushDeepLink', {
+        detail: { tab: 'inbox', numberId, conversationId },
+    }));
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
