@@ -210,8 +210,33 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
       return <div className="text-xs text-slate-500 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-2 flex items-center gap-2"><Users size={14} className="text-indigo-500" /> PCO Groups Widget</div>;
     case 'pco_registrations_widget':
       return <div className="text-xs text-slate-500 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-2 flex items-center gap-2"><ClipboardList size={14} className="text-indigo-500" /> PCO Registrations Widget</div>;
-    case 'pastoral_care_chart':
-      return <div className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900 rounded-lg p-2">📊 Pastoral Care Chart: {c.area}</div>;
+    case 'pastoral_care_chart': {
+      const area = c.area || 'Visits';
+      const data = c.data || {};
+      const period = data.period || 'Last 30 Days';
+      const count1Text = area.toLowerCase().includes('prayer') ? 'Recent Requests' : 'Recent Visits / Care';
+      const count2Text = area.toLowerCase().includes('prayer') ? 'Answered' : 'Active / Total';
+      const val1 = data.recentCount !== undefined ? data.recentCount : '—';
+      const val2 = area.toLowerCase().includes('prayer') ? (data.answeredCount !== undefined ? data.answeredCount : '—') : (data.totalCount !== undefined ? data.totalCount : '—');
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 shadow-sm text-left">
+          <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 flex justify-between items-center text-white">
+            <span className="text-[11px] font-bold tracking-wider uppercase">Pastoral Care: {area}</span>
+            <span className="text-[10px] text-indigo-100">{period}</span>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 p-4">
+            <div className="pr-4">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count1Text}</div>
+              <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val1}</div>
+            </div>
+            <div className="pl-4">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count2Text}</div>
+              <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val2}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     case 'data_chart':
       return (
         <AnalyticsWidgetBlock

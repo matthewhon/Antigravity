@@ -201,10 +201,11 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                 const area = block.content?.area || 'Pastoral Care';
                 const data = block.content?.data || {};
                 const period = data.period || 'Last 30 Days';
-                const count1Text = area === 'Visits' ? 'Recent Visits' : 'Recent Requests';
-                const count2Text = area === 'Visits' ? 'Active / Total' : 'Answered';
+                const isPrayer = area.toLowerCase().includes('prayer');
+                const count1Text = isPrayer ? 'Recent Requests' : 'Recent Visits / Care';
+                const count2Text = isPrayer ? 'Answered' : 'Active / Total';
                 const val1 = data.recentCount || 0;
-                const val2 = area === 'Visits' ? (data.totalCount || 0) : (data.answeredCount || 0);
+                const val2 = isPrayer ? (data.answeredCount || 0) : (data.totalCount || 0);
                 
                 return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
                   <div style="background:linear-gradient(135deg,#4f46e5,#6366f1);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
@@ -790,6 +791,82 @@ function renderAnalyticsBlockHtml(
                     <td width="33%" align="right"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Households</div><div style="font-size:18px;font-weight:900;color:#0284c7;font-family:${fontFamily};">${fmt(data.households || 0)}</div></td>
                   </tr>
                 </table>
+              </div>
+            </div>`;
+        }
+        case 'people_age': {
+            const buckets: { range: string; count: number }[] = data.ageData || [];
+            const maxVal = Math.max(...buckets.map(b => b.count), 1);
+            const rows = buckets.map(b => {
+                const w = Math.max(2, Math.round((b.count / maxVal) * 100));
+                return `<tr><td style="padding:4px 0;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                    <tr>
+                      <td align="left" style="font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">${b.range}</td>
+                      <td align="right" style="font-size:11px;font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(b.count)}</td>
+                    </tr>
+                  </table>
+                  <div style="background:#f1f5f9;border-radius:4px;height:6px;width:100%;">
+                    <div style="background:#f59e0b;height:100%;border-radius:4px;width:${w}%;"></div>
+                  </div>
+                </td></tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:10px 16px;">
+                <div style="font-size:10px;font-weight:800;color:#fef3c7;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Age Distribution</div>
+              </div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">${rows || '<tr><td style="font-size:11px;color:#94a3b8;font-family:' + fontFamily + ';">No age data available</td></tr>'}</table>
+              </div>
+            </div>`;
+        }
+        case 'people_gender': {
+            const items: { name: string; value: number }[] = data.genderData || [];
+            const total = items.reduce((s, i) => s + i.value, 0);
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#f59e0b,#b45309);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td align="left"><div style="font-size:10px;font-weight:800;color:#fef3c7;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Gender Breakdown</div></td>
+                  <td align="right"><div style="font-size:14px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(total)} total</div></td>
+                </tr></table>
+              </div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                  ${items.map(it => {
+                      const pct = total > 0 ? Math.round((it.value / total) * 100) : 0;
+                      return `<td align="center" style="padding:0 8px;">
+                        <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">${it.name}</div>
+                        <div style="font-size:18px;font-weight:900;color:#1e293b;margin-top:2px;font-family:${fontFamily};">${fmt(it.value)}</div>
+                        <div style="font-size:9px;color:#64748b;font-family:${fontFamily};">${pct}%</div>
+                      </td>`;
+                  }).join('')}
+                </tr></table>
+              </div>
+            </div>`;
+        }
+        case 'people_membership': {
+            const items: { name: string; value: number }[] = data.membershipData || [];
+            const maxVal = items.length > 0 ? items[0].value : 1;
+            const rows = items.map(m => {
+                const w = Math.max(2, Math.round((m.value / maxVal) * 100));
+                return `<tr><td style="padding:4px 0;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                    <tr>
+                      <td align="left" style="font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">${m.name}</td>
+                      <td align="right" style="font-size:11px;font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(m.value)}</td>
+                    </tr>
+                  </table>
+                  <div style="background:#f1f5f9;border-radius:4px;height:6px;width:100%;">
+                    <div style="background:#0ea5e9;height:100%;border-radius:4px;width:${w}%;"></div>
+                  </div>
+                </td></tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#0284c7,#0369a1);padding:10px 16px;">
+                <div style="font-size:10px;font-weight:800;color:#e0f2fe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Membership Status</div>
+              </div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">${rows || '<tr><td style="font-size:11px;color:#94a3b8;font-family:' + fontFamily + ';">No membership data available</td></tr>'}</table>
               </div>
             </div>`;
         }

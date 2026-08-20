@@ -258,34 +258,456 @@
     .text-center { text-align: center; }
     .text-center .section-sub { margin: 0 auto; }
 
-    /* ── FEATURES GRID ─────────────────────────────────────── */
-    .features-section { background: var(--white); }
-    .features-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+    /* ── PERSONAS SECTION ─────────────────────────────────────── */
+    .personas-section {
+      background: var(--gray-50);
+      padding: 90px 2rem;
+      border-bottom: 1px solid var(--gray-200);
+      transition: background-color 0.4s ease;
+    }
+    .personas-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
       margin-top: 3.5rem;
     }
-    .feature-card {
-      background: var(--gray-50); border: 1px solid var(--gray-200);
-      border-radius: var(--radius); padding: 2rem;
-      transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
-      position: relative; overflow: hidden;
+    .persona-card {
+      background: var(--white);
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(15,37,64,0.03);
     }
-    .feature-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, var(--blue), var(--gold));
-      transform: scaleX(0); transform-origin: left;
-      transition: transform 0.3s;
+    .persona-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: var(--accent-color, var(--blue));
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.3s ease;
     }
-    .feature-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); border-color: rgba(74,143,204,0.2); }
-    .feature-card:hover::before { transform: scaleX(1); }
-    .feature-icon {
-      width: 52px; height: 52px;
-      background: linear-gradient(135deg, rgba(74,143,204,0.12), rgba(246,173,28,0.08));
-      border-radius: 14px; display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; margin-bottom: 1.2rem;
+    .persona-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow);
+      border-color: var(--accent-color, var(--blue));
     }
-    .feature-card h3 { font-size: 1.05rem; font-weight: 700; color: var(--navy); margin-bottom: 0.6rem; }
-    .feature-card p { font-size: 0.9rem; color: var(--gray-600); line-height: 1.65; }
+    .persona-card:hover::before {
+      transform: scaleX(1);
+    }
+    .persona-card.active {
+      border-color: var(--accent-color, var(--blue));
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-4px) scale(1.02);
+      background: var(--white);
+    }
+    .persona-card.active::before {
+      transform: scaleX(1);
+      height: 6px;
+    }
+    .persona-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 1.5rem;
+      border: 4px solid var(--gray-100);
+      transition: all 0.4s ease;
+      box-shadow: 0 8px 24px rgba(15,37,64,0.08);
+    }
+    .persona-card:hover .persona-avatar {
+      transform: scale(1.05);
+      border-color: var(--accent-color, var(--blue));
+    }
+    .persona-card.active .persona-avatar {
+      border-color: var(--accent-color, var(--blue));
+      transform: scale(1.08);
+      box-shadow: 0 12px 32px rgba(15,37,64,0.15);
+    }
+    .persona-card h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 0.2rem;
+    }
+    .persona-role {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-color, var(--blue-dark));
+      margin-bottom: 1rem;
+      background: var(--accent-bg, rgba(74,143,204,0.1));
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .persona-tagline {
+      font-size: 0.9rem;
+      color: var(--gray-600);
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+      flex-grow: 1;
+    }
+    .persona-explore-btn {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-color, var(--blue-dark));
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: transform 0.2s ease;
+    }
+    .persona-card:hover .persona-explore-btn {
+      transform: translateX(4px);
+    }
+    .persona-card.active .persona-explore-btn {
+      color: var(--accent-color);
+      text-decoration: underline;
+    }
+
+    /* ── PERSONA DETAILS PANEL ───────────────────────────────── */
+    .persona-details-container {
+      max-width: 1100px;
+      margin: 3.5rem auto 0;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: none; /* Controlled by JS */
+      transform: translateY(20px);
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+    }
+    .persona-details-container.show {
+      display: block;
+      animation: slideUpDetails 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUpDetails {
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .persona-details-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue-deeper) 100%);
+      color: var(--white);
+      padding: 2.5rem 3rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .persona-details-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 50%, rgba(var(--accent-color-rgb), 0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .persona-details-header-text h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .persona-details-header-text p {
+      color: rgba(255,255,255,0.75);
+      font-size: 1rem;
+    }
+    .persona-details-header-text p strong {
+      color: var(--accent-color, var(--gold));
+    }
+    .persona-details-content {
+      padding: 3rem;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 3rem;
+      background: var(--white);
+    }
+    .persona-realities-column h4, .persona-solutions-column h4 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border-bottom: 2px solid var(--gray-100);
+      padding-bottom: 0.75rem;
+    }
+    .reality-item {
+      background: var(--gray-50);
+      border-left: 4px solid var(--accent-color, var(--blue));
+      padding: 1.25rem;
+      border-radius: 0 12px 12px 0;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 2px 8px rgba(15,37,64,0.01);
+    }
+    .reality-item h5 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 0.4rem;
+    }
+    .reality-item p {
+      font-size: 0.88rem;
+      color: var(--gray-600);
+      line-height: 1.55;
+    }
+    .solution-box {
+      background: var(--accent-bg, rgba(74,143,204,0.06));
+      border: 1px dashed var(--accent-color, var(--blue));
+      border-radius: 16px;
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .solution-box h5 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .solution-quote {
+      font-size: 0.92rem;
+      color: var(--navy);
+      font-style: italic;
+      line-height: 1.6;
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .solution-quote::before {
+      content: '“';
+      font-size: 3rem;
+      font-family: Georgia, serif;
+      position: absolute;
+      left: 0;
+      top: -0.8rem;
+      color: var(--accent-color, var(--blue));
+      opacity: 0.3;
+      line-height: 1;
+    }
+    .solution-feature {
+      font-size: 0.88rem;
+      color: var(--gray-800);
+      line-height: 1.5;
+      font-weight: 600;
+      background: var(--white);
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(15,37,64,0.03);
+      display: inline-block;
+      border-left: 3px solid var(--accent-color);
+    }
+    .persona-details-footer {
+      grid-column: span 2;
+      border-top: 1px solid var(--gray-100);
+      padding-top: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .persona-value-proposition {
+      font-size: 1rem;
+      color: var(--gray-600);
+      max-width: 60%;
+      line-height: 1.6;
+    }
+    .persona-value-proposition strong {
+      color: var(--navy);
+    }
+
+    /* ── NATIVE DIALOG MODAL ────────────────────────────────── */
+    dialog.persona-dialog {
+      border: none;
+      border-radius: 20px;
+      padding: 0;
+      max-width: 800px;
+      width: 90%;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
+      background: var(--white);
+    }
+    dialog.persona-dialog::backdrop {
+      background: rgba(15, 37, 64, 0.65);
+      backdrop-filter: blur(8px);
+      animation: backdropFadeIn 0.3s ease forwards;
+    }
+    @keyframes backdropFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    /* Fallback for dialog animation when supported */
+    dialog.persona-dialog[open] {
+      animation: dialogShow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes dialogShow {
+      from { transform: translate(-50%, -45%) scale(0.95); opacity: 0; }
+      to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+    .dialog-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue-deeper) 100%);
+      color: var(--white);
+      padding: 2rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+    .dialog-header-info {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .dialog-header-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255,255,255,0.2);
+    }
+    .dialog-header-title h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+    .dialog-header-title span {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-color, var(--gold));
+      background: rgba(255,255,255,0.1);
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: 0.2rem;
+    }
+    .dialog-close-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: var(--white);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.2s ease;
+    }
+    .dialog-close-btn:hover {
+      background: rgba(255,255,255,0.2);
+      transform: scale(1.05);
+    }
+    .dialog-body {
+      padding: 2.5rem;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .dialog-section {
+      margin-bottom: 2rem;
+    }
+    .dialog-section h4 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 1rem;
+      border-left: 4px solid var(--accent-color, var(--blue));
+      padding-left: 0.6rem;
+    }
+    .dialog-list {
+      list-style: none;
+      padding-left: 0;
+    }
+    .dialog-list li {
+      position: relative;
+      padding-left: 1.5rem;
+      font-size: 0.92rem;
+      color: var(--gray-600);
+      line-height: 1.6;
+      margin-bottom: 0.8rem;
+    }
+    .dialog-list li::before {
+      content: '✦';
+      position: absolute;
+      left: 0;
+      color: var(--accent-color, var(--blue));
+    }
+    .dialog-quotes {
+      display: grid;
+      gap: 1.25rem;
+    }
+    .dialog-quote-card {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      padding: 1.25rem;
+      border-radius: 12px;
+    }
+    .dialog-quote-card p {
+      font-size: 0.9rem;
+      font-style: italic;
+      color: var(--navy);
+      line-height: 1.5;
+      margin-bottom: 0.5rem;
+    }
+    .dialog-quote-card span {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--gray-400);
+    }
+
+    /* ── NARRATIVE PERSONA STORIES ────────────────────────── */
+    .persona-story {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+    .story-pain, .story-gain {
+      padding: 1.5rem;
+      border-radius: 12px;
+      line-height: 1.65;
+      font-size: 0.92rem;
+    }
+    .story-pain {
+      background: rgba(239, 68, 68, 0.04);
+      border-left: 4px solid #EF4444;
+      color: var(--gray-800);
+    }
+    .story-pain strong {
+      color: #B91C1C;
+    }
+    .story-gain {
+      background: rgba(16, 185, 129, 0.04);
+      border-left: 4px solid #10B981;
+      color: var(--gray-800);
+    }
+    .story-gain strong {
+      color: #047857;
+    }
 
     /* ── PRODUCT TOUR ─────────────────────────────────────── */
     .tour-section { background: var(--navy); padding: 90px 2rem; }
@@ -698,7 +1120,10 @@
     /* ── RESPONSIVE ─────────────────────────────── */
     @media (max-width: 900px) {
       .hero-grid, .ai-grid, .alt-feature { grid-template-columns: 1fr; gap: 2.5rem; }
-      .features-grid, .testimonials-grid, .pricing-grid { grid-template-columns: 1fr; }
+      .personas-grid, .testimonials-grid, .pricing-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+      .persona-details-content { grid-template-columns: 1fr; gap: 2rem; padding: 2rem 1.5rem; }
+      .persona-details-footer { flex-direction: column; align-items: stretch; }
+      .persona-value-proposition { max-width: 100%; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .footer-grid { grid-template-columns: 1fr 1fr; }
       .alt-feature.reverse { direction: ltr; }
@@ -719,7 +1144,7 @@
     </div>
   </a>
   <div class="nav-links">
-    <a href="#features">Features</a>
+    <a href="#personas">Who It's For</a>
     <a href="#tour">Product Tour</a>
     <a href="#iphone-app">📱 iPhone App</a>
     <a href="#pricing">Pricing</a>
@@ -802,66 +1227,84 @@
   <div class="trust-stat"><strong>Real-Time</strong><span>Data Sync</span></div>
 </div>
 
-<!-- FEATURES GRID -->
-<section class="features-section" id="features">
+<!-- PERSONAS SECTION -->
+<section class="personas-section" id="personas">
   <div class="section-inner">
     <div class="text-center fade-up">
-      <div class="section-label">Everything You Need</div>
-      <h2 class="section-title">One Platform. Complete <span>Pastoral Visibility.</span></h2>
-      <p class="section-sub">Stop switching between spreadsheets and tabs. Pastoral Care for PCO puts your entire congregation's health in one beautiful dashboard.</p>
+      <div class="section-label">Built For Your Team</div>
+      <h2 class="section-title">Tailored for the Way <span>You Lead.</span></h2>
+      <p class="section-sub">Whether you are preaching in the pulpit, managing daily operations, or guarding the budget, Pastoral Care provides the exact tools you need.</p>
     </div>
-    <div class="features-grid">
-      <div class="feature-card fade-up fade-up-delay-1">
-        <div class="feature-icon">🔗</div>
-        <h3>Deep Planning Center Sync</h3>
-        <p>Two-way OAuth integration with PCO People, Groups, Services, Giving & Registrations. Real-time webhook updates keep your data always fresh.</p>
+    
+    <div class="personas-grid">
+      <!-- Pastor Jon Card -->
+      <div class="persona-card fade-up fade-up-delay-1" id="card-jon" onclick="selectPersona('jon')" style="--accent-color: var(--gold); --accent-color-rgb: 246, 173, 28; --accent-bg: rgba(246, 173, 28, 0.08);">
+        <img src="assets/pastor_jon.jpg" alt="Pastor Jon" class="persona-avatar" />
+        <h3>Pastor Jon</h3>
+        <div class="persona-role">Lead Pastor</div>
+        <p class="persona-tagline">“I wear too many hats, and I'm terrified of visitors and members slipping through the cracks of manual systems.”</p>
+        <span class="persona-explore-btn">Explore Workflows &rarr;</span>
       </div>
-      <div class="feature-card fade-up fade-up-delay-2">
-        <div class="feature-icon">🧑‍🤝‍🧑</div>
-        <h3>People & Household Analytics</h3>
-        <p>Engagement tiers (Core, Regular, Sporadic, Inactive), age & gender demographics, household groupings, geographic maps — all from PCO data.</p>
+
+      <!-- Sally Card -->
+      <div class="persona-card fade-up fade-up-delay-2" id="card-sally" onclick="selectPersona('sally')" style="--accent-color: var(--blue); --accent-color-rgb: 74, 143, 204; --accent-bg: rgba(74, 143, 204, 0.08);">
+        <img src="assets/sally.jpg" alt="Sally" class="persona-avatar" />
+        <h3>Sally</h3>
+        <div class="persona-role">Operations Director</div>
+        <p class="persona-tagline">“I run the church's daily administration, caught in the weekly Friday scramble to coordinate communication.”</p>
+        <span class="persona-explore-btn">Explore Workflows &rarr;</span>
       </div>
-      <div class="feature-card fade-up fade-up-delay-3">
-        <div class="feature-icon">💛</div>
-        <h3>Risk Scoring Engine</h3>
-        <p>Automatically flags members who may be drifting — based on attendance, giving, group participation, and engagement patterns. Never miss someone slipping away.</p>
+
+      <!-- Jill Card -->
+      <div class="persona-card fade-up fade-up-delay-3" id="card-jill" onclick="selectPersona('jill')" style="--accent-color: #10B981; --accent-color-rgb: 16, 185, 129; --accent-bg: rgba(16, 185, 129, 0.08);">
+        <img src="assets/jill.jpg" alt="Jill" class="persona-avatar" />
+        <h3>Jill</h3>
+        <div class="persona-role">Financial Secretary</div>
+        <p class="persona-tagline">“I guard the church's financial health, turning giving numbers into insights to support our growth vision.”</p>
+        <span class="persona-explore-btn">Explore Workflows &rarr;</span>
       </div>
-      <div class="feature-card fade-up fade-up-delay-2">
-        <div class="feature-icon">📱</div>
-        <h3>Mobile App &amp; SMS Inbox</h3>
-        <p>Two-way SMS conversations, mass texting, keyword auto-responders (Prayer, Help, etc.), live push notifications, and a full mobile PWA — all role-based per staff member.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-3">
-        <div class="feature-icon">🧰</div>
-        <h3>Engagement Tools Suite</h3>
-        <p>Polls, connect cards, prayer request tracking, outreach sessions, PCO Quick-Send Notes, email campaign builder, workflow automation, and mass broadcast SMS.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-1">
-        <div class="feature-icon">🗓️</div>
-        <h3>Pastoral Calendar &amp; Care Log</h3>
-        <p>Log pastoral visits, care tasks, follow-ups, and track baptisms, salvations, new guests, and return rates — synced to Planning Center and your pastoral team.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-1">
-        <div class="feature-icon">💰</div>
-        <h3>Giving & Donor Lifecycle</h3>
-        <p>Track donor retention, recurring gifts, fund-by-fund breakdowns, budget vs. actual, and identify lapsed or at-risk donors before it's too late.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-2">
-        <div class="feature-icon">✉️</div>
-        <h3>Email Communication</h3>
-        <p>Drag-and-drop email builder with PCO audience segmentation, scheduled campaigns, custom domain sending, and open/click analytics.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-3">
-        <div class="feature-icon">🤖</div>
-        <h3>Pastor AI (Gemini-Powered)</h3>
-        <p>Ask natural language questions about your church data. "Who hasn't attended in 6 weeks?" "Draft a welcome email." "Compare our demographics to census data."</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-1">
-        <div class="feature-icon">📊</div>
-        <h3>Community Benchmarking</h3>
-        <p>Integrate US Census data to compare your congregation demographics against your local community — identify where you can grow your reach.</p>
+
+      <!-- Mia Card -->
+      <div class="persona-card fade-up fade-up-delay-4" id="card-mia" onclick="selectPersona('mia')" style="--accent-color: #EC4899; --accent-color-rgb: 236, 72, 153; --accent-bg: rgba(236, 72, 153, 0.08);">
+        <img src="assets/mia.jpg" alt="Mia" class="persona-avatar" />
+        <h3>Mia</h3>
+        <div class="persona-role">Outreach Volunteer</div>
+        <p class="persona-tagline">“I want to serve, but my life is dictated by the busy, micro-scheduled rhythm of school drop-offs and parenting.”</p>
+        <span class="persona-explore-btn">Explore Workflows &rarr;</span>
       </div>
     </div>
+
+    <!-- Active Persona Details Panel -->
+    <div class="persona-details-container" id="persona-details" style="--accent-color: var(--gold); --accent-color-rgb: 246, 173, 28; --accent-bg: rgba(246, 173, 28, 0.06);">
+      <div class="persona-details-header">
+        <div class="persona-details-header-text">
+          <h3 id="details-name">Pastor Jon</h3>
+          <p id="details-role-desc">Role: <strong>Lead Pastor</strong> of a Growing Independent Church (100-500 attendance)</p>
+        </div>
+        <button class="btn-primary" id="details-modal-btn" onclick="openPersonaModal('jon')" style="background: linear-gradient(135deg, var(--accent-color, var(--gold)) 0%, var(--gold-dark) 100%);">View Full Workflow Profile &rarr;</button>
+      </div>
+      <div class="persona-details-content">
+        <div class="persona-realities-column">
+          <h4>⚠️ Weekly Realities & Pain Points</h4>
+          <div id="details-realities">
+            <!-- Dynamic Realities -->
+          </div>
+        </div>
+        <div class="persona-solutions-column">
+          <h4>💡 How Pastoral Care Solves It</h4>
+          <div id="details-solutions">
+            <!-- Dynamic Solutions -->
+          </div>
+        </div>
+        <div class="persona-details-footer">
+          <div class="persona-value-proposition" id="details-val-prop">
+            <!-- Dynamic Value Prop -->
+          </div>
+          <a href="https://pastoralcare.barnabassoftware.com" class="btn-primary" target="_blank">Try Pastoral Care Free &rarr;</a>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -1323,7 +1766,7 @@
       </div>
       <div class="footer-col">
         <h4>Product</h4>
-        <a href="#features">Features</a>
+        <a href="#personas">Who It's For</a>
         <a href="#tour">Product Tour</a>
         <a href="#iphone-app">📱 iPhone App</a>
         <a href="#pricing">Pricing</a>
@@ -1351,11 +1794,352 @@
   </div>
 </footer>
 
+<!-- PERSONA MODAL: JON -->
+<dialog id="modal-jon" class="persona-dialog" closedby="any" aria-labelledby="title-modal-jon" style="--accent-color: var(--gold);">
+  <div class="dialog-header">
+    <div class="dialog-header-info">
+      <img src="assets/pastor_jon.jpg" alt="Pastor Jon" class="dialog-header-avatar" />
+      <div class="dialog-header-title">
+        <h3 id="title-modal-jon">Pastor Jon</h3>
+        <span>Role Spotlight: Lead Pastor</span>
+      </div>
+    </div>
+    <button class="dialog-close-btn" onclick="closePersonaModal('jon')" aria-label="Close modal">&times;</button>
+  </div>
+  <div class="dialog-body">
+    <div class="dialog-section">
+      <h4>A Day in the Life: From Memory Games to Real Connections</h4>
+      <div class="persona-story">
+        <p class="story-pain"><strong>The Monday Morning Fog:</strong> Jon sits in his office on Monday morning, staring at a blank notepad. Yesterday was amazing—the lobby was buzzing, he preached with passion, and he greeted dozens of people. But now, the silence of Monday has set in, and the anxiety begins. <em>Did Bill and his family make it? They missed the last two weeks, but did I see them in the back corner? Who was that new couple next to the lobby entrance? Did we get their contact card, or is it buried in the offering basket?</em> He knows that Tuesday morning is when visitor momentum either multiplies or dies, but he feels paralyzed trying to reconstruct the room from memory.</p>
+        <p class="story-gain"><strong>The Pastoral Care Shift:</strong> Today, Jon logs into his dashboard on Monday morning. The platform has automatically synced with Planning Center services. Instantly, a clean follow-up workflow list appears. There is Bill's family—noted as missing for three consecutive weeks—along with a prompt to send a friendly check-in. There are the first-time guests from Sunday, with their contact details automatically captured and ready for outreach. By Tuesday morning, Jon hasn't touched a single spreadsheet, yet every visitor has received a personal welcome text, and absent members feel seen and cared for. Jon can stop playing the memory game and focus on what he loves: pastoring people.</p>
+      </div>
+    </div>
+
+    <div class="dialog-section">
+      <h4>How We Transform Your Monday & Tuesday</h4>
+      <div class="dialog-quotes">
+        <div class="dialog-quote-card">
+          <p>"Stop trying to remember if 'Bill and his family' made it to church this Sunday. Automate your attendance tracking and let your software tell you who needs a follow-up by Tuesday morning."</p>
+          <span>Follow-Up Workflow</span>
+        </div>
+        <div class="dialog-quote-card">
+          <p>"You know your church is growing—now stop guessing the numbers. Instantly track month-over-month attendance averages so you can lead with clarity."</p>
+          <span>Attendance Metrics Workflow</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-section" style="margin-bottom: 0;">
+      <h4>Value Proposition</h4>
+      <p style="font-size: 1rem; color: var(--navy); font-weight: 700; background: var(--gray-50); padding: 1.25rem; border-radius: 12px; border-left: 4px solid var(--accent-color);">
+        Built for pastors who want to spend less time managing data and more time pastoring people.
+      </p>
+    </div>
+  </div>
+</dialog>
+
+<!-- PERSONA MODAL: SALLY -->
+<dialog id="modal-sally" class="persona-dialog" closedby="any" aria-labelledby="title-modal-sally" style="--accent-color: var(--blue);">
+  <div class="dialog-header">
+    <div class="dialog-header-info">
+      <img src="assets/sally.jpg" alt="Sally" class="dialog-header-avatar" />
+      <div class="dialog-header-title">
+        <h3 id="title-modal-sally">Sally</h3>
+        <span>Role Spotlight: Operations Director</span>
+      </div>
+    </div>
+    <button class="dialog-close-btn" onclick="closePersonaModal('sally')" aria-label="Close modal">&times;</button>
+  </div>
+  <div class="dialog-body">
+    <div class="dialog-section">
+      <h4>A Day in the Life: Ditching the Friday Scramble</h4>
+      <div class="persona-story">
+        <p class="story-pain"><strong>The Friday Scramble:</strong> It's 3:30 PM on a Friday. The church office is quiet, but Sally's desk is a storm of sticky notes. The ladies' ministry lead just texted: <em>“Can we send a text reminder about the baby shower registries?”</em> The youth pastor needs a message sent to parents. And the print shop deadline for Sunday's bulletin passed an hour ago, leaving Sally with a high-waste paper printout that still has a typo on the front cover. Sally feels the crushing weight of being the church's communication bottleneck, staring down another late Friday night just to get Sunday ready.</p>
+        <p class="story-gain"><strong>The Pastoral Care Shift:</strong> Today, Sally coordinates the church's communication from a single, unified hub. Instead of messy group chats and clunky phone trees, she segments the ladies' ministry and schedules a targeted SMS reminder in three clicks. She ditches the costly paper printing press entirely, deploying a sleek, mobile-friendly digital bulletin that updates instantly if a schedule changes. By 4:00 PM on Friday, the communications are scheduled, the digital bulletin is live, and Sally walks out the door to head into the weekend stress-free.</p>
+      </div>
+    </div>
+
+    <div class="dialog-section">
+      <h4>Ditching the Friday Scramble & Slashing Costs</h4>
+      <div class="dialog-quotes">
+        <div class="dialog-quote-card">
+          <p>"Stop juggling group texts, emails, and phone trees every Friday afternoon. Send targeted text reminders to specific ministry groups—like the ladies' baby shower—in seconds."</p>
+          <span>Targeted SMS Workflow</span>
+        </div>
+        <div class="dialog-quote-card">
+          <p>"Ditch the Sunday printing press. Publish a clean, mobile-friendly digital bulletin that keeps your entire congregation on the same page while slashing your paper budget."</p>
+          <span>Digital Bulletin Workflow</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-section" style="margin-bottom: 0;">
+      <h4>Value Proposition</h4>
+      <p style="font-size: 1rem; color: var(--navy); font-weight: 700; background: var(--gray-50); padding: 1.25rem; border-radius: 12px; border-left: 4px solid var(--accent-color);">
+        Built to take the chaos out of church administration so your staff can head into the weekend stress-free.
+      </p>
+    </div>
+  </div>
+</dialog>
+
+<!-- PERSONA MODAL: JILL -->
+<dialog id="modal-jill" class="persona-dialog" closedby="any" aria-labelledby="title-modal-jill" style="--accent-color: #10B981;">
+  <div class="dialog-header">
+    <div class="dialog-header-info">
+      <img src="assets/jill.jpg" alt="Jill" class="dialog-header-avatar" />
+      <div class="dialog-header-title">
+        <h3 id="title-modal-jill">Jill</h3>
+        <span>Role Spotlight: Financial Treasurer</span>
+      </div>
+    </div>
+    <button class="dialog-close-btn" onclick="closePersonaModal('jill')" aria-label="Close modal">&times;</button>
+  </div>
+  <div class="dialog-body">
+    <div class="dialog-section">
+      <h4>A Day in the Life: Shining a Light in the Financial Blind Spots</h4>
+      <div class="persona-story">
+        <p class="story-pain"><strong>The Spreadsheets Maze:</strong> Jill sits at her computer, surrounded by bank statements and spreadsheets. Pastor Jon is excited about the new capital campaign for the building expansion, but Jill is carrying the administrative weight of tracking it. She spends hours manually filtering through transactions, trying to figure out which contributions are new, designated, or seasonal. When she notices a dip in the mission fund, she has no quick way to diagnose it. <em>Is it a seasonal slump, or have our core supporters quietly stopped giving?</em> She feels the pressure of building a growth budget with Jon, but she’s running on gut feels and backward-looking spreadsheets.</p>
+        <p class="story-gain"><strong>The Pastoral Care Shift:</strong> Today, Jill collaborates with Jon using real-time financial dashboards. The software automatically tracks capital campaigns by individual, alerting her immediately when a new giver steps up. If a regular donor's giving pattern quietly shifts or goes quiet, she receives a proactive care alert so the pastoral team can reach out before they drift away. With predictive forecasting and fund-by-fund visibility, Jill can build budgets anchored in reality, fueling the church's mission with confidence.</p>
+      </div>
+    </div>
+
+    <div class="dialog-section">
+      <h4>Unlocking Financial Clarity & Donor Care</h4>
+      <div class="dialog-quotes">
+        <div class="dialog-quote-card">
+          <p>"Track your capital campaign momentum in real-time. Instantly see who stepped up as a new giver this week—tracked by individual, so no contribution slips through the cracks."</p>
+          <span>Capital Campaign Workflow</span>
+        </div>
+        <div class="dialog-quote-card">
+          <p>"Don't let a dip in your mission fund go unnoticed. Easily identify disconnected past givers and spot giving trends before faithful supporters drift away."</p>
+          <span>Giver Retention Workflow</span>
+        </div>
+        <div class="dialog-quote-card">
+          <p>"Help your pastor build a budget anchored in reality. Instantly analyze whether current giving patterns truly support your church's vision for growth."</p>
+          <span>Growth Budgeting Workflow</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-section" style="margin-bottom: 0;">
+      <h4>Value Proposition</h4>
+      <p style="font-size: 1rem; color: var(--navy); font-weight: 700; background: var(--gray-50); padding: 1.25rem; border-radius: 12px; border-left: 4px solid var(--accent-color);">
+        Built to give financial leaders crystal-clear insights, effortless tracking, and the tools they need to fuel the mission with confidence.
+      </p>
+    </div>
+  </div>
+</dialog>
+
+<!-- PERSONA MODAL: MIA -->
+<dialog id="modal-mia" class="persona-dialog" closedby="any" aria-labelledby="title-modal-mia" style="--accent-color: #EC4899;">
+  <div class="dialog-header">
+    <div class="dialog-header-info">
+      <img src="assets/mia.jpg" alt="Mia" class="dialog-header-avatar" />
+      <div class="dialog-header-title">
+        <h3 id="title-modal-mia">Mia</h3>
+        <span>Role Spotlight: Outreach Volunteer</span>
+      </div>
+    </div>
+    <button class="dialog-close-btn" onclick="closePersonaModal('mia')" aria-label="Close modal">&times;</button>
+  </div>
+  <div class="dialog-body">
+    <div class="dialog-section">
+      <h4>A Day in the Life: Ministry in the Car Line</h4>
+      <div class="persona-story">
+        <p class="story-pain"><strong>The Fragmented Day:</strong> Mia's day is a blur of school runs, laundry, and grocery lists. She deeply loves her church and has a heart for welcoming new people, but attending a rigid, two-hour "volunteer call night" at the church building is impossible for her schedule. If she wants to help with outreach, she's faced with printed lists, handwriting notes, and coordinating with staff, or exposing her personal cell phone number to strangers, which makes her uncomfortable.</p>
+        <p class="story-gain"><strong>The Pastoral Care Shift:</strong> Today, Mia does outreach ministry on her own terms, in the pockets of her day. While waiting in the school car line or sitting on her couch after the kids go to bed, she logs into her secure volunteer portal. The system guides her through a list of recent visitors who requested prayer, complete with clean context. She makes welcome calls directly through the platform, protecting her personal phone number and family privacy. In just 20 minutes between school runs, Mia has welcomed a new family and prayed with a hurting guest, turning her spare moments into eternal impact.</p>
+      </div>
+    </div>
+
+    <div class="dialog-section">
+      <h4>Mobilizing Everyday Members Safely & Securely</h4>
+      <div class="dialog-quotes">
+        <div class="dialog-quote-card">
+          <p>"Mobilize the Mias in your church. Let busy moms and at-home volunteers make first-time visitor welcome and prayer calls during their own pockets of free time—straight from their phone or laptop."</p>
+          <span>Volunteer Mobilization Workflow</span>
+        </div>
+        <div class="dialog-quote-card">
+          <p>"No phone banks, no paper lists, no privacy worries. Give your outreach team a guided, secure calling tool that turns spare minutes into meaningful connections."</p>
+          <span>Secure Outreach Calling Workflow</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-section" style="margin-bottom: 0;">
+      <h4>Value Proposition</h4>
+      <p style="font-size: 1rem; color: var(--navy); font-weight: 700; background: var(--gray-50); padding: 1.25rem; border-radius: 12px; border-left: 4px solid var(--accent-color);">
+        Built to unlock your church's greatest untapped resource: everyday members eager to care for people, equipped with tools that fit real life.
+      </p>
+    </div>
+  </div>
+</dialog>
+
 <script>
   // Nav scroll effect
   const nav = document.getElementById('main-nav');
   window.addEventListener('scroll', () => {
     nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+
+  // Persona selector and modal handling
+  const personaData = {
+    jon: {
+      name: 'Pastor Jon',
+      roleDesc: 'Role: <strong>Lead Pastor</strong> of a Growing Independent Church (100-500 attendance)',
+      accentColor: 'var(--gold)',
+      accentColorRgb: '246, 173, 28',
+      accentBg: 'rgba(246, 173, 28, 0.06)',
+      realities: [
+        { title: 'Monday Morning Memory Game', text: 'Trying to mentally reconstruct the room to remember who was missing and who was there after a busy Sunday.' },
+        { title: 'Tuesday Follow-Up Bottleneck', text: 'Pulling lists of first-time guests requires digging through paper cards, text threads, and spreadsheets, stalling momentum.' },
+        { title: 'Gut-Feel Growth Trap', text: 'Struggling to pull objective attendance trends to prove month-over-month growth patterns to the leadership board.' }
+      ],
+      solutions: [
+        { title: 'Stop the Memory Game', text: '“Automate your attendance tracking and let your software tell you who needs a follow-up by Tuesday morning.”', feature: 'Automated Attendance Flags' },
+        { title: 'Stop Guessing Church Health', text: '“Instantly track month-over-month attendance averages so you can lead with clarity.”', feature: 'Real-Time Metrics Dashboards' }
+      ],
+      valProp: 'Built for pastors who want to spend <strong>less time managing data</strong> and <strong>more time pastoring people</strong>.'
+    },
+    sally: {
+      name: 'Sally',
+      roleDesc: 'Role: <strong>Operations Director</strong> & Church Administrator',
+      accentColor: 'var(--blue)',
+      accentColorRgb: '74, 143, 204',
+      accentBg: 'rgba(74, 143, 204, 0.06)',
+      realities: [
+        { title: 'Friday Afternoon Communication Scramble', text: 'Scrambling to get group-specific communications out the door without relying on messy personal chats or forgotten emails.' },
+        { title: 'The Bulletin Balancing Act', text: 'Transitioning the congregation away from costly, wasteful print bulletins to a modern digital bulletin that reaches everyone.' },
+        { title: 'Carrying the Administrative Weight', text: 'Acting as the connective tissue for all ministries, breeding burnout due to fragmented, disjointed admin tools.' }
+      ],
+      solutions: [
+        { title: 'Stop Friday Scrambles', text: '“Send targeted text reminders to specific ministry groups—like the ladies\' baby shower—in seconds.”', feature: 'Targeted SMS Segments' },
+        { title: 'Ditch the Sunday Printing Press', text: '“Publish a clean, mobile-friendly digital bulletin that keeps your entire congregation on the same page while slashing paper budgets.”', feature: 'Dynamic Digital Bulletins' }
+      ],
+      valProp: 'Built to <strong>take the chaos out of church administration</strong> so your staff can head into the weekend stress-free.'
+    },
+    jill: {
+      name: 'Jill',
+      roleDesc: 'Role: <strong>Financial Treasurer</strong> & Secretary',
+      accentColor: '#10B981',
+      accentColorRgb: '16, 185, 129',
+      accentBg: 'rgba(16, 185, 129, 0.06)',
+      realities: [
+        { title: 'Capital Campaign Blind Spot', text: 'Filtering manually through spreadsheets to identify who has stepped up as a new individual contributor to building funds.' },
+        { title: 'The Mission Fund Mystery', text: 'Struggling to diagnose drops in designated giving funds, wondering if it\'s seasonal or if core givers have stopped.' },
+        { title: 'Lapsed Giver Needle in a Haystack', text: 'Spotting quiet giving drops too late, needing a proactive warning system to alert pastoral care before givers drift.' }
+      ],
+      solutions: [
+        { title: 'Track Campaigns in Real-Time', text: '“Instantly see who stepped up as a new giver this week—tracked by individual, so no contribution slips through.”', feature: 'Granular Giving Trackers' },
+        { title: 'Spot Lapsed Givers Early', text: '“Don\'t let a dip in your mission fund go unnoticed. Easily identify disconnected past givers before they drift away.”', feature: 'Lapsed Donor Alerts' }
+      ],
+      valProp: 'Built to give financial leaders <strong>crystal-clear insights, effortless tracking,</strong> and the tools they need to fuel the mission with confidence.'
+    },
+    mia: {
+      name: 'Mia',
+      roleDesc: 'Role: <strong>Outreach Volunteer</strong> & Lay Team Member (Busy Mom)',
+      accentColor: '#EC4899',
+      accentColorRgb: '236, 72, 153',
+      accentBg: 'rgba(236, 72, 153, 0.06)',
+      realities: [
+        { title: 'The "In-Between" Window', text: 'Serving in 20-to-30-minute pockets of time (e.g. waiting in school car lines) rather than rigid on-site volunteer nights.' },
+        { title: 'Administrative Outreach Friction', text: 'Dealing with printed calling sheets, handwritten notes, and back-and-forth updates with church staff.' },
+        { title: 'The Personal Privacy Barrier', text: 'Wanting to reach out to new visitors but hesitant to expose her personal cell phone number or manage church contacts on her personal device.' }
+      ],
+      solutions: [
+        { title: 'Mobilize At-Home Volunteers', text: '“Let busy moms and at-home volunteers make first-time visitor welcome and prayer calls during their own pockets of free time.”', feature: 'Secure Mobile & Web Portal' },
+        { title: 'Guided & Safe Calling', text: '“Give your outreach team a guided, secure calling tool that turns spare minutes into meaningful connections without privacy worries.”', feature: 'In-App Phone Routing' }
+      ],
+      valProp: 'Built to unlock your church\'s greatest untapped resource: <strong>everyday members eager to care for people</strong>, equipped with tools that fit real life.'
+    }
+  };
+
+  function selectPersona(id) {
+    // Toggle active classes on cards
+    document.querySelectorAll('.persona-card').forEach(card => card.classList.remove('active'));
+    document.getElementById('card-' + id).classList.add('active');
+
+    // Retrieve data
+    const data = personaData[id];
+    const detailsContainer = document.getElementById('persona-details');
+
+    // Smooth transition
+    detailsContainer.classList.remove('show');
+    
+    setTimeout(() => {
+      // Set styles on the details panel
+      detailsContainer.style.setProperty('--accent-color', data.accentColor);
+      detailsContainer.style.setProperty('--accent-color-rgb', data.accentColorRgb);
+      detailsContainer.style.setProperty('--accent-bg', data.accentBg);
+
+      // Populate text
+      document.getElementById('details-name').textContent = data.name;
+      document.getElementById('details-role-desc').innerHTML = data.roleDesc;
+      document.getElementById('details-val-prop').innerHTML = data.valProp;
+
+      // Populate realities
+      const realitiesDiv = document.getElementById('details-realities');
+      realitiesDiv.innerHTML = '';
+      data.realities.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'reality-item';
+        item.innerHTML = `<h5>${r.title}</h5><p>${r.text}</p>`;
+        realitiesDiv.appendChild(item);
+      });
+
+      // Populate solutions
+      const solutionsDiv = document.getElementById('details-solutions');
+      solutionsDiv.innerHTML = '';
+      data.solutions.forEach(s => {
+        const box = document.createElement('div');
+        box.className = 'solution-box';
+        box.innerHTML = `
+          <h5>${s.title}</h5>
+          <div class="solution-quote">${s.text}</div>
+          <div class="solution-feature">Feature: ${s.feature}</div>
+        `;
+        solutionsDiv.appendChild(box);
+      });
+
+      // Update CTA modal button click handler
+      document.getElementById('details-modal-btn').setAttribute('onclick', `openPersonaModal('${id}')`);
+      document.getElementById('details-modal-btn').style.background = `linear-gradient(135deg, ${data.accentColor} 0%, var(--blue-dark) 100%)`;
+
+      // Show details
+      detailsContainer.classList.add('show');
+    }, 150);
+  }
+
+  function openPersonaModal(id) {
+    const dialog = document.getElementById('modal-' + id);
+    if (dialog) dialog.showModal();
+  }
+
+  function closePersonaModal(id) {
+    const dialog = document.getElementById('modal-' + id);
+    if (dialog) dialog.close();
+  }
+
+  // Light-dismiss dialog fallbacks for older browsers
+  document.querySelectorAll('dialog.persona-dialog').forEach(dialog => {
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+      dialog.addEventListener('click', (event) => {
+        if (event.target !== dialog) return;
+        const rect = dialog.getBoundingClientRect();
+        const isDialogContent = (
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width
+        );
+        if (isDialogContent) return;
+        dialog.close();
+      });
+    }
+  });
+
+  // Auto-initialize first persona (jon)
+  document.addEventListener('DOMContentLoaded', () => {
+    selectPersona('jon');
   });
 
   // Tour tabs

@@ -1360,8 +1360,70 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
 
       <Drawer isOpen={isPastoralCareDrawerOpen} onClose={() => setIsPastoralCareDrawerOpen(false)} title="Pastoral Care Charts">
         <div className="space-y-2">
-          <button onClick={() => { const b = [...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart' as const, content: { area: 'Visits' } }]; update({ blocks: b }); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Visits Chart</button>
-          <button onClick={() => { const b = [...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart' as const, content: { area: 'Prayer Requests' } }]; update({ blocks: b }); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Prayer Requests Chart</button>
+          <button
+            onClick={async () => {
+              setIsPastoralCareDrawerOpen(false);
+              let data: any = {};
+              const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+              try {
+                const notes = await firestore.getPastoralNotes(churchId);
+                const recent = notes.filter(n => {
+                  const t = n.date ? new Date(n.date).getTime() : 0;
+                  return t >= thirtyDaysAgo;
+                });
+                data = {
+                  recentCount: recent.length,
+                  totalCount: notes.length,
+                  period: 'Last 30 Days'
+                };
+              } catch (e) {
+                console.warn('Failed to load initial visits snapshot:', e);
+              }
+              const b = [...blocks, {
+                id: Date.now().toString(),
+                type: 'pastoral_care_chart' as const,
+                content: { area: 'Visits', data, refreshedAt: Date.now() }
+              }];
+              update({ blocks: b });
+            }}
+            className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 rounded-xl text-sm text-indigo-700 dark:text-indigo-300 transition text-left flex items-center justify-between"
+          >
+            <span>Visits & Care Touches Chart</span>
+            <span className="text-xs text-indigo-500 font-medium">Last 30 Days</span>
+          </button>
+          <button
+            onClick={async () => {
+              setIsPastoralCareDrawerOpen(false);
+              let data: any = {};
+              const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+              try {
+                const reqs = await firestore.getPrayerRequests(churchId);
+                const recent = reqs.filter(r => {
+                  const t = r.date ? new Date(r.date).getTime() : 0;
+                  return t >= thirtyDaysAgo;
+                });
+                const answered = reqs.filter(r => r.status === 'Answered').length;
+                data = {
+                  recentCount: recent.length,
+                  answeredCount: answered,
+                  totalCount: reqs.length,
+                  period: 'Last 30 Days'
+                };
+              } catch (e) {
+                console.warn('Failed to load initial prayer requests snapshot:', e);
+              }
+              const b = [...blocks, {
+                id: Date.now().toString(),
+                type: 'pastoral_care_chart' as const,
+                content: { area: 'Prayer Requests', data, refreshedAt: Date.now() }
+              }];
+              update({ blocks: b });
+            }}
+            className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 rounded-xl text-sm text-indigo-700 dark:text-indigo-300 transition text-left flex items-center justify-between"
+          >
+            <span>Prayer Requests Chart</span>
+            <span className="text-xs text-indigo-500 font-medium">Last 30 Days</span>
+          </button>
         </div>
       </Drawer>
 

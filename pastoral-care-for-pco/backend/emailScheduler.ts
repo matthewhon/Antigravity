@@ -10,6 +10,23 @@ import { syncAllData } from '../services/pcoSyncService';
  * re-fetch the data using the same configuration (widgetId + config) that the
  * user set at insert time and replace the stored `data` payload with fresh numbers.
  */
+const toTimestampMs = (raw: any): number => {
+    if (!raw) return 0;
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'object' && typeof raw.toDate === 'function') {
+        return raw.toDate().getTime();
+    }
+    if (typeof raw === 'object' && typeof raw._seconds === 'number') {
+        return raw._seconds * 1000 + (raw._nanoseconds ? raw._nanoseconds / 1e6 : 0);
+    }
+    if (raw instanceof Date) return raw.getTime();
+    if (typeof raw === 'string') {
+        const parsed = new Date(raw).getTime();
+        return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+};
+
 export async function refreshCampaignBlocks(
     db: any,
     churchId: string,
@@ -48,34 +65,52 @@ export async function refreshCampaignBlocks(
             }
 
             if (block.type === 'pastoral_care_chart') {
-                const area = block.content?.area; // 'Visits' or 'Prayer Requests'
+                const area = block.content?.area || 'Visits'; // 'Visits' or 'Prayer Requests'
                 try {
                     const now = Date.now();
                     const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
                     let data: any = {};
                     
-                    if (area === 'Visits') {
+                    if (area.toLowerCase().includes('visit') || area.toLowerCase().includes('care') || area.toLowerCase().includes('contact')) {
                         const snap = await db.collection('pastoral_notes')
                             .where('churchId', '==', churchId)
                             .get();
                         const notes: any[] = snap.docs.map((d: any) => d.data());
-                        const recent = notes.filter(n => new Date(n.date || n.createdAt).getTime() >= thirtyDaysAgo);
+                        const recent = notes.filter(n => {
+                            const t = toTimestampMs(n.date) || toTimestampMs(n.createdAt) || toTimestampMs(n.timestamp);
+                            return t >= thirtyDaysAgo;
+                        });
                         data = { 
                             recentCount: recent.length, 
                             totalCount: notes.length,
                             period: 'Last 30 Days'
                         };
-                    } else if (area === 'Prayer Requests') {
+                    } else if (area.toLowerCase().includes('prayer')) {
                         const snap = await db.collection('prayer_requests')
                             .where('churchId', '==', churchId)
                             .get();
                         const reqs: any[] = snap.docs.map((d: any) => d.data());
-                        const recent = reqs.filter(r => new Date(r.date || r.createdAt).getTime() >= thirtyDaysAgo);
-                        const answered = reqs.filter(r => r.status === 'Answered').length;
+                        const recent = reqs.filter(r => {
+                            const t = toTimestampMs(r.date) || toTimestampMs(r.createdAt) || toTimestampMs(r.timestamp);
+                            return t >= thirtyDaysAgo;
+                        });
+                        const answered = reqs.filter(r => (r.status || '').toLowerCase() === 'answered').length;
                         data = { 
                             recentCount: recent.length, 
                             answeredCount: answered,
                             totalCount: reqs.length,
+                            period: 'Last 30 Days'
+                        };
+                    } else {
+                        const [notesSnap, reqsSnap] = await Promise.all([
+                            db.collection('pastoral_notes').where('churchId', '==', churchId).get(),
+                            db.collection('prayer_requests').where('churchId', '==', churchId).get()
+                        ]);
+                        const notes = notesSnap.docs.map((d: any) => d.data());
+                        const recentNotes = notes.filter((n: any) => (toTimestampMs(n.date) || toTimestampMs(n.createdAt)) >= thirtyDaysAgo);
+                        data = {
+                            recentCount: recentNotes.length,
+                            totalCount: notes.length,
                             period: 'Last 30 Days'
                         };
                     }
@@ -262,6 +297,56 @@ async function fetchWidgetData(
             const newThisMonth = people.filter(p => p.createdAt && p.createdAt >= thirtyDaysAgo).length;
             const households = new Set(people.map(p => p.householdId).filter(Boolean)).size;
             return { total, members, newThisMonth, households };
+        }
+
+        case 'people_age': {
+            const snap = await db.collection('people').where('churchId', '==', churchId).get();
+            const people = snap.docs.map(d => d.data());
+            const now = new Date();
+            const buckets: Record<string, number> = {
+                '0–17': 0, '18–29': 0, '30–44': 0, '45–59': 0, '60–74': 0, '75+': 0, 'Unknown': 0
+            };
+            people.forEach(p => {
+                if (!p.birthdate) { buckets['Unknown']++; return; }
+                const age = Math.floor((now.getTime() - new Date(p.birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                if (age < 18) buckets['0–17']++;
+                else if (age < 30) buckets['18–29']++;
+                else if (age < 45) buckets['30–44']++;
+                else if (age < 60) buckets['45–59']++;
+                else if (age < 75) buckets['60–74']++;
+                else buckets['75+']++;
+            });
+            return {
+                ageData: Object.entries(buckets).map(([range, count]) => ({ range, count }))
+            };
+        }
+
+        case 'people_gender': {
+            const snap = await db.collection('people').where('churchId', '==', churchId).get();
+            const people = snap.docs.map(d => d.data());
+            const counts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
+            people.forEach(p => {
+                const g = p.gender || 'Unknown';
+                counts[g] = (counts[g] || 0) + 1;
+            });
+            return {
+                genderData: Object.entries(counts).map(([name, value]) => ({ name, value }))
+            };
+        }
+
+        case 'people_membership': {
+            const snap = await db.collection('people').where('churchId', '==', churchId).get();
+            const people = snap.docs.map(d => d.data());
+            const counts: Record<string, number> = {};
+            people.forEach(p => {
+                const s = p.status || 'Unknown';
+                counts[s] = (counts[s] || 0) + 1;
+            });
+            return {
+                membershipData: Object.entries(counts)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value)
+            };
         }
 
         // ── Services widget ─────────────────────────────────────────────────
