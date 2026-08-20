@@ -1132,6 +1132,49 @@ export interface StatusChangeRecord {
     timestamp: number;
 }
 
+export type MembershipTimeFilter = '3m' | '6m' | '1y' | '3y' | 'all';
+
+export interface MembershipMonthlyPoint {
+    month: string;           // e.g. 'Jan 2026'
+    isoMonth: string;        // e.g. '2026-01'
+    totalMembers: number;    // Cumulative active members at end of month
+    joined: number;          // Added in that month
+    departed: number;        // Departed/transitioned away in that month
+    netChange: number;       // joined - departed
+}
+
+export interface MembershipTransitionItem {
+    id: string;
+    personId: string;
+    personName: string;
+    date: string;
+    type: 'joined' | 'departed' | 'status_change';
+    oldValue: string | null;
+    newValue: string | null;
+    timestamp: number;
+}
+
+export interface MembershipTransitionBreakdown {
+    name: string;
+    count: number;
+    type: 'inflow' | 'outflow' | 'internal';
+}
+
+export interface MembershipHistoryData {
+    timeFilter: MembershipTimeFilter;
+    chartPoints: MembershipMonthlyPoint[];
+    stats: {
+        currentMembers: number;
+        joinedInPeriod: number;
+        departedInPeriod: number;
+        netGrowthInPeriod: number;
+        netGrowthRatePercent: number;
+        retentionRatePercent: number;
+    };
+    breakdowns: MembershipTransitionBreakdown[];
+    transitions: MembershipTransitionItem[];
+}
+
 // --- Notes Module ---------------------------------------------------------------
 
 export type NoteStatus = 'draft' | 'published';

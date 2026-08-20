@@ -1,5 +1,5 @@
 
-import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord } from '../types';
+import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord, MembershipHistoryData, MembershipTimeFilter, MembershipMonthlyPoint, MembershipTransitionItem, MembershipTransitionBreakdown } from '../types';
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -1046,5 +1046,204 @@ export const calculateGroupsDashboardData = (
         recentGroups: groups.slice(0, 5),
         genderDistribution,
         progressStats: { thisMonth: attendedThisMonth.size, lastMonth: attendedLastMonth.size }
+    };
+};
+
+export const calculateMembershipHistory = (
+    people: PcoPerson[],
+    statusChanges: StatusChangeRecord[] = [],
+    timeFilter: MembershipTimeFilter = '1y'
+): MembershipHistoryData => {
+    const now = new Date();
+    let startDate = new Date();
+
+    if (timeFilter === '3m') {
+        startDate.setMonth(now.getMonth() - 3);
+    } else if (timeFilter === '6m') {
+        startDate.setMonth(now.getMonth() - 6);
+    } else if (timeFilter === '1y') {
+        startDate.setMonth(now.getMonth() - 12);
+    } else if (timeFilter === '3y') {
+        startDate.setMonth(now.getMonth() - 36);
+    } else {
+        // 'all'
+        const earliestChange = statusChanges.reduce((min, c) => Math.min(min, c.timestamp || Date.now()), Date.now());
+        const earliestCreated = people.reduce((min, p) => {
+            const d = p.createdAt ? new Date(p.createdAt).getTime() : Date.now();
+            return !isNaN(d) ? Math.min(min, d) : min;
+        }, Date.now());
+        const earliestTime = Math.min(earliestChange, earliestCreated);
+        startDate = new Date(Math.max(earliestTime, new Date('2015-01-01').getTime()));
+    }
+
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    const isMemberValue = (v: string | null | undefined): boolean => {
+        if (!v) return false;
+        const norm = v.trim().toLowerCase();
+        return norm === 'member' || norm === 'official member' || norm === 'covenant member';
+    };
+
+    // Filter relevant status/membership changes
+    const memberChanges = statusChanges.filter(c => {
+        return c.type === 'membership' || isMemberValue(c.oldValue) || isMemberValue(c.newValue);
+    });
+
+    // Build timeline transitions
+    const transitionItems: MembershipTransitionItem[] = [];
+    const breakdownCounts: Record<string, { count: number; type: 'inflow' | 'outflow' | 'internal' }> = {};
+
+    memberChanges.forEach(c => {
+        const wasMember = isMemberValue(c.oldValue);
+        const isMember = isMemberValue(c.newValue);
+        let transType: 'joined' | 'departed' | 'status_change' = 'status_change';
+
+        if (!wasMember && isMember) {
+            transType = 'joined';
+        } else if (wasMember && !isMember) {
+            transType = 'departed';
+        }
+
+        const label = `${c.oldValue || 'None'} → ${c.newValue || 'None'}`;
+        if (!breakdownCounts[label]) {
+            breakdownCounts[label] = {
+                count: 0,
+                type: transType === 'joined' ? 'inflow' : transType === 'departed' ? 'outflow' : 'internal'
+            };
+        }
+        breakdownCounts[label].count++;
+
+        transitionItems.push({
+            id: c.id,
+            personId: c.personId,
+            personName: c.personName || 'Unknown Person',
+            date: c.date,
+            type: transType,
+            oldValue: c.oldValue,
+            newValue: c.newValue,
+            timestamp: c.timestamp || (c.date ? new Date(c.date).getTime() : Date.now())
+        });
+    });
+
+    // Also include new people created with membership status if not already recorded in statusChanges
+    const personIdsWithStatusChange = new Set(statusChanges.map(s => s.personId));
+    people.forEach(p => {
+        if (isMemberValue(p.membership) && p.createdAt && !personIdsWithStatusChange.has(p.id)) {
+            const createdMs = new Date(p.createdAt).getTime();
+            if (!isNaN(createdMs)) {
+                transitionItems.push({
+                    id: `created_${p.id}`,
+                    personId: p.id,
+                    personName: p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Unknown',
+                    date: p.createdAt,
+                    type: 'joined',
+                    oldValue: 'New Profile',
+                    newValue: p.membership || 'Member',
+                    timestamp: createdMs
+                });
+                const label = `New Profile → ${p.membership || 'Member'}`;
+                if (!breakdownCounts[label]) {
+                    breakdownCounts[label] = { count: 0, type: 'inflow' };
+                }
+                breakdownCounts[label].count++;
+            }
+        }
+    });
+
+    // Sort transitions newest first
+    transitionItems.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Current known active members
+    const currentMembers = people.filter(p => isMemberValue(p.membership) || isMemberValue(p.status)).length;
+
+    // Generate monthly sequence
+    const monthlyPoints: MembershipMonthlyPoint[] = [];
+    let curMonth = new Date(startDate);
+    const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Map transitions to ISO month
+    const joinsByMonth: Record<string, number> = {};
+    const departsByMonth: Record<string, number> = {};
+
+    transitionItems.forEach(t => {
+        if (t.type === 'joined') {
+            const key = toDateStr(new Date(t.timestamp)).slice(0, 7);
+            joinsByMonth[key] = (joinsByMonth[key] || 0) + 1;
+        } else if (t.type === 'departed') {
+            const key = toDateStr(new Date(t.timestamp)).slice(0, 7);
+            departsByMonth[key] = (departsByMonth[key] || 0) + 1;
+        }
+    });
+
+    // Build forward tracking
+    const monthKeys: string[] = [];
+    while (curMonth <= endMonth) {
+        const isoMonth = `${curMonth.getFullYear()}-${pad2(curMonth.getMonth() + 1)}`;
+        monthKeys.push(isoMonth);
+        curMonth.setMonth(curMonth.getMonth() + 1);
+    }
+
+    // Calculate total net additions from the end to compute past months:
+    let runningTotal = currentMembers;
+    const totalsByMonth: Record<string, number> = {};
+
+    for (let i = monthKeys.length - 1; i >= 0; i--) {
+        const iso = monthKeys[i];
+        totalsByMonth[iso] = runningTotal;
+        const joined = joinsByMonth[iso] || 0;
+        const departed = departsByMonth[iso] || 0;
+        const netChange = joined - departed;
+        runningTotal = Math.max(0, runningTotal - netChange);
+    }
+
+    let joinedInPeriod = 0;
+    let departedInPeriod = 0;
+
+    monthKeys.forEach(iso => {
+        const [y, m] = iso.split('-').map(Number);
+        const d = new Date(y, m - 1, 1);
+        const joined = joinsByMonth[iso] || 0;
+        const departed = departsByMonth[iso] || 0;
+        joinedInPeriod += joined;
+        departedInPeriod += departed;
+        monthlyPoints.push({
+            month: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+            isoMonth: iso,
+            totalMembers: totalsByMonth[iso] || currentMembers,
+            joined,
+            departed,
+            netChange: joined - departed
+        });
+    });
+
+    const startTotal = monthlyPoints.length > 0 ? (monthlyPoints[0].totalMembers - monthlyPoints[0].netChange) : currentMembers;
+    const netGrowthInPeriod = joinedInPeriod - departedInPeriod;
+    const netGrowthRatePercent = startTotal > 0 ? Math.round((netGrowthInPeriod / startTotal) * 100) : 0;
+    const retentionRatePercent = (startTotal + joinedInPeriod) > 0
+        ? Math.round((1 - (departedInPeriod / (startTotal + joinedInPeriod))) * 100)
+        : 100;
+
+    const breakdowns: MembershipTransitionBreakdown[] = Object.entries(breakdownCounts)
+        .map(([name, info]) => ({ name, count: info.count, type: info.type }))
+        .sort((a, b) => b.count - a.count);
+
+    // Filter transitions within time window
+    const startTimeMs = startDate.getTime();
+    const filteredTransitions = transitionItems.filter(t => t.timestamp >= startTimeMs);
+
+    return {
+        timeFilter,
+        chartPoints: monthlyPoints,
+        stats: {
+            currentMembers,
+            joinedInPeriod,
+            departedInPeriod,
+            netGrowthInPeriod,
+            netGrowthRatePercent,
+            retentionRatePercent: Math.max(0, Math.min(100, retentionRatePercent))
+        },
+        breakdowns,
+        transitions: filteredTransitions
     };
 };

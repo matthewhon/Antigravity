@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { 
     PcoPerson, PeopleDashboardData, PastoralNote, CareFollowUpLog, 
-    RiskSettings, Church, OutreachSession, OutreachSlot 
+    RiskSettings, Church, OutreachSession, OutreachSlot, StatusChangeRecord
 } from '../types';
+import { MembershipHistoryWidget } from './MembershipHistoryWidget';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { firestore } from '../services/firestoreService';
 import { 
@@ -121,6 +122,7 @@ interface CareReportPageProps {
     followUpLog: CareFollowUpLog[];
     riskSettings?: RiskSettings;
     church?: Church;
+    recentStatusChanges?: StatusChangeRecord[];
     onAddNote?: (personId: string, type: PastoralNote['type'], content: string) => Promise<void>;
     onMarkFollowedUp?: (personId: string) => void;
     onDismiss?: (personId: string, signal: string) => void;
@@ -168,7 +170,7 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${filename}-${today}.csv`;
+    link.download = `${filename}_${today}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 }
@@ -402,13 +404,15 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     followUpLog,
     riskSettings = DEFAULT_RISK_SETTINGS,
     church,
+    recentStatusChanges = [],
     onAddNote,
     onMarkFollowedUp,
     onDismiss,
 }) => {
     // --- Report Tab Selection ---
-    const [activeReportTab, setActiveReportTab] = useState<'directory' | 'sessions' | 'callers'>(() => {
+    const [activeReportTab, setActiveReportTab] = useState<'directory' | 'sessions' | 'callers' | 'membership'>(() => {
         const search = window.location.search;
+        if (search.includes('tab=membership')) return 'membership';
         if (search.includes('tab=sessions') || search.includes('tab=outreach')) return 'sessions';
         if (search.includes('tab=callers')) return 'callers';
         return 'directory';
@@ -849,6 +853,16 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                         <Users size={14} /> Care Directory
                     </button>
                     <button
+                        onClick={() => setActiveReportTab('membership')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
+                            activeReportTab === 'membership'
+                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                        }`}
+                    >
+                        <TrendingUp size={14} /> Membership Changes
+                    </button>
+                    <button
                         onClick={() => setActiveReportTab('sessions')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
                             activeReportTab === 'sessions'
@@ -1256,6 +1270,18 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                             </p>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {/* TAB: MEMBERSHIP CHANGES OVER TIME                                 */}
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {activeReportTab === 'membership' && (
+                <div className="space-y-6">
+                    <MembershipHistoryWidget
+                        people={peopleData.allPeople || []}
+                        statusChanges={recentStatusChanges.length > 0 ? recentStatusChanges : (peopleData.recentStatusChanges || [])}
+                    />
                 </div>
             )}
 

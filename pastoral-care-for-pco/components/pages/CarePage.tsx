@@ -94,6 +94,7 @@ export const CarePage: React.FC<CarePageProps> = ({
             donations={donations}
             servicesData={servicesData}
             checkIns={checkIns}
+            recentStatusChanges={recentStatusChanges}
             churchWidgets={user.widgetPreferences?.['pastoral_church'] || []}
             membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || []}
             communityWidgets={user.widgetPreferences?.['pastoral_community'] || []}

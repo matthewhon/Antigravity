@@ -39,6 +39,7 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
             figures: [
                 { label: 'Total', value: fmtNumber(areas.people.total) },
                 { label: 'New this month', value: fmtNumber(areas.people.newThisMonth) },
+                { label: 'Average age', value: areas.people.avgAge !== null && areas.people.avgAge !== undefined ? `${areas.people.avgAge} yrs` : '—' },
                 { label: 'At risk', value: fmtNumber(areas.people.atRisk) },
                 { label: 'Not in a group', value: fmtNumber(areas.people.unconnected) },
             ],
@@ -64,6 +65,8 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
                 { label: 'Active groups', value: fmtNumber(areas.groups.activeGroups) },
                 { label: 'People in a group', value: fmtNumber(areas.groups.peopleInGroups) },
                 { label: 'Connection rate', value: '', meter: areas.groups.connectionRate },
+                { label: 'Avg leader age', value: areas.groups.avgLeaderAge !== null && areas.groups.avgLeaderAge !== undefined ? `${areas.groups.avgLeaderAge} yrs` : '—' },
+                { label: 'Avg member age', value: areas.groups.avgMemberAge !== null && areas.groups.avgMemberAge !== undefined ? `${areas.groups.avgMemberAge} yrs` : '—' },
                 { label: 'Avg attendance', value: fmtNumber(areas.groups.avgAttendance) },
             ],
         });
@@ -75,6 +78,7 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
             figures: [
                 { label: 'Last Sunday', value: fmtNumber(areas.services.lastSunday) },
                 { label: 'Volunteers', value: fmtNumber(areas.services.volunteers) },
+                { label: 'Avg age serving', value: areas.services.avgServingAge !== null && areas.services.avgServingAge !== undefined ? `${areas.services.avgServingAge} yrs` : '—' },
                 { label: 'Fill rate', value: '', meter: areas.services.fillRate },
                 { label: 'Next service', value: dateShort(areas.services.nextServiceDate), subtle: true },
             ],

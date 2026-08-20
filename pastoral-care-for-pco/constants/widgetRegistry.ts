@@ -162,6 +162,7 @@ export const PASTORAL_CHURCH_WIDGETS: WidgetDefinition[] = [
 
 export const PASTORAL_MEMBERSHIP_WIDGETS: WidgetDefinition[] = [
     { id: 'member_headline_stats', label: 'Member Stats', icon: '📊', size: 'full', description: 'Membership headline stats.' },
+    { id: 'member_history_chart', label: 'Membership Over Time', icon: '📈', size: 'full', description: 'Track membership growth, additions, departures, and retention over time.' },
     { id: 'member_map', label: 'Member Map', icon: '🗺️', size: 'full', description: 'Map of where members live.' },
     { id: 'member_age_chart', label: 'Generational Mix', icon: '🥧', size: 'sm', description: 'Generational mix of members.' },
     { id: 'member_attrition_chart', label: 'Attrition', icon: '📉', size: 'lg', description: 'Membership attrition over time.' },
@@ -285,8 +286,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             ? ['church_growth_stats', 'church_spiritual_stats', 'church_attendance_chart', 'church_guest_funnel']
             : ['church_growth_stats', 'church_attendance_chart'],
         pastoral_membership: isPastor || isCare
-            ? ['member_headline_stats', 'member_map', 'member_age_chart', 'member_unconnected', 'member_pastoral_touches']
-            : ['member_headline_stats', 'member_map'],
+            ? ['member_headline_stats', 'member_history_chart', 'member_map', 'member_age_chart', 'member_unconnected', 'member_pastoral_touches']
+            : ['member_headline_stats', 'member_history_chart', 'member_map'],
         pastoral_community: ['censusHero', 'culturalMosaic', 'ministrySignals', 'economicHealth'],
         pastoral_care: isCare
             ? ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list']

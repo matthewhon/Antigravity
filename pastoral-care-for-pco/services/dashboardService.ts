@@ -105,10 +105,10 @@ export interface DashboardOverview {
     thisWeek: DeltaRow[];
     trends: TrendSeries[];
     areas: {
-        people?: { total: number; newThisMonth: number; atRisk: number; unconnected: number };
+        people?: { total: number; newThisMonth: number; atRisk: number; unconnected: number; avgAge: number | null };
         giving?: { mtd: number; ytd: number; activeDonors: number; lapsedDonors: number };
-        groups?: { activeGroups: number; peopleInGroups: number; connectionRate: number; avgAttendance: number };
-        services?: { lastSunday: number; volunteers: number; fillRate: number; nextServiceDate: string | null };
+        groups?: { activeGroups: number; peopleInGroups: number; connectionRate: number; avgAttendance: number; avgLeaderAge: number | null; avgMemberAge: number | null };
+        services?: { lastSunday: number; volunteers: number; fillRate: number; nextServiceDate: string | null; avgServingAge: number | null };
         comms?: {
             smsTotal: number; smsSent: number; smsReceived: number;
             activeThreads: number; needsReply: number;
@@ -455,13 +455,38 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
     // ── Area bands ───────────────────────────────────────────────────────────
     const areas: DashboardOverview['areas'] = {};
 
+    const calcAge = (birthdate?: string | null): number | null => {
+        if (!birthdate) return null;
+        const bd = new Date(birthdate);
+        if (isNaN(bd.getTime())) return null;
+        let age = now.getFullYear() - bd.getFullYear();
+        const m = now.getMonth() - bd.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) {
+            age--;
+        }
+        return age >= 0 && age <= 125 ? age : null;
+    };
+
+    const calcAverageAge = (peopleList: (PcoPerson | undefined | null)[]): number | null => {
+        const validAges = peopleList
+            .map(p => calcAge(p?.birthdate))
+            .filter((a): a is number => a !== null);
+        if (validAges.length === 0) return null;
+        const sum = validAges.reduce((s, a) => s + a, 0);
+        return Math.round(sum / validAges.length);
+    };
+
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+
     if (canPeople && peopleData) {
         const inAGroup = new Set(groups.flatMap(g => g.memberIds || []));
+        const allChurchPeople = peopleData.allPeople?.length ? peopleData.allPeople : people;
         areas.people = {
             total: peopleData.stats.total,
             newThisMonth: peopleData.stats.newThisMonth,
             atRisk: people.filter(p => p.historicRiskCategory === 'At Risk').length,
             unconnected: people.filter(p => !inAGroup.has(p.id)).length,
+            avgAge: calcAverageAge(allChurchPeople),
         };
     }
 
@@ -476,11 +501,17 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
 
     if (canGroups && groupsData) {
         const inAGroup = new Set(groups.flatMap(g => g.memberIds || []));
+        const leaderIdSet = new Set(groups.flatMap(g => g.leaderIds || []));
+        const memberIdSet = new Set(groups.flatMap(g => g.memberIds || []));
+        const leaderPeople = Array.from(leaderIdSet).map(id => peopleMap.get(id));
+        const memberPeople = Array.from(memberIdSet).map(id => peopleMap.get(id));
         areas.groups = {
             activeGroups: activeGroupCount,
             peopleInGroups: inAGroup.size,
             connectionRate: rate(inAGroup.size, people.length),
             avgAttendance: Math.round(groupsData.stats.averageAttendance || 0),
+            avgLeaderAge: calcAverageAge(leaderPeople),
+            avgMemberAge: calcAverageAge(memberPeople),
         };
     }
 
@@ -489,11 +520,23 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
             .map((p: ServicePlanSnapshot) => p.sortDate)
             .filter(Boolean)
             .sort();
+        const volunteerIdSet = new Set<string>();
+        (servicesData.teams || []).forEach(t => {
+            (t.scheduledMemberIds || []).forEach(id => volunteerIdSet.add(id));
+            (t.memberIds || []).forEach(id => volunteerIdSet.add(id));
+        });
+        (servicesData.futurePlans || []).forEach((p: any) => {
+            (p.teamMembers || []).forEach((m: any) => {
+                if (m.personId) volunteerIdSet.add(m.personId);
+            });
+        });
+        const servingPeople = Array.from(volunteerIdSet).map(id => peopleMap.get(id));
         areas.services = {
             lastSunday: lastSunday ?? 0,
             volunteers: servicesData.stats.uniqueVolunteers,
             fillRate: Math.round(servicesData.stats.fillRate || 0),
             nextServiceDate: upcoming[0] || null,
+            avgServingAge: calcAverageAge(servingPeople),
         };
     }
 

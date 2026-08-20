@@ -4,8 +4,9 @@ import {
     AttendanceData, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     CensusStats, PcoPerson, User, Church, PastoralNote, PrayerRequest,
     DetailedDonation, ServicesDashboardData, PcoCheckInRecord,
-    SmsConversation, SmsTag, CareFollowUpLog
+    SmsConversation, SmsTag, CareFollowUpLog, StatusChangeRecord
 } from '../types';
+import { MembershipHistoryWidget } from './MembershipHistoryWidget';
 import { db } from '../services/firebase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -65,6 +66,7 @@ interface PastoralViewProps {
   donations?: DetailedDonation[];
   servicesData?: ServicesDashboardData | null;
   checkIns?: PcoCheckInRecord[];
+  recentStatusChanges?: StatusChangeRecord[];
 }
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#10b981'];
@@ -340,7 +342,8 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   onUpdateTheme,
   donations = [],
   servicesData = null,
-  checkIns = []
+  checkIns = [],
+  recentStatusChanges = []
 }) => {
   const activeTab = activePage ?? 'Church';
   // View key used to resolve each widget's width from the shared registry sizing system.
@@ -1340,12 +1343,36 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       </div>
                   </WidgetWrapper>
               );
+          case 'member_history_chart':
+              return (
+                  <MembershipHistoryWidget
+                      people={peopleData?.allPeople || []}
+                      statusChanges={recentStatusChanges.length > 0 ? recentStatusChanges : (peopleData?.recentStatusChanges || [])}
+                      currentTheme={currentTheme}
+                  />
+              );
           case 'member_pastoral_touches':
               return (
-                  <WidgetWrapper title="Pastoral Touches" onRemove={() => handleRemoveWidget(id)} source="Notes (Beta)">
-                      <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                          <p className="text-2xl mb-2">🤝</p>
-                          <p className="text-xs font-bold text-slate-400">Pastoral Care tracking coming soon.</p>
+                  <WidgetWrapper title="Pastoral Touches" onRemove={() => handleRemoveWidget(id)} source="Care Log">
+                      <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center justify-between mb-3">
+                              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent Care Touches</span>
+                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{notes.length} Total</span>
+                          </div>
+                          <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                              {notes.slice(0, 5).map((n, idx) => (
+                                  <div key={idx} className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                          <span>{n.type === 'Visit' ? '🏠' : n.type === 'Call' ? '📞' : n.type === 'Meeting' ? '🤝' : n.type === 'Hospital' ? '🏥' : '📝'}</span>
+                                          <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{n.personName || 'Member'}</span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-400 shrink-0">{n.date || 'Recent'}</span>
+                                  </div>
+                              ))}
+                              {notes.length === 0 && (
+                                  <p className="text-xs text-slate-400 text-center py-4">No pastoral touches recorded yet.</p>
+                              )}
+                          </div>
                       </div>
                   </WidgetWrapper>
               );
@@ -1846,6 +1873,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               followUpLog={followUpLog}
               riskSettings={church.riskSettings}
               church={church}
+              recentStatusChanges={recentStatusChanges.length > 0 ? recentStatusChanges : (peopleData?.recentStatusChanges || [])}
               onAddNote={handleAddNoteForPerson}
               onMarkFollowedUp={handleMarkFollowedUp}
               onDismiss={handleDismiss}
