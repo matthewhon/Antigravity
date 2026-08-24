@@ -67,9 +67,26 @@ export async function fetchFromPco(churchId: string, url: string, method: string
   }
 
   if (!response.ok) {
-    let errorMsg = `PCO API error: ${response.status}`;
-    if (response.status === 401) errorMsg = 'Unauthorized: Planning Center Token expired or invalid. Please re-authenticate your church account.';
-    if (response.status === 403) errorMsg = 'Forbidden: Your Planning Center connection lacks the necessary scopes (e.g. giving/people). Please re-authenticate to upgrade your permissions.';
+    let pcoDetail = '';
+    try {
+      const errJson = await response.json();
+      if (errJson?.errors && Array.isArray(errJson.errors)) {
+        pcoDetail = errJson.errors.map((e: any) => e.meta?.description || e.detail || e.title).filter(Boolean).join('; ');
+      }
+    } catch {
+      // Ignore parse failure
+    }
+
+    let errorMsg = `PCO API error: ${response.status}${pcoDetail ? ` - ${pcoDetail}` : ''}`;
+    if (response.status === 401) {
+      errorMsg = 'Unauthorized: Planning Center Token expired or invalid. Please re-authenticate your church account in Settings.';
+    } else if (response.status === 403) {
+      if (pcoDetail && pcoDetail.toLowerCase().includes('cannot create a pledge')) {
+        errorMsg = `Forbidden: The Planning Center account connected to this app does not have Manager or Administrator permissions in Planning Center Giving (${pcoDetail}). Please grant Giving Manager/Admin access in Planning Center Accounts or re-connect with an admin account.`;
+      } else {
+        errorMsg = `Forbidden: Planning Center permission denied (${pcoDetail || 'lacks necessary permissions'}). Please ensure your connected Planning Center user has Manager/Admin permissions in Giving and People.`;
+      }
+    }
     throw new Error(errorMsg);
   }
   return response.json();
@@ -805,32 +822,42 @@ export async function submitPublicPledge(req: any, res: any) {
     }
 
     // 3. Create the Pledge in Planning Center Giving (amount_cents = full commitment)
-    const pledgePayload = {
-      data: {
-        type: 'Pledge',
-        attributes: {
-          amount_cents: amountCents,
-          joint_giver_type: jointGiverType || 'none'
-        },
-        relationships: {
-          person: {
-            data: {
-              type: 'Person',
-              id: personId
+    let pcoPledgeId: string | null = null;
+    let syncStatus = 'synced_to_pco';
+    let syncWarning: string | null = null;
+
+    try {
+      const pledgePayload = {
+        data: {
+          type: 'Pledge',
+          attributes: {
+            amount_cents: amountCents,
+            joint_giver_type: jointGiverType || 'none'
+          },
+          relationships: {
+            person: {
+              data: {
+                type: 'Person',
+                id: personId
+              }
             }
           }
         }
-      }
-    };
+      };
 
-    const pcoPledgeRes = await fetchFromPco(
-      churchId,
-      `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges`,
-      'POST',
-      pledgePayload
-    );
+      const pcoPledgeRes = await fetchFromPco(
+        churchId,
+        `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges`,
+        'POST',
+        pledgePayload
+      );
 
-    const pcoPledgeId = pcoPledgeRes.data?.id || null;
+      pcoPledgeId = pcoPledgeRes.data?.id || null;
+    } catch (pledgeErr: any) {
+      console.warn('[submitPublicPledge] Could not write pledge to PCO Giving directly:', pledgeErr.message);
+      syncStatus = 'pending_pco_permission';
+      syncWarning = pledgeErr.message;
+    }
 
     // 4. Save submission record in Firestore for logging and quick queries
     const submissionRecord = {
@@ -855,7 +882,8 @@ export async function submitPublicPledge(req: any, res: any) {
       isNewPerson,
       pcoPledgeId,
       submittedAt: Date.now(),
-      status: 'synced_to_pco'
+      status: syncStatus,
+      syncWarning: syncWarning || null
     };
 
     await db.collection('pledge_submissions').doc(submissionId).set(submissionRecord);

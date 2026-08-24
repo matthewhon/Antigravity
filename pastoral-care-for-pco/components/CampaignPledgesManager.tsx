@@ -1054,6 +1054,10 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                                 <CheckCircle size={12} /> Synced to PCO {sub.pcoPledgeId ? `(#${sub.pcoPledgeId})` : ''}
                               </span>
+                            ) : sub.status === 'pending_pco_permission' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800" title={sub.syncWarning || 'PCO connected user lacks Giving Manager permissions'}>
+                                <AlertCircle size={12} /> Saved (PCO Giving permission needed)
+                              </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
                                 <AlertCircle size={12} /> Pending Sync
