@@ -3,6 +3,16 @@ import { getDb } from './firebase.js';
 // Simple in-memory cache: { "churchId_type": { data: any, timestamp: number } }
 const cache: Record<string, { data: any; timestamp: number }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const PLEDGE_CACHE_TTL = 30 * 1000; // 30 seconds for campaign pledges to ensure immediate widget updates
+
+export function invalidatePledgeCampaignCache(churchId: string) {
+  delete cache[`${churchId}_pledge_campaigns`];
+  Object.keys(cache).forEach(key => {
+    if (key.startsWith(`${churchId}_pledge_`)) {
+      delete cache[key];
+    }
+  });
+}
 
 export async function fetchFromPco(churchId: string, url: string, method: string = 'GET', body?: any) {
   const db = getDb();
@@ -270,7 +280,7 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
   const { churchId } = req.params;
   const cacheKey = `${churchId}_pledge_campaigns`;
 
-  if (req.query.refresh !== 'true' && cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < CACHE_TTL) {
+  if (req.query.refresh !== 'true' && cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < PLEDGE_CACHE_TTL) {
     return res.json(cache[cacheKey].data);
   }
 
@@ -810,8 +820,8 @@ export async function submitPublicPledge(req: any, res: any) {
 
     await db.collection('pledge_submissions').doc(submissionId).set(submissionRecord);
 
-    // Invalidate cache
-    delete cache[`${churchId}_pledge_campaigns`];
+    // Invalidate cache immediately so embedded widgets update on next fetch
+    invalidatePledgeCampaignCache(churchId);
 
     res.json({
       success: true,
@@ -868,7 +878,7 @@ export async function savePledgeCampaignConfig(req: any, res: any) {
       updatedAt: Date.now()
     }, { merge: true });
 
-    delete cache[`${churchId}_pledge_campaigns`];
+    invalidatePledgeCampaignCache(churchId);
 
     res.json({ success: true, message: 'Campaign configuration saved successfully.' });
   } catch (e: any) {

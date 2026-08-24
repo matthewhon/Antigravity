@@ -34,7 +34,8 @@ import {
   getPublicPledgeCampaign,
   submitPublicPledge,
   savePledgeCampaignConfig,
-  getPledgeSubmissions
+  getPledgeSubmissions,
+  invalidatePledgeCampaignCache
 } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
@@ -151,9 +152,11 @@ async function startServer() {
 
         if (area && areaMap[area]) {
           await areaMap[area]();
+          invalidatePledgeCampaignCache(churchId);
           res.json({ success: true, area });
         } else {
           await syncAllData(churchId);
+          invalidatePledgeCampaignCache(churchId);
           res.json({ success: true, area: 'all' });
         }
       } catch (e: any) {

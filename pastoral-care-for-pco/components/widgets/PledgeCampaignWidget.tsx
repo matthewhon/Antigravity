@@ -73,10 +73,12 @@ export function PledgeCampaignWidget({
     }
   }, []);
 
-  // Fetch campaign data
+  // Fetch campaign data with background polling & visibility sync
   useEffect(() => {
-    const fetchCampaign = async () => {
-      setLoading(true);
+    let isMounted = true;
+
+    const fetchCampaign = async (isSilent = false) => {
+      if (!isSilent) setLoading(true);
       try {
         const url = activeCampaignId && activeCampaignId !== 'dynamic'
           ? `${apiBaseUrl}/api/public/pledge-campaign/${churchId}/${activeCampaignId}`
@@ -85,6 +87,8 @@ export function PledgeCampaignWidget({
         const res = await fetch(url, { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Failed to load campaign');
+
+        if (!isMounted) return;
 
         if (Array.isArray(data)) {
           const selected = activeCampaignId 
@@ -95,14 +99,38 @@ export function PledgeCampaignWidget({
           setCampaign(data);
         }
       } catch (e: any) {
-        setError(e.message);
+        if (!isSilent && isMounted) {
+          setError(e.message);
+        }
       } finally {
-        setLoading(false);
+        if (!isSilent && isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchCampaign();
-  }, [churchId, activeCampaignId]);
+    // Initial load
+    fetchCampaign(false);
+
+    // Periodic silent auto-refresh every 60 seconds to keep live metrics synced
+    const intervalId = setInterval(() => {
+      fetchCampaign(true);
+    }, 60000);
+
+    // Refresh immediately when user returns to or focuses the tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCampaign(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [churchId, activeCampaignId, apiBaseUrl]);
 
   // Color themes
   const color = propColor || params.get('color') || campaign?.colorTheme || 'indigo';
