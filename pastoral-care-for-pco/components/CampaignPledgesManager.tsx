@@ -37,6 +37,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
   const [bannerUrl, setBannerUrl] = useState('');
   const [graphicStyle, setGraphicStyle] = useState<'progress_bar' | 'thermometer' | 'radial_gauge' | 'card_hero' | 'minimal'>('progress_bar');
   const [colorTheme, setColorTheme] = useState('indigo');
+  const [progressBasis, setProgressBasis] = useState<'both' | 'received' | 'pledged'>('both');
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [allowOnlinePledging, setAllowOnlinePledging] = useState(true);
   const [pledgeButtonText, setPledgeButtonText] = useState('Pledge Now');
@@ -101,6 +102,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       setBannerUrl(camp.bannerUrl || '');
       setGraphicStyle(camp.graphicStyle || 'progress_bar');
       setColorTheme(camp.colorTheme || 'indigo');
+      setProgressBasis(camp.progressBasis || 'both');
       setAllowOnlinePledging(camp.allowOnlinePledging !== false);
       setPledgeButtonText(camp.pledgeButtonText || 'Pledge Now');
       setGivingEmbedMode(camp.givingEmbedMode || 'modal');
@@ -192,6 +194,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
         bannerUrl,
         graphicStyle,
         colorTheme,
+        progressBasis,
         allowOnlinePledging,
         pledgeButtonText,
         givingEmbedMode,
@@ -238,7 +241,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
     ? 'https://pastoralcare.barnabassoftware.com'
     : window.location.origin;
 
-  const embedParams = `type=pledge_campaign&churchId=${churchId}&campaignId=${selectedCampaignId}&graphicStyle=${graphicStyle}&color=${colorTheme}&theme=${themeMode}&givingMode=${givingEmbedMode}&givingBtnText=${encodeURIComponent(givingButtonText)}&pledgeBtnText=${encodeURIComponent(pledgeButtonText)}&allowPledges=${allowOnlinePledging}`
+  const embedParams = `type=pledge_campaign&churchId=${churchId}&campaignId=${selectedCampaignId}&graphicStyle=${graphicStyle}&color=${colorTheme}&theme=${themeMode}&progressBasis=${progressBasis}&givingMode=${givingEmbedMode}&givingBtnText=${encodeURIComponent(givingButtonText)}&pledgeBtnText=${encodeURIComponent(pledgeButtonText)}&allowPledges=${allowOnlinePledging}`
     + (autoHeight ? '&autoHeight=true' : '')
     + (scale !== 1 ? `&scale=${scale}` : '');
 
@@ -349,7 +352,8 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                 const goal = (camp.goalCents || 0) / 100;
                 const pledged = (camp.totalPledgedCents || 0) / 100;
                 const received = (camp.totalReceivedCents || 0) / 100;
-                const pct = goal > 0 ? Math.round((pledged / goal) * 100) : 0;
+                const pledgedPct = goal > 0 ? ((pledged / goal) * 100).toFixed(1) : '0';
+                const receivedPct = goal > 0 ? ((received / goal) * 100).toFixed(1) : '0';
 
                 return (
                   <div
@@ -386,32 +390,47 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                           )}
                         </div>
 
-                        {/* Progress Bar & Numbers */}
+                        {/* Dual Progress Bar & Numbers */}
                         <div className="space-y-2">
                           <div className="flex justify-between items-baseline text-xs">
-                            <span className="font-bold text-slate-700 dark:text-slate-300">
-                              ${Math.round(pledged).toLocaleString()}{' '}
-                              <span className="font-normal text-slate-400">/ ${Math.round(goal).toLocaleString()}</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                              ${Math.round(received).toLocaleString()} Given ({receivedPct}%)
                             </span>
-                            <span className="font-black text-indigo-600 dark:text-indigo-400">{pct}%</span>
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                              ${Math.round(pledged).toLocaleString()} Pledged ({pledgedPct}%)
+                            </span>
                           </div>
-                          <div className="w-full h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-700"
-                              style={{ width: `${Math.min(100, pct)}%` }}
-                            />
+
+                          <div className="relative w-full h-3.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                            {parseFloat(pledgedPct) > 0 && (
+                              <div
+                                className="absolute top-0 bottom-0 left-0 bg-indigo-300 dark:bg-indigo-700/60 rounded-full transition-all duration-700"
+                                style={{ width: `${Math.min(100, Math.max(4, parseFloat(pledgedPct)))}%` }}
+                              />
+                            )}
+                            {parseFloat(receivedPct) > 0 && (
+                              <div
+                                className="relative h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700 shadow-sm"
+                                style={{ width: `${Math.min(100, Math.max(5, parseFloat(receivedPct)))}%` }}
+                              />
+                            )}
+                          </div>
+
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                            <span>Target Goal: ${Math.round(goal).toLocaleString()}</span>
+                            <span>{camp.pledgeCount || 0} Pledges</span>
                           </div>
                         </div>
 
                         {/* Quick Stats Grid */}
-                        <div className="grid grid-cols-2 gap-2 text-center pt-2">
-                          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-750 border border-slate-100 dark:border-slate-700">
-                            <span className="text-[10px] uppercase font-bold text-slate-400">Pledges</span>
-                            <div className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">{camp.pledgeCount || 0}</div>
+                        <div className="grid grid-cols-2 gap-2 text-center pt-1">
+                          <div className="p-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                            <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Given to Fund</span>
+                            <div className="text-sm font-black text-emerald-700 dark:text-emerald-300 mt-0.5">${Math.round(received).toLocaleString()}</div>
                           </div>
-                          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-750 border border-slate-100 dark:border-slate-700">
-                            <span className="text-[10px] uppercase font-bold text-slate-400">Received</span>
-                            <div className="text-sm font-black text-slate-800 dark:text-slate-200 mt-0.5">${Math.round(received).toLocaleString()}</div>
+                          <div className="p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30">
+                            <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">Total Pledged</span>
+                            <div className="text-sm font-black text-indigo-700 dark:text-indigo-300 mt-0.5">${Math.round(pledged).toLocaleString()}</div>
                           </div>
                         </div>
                       </div>
@@ -521,6 +540,30 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                   onChange={e => setBannerUrl(e.target.value)}
                   className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white"
                 />
+              </div>
+            </div>
+
+            {/* Progress Metric Focus */}
+            <div>
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">Progress Metric Focus</label>
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+                {[
+                  { id: 'both', label: 'Combined' },
+                  { id: 'received', label: 'Money Given' },
+                  { id: 'pledged', label: 'Pledges' },
+                ].map(pb => (
+                  <button
+                    key={pb.id}
+                    onClick={() => setProgressBasis(pb.id as any)}
+                    className={`py-1.5 px-2 text-[11px] font-bold rounded-lg transition text-center ${
+                      progressBasis === pb.id
+                        ? 'bg-white dark:bg-slate-750 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {pb.label}
+                  </button>
+                ))}
               </div>
             </div>
 

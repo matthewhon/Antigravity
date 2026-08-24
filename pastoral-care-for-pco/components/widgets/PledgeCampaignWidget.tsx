@@ -117,13 +117,17 @@ export function PledgeCampaignWidget({
   const givingBtnText = propGivingButtonText || params.get('givingBtnText') || campaign?.givingButtonText || 'Give to Campaign';
   const pledgeBtnText = propPledgeButtonText || params.get('pledgeBtnText') || campaign?.pledgeButtonText || 'Pledge Now';
   const allowPledges = propAllowOnlinePledging ?? (params.get('allowPledges') !== 'false' && campaign?.allowOnlinePledging !== false);
+  const progressBasis = campaign?.progressBasis || 'both';
 
   // Calculations
   const goalDollars = (campaign?.goalCents || 0) / 100;
   const pledgedDollars = (campaign?.totalPledgedCents || 0) / 100;
   const receivedDollars = (campaign?.totalReceivedCents || 0) / 100;
-  const percentFunded = goalDollars > 0 ? Math.min(100, Math.round((pledgedDollars / goalDollars) * 100)) : 0;
-  const actualPercent = goalDollars > 0 ? ((pledgedDollars / goalDollars) * 100).toFixed(1) : '0';
+
+  const pledgedPercentNum = goalDollars > 0 ? Math.min(100, Math.round((pledgedDollars / goalDollars) * 100)) : 0;
+  const receivedPercentNum = goalDollars > 0 ? Math.min(100, Math.round((receivedDollars / goalDollars) * 100)) : 0;
+  const pledgedPercentStr = goalDollars > 0 ? ((pledgedDollars / goalDollars) * 100).toFixed(1) : '0';
+  const receivedPercentStr = goalDollars > 0 ? ((receivedDollars / goalDollars) * 100).toFixed(1) : '0';
 
   const daysLeft = useMemo(() => {
     if (!campaign?.endsAt) return null;
@@ -240,24 +244,45 @@ export function PledgeCampaignWidget({
                 {/* Mercury Liquid Fill */}
                 <defs>
                   <linearGradient id="mercuryGrad" x1="0" y1="1" x2="0" y2="0">
-                    <stop offset="0%" stopColor="#4f46e5" />
+                    <stop offset="0%" stopColor="#10b981" />
+                    <stop offset="100%" stopColor="#34d399" />
+                  </linearGradient>
+                  <linearGradient id="pledgeGrad" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0%" stopColor="#6366f1" />
                     <stop offset="100%" stopColor="#818cf8" />
                   </linearGradient>
                 </defs>
-                {/* Bulb Liquid */}
+
+                {/* Bulb Liquid (Received) */}
                 <circle cx="50" cy="195" r="24" fill="url(#mercuryGrad)" />
-                {/* Tube Liquid */}
-                {percentFunded > 0 && (
+
+                {/* Pledged Column (Translucent background) */}
+                {pledgedPercentNum > 0 && (
                   <rect 
                     x="40" 
-                    y={170 - (Math.min(100, percentFunded) / 100) * 140} 
+                    y={170 - (Math.min(100, pledgedPercentNum) / 100) * 140} 
                     width="20" 
-                    height={(Math.min(100, percentFunded) / 100) * 140 + 10} 
+                    height={(Math.min(100, pledgedPercentNum) / 100) * 140 + 10} 
+                    rx="10" 
+                    fill="url(#pledgeGrad)" 
+                    opacity="0.6"
+                    className="transition-all duration-1000"
+                  />
+                )}
+
+                {/* Given / Received Liquid (Solid Foreground) */}
+                {receivedPercentNum > 0 && (
+                  <rect 
+                    x="40" 
+                    y={170 - (Math.min(100, receivedPercentNum) / 100) * 140} 
+                    width="20" 
+                    height={(Math.min(100, receivedPercentNum) / 100) * 140 + 10} 
                     rx="10" 
                     fill="url(#mercuryGrad)" 
                     className="transition-all duration-1000"
                   />
                 )}
+
                 {/* Tick marks */}
                 {[0, 25, 50, 75, 100].map((t) => {
                   const y = 170 - (t / 100) * 140;
@@ -274,13 +299,16 @@ export function PledgeCampaignWidget({
             {/* Thermometer Stats Breakdown */}
             <div className="flex-1 space-y-4 text-center md:text-left">
               <div>
-                <span className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Total Pledged to Date</span>
+                <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Total Given Toward Fund</span>
                 <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-                  ${Math.round(pledgedDollars).toLocaleString()}
+                  ${Math.round(receivedDollars).toLocaleString()}
                 </div>
-                <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-2">
                   <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                    {actualPercent}% of Goal
+                    {receivedPercentStr}% Given
+                  </span>
+                  <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                    {pledgedPercentStr}% Pledged
                   </span>
                   <span className="text-sm text-slate-500 dark:text-slate-400">
                     Target: <strong>${Math.round(goalDollars).toLocaleString()}</strong>
@@ -288,47 +316,84 @@ export function PledgeCampaignWidget({
                 </div>
               </div>
 
-              {/* Pledgers info */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs font-bold text-slate-400 uppercase">Pledges Made</div>
-                  <div className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{campaign.pledgeCount || 0}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Total Pledged</div>
+                  <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 mt-0.5">${Math.round(pledgedDollars).toLocaleString()}</div>
                 </div>
                 <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs font-bold text-slate-400 uppercase">Total Received</div>
-                  <div className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">${Math.round(receivedDollars).toLocaleString()}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Pledges Count</div>
+                  <div className="text-lg font-black text-slate-800 dark:text-slate-200 mt-0.5">{campaign.pledgeCount || 0}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 col-span-2 sm:col-span-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Goal Target</div>
+                  <div className="text-lg font-black text-slate-800 dark:text-slate-200 mt-0.5">${Math.round(goalDollars).toLocaleString()}</div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. VISUAL GRAPHIC: PROGRESS BAR & MILESTONES */}
+        {/* 2. VISUAL GRAPHIC: PROGRESS BAR & DUAL PROGRESS TRACKS */}
         {(graphicStyle === 'progress_bar' || graphicStyle === 'card_hero') && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-end">
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
               <div>
-                <span className="text-xs font-black uppercase tracking-wider text-slate-400">Campaign Progress</span>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-400">Campaign Giving & Pledge Progress</span>
                 <div className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mt-0.5">
-                  ${Math.round(pledgedDollars).toLocaleString()}{' '}
-                  <span className="text-lg sm:text-xl font-semibold text-slate-400">
-                    / ${Math.round(goalDollars).toLocaleString()}
-                  </span>
+                  ${Math.round(receivedDollars).toLocaleString()}{' '}
+                  <span className="text-base sm:text-lg font-medium text-slate-400">Given</span>
+                  {' · '}
+                  <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                    ${Math.round(pledgedDollars).toLocaleString()}
+                  </span>{' '}
+                  <span className="text-base sm:text-lg font-medium text-slate-400">Pledged</span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">{actualPercent}%</span>
-                <span className="block text-[10px] uppercase font-bold text-slate-400">Funded</span>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{receivedPercentStr}%</span>
+                  <span className="block text-[10px] uppercase font-bold text-slate-400">Given</span>
+                </div>
+                <div className="text-right border-l pl-3 border-slate-200 dark:border-slate-700">
+                  <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">{pledgedPercentStr}%</span>
+                  <span className="block text-[10px] uppercase font-bold text-slate-400">Pledged</span>
+                </div>
               </div>
             </div>
 
-            {/* Gradient Progress Bar */}
-            <div className="relative w-full h-7 bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700 overflow-hidden shadow-inner">
-              <div 
-                className={`h-full rounded-full bg-gradient-to-r ${activeTheme.bar} transition-all duration-1000 shadow-md relative flex items-center justify-end pr-2`}
-                style={{ width: `${Math.max(5, Math.min(100, percentFunded))}%` }}
-              >
-                <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+            {/* Dual Multi-layer Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="relative w-full h-8 bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700 overflow-hidden shadow-inner flex items-center">
+                {/* Pledged bar (outer/behind) */}
+                {pledgedPercentNum > 0 && (
+                  <div 
+                    className="absolute top-1 bottom-1 left-1 rounded-full bg-indigo-400/40 dark:bg-indigo-500/40 transition-all duration-1000 border-r-2 border-indigo-500"
+                    style={{ width: `calc(${Math.min(100, Math.max(4, pledgedPercentNum))}% - 8px)` }}
+                  />
+                )}
+                {/* Given / Received bar (inner solid) */}
+                {receivedPercentNum > 0 && (
+                  <div 
+                    className={`relative h-full rounded-full bg-gradient-to-r ${activeTheme.bar} transition-all duration-1000 shadow-md flex items-center justify-end pr-2`}
+                    style={{ width: `${Math.min(100, Math.max(5, receivedPercentNum))}%` }}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 px-1">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Given: ${Math.round(receivedDollars).toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" /> Pledged: ${Math.round(pledgedDollars).toLocaleString()}
+                  </span>
+                </div>
+                <span>Goal: ${Math.round(goalDollars).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -337,9 +402,11 @@ export function PledgeCampaignWidget({
         {/* 3. VISUAL GRAPHIC: RADIAL GAUGE */}
         {graphicStyle === 'radial_gauge' && (
           <div className="flex flex-col sm:flex-row items-center justify-around gap-6 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-            <div className="relative w-44 h-44 flex items-center justify-center">
+            <div className="relative w-48 h-48 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                {/* Background Ring */}
                 <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="12" className="text-slate-200 dark:text-slate-700 fill-none" />
+                {/* Pledged Ring */}
                 <circle 
                   cx="60" 
                   cy="60" 
@@ -347,30 +414,42 @@ export function PledgeCampaignWidget({
                   stroke="currentColor" 
                   strokeWidth="12" 
                   strokeDasharray="314.159" 
-                  strokeDashoffset={314.159 - (314.159 * Math.min(100, percentFunded)) / 100}
+                  strokeDashoffset={314.159 - (314.159 * Math.min(100, pledgedPercentNum)) / 100}
                   strokeLinecap="round" 
-                  className="text-indigo-600 dark:text-indigo-400 fill-none transition-all duration-1000"
+                  className="text-indigo-300 dark:text-indigo-500/50 fill-none transition-all duration-1000"
+                />
+                {/* Given Ring */}
+                <circle 
+                  cx="60" 
+                  cy="60" 
+                  r="50" 
+                  stroke="currentColor" 
+                  strokeWidth="12" 
+                  strokeDasharray="314.159" 
+                  strokeDashoffset={314.159 - (314.159 * Math.min(100, receivedPercentNum)) / 100}
+                  strokeLinecap="round" 
+                  className="text-emerald-500 dark:text-emerald-400 fill-none transition-all duration-1000"
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-3xl font-black text-slate-900 dark:text-white">{actualPercent}%</span>
-                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Funded</span>
+                <span className="text-3xl font-black text-slate-900 dark:text-white">{receivedPercentStr}%</span>
+                <span className="text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">Given</span>
               </div>
             </div>
 
             <div className="space-y-3 text-center sm:text-left">
               <div>
-                <span className="text-xs font-bold text-slate-400 uppercase">Pledged Amount</span>
-                <div className="text-3xl font-black text-slate-900 dark:text-white">${Math.round(pledgedDollars).toLocaleString()}</div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Given Toward Fund</span>
+                <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">${Math.round(receivedDollars).toLocaleString()}</div>
               </div>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase">Goal</span>
-                  <div className="text-lg font-bold text-slate-700 dark:text-slate-300">${Math.round(goalDollars).toLocaleString()}</div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Pledged ({pledgedPercentStr}%)</span>
+                  <div className="text-lg font-black text-indigo-600 dark:text-indigo-400">${Math.round(pledgedDollars).toLocaleString()}</div>
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase">Pledgers</span>
-                  <div className="text-lg font-bold text-slate-700 dark:text-slate-300">{campaign.pledgeCount || 0}</div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Target Goal</span>
+                  <div className="text-lg font-bold text-slate-700 dark:text-slate-300">${Math.round(goalDollars).toLocaleString()}</div>
                 </div>
               </div>
             </div>

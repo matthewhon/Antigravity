@@ -65,6 +65,32 @@ export async function fetchFromPco(churchId: string, url: string, method: string
   return response.json();
 }
 
+export async function fetchAllFromPco(churchId: string, initialUrl: string, maxPages: number = 10): Promise<{ data: any[]; included: any[] }> {
+  let allData: any[] = [];
+  let allIncluded: any[] = [];
+  let nextUrl: string | null = initialUrl;
+  let page = 0;
+
+  while (nextUrl && page < maxPages) {
+    page++;
+    try {
+      const res = await fetchFromPco(churchId, nextUrl);
+      if (res.data && Array.isArray(res.data)) {
+        allData = allData.concat(res.data);
+      }
+      if (res.included && Array.isArray(res.included)) {
+        allIncluded = allIncluded.concat(res.included);
+      }
+      nextUrl = res.links?.next || null;
+    } catch (e) {
+      console.warn(`[fetchAllFromPco] Pagination stopped at page ${page}:`, e);
+      break;
+    }
+  }
+
+  return { data: allData, included: allIncluded };
+}
+
 export async function getPublicGroups(req: any, res: any) {
   const { churchId } = req.params;
   const cacheKey = `${churchId}_groups`;
@@ -268,32 +294,78 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
       const fundId = c.relationships?.fund?.data?.id;
       const fundObj = included.find((i: any) => i.type === 'Fund' && i.id === fundId);
       const customConfig = configsMap.get(c.id) || {};
+      const startsAt = c.attributes?.starts_at || null;
+      const startDateStr = startsAt ? startsAt.slice(0, 10) : '';
 
       let totalPledgedCents = 0;
       let pledgeCount = 0;
 
+      // 1. Fetch all pledges across pages for this campaign
       try {
-        const pledgesData = await fetchFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${c.id}/pledges?per_page=100`);
-        const pledgesList = pledgesData.data || [];
+        const pledgesRes = await fetchAllFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${c.id}/pledges?per_page=100`);
+        const pledgesList = pledgesRes.data || [];
         pledgeCount = pledgesList.length;
         totalPledgedCents = pledgesList.reduce((sum: number, p: any) => sum + (p.attributes?.amount_cents || 0), 0);
       } catch (err) {
         console.warn(`[publicApi] Could not fetch pledges for campaign ${c.id}:`, err);
       }
 
-      let totalReceivedCents = c.attributes?.total_cents || 0;
-      if (totalReceivedCents === 0 && fundId) {
+      // 2. Fetch total money given to the campaign fund
+      let totalReceivedCents = 0;
+      let donorsCount = 0;
+
+      if (fundId) {
         try {
           const donationsSnap = await db.collection('donations')
             .where('churchId', '==', churchId)
             .where('fundId', '==', fundId)
             .get();
+
           if (!donationsSnap.empty) {
-            totalReceivedCents = donationsSnap.docs.reduce((sum, d) => sum + Math.round((d.data()?.amount || 0) * 100), 0);
+            const uniqueDonors = new Set<string>();
+            donationsSnap.docs.forEach(d => {
+              const data = d.data();
+              const donationDate = (data.date || '').slice(0, 10);
+              if (!startDateStr || donationDate >= startDateStr) {
+                totalReceivedCents += Math.round((data.amount || 0) * 100);
+                if (data.donorId && data.donorId !== 'anonymous') {
+                  uniqueDonors.add(data.donorId);
+                }
+              }
+            });
+            donorsCount = uniqueDonors.size;
+          } else {
+            // Live fallback query to PCO Giving
+            const sinceDate = startDateStr || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+            const liveDonations = await fetchAllFromPco(
+              churchId, 
+              `https://api.planningcenteronline.com/giving/v2/donations?where[received_at][gte]=${sinceDate}&include=designations&per_page=100`,
+              5
+            );
+            const liveIncluded = liveDonations.included || [];
+            const uniqueLiveDonors = new Set<string>();
+
+            (liveDonations.data || []).forEach((d: any) => {
+              const donorId = d.relationships?.person?.data?.id;
+              const designationRefs = d.relationships?.designations?.data || [];
+              designationRefs.forEach((ref: any) => {
+                const des = liveIncluded.find((i: any) => i.type === 'Designation' && String(i.id) === String(ref.id));
+                if (des && des.relationships?.fund?.data?.id === fundId) {
+                  totalReceivedCents += des.attributes?.amount_cents || 0;
+                  if (donorId) uniqueLiveDonors.add(donorId);
+                }
+              });
+            });
+            donorsCount = uniqueLiveDonors.size;
           }
         } catch (e) {
-          // Ignore
+          console.warn(`[publicApi] Error calculating donations for fund ${fundId}:`, e);
         }
+      }
+
+      // Check if PCO attributes supplied total_cents
+      if (totalReceivedCents === 0 && c.attributes?.total_cents) {
+        totalReceivedCents = c.attributes.total_cents;
       }
 
       const churchCenterUrl = subdomain
@@ -304,7 +376,7 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         id: c.id,
         name: c.attributes?.name || 'Unnamed Campaign',
         description: c.attributes?.description || '',
-        startsAt: c.attributes?.starts_at || null,
+        startsAt,
         endsAt: c.attributes?.ends_at || null,
         goalCents: c.attributes?.goal_cents || 0,
         goalCurrency: c.attributes?.goal_currency || 'USD',
@@ -315,7 +387,9 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         churchCenterUrl,
         totalPledgedCents,
         pledgeCount,
-        totalReceivedCents: totalReceivedCents || totalPledgedCents,
+        totalReceivedCents,
+        donorsCount,
+        progressBasis: customConfig.progressBasis || 'both', // 'both' | 'received' | 'pledged'
         imageUrl: customConfig.imageUrl || null,
         bannerUrl: customConfig.bannerUrl || null,
         headline: customConfig.headline || '',
@@ -364,32 +438,74 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
 
     const configDoc = await db.collection('churches').doc(churchId).collection('pledge_campaign_configs').doc(campaignId).get();
     const customConfig = configDoc.exists ? configDoc.data() || {} : {};
+    const startsAt = c.attributes?.starts_at || null;
+    const startDateStr = startsAt ? startsAt.slice(0, 10) : '';
 
     let totalPledgedCents = 0;
     let pledgeCount = 0;
 
     try {
-      const pledgesData = await fetchFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges?per_page=100`);
-      const pledgesList = pledgesData.data || [];
+      const pledgesRes = await fetchAllFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges?per_page=100`);
+      const pledgesList = pledgesRes.data || [];
       pledgeCount = pledgesList.length;
       totalPledgedCents = pledgesList.reduce((sum: number, p: any) => sum + (p.attributes?.amount_cents || 0), 0);
     } catch (err) {
       console.warn(`[publicApi] Could not fetch pledges for campaign ${campaignId}:`, err);
     }
 
-    let totalReceivedCents = c.attributes?.total_cents || 0;
-    if (totalReceivedCents === 0 && fundId) {
+    let totalReceivedCents = 0;
+    let donorsCount = 0;
+
+    if (fundId) {
       try {
         const donationsSnap = await db.collection('donations')
           .where('churchId', '==', churchId)
           .where('fundId', '==', fundId)
           .get();
+
         if (!donationsSnap.empty) {
-          totalReceivedCents = donationsSnap.docs.reduce((sum, d) => sum + Math.round((d.data()?.amount || 0) * 100), 0);
+          const uniqueDonors = new Set<string>();
+          donationsSnap.docs.forEach(d => {
+            const data = d.data();
+            const donationDate = (data.date || '').slice(0, 10);
+            if (!startDateStr || donationDate >= startDateStr) {
+              totalReceivedCents += Math.round((data.amount || 0) * 100);
+              if (data.donorId && data.donorId !== 'anonymous') {
+                uniqueDonors.add(data.donorId);
+              }
+            }
+          });
+          donorsCount = uniqueDonors.size;
+        } else {
+          const sinceDate = startDateStr || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+          const liveDonations = await fetchAllFromPco(
+            churchId, 
+            `https://api.planningcenteronline.com/giving/v2/donations?where[received_at][gte]=${sinceDate}&include=designations&per_page=100`,
+            5
+          );
+          const liveIncluded = liveDonations.included || [];
+          const uniqueLiveDonors = new Set<string>();
+
+          (liveDonations.data || []).forEach((d: any) => {
+            const donorId = d.relationships?.person?.data?.id;
+            const designationRefs = d.relationships?.designations?.data || [];
+            designationRefs.forEach((ref: any) => {
+              const des = liveIncluded.find((i: any) => i.type === 'Designation' && String(i.id) === String(ref.id));
+              if (des && des.relationships?.fund?.data?.id === fundId) {
+                totalReceivedCents += des.attributes?.amount_cents || 0;
+                if (donorId) uniqueLiveDonors.add(donorId);
+              }
+            });
+          });
+          donorsCount = uniqueLiveDonors.size;
         }
       } catch (e) {
-        // Ignore
+        console.warn(`[publicApi] Error calculating donations for fund ${fundId}:`, e);
       }
+    }
+
+    if (totalReceivedCents === 0 && c.attributes?.total_cents) {
+      totalReceivedCents = c.attributes.total_cents;
     }
 
     const churchCenterUrl = subdomain
@@ -400,7 +516,7 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       id: c.id,
       name: c.attributes?.name || 'Unnamed Campaign',
       description: c.attributes?.description || '',
-      startsAt: c.attributes?.starts_at || null,
+      startsAt,
       endsAt: c.attributes?.ends_at || null,
       goalCents: c.attributes?.goal_cents || 0,
       goalCurrency: c.attributes?.goal_currency || 'USD',
@@ -411,7 +527,9 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       churchCenterUrl,
       totalPledgedCents,
       pledgeCount,
-      totalReceivedCents: totalReceivedCents || totalPledgedCents,
+      totalReceivedCents,
+      donorsCount,
+      progressBasis: customConfig.progressBasis || 'both',
       imageUrl: customConfig.imageUrl || null,
       bannerUrl: customConfig.bannerUrl || null,
       headline: customConfig.headline || '',
