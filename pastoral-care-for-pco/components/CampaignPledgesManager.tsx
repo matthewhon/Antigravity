@@ -38,6 +38,8 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
   const [graphicStyle, setGraphicStyle] = useState<'progress_bar' | 'thermometer' | 'radial_gauge' | 'card_hero' | 'minimal'>('progress_bar');
   const [colorTheme, setColorTheme] = useState('indigo');
   const [progressBasis, setProgressBasis] = useState<'both' | 'received' | 'pledged'>('both');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [allowOnlinePledging, setAllowOnlinePledging] = useState(true);
   const [pledgeButtonText, setPledgeButtonText] = useState('Pledge Now');
@@ -103,6 +105,8 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       setGraphicStyle(camp.graphicStyle || 'progress_bar');
       setColorTheme(camp.colorTheme || 'indigo');
       setProgressBasis(camp.progressBasis || 'both');
+      setStartDate(camp.startDate || (camp.startsAt ? camp.startsAt.slice(0, 10) : ''));
+      setEndDate(camp.endDate || (camp.endsAt ? camp.endsAt.slice(0, 10) : ''));
       setAllowOnlinePledging(camp.allowOnlinePledging !== false);
       setPledgeButtonText(camp.pledgeButtonText || 'Pledge Now');
       setGivingEmbedMode(camp.givingEmbedMode || 'modal');
@@ -195,6 +199,8 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
         graphicStyle,
         colorTheme,
         progressBasis,
+        startDate: startDate || null,
+        endDate: endDate || null,
         allowOnlinePledging,
         pledgeButtonText,
         givingEmbedMode,
@@ -210,9 +216,9 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save configuration');
 
-      // Update in local campaigns array
-      setCampaigns(prev => prev.map(c => String(c.id) === String(selectedCampaignId) ? { ...c, ...payload } : c));
-      showToast('Campaign widget configuration saved!');
+      // Refresh campaigns from backend to recalculate totals for this date range
+      await loadCampaigns(true);
+      showToast('Campaign widget & date range configuration saved!');
     } catch (e: any) {
       showToast(`Save failed: ${e.message}`);
     } finally {
@@ -382,7 +388,15 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
 
                       <div className="p-5 space-y-4">
                         <div>
-                          <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{camp.name}</h3>
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{camp.name}</h3>
+                            {(camp.startDate || camp.endDate || camp.startsAt || camp.endsAt) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md shrink-0">
+                                <Calendar size={11} className="text-indigo-500" />
+                                {camp.startDate || camp.startsAt?.slice(0, 10) || 'Open'} → {camp.endDate || camp.endsAt?.slice(0, 10) || 'Ongoing'}
+                              </span>
+                            )}
+                          </div>
                           {camp.description && (
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                               {camp.description.replace(/<[^>]+>/g, '')}
@@ -565,6 +579,49 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Campaign Date Range (Beginning & End Dates) */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500">Campaign Date Range</label>
+                {selectedCampaign?.pcoStartsAt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate(selectedCampaign.pcoStartsAt ? selectedCampaign.pcoStartsAt.slice(0, 10) : '');
+                      setEndDate(selectedCampaign.pcoEndsAt ? selectedCampaign.pcoEndsAt.slice(0, 10) : '');
+                    }}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                  >
+                    Reset to PCO
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Beginning Date</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">End Date</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                PCO donations & pledges between these dates are synced and calculated toward this campaign.
+              </p>
             </div>
 
             {/* Visual Graphic Style */}

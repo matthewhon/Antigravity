@@ -130,10 +130,11 @@ export function PledgeCampaignWidget({
   const receivedPercentStr = goalDollars > 0 ? ((receivedDollars / goalDollars) * 100).toFixed(1) : '0';
 
   const daysLeft = useMemo(() => {
-    if (!campaign?.endsAt) return null;
-    const diff = differenceInDays(new Date(campaign.endsAt), new Date());
+    const end = campaign?.endDate || campaign?.endsAt;
+    if (!end) return null;
+    const diff = differenceInDays(new Date(end), new Date());
     return Math.max(0, diff);
-  }, [campaign?.endsAt]);
+  }, [campaign?.endDate, campaign?.endsAt]);
 
   const handlePledgeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +207,12 @@ export function PledgeCampaignWidget({
             {campaign.fundName && (
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/40 backdrop-blur-md border border-white/10 text-slate-200">
                 <Target size={13} className="text-indigo-400" /> {campaign.fundName}
+              </span>
+            )}
+            {(campaign.startDate || campaign.endDate) && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/40 backdrop-blur-md border border-white/10 text-slate-300">
+                <Calendar size={13} className="text-indigo-300" /> 
+                {campaign.startDate || 'Start'} → {campaign.endDate || 'Ongoing'}
               </span>
             )}
             {daysLeft !== null && (
