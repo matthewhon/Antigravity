@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User } from '../types';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
@@ -34,6 +34,17 @@ function formatDate(dateStr?: string | null) {
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
+
+export function canViewGiving(user?: User | null): boolean {
+  if (!user || !user.roles) return false;
+  return user.roles.some((role: string) => 
+    role === 'System Administration' ||
+    role === 'Church Admin' ||
+    role === 'Pastor' ||
+    role === 'Giving' ||
+    role === 'Finance'
+  );
 }
 
 export function getPersonEmail(person?: PcoPerson | null): string | null {
@@ -240,6 +251,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
     }
   }, [person, noteContent, noteType, noteFollowUp, churchId, user, pcoConnected]);
 
+  const canAccessGiving = canViewGiving(user);
+
   useEffect(() => {
     if (!personId || !churchId) return;
     const loadData = async () => {
@@ -255,7 +268,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           firestore.getPersonOutreachSlots(churchId, personId),
           firestore.getGroups(churchId),
           firestore.getPrayerRequests(churchId),
-          firestore.getDetailedDonations(churchId),
+          canAccessGiving ? firestore.getDetailedDonations(churchId) : Promise.resolve([]),
         ]);
         setAllPeople(people);
         setGroups(fetchedGroups);
@@ -666,53 +679,55 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             )}
           </div>
 
-          {/* ── Giving Health ── */}
-          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-emerald-500" />
-                Giving Health & Donor Status
-              </h3>
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                hasRecurring
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/40'
-                  : isDonor 
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
-                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-              }`}>
-                {hasRecurring ? 'Recurring Giver' : isDonor ? 'Active Contributor' : 'Non-Giver'}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">YTD Contributions</span>
-                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block">
-                  {effectiveYtd > 0 ? formatCurrency(effectiveYtd) : (effectiveMonthly > 0 ? `${formatCurrency(effectiveMonthly)}/mo` : 'No gifts YTD')}
+          {/* ── Giving Health (Gated by Permission) ── */}
+          {canAccessGiving && (
+            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-500" />
+                  Giving Health & Donor Status
+                </h3>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  hasRecurring
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/40'
+                    : isDonor 
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                }`}>
+                  {hasRecurring ? 'Recurring Giver' : isDonor ? 'Active Contributor' : 'Non-Giver'}
                 </span>
               </div>
-              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Latest Contribution</span>
-                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
-                  {lastDonation ? `${formatCurrency(lastDonation.amount)} (${formatDate(lastDonation.date)})` : (isDonor ? 'Active Giver' : 'None logged')}
-                </span>
-              </div>
-            </div>
-            {recentDonations.length > 0 && (
-              <div className="space-y-1 pt-1">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">Recent Gifts:</span>
-                <div className="space-y-1">
-                  {recentDonations.slice(0, 3).map((d, i) => (
-                    <div key={d.id || i} className="flex justify-between items-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl text-xs border border-slate-100 dark:border-slate-700/60">
-                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{d.fundName || 'General Fund'}</span>
-                      <span className="font-bold text-slate-800 dark:text-white shrink-0 ml-2">
-                        {formatCurrency(d.amount)} <span className="text-[10px] text-slate-400 font-normal">({formatDate(d.date)})</span>
-                      </span>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">YTD Contributions</span>
+                  <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block">
+                    {effectiveYtd > 0 ? formatCurrency(effectiveYtd) : (effectiveMonthly > 0 ? `${formatCurrency(effectiveMonthly)}/mo` : 'No gifts YTD')}
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Latest Contribution</span>
+                  <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
+                    {lastDonation ? `${formatCurrency(lastDonation.amount)} (${formatDate(lastDonation.date)})` : (isDonor ? 'Active Giver' : 'None logged')}
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
+              {recentDonations.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Recent Gifts:</span>
+                  <div className="space-y-1">
+                    {recentDonations.slice(0, 3).map((d, i) => (
+                      <div key={d.id || i} className="flex justify-between items-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl text-xs border border-slate-100 dark:border-slate-700/60">
+                        <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{d.fundName || 'General Fund'}</span>
+                        <span className="font-bold text-slate-800 dark:text-white shrink-0 ml-2">
+                          {formatCurrency(d.amount)} <span className="text-[10px] text-slate-400 font-normal">({formatDate(d.date)})</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Prayer Requests ── */}
           <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
