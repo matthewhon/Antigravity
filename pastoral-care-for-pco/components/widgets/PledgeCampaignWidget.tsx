@@ -5,9 +5,11 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 
-const apiBaseUrl = process.env.NODE_ENV === 'production'
-  ? 'https://pastoralcare.barnabassoftware.com'
-  : 'http://localhost:8080';
+const apiBaseUrl = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
+  ? window.location.origin
+  : (process.env.NODE_ENV === 'production'
+    ? 'https://pastoralcare.barnabassoftware.com'
+    : 'http://localhost:8080');
 
 interface PledgeCampaignWidgetProps {
   churchId: string;
@@ -72,13 +74,11 @@ export function PledgeCampaignWidget({
     const fetchCampaign = async () => {
       setLoading(true);
       try {
-        const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
-        let url = `${apiBaseUrl}/api/public/pledge-campaigns/${churchId}${queryStr}`;
-        if (activeCampaignId && activeCampaignId !== 'dynamic') {
-          url = `${apiBaseUrl}/api/public/pledge-campaign/${churchId}/${activeCampaignId}${queryStr}`;
-        }
+        const url = activeCampaignId && activeCampaignId !== 'dynamic'
+          ? `${apiBaseUrl}/api/public/pledge-campaign/${churchId}/${activeCampaignId}`
+          : `${apiBaseUrl}/api/public/pledge-campaigns/${churchId}`;
         
-        const res = await fetch(url);
+        const res = await fetch(url, { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Failed to load campaign');
 

@@ -266,6 +266,7 @@ export async function getFeaturedEvent(req: any, res: any) {
 }
 
 export async function getPublicPledgeCampaigns(req: any, res: any) {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   const { churchId } = req.params;
   const cacheKey = `${churchId}_pledge_campaigns`;
 
@@ -449,6 +450,7 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
 }
 
 export async function getPublicPledgeCampaign(req: any, res: any) {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   const { churchId, campaignId } = req.params;
   try {
     const db = getDb();

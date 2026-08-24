@@ -10,9 +10,11 @@ import { storage } from '../services/firebase';
 import { Church } from '../types';
 import { PledgeCampaignWidget } from './widgets/PledgeCampaignWidget';
 
-const apiBaseUrl = process.env.NODE_ENV === 'production'
-  ? 'https://pastoralcare.barnabassoftware.com'
-  : 'http://localhost:8080';
+const apiBaseUrl = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
+  ? window.location.origin
+  : (process.env.NODE_ENV === 'production'
+    ? 'https://pastoralcare.barnabassoftware.com'
+    : 'http://localhost:8080');
 
 interface CampaignPledgesManagerProps {
   churchId: string;
@@ -74,7 +76,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
     setLoading(true);
     try {
       const queryStr = refresh ? '?refresh=true' : '';
-      const res = await fetch(`${apiBaseUrl}/api/public/pledge-campaigns/${churchId}${queryStr}`);
+      const res = await fetch(`${apiBaseUrl}/api/public/pledge-campaigns/${churchId}${queryStr}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch campaigns');
       
