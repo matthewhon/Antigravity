@@ -49,13 +49,17 @@ export function PledgeCampaignWidget({
     lastName: '',
     email: '',
     phone: '',
-    amount: '',
-    frequency: 'one_time',
+    pledgeType: 'monthly' as 'one_time' | 'monthly',
+    amount: '500',
+    monthlyAmount: '100',
+    durationMonths: 12,
+    customDuration: '',
     jointGiverType: 'none',
     notes: ''
   });
   const [isSubmittingPledge, setIsSubmittingPledge] = useState(false);
   const [pledgeSubmitted, setPledgeSubmitted] = useState(false);
+  const [submittedSummary, setSubmittedSummary] = useState('');
   const [pledgeError, setPledgeError] = useState<string | null>(null);
 
   // Load Church Center modal script if in modal mode
@@ -136,23 +140,49 @@ export function PledgeCampaignWidget({
     return Math.max(0, diff);
   }, [campaign?.endDate, campaign?.endsAt]);
 
+  // Current commitment calculation in form
+  const effectiveMonths = pledgeForm.durationMonths || 1;
+  const effectiveMonthlyAmount = parseFloat(pledgeForm.monthlyAmount) || 0;
+  const calculatedTotalCommitment = pledgeForm.pledgeType === 'monthly'
+    ? effectiveMonthlyAmount * effectiveMonths
+    : (parseFloat(pledgeForm.amount) || 0);
+
   const handlePledgeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingPledge(true);
     setPledgeError(null);
 
     try {
+      const payload = {
+        firstName: pledgeForm.firstName,
+        lastName: pledgeForm.lastName,
+        email: pledgeForm.email,
+        phone: pledgeForm.phone,
+        pledgeType: pledgeForm.pledgeType,
+        amount: String(calculatedTotalCommitment),
+        monthlyAmount: pledgeForm.pledgeType === 'monthly' ? effectiveMonthlyAmount : null,
+        durationMonths: pledgeForm.pledgeType === 'monthly' ? effectiveMonths : null,
+        jointGiverType: pledgeForm.jointGiverType,
+        notes: pledgeForm.notes
+      };
+
       const res = await fetch(`${apiBaseUrl}/api/public/pledge-campaign/${churchId}/${campaign.id}/pledge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pledgeForm)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to submit pledge');
 
+      const summaryText = pledgeForm.pledgeType === 'monthly'
+        ? `$${effectiveMonthlyAmount.toFixed(2)}/month for ${effectiveMonths} months ($${calculatedTotalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total commitment)`
+        : `$${calculatedTotalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} one-time pledge`;
+
+      setSubmittedSummary(summaryText);
       setPledgeSubmitted(true);
+
       // Update local state numbers
-      const addedCents = Math.round(parseFloat(pledgeForm.amount) * 100);
+      const addedCents = Math.round(calculatedTotalCommitment * 100);
       setCampaign((prev: any) => ({
         ...prev,
         totalPledgedCents: (prev.totalPledgedCents || 0) + addedCents,
@@ -547,8 +577,11 @@ export function PledgeCampaignWidget({
                 </div>
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">Thank You for Your Pledge!</h3>
                 <p className="text-sm text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
-                  Your pledge of <strong>${parseFloat(pledgeForm.amount).toLocaleString()}</strong> towards <strong>{campaign.name}</strong> has been securely recorded.
+                  Your pledge commitment towards <strong>{campaign.name}</strong> has been securely recorded:
                 </p>
+                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-800 dark:text-emerald-300 font-bold text-sm">
+                  {submittedSummary}
+                </div>
                 <button
                   onClick={() => setShowPledgeModal(false)}
                   className="w-full py-3 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition"
@@ -562,13 +595,133 @@ export function PledgeCampaignWidget({
                   <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Make a Commitment</span>
                   <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{campaign.name}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Fill out the details below to submit your campaign pledge.
+                    Choose a one-time gift or monthly pledge for a set number of months.
                   </p>
                 </div>
 
                 {pledgeError && (
                   <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2">
                     <AlertCircle size={14} className="shrink-0" /> {pledgeError}
+                  </div>
+                )}
+
+                {/* Pledge Commitment Type Toggle */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setPledgeForm({ ...pledgeForm, pledgeType: 'monthly' })}
+                    className={`py-2 px-3 text-xs font-black rounded-xl transition text-center flex items-center justify-center gap-1.5 ${
+                      pledgeForm.pledgeType === 'monthly'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Calendar size={13} /> Monthly Pledge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPledgeForm({ ...pledgeForm, pledgeType: 'one_time' })}
+                    className={`py-2 px-3 text-xs font-black rounded-xl transition text-center flex items-center justify-center gap-1.5 ${
+                      pledgeForm.pledgeType === 'one_time'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <DollarSign size={13} /> One-Time Gift
+                  </button>
+                </div>
+
+                {/* Monthly Recurring Form Section */}
+                {pledgeForm.pledgeType === 'monthly' ? (
+                  <div className="space-y-3 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Monthly Amount ($) *</label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-2 font-black text-slate-400 text-sm">$</span>
+                          <input 
+                            type="number" 
+                            required 
+                            min="1" 
+                            step="any"
+                            value={pledgeForm.monthlyAmount}
+                            onChange={e => setPledgeForm({ ...pledgeForm, monthlyAmount: e.target.value })}
+                            placeholder="100.00" 
+                            className="w-full pl-7 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-base font-black bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Duration (Months) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          min="1" 
+                          max="120"
+                          value={pledgeForm.durationMonths}
+                          onChange={e => setPledgeForm({ ...pledgeForm, durationMonths: parseInt(e.target.value, 10) || 1 })}
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-base font-black bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Duration Quick Preset Chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: '6 Mos', months: 6 },
+                        { label: '12 Mos (1 Yr)', months: 12 },
+                        { label: '24 Mos (2 Yrs)', months: 24 },
+                        { label: '36 Mos (3 Yrs)', months: 36 },
+                        { label: '48 Mos (4 Yrs)', months: 48 },
+                      ].map(chip => (
+                        <button
+                          key={chip.months}
+                          type="button"
+                          onClick={() => setPledgeForm({ ...pledgeForm, durationMonths: chip.months })}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${
+                            pledgeForm.durationMonths === chip.months
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Live Total Commitment Calculation Card */}
+                    <div className="p-3 bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-800 rounded-xl flex items-center justify-between shadow-sm">
+                      <div className="text-xs">
+                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Total Campaign Commitment</span>
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">
+                          ${(parseFloat(pledgeForm.monthlyAmount) || 0).toFixed(2)}/mo × {pledgeForm.durationMonths || 1} mos
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-base font-black text-indigo-600 dark:text-indigo-400">
+                          ${calculatedTotalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* One-Time Gift Section */
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">One-Time Pledge Amount ($) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-2.5 font-black text-slate-400 text-base">$</span>
+                      <input 
+                        type="number" 
+                        required 
+                        min="1" 
+                        step="any"
+                        value={pledgeForm.amount}
+                        onChange={e => setPledgeForm({ ...pledgeForm, amount: e.target.value })}
+                        placeholder="500.00" 
+                        className="w-full pl-8 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-black bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -622,47 +775,15 @@ export function PledgeCampaignWidget({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Pledge Amount ($) *</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 font-black text-slate-400 text-base">$</span>
-                    <input 
-                      type="number" 
-                      required 
-                      min="1" 
-                      step="any"
-                      value={pledgeForm.amount}
-                      onChange={e => setPledgeForm({ ...pledgeForm, amount: e.target.value })}
-                      placeholder="500.00" 
-                      className="w-full pl-8 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-black bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Frequency</label>
-                    <select
-                      value={pledgeForm.frequency}
-                      onChange={e => setPledgeForm({ ...pledgeForm, frequency: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="one_time">One-Time Pledge</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="annually">Annually</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Pledge As</label>
-                    <select
-                      value={pledgeForm.jointGiverType}
-                      onChange={e => setPledgeForm({ ...pledgeForm, jointGiverType: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="none">Individual</option>
-                      <option value="joint">Joint / Household</option>
-                    </select>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Pledge As</label>
+                  <select
+                    value={pledgeForm.jointGiverType}
+                    onChange={e => setPledgeForm({ ...pledgeForm, jointGiverType: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="none">Individual</option>
+                    <option value="joint">Joint / Household</option>
+                  </select>
                 </div>
 
                 <div>
@@ -678,11 +799,18 @@ export function PledgeCampaignWidget({
 
                 <button
                   type="submit"
-                  disabled={isSubmittingPledge}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={isSubmittingPledge || calculatedTotalCommitment <= 0}
+                  className={`w-full py-3.5 px-6 rounded-2xl font-black text-sm text-white transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 ${activeTheme.bg}`}
                 >
-                  {isSubmittingPledge ? <Loader2 size={16} className="animate-spin" /> : <Heart size={16} />}
-                  {isSubmittingPledge ? 'Submitting to Planning Center...' : 'Confirm Pledge'}
+                  {isSubmittingPledge ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recording Pledge in Planning Center...
+                    </>
+                  ) : (
+                    <>
+                      <Heart size={16} /> Submit Pledge (${calculatedTotalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    </>
+                  )}
                 </button>
               </form>
             )}

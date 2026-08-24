@@ -629,18 +629,43 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
 
 export async function submitPublicPledge(req: any, res: any) {
   const { churchId, campaignId } = req.params;
-  const { firstName, lastName, email, phone, amount, frequency, jointGiverType, notes } = req.body;
+  const { 
+    firstName, lastName, email, phone, 
+    amount, pledgeType = 'one_time', monthlyAmount, durationMonths, 
+    frequency, jointGiverType, notes 
+  } = req.body;
 
-  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-    return res.status(400).json({ error: 'Valid pledge amount is required.' });
+  let totalCommitment = 0;
+  let parsedMonthlyAmount = 0;
+  let parsedDurationMonths = 1;
+
+  if (pledgeType === 'monthly') {
+    parsedMonthlyAmount = parseFloat(monthlyAmount);
+    parsedDurationMonths = parseInt(durationMonths, 10);
+    if (!parsedMonthlyAmount || isNaN(parsedMonthlyAmount) || parsedMonthlyAmount <= 0) {
+      return res.status(400).json({ error: 'Valid monthly pledge amount is required.' });
+    }
+    if (!parsedDurationMonths || isNaN(parsedDurationMonths) || parsedDurationMonths < 1) {
+      return res.status(400).json({ error: 'Valid number of pledge months (at least 1) is required.' });
+    }
+    totalCommitment = parsedMonthlyAmount * parsedDurationMonths;
+  } else {
+    totalCommitment = parseFloat(amount);
+    if (!totalCommitment || isNaN(totalCommitment) || totalCommitment <= 0) {
+      return res.status(400).json({ error: 'Valid pledge amount is required.' });
+    }
   }
+
   if (!firstName || !lastName) {
     return res.status(400).json({ error: 'First name and last name are required.' });
   }
 
   const db = getDb();
   const submissionId = `pledge_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const amountCents = Math.round(parseFloat(amount) * 100);
+  const amountCents = Math.round(totalCommitment * 100);
+  const formattedSchedule = pledgeType === 'monthly'
+    ? `$${parsedMonthlyAmount.toFixed(2)}/mo for ${parsedDurationMonths} months ($${totalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Total)`
+    : `One-Time Pledge of $${totalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   try {
     // 1. Search for existing person in PCO People by email or phone
@@ -729,7 +754,7 @@ export async function submitPublicPledge(req: any, res: any) {
       }
     }
 
-    // 3. Create the Pledge in Planning Center Giving
+    // 3. Create the Pledge in Planning Center Giving (amount_cents = full commitment)
     const pledgePayload = {
       data: {
         type: 'Pledge',
@@ -766,10 +791,15 @@ export async function submitPublicPledge(req: any, res: any) {
       lastName,
       email: email || '',
       phone: phone || '',
-      amount: parseFloat(amount),
+      pledgeType,
+      monthlyAmount: pledgeType === 'monthly' ? parsedMonthlyAmount : null,
+      durationMonths: pledgeType === 'monthly' ? parsedDurationMonths : null,
+      totalCommitment,
+      amount: totalCommitment,
       amountCents,
-      frequency: frequency || 'one_time',
+      frequency: pledgeType === 'monthly' ? 'monthly' : (frequency || 'one_time'),
       jointGiverType: jointGiverType || 'none',
+      formattedSchedule,
       notes: notes || '',
       personId,
       isNewPerson,
@@ -788,7 +818,12 @@ export async function submitPublicPledge(req: any, res: any) {
       submissionId,
       pcoPledgeId,
       personId,
-      message: `Pledge of $${parseFloat(amount).toLocaleString()} successfully recorded in Planning Center!`
+      pledgeType,
+      monthlyAmount: parsedMonthlyAmount,
+      durationMonths: parsedDurationMonths,
+      totalCommitment,
+      formattedSchedule,
+      message: `Pledge of $${totalCommitment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} successfully recorded in Planning Center!`
     });
   } catch (e: any) {
     console.error('[submitPublicPledge] Error:', e);
@@ -801,12 +836,18 @@ export async function submitPublicPledge(req: any, res: any) {
         lastName,
         email: email || '',
         phone: phone || '',
-        amount: parseFloat(amount) || 0,
+        pledgeType,
+        monthlyAmount: parsedMonthlyAmount,
+        durationMonths: parsedDurationMonths,
+        totalCommitment,
+        amount: totalCommitment,
         amountCents,
-        frequency: frequency || 'one_time',
+        formattedSchedule,
+        frequency: pledgeType === 'monthly' ? 'monthly' : (frequency || 'one_time'),
+        jointGiverType: jointGiverType || 'none',
         notes: notes || '',
         submittedAt: Date.now(),
-        status: 'failed_pco_sync',
+        status: 'error',
         error: e.message
       });
     } catch (saveErr) {

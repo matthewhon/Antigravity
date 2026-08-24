@@ -903,86 +903,151 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       )}
 
       {/* ─── TAB 3: PLEDGE SUBMISSIONS LOG ─────────────────────────────── */}
-      {activeTab === 'submissions' && (
-        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">Online Pledge Submissions</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Pledges submitted through the website widget and automatically synced to Planning Center.
-              </p>
-            </div>
-            <span className="text-xs font-bold text-slate-400">
-              {submissions.length} Total Submissions
-            </span>
-          </div>
+      {activeTab === 'submissions' && (() => {
+        const totalPledgedVol = submissions.reduce((s, sub) => s + (sub.totalCommitment || sub.amount || 0), 0);
+        const monthlySubs = submissions.filter(s => s.pledgeType === 'monthly');
+        const oneTimeSubs = submissions.filter(s => s.pledgeType !== 'monthly');
+        const monthlyCashflow = monthlySubs.reduce((s, sub) => s + (sub.monthlyAmount || 0), 0);
 
-          {loadingSubmissions ? (
-            <div className="flex items-center justify-center h-48 text-slate-400">
-              <Loader2 size={24} className="animate-spin mr-2 text-indigo-500" /> Loading submissions...
+        return (
+          <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">Online Pledge Submissions</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pledges submitted through the website widget and automatically synced to Planning Center.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-slate-400">
+                {submissions.length} Total Submissions
+              </span>
             </div>
-          ) : submissions.length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-              <Heart size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">No online pledges recorded yet.</p>
-              <p className="text-[11px] text-slate-400 mt-1">When visitors submit a pledge on your website widget, they will appear here.</p>
+
+            {/* Top Summary Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400">Total Pledged Commitment</span>
+                <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+                  ${totalPledgedVol.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  Across {submissions.length} total pledges
+                </span>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400">Monthly Recurring Pledges</span>
+                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                  ${monthlyCashflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold text-slate-400">/mo</span>
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  {monthlySubs.length} recurring pledges scheduled
+                </span>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400">One-Time Pledges</span>
+                <div className="text-xl font-black text-slate-900 dark:text-white">
+                  ${oneTimeSubs.reduce((s, sub) => s + (sub.totalCommitment || sub.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  {oneTimeSubs.length} one-time gifts pledged
+                </span>
+              </div>
             </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
-                    <th className="px-4 py-3 text-left">Pledger Name</th>
-                    <th className="px-4 py-3 text-left">Contact</th>
-                    <th className="px-4 py-3 text-left">Pledge Amount</th>
-                    <th className="px-4 py-3 text-left">Frequency</th>
-                    <th className="px-4 py-3 text-left">PCO Sync Status</th>
-                    <th className="px-4 py-3 text-right">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
-                  {submissions.map(sub => (
-                    <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-750 transition">
-                      <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
-                        {sub.firstName} {sub.lastName}
-                        {sub.isNewPerson && (
-                          <span className="ml-2 text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded font-bold border border-indigo-200 dark:border-indigo-800">
-                            New Person
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                        <div>{sub.email}</div>
-                        {sub.phone && <div className="text-[10px] text-slate-400">{sub.phone}</div>}
-                      </td>
-                      <td className="px-4 py-3 font-black text-slate-900 dark:text-white">
-                        ${(sub.amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 capitalize text-slate-600 dark:text-slate-300">
-                        {sub.frequency?.replace('_', ' ') || 'One-Time'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {sub.status === 'synced_to_pco' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                            <CheckCircle size={12} /> Synced to PCO ({sub.pcoPledgeId || 'Pledge Created'})
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
-                            <AlertCircle size={12} /> Pending Sync
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-400">
-                        {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </td>
+
+            {loadingSubmissions ? (
+              <div className="flex items-center justify-center h-48 text-slate-400">
+                <Loader2 size={24} className="animate-spin mr-2 text-indigo-500" /> Loading submissions...
+              </div>
+            ) : submissions.length === 0 ? (
+              <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                <Heart size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">No online pledges recorded yet.</p>
+                <p className="text-[11px] text-slate-400 mt-1">When visitors submit a pledge on your website widget, they will appear here.</p>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
+                      <th className="px-4 py-3 text-left">Pledger Name</th>
+                      <th className="px-4 py-3 text-left">Contact</th>
+                      <th className="px-4 py-3 text-left">Schedule & Breakdown</th>
+                      <th className="px-4 py-3 text-left">Total Commitment</th>
+                      <th className="px-4 py-3 text-left">PCO Sync Status</th>
+                      <th className="px-4 py-3 text-right">Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium">
+                    {submissions.map(sub => {
+                      const total = sub.totalCommitment || sub.amount || 0;
+                      const isMonthly = sub.pledgeType === 'monthly';
+
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-750 transition">
+                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                            {sub.firstName} {sub.lastName}
+                            {sub.isNewPerson && (
+                              <span className="ml-2 text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded font-bold border border-indigo-200 dark:border-indigo-800">
+                                New Person
+                              </span>
+                            )}
+                            {sub.jointGiverType === 'joint' && (
+                              <span className="ml-1 text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">
+                                Joint
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                            <div>{sub.email}</div>
+                            {sub.phone && <div className="text-[10px] text-slate-400">{sub.phone}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isMonthly ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/80">
+                                <Calendar size={11} className="text-emerald-500" />
+                                ${(sub.monthlyAmount || 0).toLocaleString()}/mo × {sub.durationMonths || 1} mos
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-lg">
+                                <DollarSign size={11} className="text-slate-400" />
+                                One-Time Gift
+                              </span>
+                            )}
+                            {sub.notes && (
+                              <div className="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">
+                                {sub.notes}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-black text-slate-900 dark:text-white">
+                            ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-3">
+                            {sub.status === 'synced_to_pco' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle size={12} /> Synced to PCO {sub.pcoPledgeId ? `(#${sub.pcoPledgeId})` : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
+                                <AlertCircle size={12} /> Pending Sync
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-400">
+                            {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };
