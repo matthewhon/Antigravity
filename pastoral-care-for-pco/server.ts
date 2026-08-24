@@ -35,6 +35,7 @@ import {
   submitPublicPledge,
   savePledgeCampaignConfig,
   getPledgeSubmissions,
+  syncPledgeSubmissionToPco,
   invalidatePledgeCampaignCache
 } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
@@ -361,6 +362,7 @@ async function startServer() {
     app.post('/api/public/pledge-campaign/:churchId/:campaignId/pledge', express.json(), submitPublicPledge);
     app.post('/api/pledge-campaign-config/:churchId/:campaignId', express.json(), savePledgeCampaignConfig);
     app.get('/api/pledge-submissions/:churchId/:campaignId', getPledgeSubmissions);
+    app.post('/api/pledge-submissions/:churchId/:submissionId/sync-pco', express.json(), syncPledgeSubmissionToPco);
     app.get('/widget.js', serveWidgetScript);
 
     // ─── PCO Web Forms Endpoints ─────────────────────────────────────

@@ -66,10 +66,32 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
   // Submissions state
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [syncingSubId, setSyncingSubId] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3500);
+  };
+
+  const handleSyncSubmissionToPco = async (submissionId: string) => {
+    setSyncingSubId(submissionId);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/pledge-submissions/${churchId}/${submissionId}/sync-pco`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to sync pledge to Planning Center');
+      showToast('Pledge successfully synced to Planning Center Giving!');
+      // Refresh submissions
+      const refreshed = await fetch(`${apiBaseUrl}/api/pledge-submissions/${churchId}/${selectedCampaignId || 'all'}`).then(r => r.json());
+      setSubmissions(Array.isArray(refreshed) ? refreshed : []);
+      await loadCampaigns(true);
+    } catch (err: any) {
+      showToast(`Sync error: ${err.message}`);
+    } finally {
+      setSyncingSubId(null);
+    }
   };
 
   // Fetch campaigns from backend
@@ -981,6 +1003,19 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
               </div>
             </div>
 
+            {/* Informational banner if any submissions are pending PCO permissions */}
+            {submissions.some(s => s.status === 'pending_pco_permission') && (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
+                <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-900 dark:text-amber-200">
+                  <strong className="font-bold">Planning Center Giving Permission Required:</strong>
+                  <p className="mt-0.5 text-[11px] leading-relaxed opacity-90">
+                    Pledges submitted on your website are safely recorded in your church database. To insert them into Planning Center Giving, grant <strong>Manager</strong> or <strong>Administrator</strong> access for <strong>Giving</strong> to the connected Planning Center user in Accounts, then click <strong>Sync to PCO</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {loadingSubmissions ? (
               <div className="flex items-center justify-center h-48 text-slate-400">
                 <Loader2 size={24} className="animate-spin mr-2 text-indigo-500" /> Loading submissions...
@@ -1050,19 +1085,36 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                             ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3">
-                            {sub.status === 'synced_to_pco' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                <CheckCircle size={12} /> Synced to PCO {sub.pcoPledgeId ? `(#${sub.pcoPledgeId})` : ''}
-                              </span>
-                            ) : sub.status === 'pending_pco_permission' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800" title={sub.syncWarning || 'PCO connected user lacks Giving Manager permissions'}>
-                                <AlertCircle size={12} /> Saved (PCO Giving permission needed)
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
-                                <AlertCircle size={12} /> Pending Sync
-                              </span>
-                            )}
+                            <div className="space-y-1">
+                              {sub.status === 'synced_to_pco' ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                  <CheckCircle size={12} /> Synced to PCO {sub.pcoPledgeId ? `(#${sub.pcoPledgeId})` : ''}
+                                </span>
+                              ) : sub.status === 'pending_pco_permission' ? (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800" title={sub.syncWarning || 'PCO connected user lacks Giving Manager permissions'}>
+                                    <AlertCircle size={12} /> Saved (PCO Giving permission needed)
+                                  </span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">
+                                    <AlertCircle size={12} /> Pending Sync
+                                  </span>
+                                </div>
+                              )}
+
+                              {sub.status !== 'synced_to_pco' && (
+                                <button
+                                  onClick={() => handleSyncSubmissionToPco(sub.id)}
+                                  disabled={syncingSubId === sub.id}
+                                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 flex items-center gap-1 transition"
+                                >
+                                  {syncingSubId === sub.id ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                                  Sync to PCO
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-right text-slate-400">
                             {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}

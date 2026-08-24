@@ -958,15 +958,102 @@ export async function getPledgeSubmissions(req: any, res: any) {
   const { churchId, campaignId } = req.params;
   try {
     const db = getDb();
-    let q = db.collection('pledge_submissions').where('churchId', '==', churchId);
+    const snap = await db.collection('pledge_submissions')
+      .where('churchId', '==', churchId)
+      .get();
+    
+    let submissions = snap.docs.map(d => d.data());
     if (campaignId && campaignId !== 'all') {
-      q = q.where('campaignId', '==', campaignId);
+      submissions = submissions.filter(s => String(s.campaignId) === String(campaignId));
     }
-    const snap = await q.orderBy('submittedAt', 'desc').limit(100).get();
-    const submissions = snap.docs.map(d => d.data());
+    submissions.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
     res.json(submissions);
   } catch (e: any) {
+    console.error('[publicApi] getPledgeSubmissions error:', e);
     res.status(500).json({ error: e.message });
+  }
+}
+
+export async function syncPledgeSubmissionToPco(req: any, res: any) {
+  const { churchId, submissionId } = req.params;
+  try {
+    const db = getDb();
+    const docRef = db.collection('pledge_submissions').doc(submissionId);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+    const sub = docSnap.data();
+
+    // 1. Ensure personId exists in PCO
+    let personId = sub.personId;
+    if (!personId) {
+      if (sub.email) {
+        try {
+          const searchRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(sub.email.trim())}`);
+          if (searchRes.data && searchRes.data.length > 0) {
+            personId = searchRes.data[0].relationships?.person?.data?.id || null;
+          }
+        } catch (err) {}
+      }
+      if (!personId && (sub.firstName || sub.lastName)) {
+        const createRes = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/people/v2/people', 'POST', {
+          data: {
+            type: 'Person',
+            attributes: { first_name: sub.firstName?.trim(), last_name: sub.lastName?.trim() }
+          }
+        });
+        personId = createRes.data?.id || null;
+      }
+    }
+
+    if (!personId) {
+      throw new Error('Unable to find or create person in Planning Center');
+    }
+
+    // 2. Create the pledge in PCO Giving
+    const pledgePayload = {
+      data: {
+        type: 'Pledge',
+        attributes: {
+          amount_cents: sub.amountCents || Math.round((sub.amount || sub.totalCommitment || 0) * 100),
+          joint_giver_type: sub.jointGiverType || 'none'
+        },
+        relationships: {
+          person: {
+            data: {
+              type: 'Person',
+              id: personId
+            }
+          }
+        }
+      }
+    };
+
+    const pcoRes = await fetchFromPco(
+      churchId,
+      `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${sub.campaignId}/pledges`,
+      'POST',
+      pledgePayload
+    );
+
+    const pcoPledgeId = pcoRes.data?.id;
+
+    await docRef.update({
+      personId,
+      pcoPledgeId,
+      status: 'synced_to_pco',
+      syncWarning: null,
+      error: null,
+      syncedAt: Date.now()
+    });
+
+    invalidatePledgeCampaignCache(churchId);
+
+    res.json({ success: true, pcoPledgeId, message: 'Pledge successfully synced to Planning Center Giving!' });
+  } catch (err: any) {
+    console.error('[publicApi] syncPledgeSubmissionToPco error:', err);
+    res.status(500).json({ error: err.message });
   }
 }
 
