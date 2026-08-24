@@ -118,6 +118,17 @@ export const syncPeopleData = async (churchId: string) => {
             const rawPhone = primaryPhone ? primaryPhone.number.replace(/\D/g, '') : '';
             const e164Phone = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : null;
 
+            // ── Emails ──────────────────────────────────────────────────────
+            const personEmails = (included || [])
+                .filter(i => i.type === 'Email' && rels?.emails?.data?.some((r: any) => r.id === i.id))
+                .map(e => ({
+                    address: e.attributes.address,
+                    location: e.attributes.location,
+                    primary: e.attributes.primary,
+                }));
+
+            const primaryEmail = personEmails.find(e => e.primary) || personEmails[0] || null;
+
             return {
                 id: p.id,
                 churchId,
@@ -137,6 +148,7 @@ export const syncPeopleData = async (churchId: string) => {
                 spiritualMilestones: milestones,
                 householdId,
                 householdName,
+                email: primaryEmail ? primaryEmail.address : null,
                 phone: primaryPhone ? primaryPhone.number : null,
                 e164Phone,
                 phoneNumbers: personPhoneNumbers,
@@ -149,13 +161,7 @@ export const syncPeopleData = async (churchId: string) => {
                         zip: a.attributes.zip || null,
                         location: a.attributes.location || null,
                     })),
-                emails: (included || [])
-                    .filter(i => i.type === 'Email' && rels?.emails?.data?.some((r: any) => r.id === i.id))
-                    .map(e => ({
-                        address: e.attributes.address,
-                        location: e.attributes.location,
-                        primary: e.attributes.primary,
-                    })),
+                emails: personEmails,
                 checkInCount: 0,
                 primaryCampusId,
                 primaryCampusName,

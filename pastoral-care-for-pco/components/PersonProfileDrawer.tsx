@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation } from '../types';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
@@ -25,10 +25,48 @@ const NOTE_TYPE_COLORS: Record<string, string> = {
   Hospital: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
 };
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return 'Not recorded';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
+
+export function getPersonEmail(person?: PcoPerson | null): string | null {
+  if (!person) return null;
+  if (person.email && typeof person.email === 'string' && person.email.trim().length > 0) {
+    return person.email.trim();
+  }
+  if (Array.isArray(person.emails) && person.emails.length > 0) {
+    const primaryObj = person.emails.find((e: any) => e?.primary && e?.address);
+    if (primaryObj?.address) return primaryObj.address.trim();
+    const firstObj = person.emails.find((e: any) => e?.address);
+    if (firstObj?.address) return firstObj.address.trim();
+    const firstStr = person.emails.find((e: any) => typeof e === 'string' && e.trim().length > 0);
+    if (firstStr) return (firstStr as string).trim();
+  }
+  return null;
+}
+
+export function getPersonPhone(person?: PcoPerson | null): string | null {
+  if (!person) return null;
+  if (person.phone && typeof person.phone === 'string' && person.phone.trim().length > 0) {
+    return person.phone.trim();
+  }
+  if (person.e164Phone && typeof person.e164Phone === 'string' && person.e164Phone.trim().length > 0) {
+    return person.e164Phone.trim();
+  }
+  if (Array.isArray(person.phoneNumbers) && person.phoneNumbers.length > 0) {
+    const primaryObj = person.phoneNumbers.find((p: any) => p?.primary && p?.number);
+    if (primaryObj?.number) return primaryObj.number.trim();
+    const firstObj = person.phoneNumbers.find((p: any) => p?.number);
+    if (firstObj?.number) return firstObj.number.trim();
+  }
+  return null;
 }
 
 function getEngagementStatus(person: PcoPerson): string {
@@ -80,6 +118,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [allPeople, setAllPeople] = useState<PcoPerson[]>([]);
   const [groups, setGroups] = useState<PcoGroup[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+  const [donations, setDonations] = useState<DetailedDonation[]>([]);
   const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,12 +155,13 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
   const handleSendSms = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!person?.phone || !smsBody.trim()) return;
+    const targetPhone = getPersonPhone(person);
+    if (!targetPhone || !smsBody.trim()) return;
     setSendingSms(true);
     setSmsError('');
     setSmsSuccess(false);
     try {
-      const cleanedPhone = person.phone.replace(/[^\d+]/g, '');
+      const cleanedPhone = targetPhone.replace(/[^\d+]/g, '');
       const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,15 +171,17 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           body: smsBody.trim(),
           sentBy: user?.id || null,
           sentByName: user?.name || null,
-          personId: person.id,
-          personName: person.name,
+          personId: person?.id,
+          personName: person?.name,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || `Send failed (HTTP ${res.status})`);
       setSmsSuccess(true);
       setSmsBody('');
-      window.dispatchEvent(new CustomEvent('careFollowUpCompleted', { detail: person.id }));
+      if (person?.id) {
+        window.dispatchEvent(new CustomEvent('careFollowUpCompleted', { detail: person.id }));
+      }
     } catch (err: any) {
       setSmsError(err.message || 'An error occurred while sending the message.');
     } finally {
@@ -206,17 +248,19 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setNotes([]);
       setTimeline([]);
       try {
-        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
           firestore.getPersonOutreachSlots(churchId, personId),
           firestore.getGroups(churchId),
           firestore.getPrayerRequests(churchId),
+          firestore.getDetailedDonations(churchId),
         ]);
         setAllPeople(people);
         setGroups(fetchedGroups);
         setPrayerRequests(fetchedPrayers);
+        setDonations(fetchedDonations || []);
         const p = people.find(p => p.id === personId);
         if (p) setPerson(p);
         setTimeline(changes);
@@ -267,6 +311,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const timesServed = person?.servingStats?.last90DaysCount ?? 0;
   const servingStats = person?.servingStats;
 
+  // Contact resolution
+  const resolvedEmail = getPersonEmail(person);
+  const resolvedPhone = getPersonPhone(person);
+
   // Household members
   const householdMembers = person?.householdId 
     ? allPeople.filter(m => m.householdId === person.householdId && m.id !== person.id) 
@@ -284,6 +332,46 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
     pr.personId === person?.id || 
     (pr.personName && person?.name && pr.personName.toLowerCase() === person.name.toLowerCase())
   );
+
+  // Donations & Giving calculation
+  const personDonations = donations.filter(d => 
+    (person?.id && String(d.donorId) === String(person.id)) ||
+    (person?.id && d.id?.startsWith(`${person.id}_`)) ||
+    (person?.name && d.donorName && d.donorName.toLowerCase() === person.name.toLowerCase())
+  );
+
+  const totalDonationsAmount = personDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+  const ytdFromDonations = personDonations
+    .filter(d => d.date && d.date >= startOfYear)
+    .reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const monthlyFromDonations = personDonations
+    .filter(d => d.date && d.date >= startOfMonth)
+    .reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const effectiveYtd = (person?.givingStats?.ytd && person.givingStats.ytd > 0)
+    ? person.givingStats.ytd
+    : (ytdFromDonations > 0 ? ytdFromDonations : totalDonationsAmount);
+
+  const effectiveMonthly = (person?.givingStats?.monthly && person.givingStats.monthly > 0)
+    ? person.givingStats.monthly
+    : monthlyFromDonations;
+
+  const hasRecurring = personDonations.some(d => d.isRecurring);
+  const isDonor = !!(
+    person?.isDonor || 
+    personDonations.length > 0 || 
+    effectiveYtd > 0 || 
+    (person?.givingStats && (person.givingStats.ytd > 0 || person.givingStats.monthly > 0 || person.givingStats.weekly > 0))
+  );
+
+  const recentDonations = [...personDonations].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const lastDonation = recentDonations[0];
 
   // Touchpoint date calculation
   const lastTouchpointDate = notes.length > 0 ? new Date(notes[0].date) : null;
@@ -586,27 +674,44 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                 Giving Health & Donor Status
               </h3>
               <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                person.isDonor 
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
-                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                hasRecurring
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/40'
+                  : isDonor 
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
               }`}>
-                {person.isDonor ? 'Contributing Giver' : 'Non-Giver'}
+                {hasRecurring ? 'Recurring Giver' : isDonor ? 'Active Contributor' : 'Non-Giver'}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Giving Cadence</span>
-                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
-                  {person.isDonor ? 'Active Contributor' : 'No donations recorded'}
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">YTD Contributions</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block">
+                  {effectiveYtd > 0 ? formatCurrency(effectiveYtd) : (effectiveMonthly > 0 ? `${formatCurrency(effectiveMonthly)}/mo` : 'No gifts YTD')}
                 </span>
               </div>
               <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Donor Category</span>
-                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
-                  {person.isDonor ? 'Regular Giver' : 'First-time / Inactive'}
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Latest Contribution</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
+                  {lastDonation ? `${formatCurrency(lastDonation.amount)} (${formatDate(lastDonation.date)})` : (isDonor ? 'Active Giver' : 'None logged')}
                 </span>
               </div>
             </div>
+            {recentDonations.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Recent Gifts:</span>
+                <div className="space-y-1">
+                  {recentDonations.slice(0, 3).map((d, i) => (
+                    <div key={d.id || i} className="flex justify-between items-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl text-xs border border-slate-100 dark:border-slate-700/60">
+                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{d.fundName || 'General Fund'}</span>
+                      <span className="font-bold text-slate-800 dark:text-white shrink-0 ml-2">
+                        {formatCurrency(d.amount)} <span className="text-[10px] text-slate-400 font-normal">({formatDate(d.date)})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Prayer Requests ── */}
@@ -681,9 +786,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                {person.email ? (
-                  <a href={`mailto:${person.email}`} className="text-indigo-600 dark:text-indigo-400 hover:underline break-all font-semibold">
-                    {person.email}
+                {resolvedEmail ? (
+                  <a href={`mailto:${resolvedEmail}`} className="text-indigo-600 dark:text-indigo-400 hover:underline break-all font-semibold">
+                    {resolvedEmail}
                   </a>
                 ) : (
                   <span className="text-slate-400 dark:text-slate-500 italic">No email address</span>
@@ -691,9 +796,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                {person.phone ? (
-                  <a href={`tel:${person.phone}`} className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">
-                    {person.phone}
+                {resolvedPhone ? (
+                  <a href={`tel:${resolvedPhone}`} className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">
+                    {resolvedPhone}
                   </a>
                 ) : (
                   <span className="text-slate-400 dark:text-slate-500 italic">No phone number</span>

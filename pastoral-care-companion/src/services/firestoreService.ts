@@ -20,7 +20,7 @@ import {
   Church, User, UserRole, 
   PcoPerson, PcoGroup, SystemSettings, 
   PastoralNote, PrayerRequest, PcoList,
-  OutreachSession, OutreachSlot
+  OutreachSession, OutreachSlot, DetailedDonation
 } from '../types';
 
 class FirestoreService {
@@ -167,6 +167,18 @@ class FirestoreService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => d.data() as PcoGroup);
     } catch (e) {
+      return [];
+    }
+  }
+
+  // --- Giving & Donations ---
+  async getDetailedDonations(churchId: string): Promise<DetailedDonation[]> {
+    try {
+      const q = query(collection(db, 'detailed_donations'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as DetailedDonation);
+    } catch (e) {
+      console.warn('getDetailedDonations error:', e);
       return [];
     }
   }

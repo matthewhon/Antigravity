@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest } from '../types';
+import { PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation } from '../types';
 import { firestore } from '../services/firestoreService';
 import { 
   Phone, MessageSquare, MapPin, Calendar, 
@@ -51,6 +51,43 @@ function formatDate(dateStr?: string | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
+
+export function getPersonEmail(person?: PcoPerson | null): string | null {
+  if (!person) return null;
+  if (person.email && typeof person.email === 'string' && person.email.trim().length > 0) {
+    return person.email.trim();
+  }
+  if (Array.isArray(person.emails) && person.emails.length > 0) {
+    const primaryObj = person.emails.find((e: any) => e?.primary && e?.address);
+    if (primaryObj?.address) return primaryObj.address.trim();
+    const firstObj = person.emails.find((e: any) => e?.address);
+    if (firstObj?.address) return firstObj.address.trim();
+    const firstStr = person.emails.find((e: any) => typeof e === 'string' && e.trim().length > 0);
+    if (firstStr) return (firstStr as string).trim();
+  }
+  return null;
+}
+
+export function getPersonPhone(person?: PcoPerson | null): string | null {
+  if (!person) return null;
+  if (person.phone && typeof person.phone === 'string' && person.phone.trim().length > 0) {
+    return person.phone.trim();
+  }
+  if (person.e164Phone && typeof person.e164Phone === 'string' && person.e164Phone.trim().length > 0) {
+    return person.e164Phone.trim();
+  }
+  if (Array.isArray(person.phoneNumbers) && person.phoneNumbers.length > 0) {
+    const primaryObj = person.phoneNumbers.find((p: any) => p?.primary && p?.number);
+    if (primaryObj?.number) return primaryObj.number.trim();
+    const firstObj = person.phoneNumbers.find((p: any) => p?.number);
+    if (firstObj?.number) return firstObj.number.trim();
+  }
+  return null;
+}
+
 interface PersonProfileViewProps {
   person: PcoPerson;
   onClose: () => void;
@@ -67,25 +104,28 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [groups, setGroups] = useState<PcoGroup[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+  const [donations, setDonations] = useState<DetailedDonation[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteType, setNoteType] = useState<PastoralNote['type']>('Note');
   const [followUpDate, setFollowUpDate] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
-  // Load notes, groups, and prayer requests on mount/change
+  // Load notes, groups, prayer requests, and donations on mount/change
   useEffect(() => {
     const fetchExtraData = async () => {
       setLoadingNotes(true);
       try {
-        const [list, fetchedGroups, fetchedPrayers] = await Promise.all([
+        const [list, fetchedGroups, fetchedPrayers, fetchedDonations] = await Promise.all([
           firestore.getPastoralNotes(churchId, person.id),
           firestore.getGroups(churchId),
-          firestore.getPrayerRequests(churchId)
+          firestore.getPrayerRequests(churchId),
+          firestore.getDetailedDonations(churchId),
         ]);
         setNotes(list);
         setGroups(fetchedGroups);
         setPrayerRequests(fetchedPrayers);
+        setDonations(fetchedDonations || []);
       } catch (e) {
         console.error("Failed to load profile data:", e);
       } finally {
@@ -159,6 +199,10 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   const timesServed = person.servingStats?.last90DaysCount ?? 0;
   const servingStats = person.servingStats;
 
+  // Contact resolution
+  const resolvedEmail = getPersonEmail(person);
+  const resolvedPhone = getPersonPhone(person);
+
   // Household members
   const householdMembers = person.householdId 
     ? people.filter(m => m.householdId === person.householdId && m.id !== person.id) 
@@ -176,6 +220,46 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
     pr.personId === person.id || 
     (pr.personName && person.name && pr.personName.toLowerCase() === person.name.toLowerCase())
   );
+
+  // Donations & Giving calculation
+  const personDonations = donations.filter(d => 
+    (person?.id && String(d.donorId) === String(person.id)) ||
+    (person?.id && d.id?.startsWith(`${person.id}_`)) ||
+    (person?.name && d.donorName && d.donorName.toLowerCase() === person.name.toLowerCase())
+  );
+
+  const totalDonationsAmount = personDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+  const ytdFromDonations = personDonations
+    .filter(d => d.date && d.date >= startOfYear)
+    .reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const monthlyFromDonations = personDonations
+    .filter(d => d.date && d.date >= startOfMonth)
+    .reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const effectiveYtd = (person?.givingStats?.ytd && person.givingStats.ytd > 0)
+    ? person.givingStats.ytd
+    : (ytdFromDonations > 0 ? ytdFromDonations : totalDonationsAmount);
+
+  const effectiveMonthly = (person?.givingStats?.monthly && person.givingStats.monthly > 0)
+    ? person.givingStats.monthly
+    : monthlyFromDonations;
+
+  const hasRecurring = personDonations.some(d => d.isRecurring);
+  const isDonor = !!(
+    person?.isDonor || 
+    personDonations.length > 0 || 
+    effectiveYtd > 0 || 
+    (person?.givingStats && (person.givingStats.ytd > 0 || person.givingStats.monthly > 0 || person.givingStats.weekly > 0))
+  );
+
+  const recentDonations = [...personDonations].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const lastDonation = recentDonations[0];
 
   // Touchpoint date calculation
   const lastTouchpointDate = notes.length > 0 ? new Date(notes[0].date) : null;
@@ -495,27 +579,44 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
                 Giving Health
               </h3>
               <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                person.isDonor 
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'
-                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
+                hasRecurring
+                  ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/30'
+                  : isDonor 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'
+                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
               }`}>
-                {person.isDonor ? 'Contributing Giver' : 'Non-Giver'}
+                {hasRecurring ? 'Recurring Giver' : isDonor ? 'Active Contributor' : 'Non-Giver'}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800">
-                <span className="text-[9px] font-black text-slate-400 uppercase block">Giving Cadence</span>
-                <span className="font-bold text-slate-800 dark:text-zinc-200 mt-0.5 block">
-                  {person.isDonor ? 'Active Contributor' : 'No gifts logged'}
+                <span className="text-[9px] font-black text-slate-400 uppercase block">YTD Contributions</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-zinc-200 mt-0.5 block truncate">
+                  {effectiveYtd > 0 ? formatCurrency(effectiveYtd) : (effectiveMonthly > 0 ? `${formatCurrency(effectiveMonthly)}/mo` : 'No gifts YTD')}
                 </span>
               </div>
               <div className="bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800">
-                <span className="text-[9px] font-black text-slate-400 uppercase block">Donor Category</span>
-                <span className="font-bold text-slate-800 dark:text-zinc-200 mt-0.5 block">
-                  {person.isDonor ? 'Regular Giver' : 'Inactive'}
+                <span className="text-[9px] font-black text-slate-400 uppercase block">Latest Contribution</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-zinc-200 mt-0.5 block truncate">
+                  {lastDonation ? `${formatCurrency(lastDonation.amount)} (${formatDate(lastDonation.date)})` : (isDonor ? 'Active Giver' : 'None logged')}
                 </span>
               </div>
             </div>
+            {recentDonations.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <span className="text-[9px] font-black text-slate-400 uppercase block">Recent Gifts:</span>
+                <div className="space-y-1">
+                  {recentDonations.slice(0, 3).map((d, i) => (
+                    <div key={d.id || i} className="flex justify-between items-center bg-slate-50 dark:bg-zinc-800/60 px-2.5 py-1 rounded-xl text-xs border border-slate-100 dark:border-zinc-800">
+                      <span className="text-[11px] font-medium text-slate-700 dark:text-zinc-300 truncate">{d.fundName || 'General Fund'}</span>
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 shrink-0 ml-1">
+                        {formatCurrency(d.amount)} <span className="text-[9px] text-slate-400 font-normal">({formatDate(d.date)})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Prayer Requests ── */}
@@ -588,37 +689,47 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Key Profile Data</h3>
             
-            {person.phone && (
+            {resolvedPhone ? (
               <div className="flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Phone size={14} className="text-indigo-500 shrink-0" />
-                  <a href={`tel:${person.phone}`} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline truncate">
-                    {formatPhone(person.phone)}
+                  <a href={`tel:${resolvedPhone}`} className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline truncate">
+                    {formatPhone(resolvedPhone)}
                   </a>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   <a
-                    href={`tel:${person.phone}`}
+                    href={`tel:${resolvedPhone}`}
                     className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/10 text-[9px] font-black tracking-widest text-emerald-600 dark:text-emerald-400 uppercase rounded-lg active:scale-95 transition"
                   >
                     Call
                   </a>
                   <a
-                    href={`sms:${person.phone}`}
+                    href={`sms:${resolvedPhone}`}
                     className="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100/10 text-[9px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 uppercase rounded-lg active:scale-95 transition"
                   >
                     Text
                   </a>
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center gap-2.5 text-xs min-w-0 text-slate-400 dark:text-zinc-500 italic">
+                <Phone size={14} className="text-slate-300 dark:text-zinc-600 shrink-0" />
+                <span>No phone number</span>
+              </div>
             )}
 
-            {person.email && (
+            {resolvedEmail ? (
               <div className="flex items-center gap-2.5 text-xs min-w-0">
                 <Mail size={14} className="text-indigo-500 shrink-0" />
-                <a href={`mailto:${person.email}`} className="font-bold text-slate-700 dark:text-zinc-300 hover:underline truncate">
-                  {person.email}
+                <a href={`mailto:${resolvedEmail}`} className="font-bold text-slate-700 dark:text-zinc-300 hover:underline truncate">
+                  {resolvedEmail}
                 </a>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 text-xs min-w-0 text-slate-400 dark:text-zinc-500 italic">
+                <Mail size={14} className="text-slate-300 dark:text-zinc-600 shrink-0" />
+                <span>No email address</span>
               </div>
             )}
 
