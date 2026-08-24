@@ -831,14 +831,13 @@ export async function submitPublicPledge(req: any, res: any) {
         data: {
           type: 'Pledge',
           attributes: {
-            amount_cents: amountCents,
-            joint_giver_type: jointGiverType || 'none'
+            amount_cents: amountCents
           },
           relationships: {
-            person: {
+            pledge_campaign: {
               data: {
-                type: 'Person',
-                id: personId
+                type: 'PledgeCampaign',
+                id: String(campaignId)
               }
             }
           }
@@ -847,7 +846,7 @@ export async function submitPublicPledge(req: any, res: any) {
 
       const pcoPledgeRes = await fetchFromPco(
         churchId,
-        `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges`,
+        `https://api.planningcenteronline.com/giving/v2/people/${personId}/pledges`,
         'POST',
         pledgePayload
       );
@@ -1016,14 +1015,13 @@ export async function syncPledgeSubmissionToPco(req: any, res: any) {
       data: {
         type: 'Pledge',
         attributes: {
-          amount_cents: sub.amountCents || Math.round((sub.amount || sub.totalCommitment || 0) * 100),
-          joint_giver_type: sub.jointGiverType || 'none'
+          amount_cents: sub.amountCents || Math.round((sub.amount || sub.totalCommitment || 0) * 100)
         },
         relationships: {
-          person: {
+          pledge_campaign: {
             data: {
-              type: 'Person',
-              id: personId
+              type: 'PledgeCampaign',
+              id: String(sub.campaignId)
             }
           }
         }
@@ -1032,7 +1030,7 @@ export async function syncPledgeSubmissionToPco(req: any, res: any) {
 
     const pcoRes = await fetchFromPco(
       churchId,
-      `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${sub.campaignId}/pledges`,
+      `https://api.planningcenteronline.com/giving/v2/people/${personId}/pledges`,
       'POST',
       pledgePayload
     );
