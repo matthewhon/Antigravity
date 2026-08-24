@@ -4,7 +4,7 @@ import { getDb } from './firebase.js';
 const cache: Record<string, { data: any; timestamp: number }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-export async function fetchFromPco(churchId: string, url: string) {
+export async function fetchFromPco(churchId: string, url: string, method: string = 'GET', body?: any) {
   const db = getDb();
   const churchDoc = await db.collection('churches').doc(churchId).get();
   if (!churchDoc.exists) throw new Error('Church not found');
@@ -16,11 +16,13 @@ export async function fetchFromPco(churchId: string, url: string) {
 
   const performReq = async (token: string) => {
     return fetch(url, {
+      method,
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'PastoralCareApp/1.0'
-      }
+      },
+      body: body ? JSON.stringify(body) : undefined
     });
   };
 
@@ -57,7 +59,7 @@ export async function fetchFromPco(churchId: string, url: string) {
   if (!response.ok) {
     let errorMsg = `PCO API error: ${response.status}`;
     if (response.status === 401) errorMsg = 'Unauthorized: Planning Center Token expired or invalid. Please re-authenticate your church account.';
-    if (response.status === 403) errorMsg = 'Forbidden: Your Planning Center connection lacks the necessary scopes (e.g. calendar/registrations). Please re-authenticate to upgrade your permissions.';
+    if (response.status === 403) errorMsg = 'Forbidden: Your Planning Center connection lacks the necessary scopes (e.g. giving/people). Please re-authenticate to upgrade your permissions.';
     throw new Error(errorMsg);
   }
   return response.json();
@@ -237,6 +239,429 @@ export async function getFeaturedEvent(req: any, res: any) {
   }
 }
 
+export async function getPublicPledgeCampaigns(req: any, res: any) {
+  const { churchId } = req.params;
+  const cacheKey = `${churchId}_pledge_campaigns`;
+
+  if (req.query.refresh !== 'true' && cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < CACHE_TTL) {
+    return res.json(cache[cacheKey].data);
+  }
+
+  try {
+    const db = getDb();
+    const churchDoc = await db.collection('churches').doc(churchId).get();
+    const churchData = churchDoc.exists ? churchDoc.data() : null;
+    const subdomain = churchData?.subdomain || '';
+
+    // Fetch campaigns from PCO Giving API
+    const pcoData = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/giving/v2/pledge_campaigns?include=fund&per_page=100');
+    const rawCampaigns = pcoData.data || [];
+    const included = pcoData.included || [];
+
+    // Fetch custom configs for this church from Firestore
+    const configsSnap = await db.collection('churches').doc(churchId).collection('pledge_campaign_configs').get();
+    const configsMap = new Map<string, any>();
+    configsSnap.docs.forEach(doc => configsMap.set(doc.id, doc.data()));
+
+    // Process campaigns and calculate pledge and giving stats
+    const campaigns = await Promise.all(rawCampaigns.map(async (c: any) => {
+      const fundId = c.relationships?.fund?.data?.id;
+      const fundObj = included.find((i: any) => i.type === 'Fund' && i.id === fundId);
+      const customConfig = configsMap.get(c.id) || {};
+
+      let totalPledgedCents = 0;
+      let pledgeCount = 0;
+
+      try {
+        const pledgesData = await fetchFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${c.id}/pledges?per_page=100`);
+        const pledgesList = pledgesData.data || [];
+        pledgeCount = pledgesList.length;
+        totalPledgedCents = pledgesList.reduce((sum: number, p: any) => sum + (p.attributes?.amount_cents || 0), 0);
+      } catch (err) {
+        console.warn(`[publicApi] Could not fetch pledges for campaign ${c.id}:`, err);
+      }
+
+      let totalReceivedCents = c.attributes?.total_cents || 0;
+      if (totalReceivedCents === 0 && fundId) {
+        try {
+          const donationsSnap = await db.collection('donations')
+            .where('churchId', '==', churchId)
+            .where('fundId', '==', fundId)
+            .get();
+          if (!donationsSnap.empty) {
+            totalReceivedCents = donationsSnap.docs.reduce((sum, d) => sum + Math.round((d.data()?.amount || 0) * 100), 0);
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
+
+      const churchCenterUrl = subdomain
+        ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${fundId ? `&fund_id=${fundId}` : ''}`
+        : `https://churchcenter.com/giving`;
+
+      return {
+        id: c.id,
+        name: c.attributes?.name || 'Unnamed Campaign',
+        description: c.attributes?.description || '',
+        startsAt: c.attributes?.starts_at || null,
+        endsAt: c.attributes?.ends_at || null,
+        goalCents: c.attributes?.goal_cents || 0,
+        goalCurrency: c.attributes?.goal_currency || 'USD',
+        showGoalInChurchCenter: c.attributes?.show_goal_in_church_center ?? true,
+        showProgressInChurchCenter: c.attributes?.show_progress_in_church_center ?? true,
+        fundId: fundId || null,
+        fundName: fundObj?.attributes?.name || 'General Fund',
+        churchCenterUrl,
+        totalPledgedCents,
+        pledgeCount,
+        totalReceivedCents: totalReceivedCents || totalPledgedCents,
+        imageUrl: customConfig.imageUrl || null,
+        bannerUrl: customConfig.bannerUrl || null,
+        headline: customConfig.headline || '',
+        storyMarkdown: customConfig.storyMarkdown || '',
+        graphicStyle: customConfig.graphicStyle || 'progress_bar',
+        colorTheme: customConfig.colorTheme || 'indigo',
+        showMetrics: customConfig.showMetrics || {
+          goal: true,
+          pledged: true,
+          received: true,
+          percent: true,
+          pledgers: true,
+          daysLeft: true,
+        },
+        milestones: customConfig.milestones || [],
+        allowOnlinePledging: customConfig.allowOnlinePledging !== false,
+        givingEmbedMode: customConfig.givingEmbedMode || 'modal',
+        givingButtonText: customConfig.givingButtonText || 'Give to Campaign',
+        pledgeButtonText: customConfig.pledgeButtonText || 'Pledge Now',
+        updatedAt: customConfig.updatedAt || null,
+      };
+    }));
+
+    cache[cacheKey] = { data: campaigns, timestamp: Date.now() };
+    res.json(campaigns);
+  } catch (e: any) {
+    console.error('[publicApi] getPublicPledgeCampaigns error:', e);
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function getPublicPledgeCampaign(req: any, res: any) {
+  const { churchId, campaignId } = req.params;
+  try {
+    const db = getDb();
+    const churchDoc = await db.collection('churches').doc(churchId).get();
+    const churchData = churchDoc.exists ? churchDoc.data() : null;
+    const subdomain = churchData?.subdomain || '';
+
+    const pcoData = await fetchFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}?include=fund`);
+    const c = pcoData.data;
+    if (!c) return res.status(404).json({ error: 'Pledge Campaign not found' });
+
+    const fundId = c.relationships?.fund?.data?.id;
+    const fundObj = (pcoData.included || []).find((i: any) => i.type === 'Fund' && i.id === fundId);
+
+    const configDoc = await db.collection('churches').doc(churchId).collection('pledge_campaign_configs').doc(campaignId).get();
+    const customConfig = configDoc.exists ? configDoc.data() || {} : {};
+
+    let totalPledgedCents = 0;
+    let pledgeCount = 0;
+
+    try {
+      const pledgesData = await fetchFromPco(churchId, `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges?per_page=100`);
+      const pledgesList = pledgesData.data || [];
+      pledgeCount = pledgesList.length;
+      totalPledgedCents = pledgesList.reduce((sum: number, p: any) => sum + (p.attributes?.amount_cents || 0), 0);
+    } catch (err) {
+      console.warn(`[publicApi] Could not fetch pledges for campaign ${campaignId}:`, err);
+    }
+
+    let totalReceivedCents = c.attributes?.total_cents || 0;
+    if (totalReceivedCents === 0 && fundId) {
+      try {
+        const donationsSnap = await db.collection('donations')
+          .where('churchId', '==', churchId)
+          .where('fundId', '==', fundId)
+          .get();
+        if (!donationsSnap.empty) {
+          totalReceivedCents = donationsSnap.docs.reduce((sum, d) => sum + Math.round((d.data()?.amount || 0) * 100), 0);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    const churchCenterUrl = subdomain
+      ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${fundId ? `&fund_id=${fundId}` : ''}`
+      : `https://churchcenter.com/giving`;
+
+    const campaign = {
+      id: c.id,
+      name: c.attributes?.name || 'Unnamed Campaign',
+      description: c.attributes?.description || '',
+      startsAt: c.attributes?.starts_at || null,
+      endsAt: c.attributes?.ends_at || null,
+      goalCents: c.attributes?.goal_cents || 0,
+      goalCurrency: c.attributes?.goal_currency || 'USD',
+      showGoalInChurchCenter: c.attributes?.show_goal_in_church_center ?? true,
+      showProgressInChurchCenter: c.attributes?.show_progress_in_church_center ?? true,
+      fundId: fundId || null,
+      fundName: fundObj?.attributes?.name || 'General Fund',
+      churchCenterUrl,
+      totalPledgedCents,
+      pledgeCount,
+      totalReceivedCents: totalReceivedCents || totalPledgedCents,
+      imageUrl: customConfig.imageUrl || null,
+      bannerUrl: customConfig.bannerUrl || null,
+      headline: customConfig.headline || '',
+      storyMarkdown: customConfig.storyMarkdown || '',
+      graphicStyle: customConfig.graphicStyle || 'progress_bar',
+      colorTheme: customConfig.colorTheme || 'indigo',
+      showMetrics: customConfig.showMetrics || {
+        goal: true,
+        pledged: true,
+        received: true,
+        percent: true,
+        pledgers: true,
+        daysLeft: true,
+      },
+      milestones: customConfig.milestones || [],
+      allowOnlinePledging: customConfig.allowOnlinePledging !== false,
+      givingEmbedMode: customConfig.givingEmbedMode || 'modal',
+      givingButtonText: customConfig.givingButtonText || 'Give to Campaign',
+      pledgeButtonText: customConfig.pledgeButtonText || 'Pledge Now',
+    };
+
+    res.json(campaign);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function submitPublicPledge(req: any, res: any) {
+  const { churchId, campaignId } = req.params;
+  const { firstName, lastName, email, phone, amount, frequency, jointGiverType, notes } = req.body;
+
+  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    return res.status(400).json({ error: 'Valid pledge amount is required.' });
+  }
+  if (!firstName || !lastName) {
+    return res.status(400).json({ error: 'First name and last name are required.' });
+  }
+
+  const db = getDb();
+  const submissionId = `pledge_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const amountCents = Math.round(parseFloat(amount) * 100);
+
+  try {
+    // 1. Search for existing person in PCO People by email or phone
+    let personId: string | null = null;
+    let isNewPerson = false;
+
+    if (email) {
+      try {
+        const searchRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(email.trim())}`);
+        if (searchRes.data && searchRes.data.length > 0) {
+          personId = searchRes.data[0].relationships?.person?.data?.id || null;
+        }
+      } catch (err) {
+        console.warn('[submitPublicPledge] Email search error:', err);
+      }
+    }
+
+    if (!personId && phone) {
+      try {
+        const digitsOnly = phone.replace(/\D/g, '');
+        const phoneRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/phone_numbers?where[number]=${digitsOnly}`);
+        if (phoneRes.data && phoneRes.data.length > 0) {
+          personId = phoneRes.data[0].relationships?.person?.data?.id || null;
+        }
+      } catch (err) {
+        console.warn('[submitPublicPledge] Phone search error:', err);
+      }
+    }
+
+    // 2. If person not found, create new person in PCO People
+    if (!personId) {
+      isNewPerson = true;
+      const createPersonRes = await fetchFromPco(
+        churchId,
+        'https://api.planningcenteronline.com/people/v2/people',
+        'POST',
+        {
+          data: {
+            type: 'Person',
+            attributes: {
+              first_name: firstName.trim(),
+              last_name: lastName.trim()
+            }
+          }
+        }
+      );
+      personId = createPersonRes.data?.id;
+      if (!personId) throw new Error('Failed to create person record in Planning Center.');
+
+      // Add email
+      if (email) {
+        try {
+          await fetchFromPco(
+            churchId,
+            `https://api.planningcenteronline.com/people/v2/people/${personId}/emails`,
+            'POST',
+            {
+              data: {
+                type: 'Email',
+                attributes: { address: email.trim(), location: 'Home' }
+              }
+            }
+          );
+        } catch (e) {
+          console.warn('[submitPublicPledge] Add email failed:', e);
+        }
+      }
+
+      // Add phone
+      if (phone) {
+        try {
+          await fetchFromPco(
+            churchId,
+            `https://api.planningcenteronline.com/people/v2/people/${personId}/phone_numbers`,
+            'POST',
+            {
+              data: {
+                type: 'PhoneNumber',
+                attributes: { number: phone.trim(), location: 'Mobile' }
+              }
+            }
+          );
+        } catch (e) {
+          console.warn('[submitPublicPledge] Add phone failed:', e);
+        }
+      }
+    }
+
+    // 3. Create the Pledge in Planning Center Giving
+    const pledgePayload = {
+      data: {
+        type: 'Pledge',
+        attributes: {
+          amount_cents: amountCents,
+          joint_giver_type: jointGiverType || 'none'
+        },
+        relationships: {
+          person: {
+            data: {
+              type: 'Person',
+              id: personId
+            }
+          }
+        }
+      }
+    };
+
+    const pcoPledgeRes = await fetchFromPco(
+      churchId,
+      `https://api.planningcenteronline.com/giving/v2/pledge_campaigns/${campaignId}/pledges`,
+      'POST',
+      pledgePayload
+    );
+
+    const pcoPledgeId = pcoPledgeRes.data?.id || null;
+
+    // 4. Save submission record in Firestore for logging and quick queries
+    const submissionRecord = {
+      id: submissionId,
+      churchId,
+      campaignId,
+      firstName,
+      lastName,
+      email: email || '',
+      phone: phone || '',
+      amount: parseFloat(amount),
+      amountCents,
+      frequency: frequency || 'one_time',
+      jointGiverType: jointGiverType || 'none',
+      notes: notes || '',
+      personId,
+      isNewPerson,
+      pcoPledgeId,
+      submittedAt: Date.now(),
+      status: 'synced_to_pco'
+    };
+
+    await db.collection('pledge_submissions').doc(submissionId).set(submissionRecord);
+
+    // Invalidate cache
+    delete cache[`${churchId}_pledge_campaigns`];
+
+    res.json({
+      success: true,
+      submissionId,
+      pcoPledgeId,
+      personId,
+      message: `Pledge of $${parseFloat(amount).toLocaleString()} successfully recorded in Planning Center!`
+    });
+  } catch (e: any) {
+    console.error('[submitPublicPledge] Error:', e);
+    try {
+      await db.collection('pledge_submissions').doc(submissionId).set({
+        id: submissionId,
+        churchId,
+        campaignId,
+        firstName,
+        lastName,
+        email: email || '',
+        phone: phone || '',
+        amount: parseFloat(amount) || 0,
+        amountCents,
+        frequency: frequency || 'one_time',
+        notes: notes || '',
+        submittedAt: Date.now(),
+        status: 'failed_pco_sync',
+        error: e.message
+      });
+    } catch (saveErr) {
+      // Ignore
+    }
+    res.status(500).json({ error: e.message || 'Failed to submit pledge to Planning Center' });
+  }
+}
+
+export async function savePledgeCampaignConfig(req: any, res: any) {
+  const { churchId, campaignId } = req.params;
+  const config = req.body;
+
+  try {
+    const db = getDb();
+    await db.collection('churches').doc(churchId).collection('pledge_campaign_configs').doc(campaignId).set({
+      ...config,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    delete cache[`${churchId}_pledge_campaigns`];
+
+    res.json({ success: true, message: 'Campaign configuration saved successfully.' });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function getPledgeSubmissions(req: any, res: any) {
+  const { churchId, campaignId } = req.params;
+  try {
+    const db = getDb();
+    let q = db.collection('pledge_submissions').where('churchId', '==', churchId);
+    if (campaignId && campaignId !== 'all') {
+      q = q.where('campaignId', '==', campaignId);
+    }
+    const snap = await q.orderBy('submittedAt', 'desc').limit(100).get();
+    const submissions = snap.docs.map(d => d.data());
+    res.json(submissions);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
 
 export async function serveWidgetScript(req: any, res: any) {
   res.setHeader('Content-Type', 'application/javascript');

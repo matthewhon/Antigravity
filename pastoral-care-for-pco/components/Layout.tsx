@@ -5,7 +5,7 @@ import {
   TrendingUp, Wrench, SlidersHorizontal, Home, AlertTriangle, FileText, Palette,
   MapPin, User as UserIcon, Calendar, Smartphone, BarChart3, Briefcase, Church as ChurchIcon,
   Building2, Phone, ClipboardList, Pencil, Settings, Mail, MessageSquare, Zap,
-  Newspaper, StickyNote, QrCode, Folder, Sparkles, UserMinus, ChevronDown, LogOut,
+  Newspaper, StickyNote, QrCode, Folder, Sparkles, UserMinus, ChevronDown, LogOut, Target,
   type LucideIcon,
 } from 'lucide-react';
 import { Church, User } from '../types';
@@ -210,6 +210,7 @@ const Layout: React.FC<LayoutProps> = ({
         kind: 'menu', key: 'giving', icon: HandCoins, label: 'Giving', prefix: 'giving',
         items: [
           { view: 'giving',         icon: BarChart3, label: 'Overview' },
+          { view: 'giving-pledges', icon: Target,    label: 'Campaign Pledges' },
           { view: 'giving-donor',   icon: Users,     label: 'Donors'   },
           { view: 'giving-budgets', icon: Briefcase, label: 'Budgets'  },
           { view: 'giving-reports', icon: FileText,  label: 'Reports'  },

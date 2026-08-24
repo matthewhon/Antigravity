@@ -22,7 +22,20 @@ import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { handlePostmarkWebhook } from './backend/postmarkWebhook';
-import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms, setFeaturedEvent, getFeaturedEvent } from './backend/publicApi.js';
+import { 
+  getPublicGroups, 
+  getPublicRegistrations, 
+  getPublicEvents, 
+  serveWidgetScript, 
+  getPublicForms, 
+  setFeaturedEvent, 
+  getFeaturedEvent,
+  getPublicPledgeCampaigns,
+  getPublicPledgeCampaign,
+  submitPublicPledge,
+  savePledgeCampaignConfig,
+  getPledgeSubmissions
+} from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
 import { fetchSignalWireMedia } from './backend/signalwireClient';
@@ -126,12 +139,14 @@ async function startServer() {
         } = await import('./services/pcoSyncService.js');
 
         const areaMap: Record<string, () => Promise<void>> = {
-          people:        () => syncPeopleData(churchId),
-          groups:        () => syncGroupsData(churchId),
-          services:      () => syncServicesData(churchId),
-          giving:        () => syncRecentGiving(churchId),
-          checkins:      () => Promise.all([syncCheckInCounts(churchId), syncCheckInsData(churchId)]).then(() => {}),
-          registrations: () => syncRegistrationsData(churchId),
+          people:           () => syncPeopleData(churchId),
+          groups:           () => syncGroupsData(churchId),
+          services:         () => syncServicesData(churchId),
+          giving:           () => syncRecentGiving(churchId),
+          pledges:          () => syncRecentGiving(churchId),
+          pledge_campaigns: () => syncRecentGiving(churchId),
+          checkins:         () => Promise.all([syncCheckInCounts(churchId), syncCheckInsData(churchId)]).then(() => {}),
+          registrations:    () => syncRegistrationsData(churchId),
         };
 
         if (area && areaMap[area]) {
@@ -338,6 +353,11 @@ async function startServer() {
     app.get('/api/public/forms/:churchId', getPublicForms);
     app.get('/api/public/featured-event/:churchId', getFeaturedEvent);
     app.post('/api/public/featured-event/:churchId', express.json(), setFeaturedEvent);
+    app.get('/api/public/pledge-campaigns/:churchId', getPublicPledgeCampaigns);
+    app.get('/api/public/pledge-campaign/:churchId/:campaignId', getPublicPledgeCampaign);
+    app.post('/api/public/pledge-campaign/:churchId/:campaignId/pledge', express.json(), submitPublicPledge);
+    app.post('/api/pledge-campaign-config/:churchId/:campaignId', express.json(), savePledgeCampaignConfig);
+    app.get('/api/pledge-submissions/:churchId/:campaignId', getPledgeSubmissions);
     app.get('/widget.js', serveWidgetScript);
 
     // ─── PCO Web Forms Endpoints ─────────────────────────────────────

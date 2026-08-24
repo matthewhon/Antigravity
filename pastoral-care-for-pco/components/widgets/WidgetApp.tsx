@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { Calendar, Clock, MapPin, ExternalLink, Sparkles, ArrowRight } from 'lucide-react';
+import { PledgeCampaignWidget } from './PledgeCampaignWidget';
 
 const apiBaseUrl = process.env.NODE_ENV === 'production' 
   ? 'https://pastoralcare.barnabassoftware.com' 
@@ -39,6 +40,14 @@ export default function WidgetApp() {
   const ctaText = params.get('ctaText') || 'Register Now';
   const showCountdown = params.get('showCountdown') !== 'false';
   const showLocation = params.get('showLocation') !== 'false';
+
+  // Pledge Campaign specifics
+  const campaignId = params.get('campaignId') || '';
+  const graphicStyle = (params.get('graphicStyle') as any) || 'progress_bar';
+  const givingEmbedMode = (params.get('givingEmbedMode') || params.get('givingMode') as any) || 'modal';
+  const givingButtonText = params.get('givingButtonText') || params.get('givingBtnText') || undefined;
+  const pledgeButtonText = params.get('pledgeButtonText') || params.get('pledgeBtnText') || undefined;
+  const allowOnlinePledging = params.get('allowOnlinePledging') !== 'false' && params.get('allowPledges') !== 'false';
 
   useEffect(() => {
     if (autoHeight && iframeId) {
@@ -100,6 +109,20 @@ export default function WidgetApp() {
         />
       )}
       {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} singleFormId={singleFormId} visibleFormIds={visibleFormIds} />}
+      {(type === 'pledge_campaign' || type === 'pledges') && (
+        <PledgeCampaignWidget 
+          churchId={churchId}
+          campaignId={campaignId}
+          graphicStyle={graphicStyle}
+          color={color}
+          theme={theme}
+          givingEmbedMode={givingEmbedMode}
+          givingButtonText={givingButtonText}
+          pledgeButtonText={pledgeButtonText}
+          allowOnlinePledging={allowOnlinePledging}
+          scale={scale}
+        />
+      )}
     </div>
   );
 }

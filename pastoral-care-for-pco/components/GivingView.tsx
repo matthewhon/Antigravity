@@ -14,6 +14,7 @@ import { calculateGivingAnalytics } from '../services/analyticsService';
 import { firestore } from '../services/firestoreService';
 
 import { DonationReport } from './DonationReport';
+import { CampaignPledgesManager } from './CampaignPledgesManager';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -22,7 +23,7 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString();
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
-  activePage?: 'overview' | 'donor' | 'budgets' | 'reports';
+  activePage?: 'overview' | 'donor' | 'budgets' | 'reports' | 'pledges';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
@@ -2126,6 +2127,14 @@ export const GivingView: React.FC<GivingViewProps> = ({
           </div>
       </div>
   );
+
+  if (activeTab === 'pledges') {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <CampaignPledgesManager churchId={churchId} church={church} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
