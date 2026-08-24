@@ -244,6 +244,97 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                     </div>
                   </div>`;
             }
+            case 'pco_pledge_campaign': {
+                const c = block.content || {};
+                const strip = (h: string) => (h || '').replace(/<[^>]*>/g, '').trim();
+                const goalDollars = (c.goalCents || 0) / 100;
+                const receivedDollars = (c.totalReceivedCents || 0) / 100;
+                const pledgedDollars = (c.totalPledgedCents || 0) / 100;
+                const receivedPct = goalDollars > 0 ? Math.min(100, Math.round((receivedDollars / goalDollars) * 100)) : 0;
+                const pledgedPct = goalDollars > 0 ? Math.min(100, Math.round((pledgedDollars / goalDollars) * 100)) : 0;
+                const remainingPct = Math.max(0, 100 - receivedPct - pledgedPct);
+
+                return `
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-bottom:18px;background:#ffffff;border-collapse:separate;">
+                    ${c.imageUrl ? `
+                    <tr>
+                      <td style="padding:0;line-height:0;">
+                        <img src="${c.imageUrl}" alt="${c.name || 'Campaign'}" style="width:100%;height:auto;display:block;border-top-left-radius:14px;border-top-right-radius:14px;" />
+                      </td>
+                    </tr>` : `
+                    <tr>
+                      <td style="background:#0f172a;padding:22px 18px;text-align:center;">
+                        <div style="font-size:10px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Pledge Campaign</div>
+                        <div style="font-size:20px;font-weight:900;color:#ffffff;font-family:${fontFamily};margin-top:4px;">${c.headline || c.name || 'Pledge Campaign'}</div>
+                      </td>
+                    </tr>`}
+                    <tr>
+                      <td style="padding:18px 20px;">
+                        ${c.imageUrl ? `<div style="font-size:18px;font-weight:800;color:#0f172a;font-family:${fontFamily};margin-bottom:6px;">${c.headline || c.name || 'Pledge Campaign'}</div>` : ''}
+                        ${c.description ? `<div style="font-size:13px;color:#475569;line-height:1.55;font-family:${fontFamily};margin-bottom:14px;">${strip(c.description)}</div>` : ''}
+
+                        <!-- Progress Stats Header -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
+                          <tr>
+                            <td align="left">
+                              <span style="font-size:11px;font-weight:800;color:#059669;text-transform:uppercase;font-family:${fontFamily};">
+                                $${Math.round(receivedDollars).toLocaleString()} (${receivedPct}% Given)
+                              </span>
+                            </td>
+                            <td align="right">
+                              <span style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;font-family:${fontFamily};">
+                                Goal: $${Math.round(goalDollars).toLocaleString()}
+                              </span>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <!-- HTML Progress Bar Table (Email Safe) -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:999px;overflow:hidden;background:#f1f5f9;height:12px;line-height:12px;margin-bottom:16px;">
+                          <tr>
+                            ${receivedPct > 0 ? `<td width="${receivedPct}%" style="background:#10b981;height:12px;line-height:12px;font-size:1px;">&nbsp;</td>` : ''}
+                            ${pledgedPct > 0 ? `<td width="${pledgedPct}%" style="background:#6366f1;height:12px;line-height:12px;font-size:1px;">&nbsp;</td>` : ''}
+                            ${remainingPct > 0 ? `<td width="${remainingPct}%" style="background:#f1f5f9;height:12px;line-height:12px;font-size:1px;">&nbsp;</td>` : ''}
+                          </tr>
+                        </table>
+
+                        <!-- 3-Column Metrics Table -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc;border-radius:10px;border:1px solid #f1f5f9;margin-bottom:18px;">
+                          <tr>
+                            <td width="33%" align="center" style="padding:10px 4px;border-right:1px solid #e2e8f0;">
+                              <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;font-family:${fontFamily};">Given</div>
+                              <div style="font-size:14px;font-weight:900;color:#059669;font-family:${fontFamily};margin-top:2px;">$${Math.round(receivedDollars).toLocaleString()}</div>
+                            </td>
+                            <td width="33%" align="center" style="padding:10px 4px;border-right:1px solid #e2e8f0;">
+                              <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;font-family:${fontFamily};">Pledged</div>
+                              <div style="font-size:14px;font-weight:900;color:#4f46e5;font-family:${fontFamily};margin-top:2px;">$${Math.round(pledgedDollars).toLocaleString()}</div>
+                            </td>
+                            <td width="34%" align="center" style="padding:10px 4px;">
+                              <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;font-family:${fontFamily};">Goal</div>
+                              <div style="font-size:14px;font-weight:900;color:#0f172a;font-family:${fontFamily};margin-top:2px;">$${Math.round(goalDollars).toLocaleString()}</div>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <!-- Dual Action Buttons (Email Safe) -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td width="50%" align="center" style="padding-right:6px;">
+                              <a href="${c.url || c.churchCenterUrl || '#'}" style="display:block;padding:12px 14px;background:${primaryColor || '#4f46e5'};color:#ffffff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:800;text-align:center;font-family:${fontFamily};">
+                                &#10084;&#65039; ${c.pledgeButtonText || 'Pledge Now'}
+                              </a>
+                            </td>
+                            <td width="50%" align="center" style="padding-left:6px;">
+                              <a href="${c.churchCenterUrl || c.url || '#'}" style="display:block;padding:12px 14px;background:#0f172a;color:#ffffff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:800;text-align:center;font-family:${fontFamily};">
+                                &#128176; ${c.givingButtonText || 'Give Online'}
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>`;
+            }
             case 'pco_service_plan': {
                 const plan = block.content?.rawPlan;
                 if (!plan) return `<div style="padding:12px;border:1px solid #e2e8f0;border-radius:12px;color:#94a3b8;font-size:13px;font-family:${fontFamily};">Service plan details unavailable</div>`;

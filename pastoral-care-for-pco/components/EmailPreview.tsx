@@ -449,6 +449,105 @@ const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryCol
   );
 };
 
+// Rich card for PCO Pledge Campaign widget
+const PledgeCampaignCard = ({ block, primaryColor }: { block: EmailBlock; primaryColor?: string }) => {
+  const c = block.content || {};
+  const goal = (c.goalCents || 0) / 100;
+  const received = (c.totalReceivedCents || 0) / 100;
+  const pledged = (c.totalPledgedCents || 0) / 100;
+  const receivedPct = goal > 0 ? Math.min(100, Math.round((received / goal) * 100)) : 0;
+  const pledgedPct = goal > 0 ? Math.min(100, Math.round((pledged / goal) * 100)) : 0;
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: '#fff', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      {c.imageUrl ? (
+        <img
+          src={c.imageUrl}
+          alt={c.name || 'Campaign'}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', padding: '20px 16px', textAlign: 'center', color: '#fff' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#a5b4fc' }}>Pledge Campaign</div>
+          <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>{c.headline || c.name || 'Campaign'}</div>
+        </div>
+      )}
+      <div style={{ padding: '16px' }}>
+        {c.imageUrl && (
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{c.headline || c.name || 'Campaign'}</div>
+        )}
+        {c.description && (
+          <div
+            style={{ fontSize: 13, color: '#475569', lineHeight: 1.5, marginBottom: 12 }}
+            dangerouslySetInnerHTML={{ __html: c.description }}
+          />
+        )}
+
+        {/* Progress Bar Header */}
+        <table width="100%" cellPadding={0} cellSpacing={0} style={{ marginBottom: 6 }}>
+          <tbody>
+            <tr>
+              <td align="left">
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>
+                  ${Math.round(received).toLocaleString()} ({receivedPct}% Given)
+                </span>
+              </td>
+              <td align="right">
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  Goal: ${Math.round(goal).toLocaleString()}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Dual-Track Progress Bar */}
+        <div style={{ height: 12, borderRadius: 999, background: '#f1f5f9', overflow: 'hidden', display: 'flex', marginBottom: 12 }}>
+          <div style={{ width: `${receivedPct}%`, background: '#10b981', height: '100%' }} />
+          <div style={{ width: `${pledgedPct}%`, background: '#6366f1', height: '100%', opacity: 0.8 }} />
+        </div>
+
+        {/* Metric Boxes */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, background: '#f8fafc', padding: '10px 8px', borderRadius: 10, border: '1px solid #f1f5f9', textAlign: 'center', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Given</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: '#059669', marginTop: 1 }}>${Math.round(received).toLocaleString()}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Pledged</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: '#4f46e5', marginTop: 1 }}>${Math.round(pledged).toLocaleString()}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Goal</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', marginTop: 1 }}>${Math.round(goal).toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a
+            href={c.url || c.churchCenterUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ flex: 1, padding: '10px 14px', background: primaryColor || '#4f46e5', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'block' }}
+          >
+            ❤️ {c.pledgeButtonText || 'Pledge Now'}
+          </a>
+          <a
+            href={c.churchCenterUrl || c.url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ flex: 1, padding: '10px 14px', background: '#0f172a', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'block' }}
+          >
+            💰 {c.givingButtonText || 'Give Online'}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // ─── Social icon SVG paths ────────────────────────────────────────────────────
 
@@ -624,6 +723,10 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
 
             {block.type === 'pco_service_plan' && (
               <PcoServicePlanCard block={block} primaryColor={settings.primaryColor} textColor={settings.textColor} />
+            )}
+
+            {block.type === 'pco_pledge_campaign' && (
+              <PledgeCampaignCard block={block} primaryColor={settings.primaryColor} />
             )}
 
             {block.type === 'pco_groups_widget' && (

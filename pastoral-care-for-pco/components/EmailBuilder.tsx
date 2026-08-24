@@ -18,7 +18,7 @@ import {
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
-  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone, DollarSign
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ export type BlockType =
   | 'text' | 'header' | 'image' | 'button' | 'file' | 'divider' | 'video' | 'html'
   | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan' | 'pco_form'
   | 'pco_groups_widget' | 'pco_registrations_widget' | 'pco_announcement'
+  | 'pco_pledge_campaign'
   | 'pastoral_care_chart' | 'data_chart'
   | 'columns'
   // Bulletin-only embedded blocks
@@ -284,6 +285,72 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
           <Heart size={14} /> Giving Form: {c.url ? 'Configured' : 'Needs configuration'}
         </div>
       );
+    case 'pco_pledge_campaign': {
+      const goal = (c.goalCents || 0) / 100;
+      const received = (c.totalReceivedCents || 0) / 100;
+      const pledged = (c.totalPledgedCents || 0) / 100;
+      const receivedPct = goal > 0 ? Math.min(100, Math.round((received / goal) * 100)) : 0;
+      const pledgedPct = goal > 0 ? Math.min(100, Math.round((pledged / goal) * 100)) : 0;
+
+      return (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 shadow-sm text-left">
+          {c.imageUrl ? (
+            <img src={c.imageUrl} alt={c.name} className="w-full h-36 object-cover" />
+          ) : (
+            <div className="w-full h-20 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4 text-center">
+              <span className="text-sm font-black text-white">{c.headline || c.name || 'Pledge Campaign'}</span>
+            </div>
+          )}
+          <div className="p-4 space-y-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Pledge Campaign</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">{c.headline || c.name || 'Pledge Campaign'}</div>
+              {c.description && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1" dangerouslySetInnerHTML={{ __html: c.description }} />
+              )}
+            </div>
+
+            {/* Progress Bar */}
+            <div>
+              <div className="flex justify-between text-[11px] font-bold mb-1">
+                <span className="text-emerald-600 dark:text-emerald-400">${Math.round(received).toLocaleString()} ({receivedPct}% Given)</span>
+                <span className="text-slate-400">Goal: ${Math.round(goal).toLocaleString()}</span>
+              </div>
+              <div className="h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
+                <div style={{ width: `${receivedPct}%` }} className="bg-emerald-500 h-full" />
+                <div style={{ width: `${pledgedPct}%` }} className="bg-indigo-500 h-full opacity-80" />
+              </div>
+            </div>
+
+            {/* Metric Chips */}
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700 text-center">
+              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-750">
+                <div className="text-[9px] font-bold text-slate-400 uppercase">Given</div>
+                <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">${Math.round(received).toLocaleString()}</div>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-750">
+                <div className="text-[9px] font-bold text-slate-400 uppercase">Pledged</div>
+                <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">${Math.round(pledged).toLocaleString()}</div>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-750">
+                <div className="text-[9px] font-bold text-slate-400 uppercase">Goal</div>
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-200">${Math.round(goal).toLocaleString()}</div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 pt-1">
+              <div className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 text-white font-bold text-xs text-center flex items-center justify-center gap-1.5 shadow-sm">
+                <Heart size={13} /> {c.pledgeButtonText || 'Pledge Now'}
+              </div>
+              <div className="flex-1 py-2 px-3 rounded-xl bg-slate-900 dark:bg-slate-700 text-white font-bold text-xs text-center flex items-center justify-center gap-1.5 shadow-sm">
+                <DollarSign size={13} className="text-emerald-400" /> {c.givingButtonText || 'Give Online'}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     default:
       return <div className="text-xs text-slate-400">{block.type}</div>;
   }
@@ -1095,6 +1162,70 @@ const InlineMediaEditor: React.FC<{
       </div>
     );
   }
+  if (block.type === 'pco_pledge_campaign') {
+    return (
+      <div className="space-y-3 p-3">
+        <div className="text-[11px] text-slate-500 mb-1 font-bold flex items-center justify-between">
+          <span>Campaign: {c.name || 'Pledge Campaign'}</span>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wide">
+            {c.goalCents > 0 ? `${Math.round(((c.totalReceivedCents || 0) / c.goalCents) * 100)}% Reached` : ''}
+          </span>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Headline</label>
+          <input
+            type="text"
+            value={c.headline || ''}
+            onChange={e => onUpdate({ ...c, headline: e.target.value })}
+            placeholder={c.name || 'Campaign Headline'}
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Banner Image URL</label>
+          <input
+            type="url"
+            value={c.imageUrl || ''}
+            onChange={e => onUpdate({ ...c, imageUrl: e.target.value })}
+            placeholder="https://..."
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Giving Button Text</label>
+            <input
+              type="text"
+              value={c.givingButtonText || ''}
+              onChange={e => onUpdate({ ...c, givingButtonText: e.target.value })}
+              placeholder="Give Online"
+              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pledge Button Text</label>
+            <input
+              type="text"
+              value={c.pledgeButtonText || ''}
+              onChange={e => onUpdate({ ...c, pledgeButtonText: e.target.value })}
+              placeholder="Pledge Now"
+              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Church Center Giving / Campaign URL</label>
+          <input
+            type="url"
+            value={c.churchCenterUrl || c.url || ''}
+            onChange={e => onUpdate({ ...c, churchCenterUrl: e.target.value, url: e.target.value })}
+            placeholder="https://...churchcenter.com/giving"
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+    );
+  }
   return null;
 };
 
@@ -1171,7 +1302,7 @@ const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) =
 
 // ─── Sortable canvas block ────────────────────────────────────────────────────
 
-const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form', 'pco_form']);
+const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form', 'pco_form', 'pco_pledge_campaign']);
 
 const SortableCanvasBlock: React.FC<{
   block: EmailBlock;
@@ -1461,13 +1592,13 @@ const SidebarSection: React.FC<{ title: string; icon: React.ReactNode; children:
 
 // ─── PCO Quick Picker (inline, single-item) ──────────────────────────────────
 
-type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event' | 'pco_service_plan' | 'pco_form';
+type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event' | 'pco_service_plan' | 'pco_form' | 'pco_pledge_campaign';
 
 const PCO_PICK_CONFIG: Record<PcoPickType, {
   label: string;
   icon: React.ReactNode;
   fetch: (churchId: string) => Promise<any[]>;
-  map: (item: any) => { id: string; name: string; date?: string; imageUrl?: string; description?: string; meta?: string; url?: string; rawPlan?: any };
+  map: (item: any) => { id: string; name: string; date?: string; imageUrl?: string; description?: string; meta?: string; url?: string; rawPlan?: any; [key: string]: any };
 }> = {
   pco_registration: {
     label: 'Registration',
@@ -1559,6 +1690,34 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
       name: item.attributes?.title || item.attributes?.name || 'Untitled Form',
       description: item.attributes?.description || 'No description',
       url: item.attributes?.public_url || '#'
+    })
+  },
+  pco_pledge_campaign: {
+    label: 'Pledge Campaign',
+    icon: <Heart size={14} className="text-rose-500" />,
+    fetch: async (churchId) => {
+      const res = await fetch(`/api/public/pledge-campaigns/${churchId}`);
+      if (!res.ok) throw new Error('Failed to load pledge campaigns');
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    map: (c: any) => ({
+      id: c.id,
+      campaignId: c.id,
+      name: c.name || 'Pledge Campaign',
+      headline: c.headline || c.name || '',
+      description: c.description || '',
+      imageUrl: c.bannerUrl || c.imageUrl,
+      goalCents: c.goalCents || 0,
+      totalReceivedCents: c.totalReceivedCents || 0,
+      totalPledgedCents: c.totalPledgedCents || 0,
+      pledgeCount: c.pledgeCount || 0,
+      donorsCount: c.donorsCount || 0,
+      churchCenterUrl: c.churchCenterUrl || '',
+      givingButtonText: c.givingButtonText || 'Give Online',
+      pledgeButtonText: c.pledgeButtonText || 'Pledge Now',
+      meta: `Goal: $${Math.round((c.goalCents || 0) / 100).toLocaleString()} · $${Math.round((c.totalReceivedCents || 0) / 100).toLocaleString()} Given`,
+      url: c.churchCenterUrl || ''
     })
   }
 };
@@ -2029,12 +2188,22 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
       type,
       content: {
         name: item.name,
+        headline: item.headline || item.name,
         description: item.description,
         date: item.date,
         imageUrl: item.imageUrl,
         meta: item.meta,
-        url: item.url,
+        url: item.url || item.churchCenterUrl,
+        churchCenterUrl: item.churchCenterUrl,
+        givingButtonText: item.givingButtonText || 'Give Online',
+        pledgeButtonText: item.pledgeButtonText || 'Pledge Now',
+        goalCents: item.goalCents,
+        totalReceivedCents: item.totalReceivedCents,
+        totalPledgedCents: item.totalPledgedCents,
+        pledgeCount: item.pledgeCount,
+        donorsCount: item.donorsCount,
         pcoId: item.id,
+        campaignId: item.campaignId || item.id,
         rawPlan: item.rawPlan
       }
     };
@@ -2141,7 +2310,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Planning Center</span>
           </div>
           <div className="space-y-1.5">
-            {(['pco_registration', 'pco_group', 'pco_event', 'pco_service_plan', 'pco_form'] as PcoPickType[]).map(type => {
+            {(['pco_registration', 'pco_group', 'pco_event', 'pco_service_plan', 'pco_form', 'pco_pledge_campaign'] as PcoPickType[]).map(type => {
               const cfg = PCO_PICK_CONFIG[type];
               const isOpen = quickPickType === type;
               return (
