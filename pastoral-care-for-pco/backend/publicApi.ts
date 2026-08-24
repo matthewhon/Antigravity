@@ -295,6 +295,18 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
     const rawCampaigns = pcoData.data || [];
     const included = pcoData.included || [];
 
+    // Fetch all active funds from PCO Giving API
+    let availableFunds: { id: string; name: string }[] = [];
+    try {
+      const fundsRes = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/giving/v2/funds?per_page=100');
+      availableFunds = (fundsRes.data || []).map((f: any) => ({
+        id: String(f.id),
+        name: f.attributes?.name || 'Unnamed Fund'
+      }));
+    } catch (err) {
+      console.warn('[publicApi] Could not fetch funds list:', err);
+    }
+
     // Fetch custom configs for this church from Firestore
     const configsSnap = await db.collection('churches').doc(churchId).collection('pledge_campaign_configs').get();
     const configsMap = new Map<string, any>();
@@ -302,11 +314,16 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
 
     // Process campaigns and calculate pledge and giving stats
     const campaigns = await Promise.all(rawCampaigns.map(async (c: any) => {
-      const fundId = c.relationships?.fund?.data?.id;
-      const fundObj = included.find((i: any) => i.type === 'Fund' && i.id === fundId);
+      const campaignFundId = c.relationships?.fund?.data?.id ? String(c.relationships.fund.data.id) : null;
+      const fundObj = included.find((i: any) => i.type === 'Fund' && String(i.id) === String(campaignFundId));
       const customConfig = configsMap.get(c.id) || {};
       const pcoStartsAt = c.attributes?.starts_at || null;
       const pcoEndsAt = c.attributes?.ends_at || null;
+
+      const defaultFundId = customConfig.defaultFundId ? String(customConfig.defaultFundId) : campaignFundId;
+      const defaultFundObj = availableFunds.find(f => f.id === defaultFundId) || (included.find((i: any) => i.type === 'Fund' && String(i.id) === String(defaultFundId)));
+      const defaultFundName = defaultFundObj?.name || defaultFundObj?.attributes?.name || fundObj?.attributes?.name || 'General Fund';
+      const fundId = campaignFundId;
 
       // Effective Beginning & End Dates (Custom override takes precedence over PCO dates)
       const effectiveStartDate = customConfig.startDate || (pcoStartsAt ? pcoStartsAt.slice(0, 10) : '');
@@ -410,7 +427,7 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
       }
 
       const churchCenterUrl = subdomain
-        ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${fundId ? `&fund_id=${fundId}` : ''}`
+        ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${defaultFundId ? `&fund_id=${defaultFundId}` : ''}`
         : `https://churchcenter.com/giving`;
 
       return {
@@ -429,6 +446,9 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         showProgressInChurchCenter: c.attributes?.show_progress_in_church_center ?? true,
         fundId: fundId || null,
         fundName: fundObj?.attributes?.name || 'General Fund',
+        defaultFundId: defaultFundId || null,
+        defaultFundName: defaultFundName,
+        availableFunds,
         churchCenterUrl,
         totalPledgedCents,
         pledgeCount,
@@ -584,8 +604,25 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       }
     }
 
+    // Fetch all active funds from PCO Giving API
+    let availableFunds: { id: string; name: string }[] = [];
+    try {
+      const fundsRes = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/giving/v2/funds?per_page=100');
+      availableFunds = (fundsRes.data || []).map((f: any) => ({
+        id: String(f.id),
+        name: f.attributes?.name || 'Unnamed Fund'
+      }));
+    } catch (err) {
+      console.warn('[publicApi] Could not fetch funds list:', err);
+    }
+
+    const campaignFundId = c.relationships?.fund?.data?.id ? String(c.relationships.fund.data.id) : null;
+    const defaultFundId = customConfig.defaultFundId ? String(customConfig.defaultFundId) : campaignFundId;
+    const defaultFundObj = availableFunds.find(f => f.id === defaultFundId) || ((pcoData.included || []).find((i: any) => i.type === 'Fund' && String(i.id) === String(defaultFundId)));
+    const defaultFundName = defaultFundObj?.name || defaultFundObj?.attributes?.name || fundObj?.attributes?.name || 'General Fund';
+
     const churchCenterUrl = subdomain
-      ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${fundId ? `&fund_id=${fundId}` : ''}`
+      ? `https://${subdomain}.churchcenter.com/giving?campaign=${c.id}${defaultFundId ? `&fund_id=${defaultFundId}` : ''}`
       : `https://churchcenter.com/giving`;
 
     const campaign = {
@@ -604,6 +641,9 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       showProgressInChurchCenter: c.attributes?.show_progress_in_church_center ?? true,
       fundId: fundId || null,
       fundName: fundObj?.attributes?.name || 'General Fund',
+      defaultFundId: defaultFundId || null,
+      defaultFundName: defaultFundName,
+      availableFunds,
       churchCenterUrl,
       totalPledgedCents,
       pledgeCount,

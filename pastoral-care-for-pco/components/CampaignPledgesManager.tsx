@@ -47,6 +47,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
   const [pledgeButtonText, setPledgeButtonText] = useState('Pledge Now');
   const [givingEmbedMode, setGivingEmbedMode] = useState<'modal' | 'direct_link' | 'inline'>('modal');
   const [givingButtonText, setGivingButtonText] = useState('Give to Campaign');
+  const [defaultFundId, setDefaultFundId] = useState('');
   const [milestones, setMilestones] = useState<{ amount: string; title: string }[]>([]);
   const [autoHeight, setAutoHeight] = useState(true);
   const [scale, setScale] = useState<number>(1);
@@ -109,6 +110,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       setProgressBasis(camp.progressBasis || 'both');
       setStartDate(camp.startDate || (camp.startsAt ? camp.startsAt.slice(0, 10) : ''));
       setEndDate(camp.endDate || (camp.endsAt ? camp.endsAt.slice(0, 10) : ''));
+      setDefaultFundId(camp.defaultFundId || camp.fundId || '');
       setAllowOnlinePledging(camp.allowOnlinePledging !== false);
       setPledgeButtonText(camp.pledgeButtonText || 'Pledge Now');
       setGivingEmbedMode(camp.givingEmbedMode || 'modal');
@@ -203,6 +205,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
         progressBasis,
         startDate: startDate || null,
         endDate: endDate || null,
+        defaultFundId: defaultFundId || null,
         allowOnlinePledging,
         pledgeButtonText,
         givingEmbedMode,
@@ -757,6 +760,28 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                   placeholder="Give to Campaign"
                   className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
+                  <span>Default Giving Fund</span>
+                  <span className="text-[10px] text-indigo-500 font-bold lowercase">pre-selected in form</span>
+                </label>
+                <select
+                  value={defaultFundId}
+                  onChange={e => setDefaultFundId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Campaign Default Fund ({selectedCampaign?.fundName || 'Auto'})</option>
+                  {(selectedCampaign?.availableFunds || []).map((f: any) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} {f.id === selectedCampaign?.fundId ? '(Linked to Campaign)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 leading-tight">
+                  When donors click &quot;Give to Campaign&quot;, the Church Center form will automatically open with this fund pre-selected.
+                </p>
               </div>
             </div>
 
