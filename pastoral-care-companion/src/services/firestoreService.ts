@@ -18,7 +18,7 @@ import {
 import { db } from './firebase';
 import { 
   Church, User, UserRole, 
-  PcoPerson, SystemSettings, 
+  PcoPerson, PcoGroup, SystemSettings, 
   PastoralNote, PrayerRequest, PcoList,
   OutreachSession, OutreachSlot
 } from '../types';
@@ -147,6 +147,25 @@ class FirestoreService {
       );
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => d.data() as PrayerRequest);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async savePrayerRequest(request: PrayerRequest): Promise<void> {
+    try {
+      await setDoc(doc(db, 'prayer_requests', request.id), request, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Groups ---
+  async getGroups(churchId: string): Promise<PcoGroup[]> {
+    try {
+      const q = query(collection(db, 'groups'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as PcoGroup);
     } catch (e) {
       return [];
     }

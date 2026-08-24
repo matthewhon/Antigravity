@@ -406,6 +406,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
           churchId={church.id}
           currentUser={currentUser}
           onAddNote={handleAddNewNote}
+          people={people}
+          onSelectPerson={setSelectedPerson}
         />
       )}
     </div>

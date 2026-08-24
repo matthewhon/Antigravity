@@ -2,11 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest } from '../types';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
-  NotebookPen, ChevronDown, ChevronUp, Plus, X
+  NotebookPen, ChevronDown, ChevronUp, Plus, X,
+  ShieldAlert, Activity, HeartHandshake, CalendarCheck, UserCheck,
+  Users, Church as ChurchIcon, Sparkles, DollarSign,
+  Heart, Clock, Tag, Check, Calendar, CheckSquare
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -28,6 +31,41 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function getEngagementStatus(person: PcoPerson): string {
+  if (person.engagementStatus) return person.engagementStatus;
+  const count = person.checkInCount || 0;
+  if (count > 8) return 'Core';
+  if (count >= 4) return 'Regular';
+  if (count > 0) return 'Sporadic';
+  return 'Inactive';
+}
+
+function getEngagementBadgeColor(status: string): string {
+  switch (status) {
+    case 'Core':
+      return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/40';
+    case 'Regular':
+      return 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/40';
+    case 'Sporadic':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
+    case 'Inactive':
+    default:
+      return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+  }
+}
+
+function getRiskCategoryBadgeColor(category?: string): string {
+  switch (category) {
+    case 'Healthy':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
+    case 'At Risk':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
+    case 'Disconnected':
+    default:
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-800/40';
+  }
+}
+
 interface PersonProfileDrawerProps {
   personId: string | null;
   churchId: string;
@@ -39,6 +77,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const pcoConnected = !!(church?.pcoAccessToken);
 
   const [person, setPerson] = useState<PcoPerson | null>(null);
+  const [allPeople, setAllPeople] = useState<PcoPerson[]>([]);
+  const [groups, setGroups] = useState<PcoGroup[]>([]);
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [loading, setLoading] = useState(false);
@@ -165,12 +206,17 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setNotes([]);
       setTimeline([]);
       try {
-        const [people, changes, personNotes, outreachSlots] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
           firestore.getPersonOutreachSlots(churchId, personId),
+          firestore.getGroups(churchId),
+          firestore.getPrayerRequests(churchId),
         ]);
+        setAllPeople(people);
+        setGroups(fetchedGroups);
+        setPrayerRequests(fetchedPrayers);
         const p = people.find(p => p.id === personId);
         if (p) setPerson(p);
         setTimeline(changes);
@@ -212,6 +258,54 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
   const visibleNotes = showAllNotes ? notes : notes.slice(0, 3);
 
+  const riskProfile = person?.riskProfile || (person?.historicRiskCategory ? {
+    category: person.historicRiskCategory as 'Healthy' | 'At Risk' | 'Disconnected',
+    score: person.historicRiskScore ?? 0,
+    factors: []
+  } : undefined);
+  const engagementStatus = person ? getEngagementStatus(person) : 'Inactive';
+  const timesServed = person?.servingStats?.last90DaysCount ?? 0;
+  const servingStats = person?.servingStats;
+
+  // Household members
+  const householdMembers = person?.householdId 
+    ? allPeople.filter(m => m.householdId === person.householdId && m.id !== person.id) 
+    : [];
+
+  // Groups
+  const personGroups = groups.filter(g => 
+    person?.groupIds?.includes(g.id) || 
+    g.memberIds?.includes(person?.id || '') || 
+    g.leaderIds?.includes(person?.id || '')
+  );
+
+  // Prayer requests
+  const personPrayerRequests = prayerRequests.filter(pr => 
+    pr.personId === person?.id || 
+    (pr.personName && person?.name && pr.personName.toLowerCase() === person.name.toLowerCase())
+  );
+
+  // Touchpoint date calculation
+  const lastTouchpointDate = notes.length > 0 ? new Date(notes[0].date) : null;
+  const daysSinceLastTouchpoint = lastTouchpointDate 
+    ? Math.max(0, Math.floor((Date.now() - lastTouchpointDate.getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  const handleSelectPerson = (targetPersonId: string) => {
+    window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: targetPersonId }));
+  };
+
+  const handleTogglePrayerAnswered = async (pr: PrayerRequest) => {
+    const nextStatus = pr.status === 'Answered' ? 'Active' : 'Answered';
+    const updated: PrayerRequest = { ...pr, status: nextStatus };
+    try {
+      await firestore.savePrayerRequest(updated);
+      setPrayerRequests(prev => prev.map(p => p.id === pr.id ? updated : p));
+    } catch (e) {
+      console.error("Failed to update prayer request:", e);
+    }
+  };
+
   return (
     <Drawer isOpen={!!personId} onClose={onClose} title="Person Profile">
       {loading ? (
@@ -232,11 +326,128 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 dark:text-white">{person.name}</h2>
-              <div className="flex gap-2 mt-1">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                   {person.membership || 'Guest'}
                 </span>
+                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${getEngagementBadgeColor(engagementStatus)}`}>
+                  {engagementStatus}
+                </span>
+                {riskProfile && (
+                  <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${getRiskCategoryBadgeColor(riskProfile.category)}`}>
+                    {riskProfile.category} ({riskProfile.score})
+                  </span>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* ── Care Cadence & Touchpoint Banner ── */}
+          <div className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+            daysSinceLastTouchpoint === null ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300' :
+            daysSinceLastTouchpoint <= 30 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300' :
+            daysSinceLastTouchpoint <= 60 ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300' :
+            'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/30 text-rose-800 dark:text-rose-300'
+          }`}>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Clock className="w-4 h-4 shrink-0" />
+              <div className="min-w-0">
+                <span className="font-bold">
+                  {daysSinceLastTouchpoint === null 
+                    ? 'No pastoral contact logged yet'
+                    : `Last touchpoint ${daysSinceLastTouchpoint === 0 ? 'today' : `${daysSinceLastTouchpoint} day${daysSinceLastTouchpoint > 1 ? 's' : ''} ago`}`}
+                </span>
+                {notes.length > 0 && (
+                  <span className="text-[11px] opacity-80 block truncate">
+                    ({notes[0].type} on {formatDate(notes[0].date)} by {notes[0].authorName})
+                  </span>
+                )}
+              </div>
+            </div>
+            {person.primaryCampusName && (
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 shrink-0 border border-current shadow-xs">
+                🏛️ {person.primaryCampusName}
+              </span>
+            )}
+          </div>
+
+          {/* ── Status & Engagement Overview Grid ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Risk Profile Card */}
+            <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                  <ShieldAlert className="w-3.5 h-3.5 text-indigo-500" />
+                  Risk Profile
+                </span>
+                {riskProfile && (
+                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getRiskCategoryBadgeColor(riskProfile.category)}`}>
+                    {riskProfile.category}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${
+                  riskProfile?.category === 'Healthy' ? 'text-emerald-600 dark:text-emerald-400' :
+                  riskProfile?.category === 'At Risk' ? 'text-amber-600 dark:text-amber-400' :
+                  riskProfile ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'
+                }`}>
+                  {riskProfile ? riskProfile.score : 'N/A'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">/ 100 score</span>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium line-clamp-1" title={riskProfile?.factors?.join(', ') || 'No risk factors'}>
+                {riskProfile?.factors && riskProfile.factors.length > 0 ? riskProfile.factors.join(', ') : 'No active risk factors'}
+              </p>
+            </div>
+
+            {/* Engagement Status Card */}
+            <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                  <Activity className="w-3.5 h-3.5 text-indigo-500" />
+                  Engagement
+                </span>
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getEngagementBadgeColor(engagementStatus)}`}>
+                  {engagementStatus}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-slate-800 dark:text-white">
+                  {engagementStatus}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                {person.checkInCount ? `${person.checkInCount} check-in${person.checkInCount > 1 ? 's' : ''}` : 'No recent check-ins'}
+              </p>
+            </div>
+
+            {/* Recently Served Card */}
+            <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                  <HeartHandshake className="w-3.5 h-3.5 text-indigo-500" />
+                  Recently Served
+                </span>
+                {timesServed > 0 && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 uppercase">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-slate-800 dark:text-white">
+                  {timesServed}x
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">last 90 days</span>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium truncate">
+                {servingStats?.recentServices && servingStats.recentServices.length > 0 
+                  ? `Last: ${servingStats.recentServices[0].teamName || 'Service'} (${formatDate(servingStats.recentServices[0].date)})`
+                  : servingStats?.nextServiceDate 
+                    ? `Next: ${formatDate(servingStats.nextServiceDate)}`
+                    : timesServed === 0 ? 'Not served recently' : `${timesServed} service plans`}
+              </p>
             </div>
           </div>
 
@@ -251,6 +462,218 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               View in PCO
             </a>
           </div>
+
+          {/* ── Spiritual Milestones ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              Spiritual Milestones & Journey
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">✝️ Salvation</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
+                  {person.salvationDate ? formatDate(person.salvationDate) : 'Not recorded'}
+                </span>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">💧 Baptism</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
+                  {person.baptismDate ? formatDate(person.baptismDate) : 'Not recorded'}
+                </span>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60 col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">🏛️ Membership</span>
+                <span className="font-bold text-xs text-slate-800 dark:text-white mt-0.5 block truncate">
+                  {person.membership || 'Non-Member'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Household & Family ── */}
+          {(person.householdName || householdMembers.length > 0) && (
+            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-indigo-500" />
+                  {person.householdName || 'Household Members'}
+                </h3>
+                {householdMembers.length > 0 && (
+                  <span className="text-[10px] font-black bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                    {householdMembers.length + 1} Members
+                  </span>
+                )}
+              </div>
+              {householdMembers.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No other household members recorded.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {householdMembers.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleSelectPerson(m.id)}
+                      className="flex items-center gap-2.5 p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-700 transition text-left cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0">
+                        {m.avatar ? (
+                          <img src={m.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-slate-400 text-xs">
+                            {m.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                          {m.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {m.membership || m.status || 'Family Member'}{m.age ? ` • Age ${m.age}` : ''}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Small Groups ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-purple-500" />
+                Small Groups & Community
+              </h3>
+              {personGroups.length > 0 && (
+                <span className="text-[10px] font-black bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">
+                  {personGroups.length} Group{personGroups.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            {personGroups.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Not currently enrolled in any small groups.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {personGroups.map(g => {
+                  const isLeader = g.leaderIds?.includes(person.id);
+                  return (
+                    <div key={g.id} className="flex justify-between items-center bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60 text-xs">
+                      <div className="min-w-0 pr-2">
+                        <span className="font-bold text-slate-800 dark:text-white block truncate">{g.name}</span>
+                        <span className="text-[10px] text-slate-400">{g.groupTypeName || 'Group'}{g.membersCount ? ` • ${g.membersCount} members` : ''}</span>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
+                        isLeader 
+                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600'
+                      }`}>
+                        {isLeader ? 'Leader' : 'Member'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Giving Health ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <DollarSign className="w-4 h-4 text-emerald-500" />
+                Giving Health & Donor Status
+              </h3>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                person.isDonor 
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+              }`}>
+                {person.isDonor ? 'Contributing Giver' : 'Non-Giver'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Giving Cadence</span>
+                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
+                  {person.isDonor ? 'Active Contributor' : 'No donations recorded'}
+                </span>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Donor Category</span>
+                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
+                  {person.isDonor ? 'Regular Giver' : 'First-time / Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Prayer Requests ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Heart className="w-4 h-4 text-rose-500" />
+                Prayer Requests
+              </h3>
+              {personPrayerRequests.length > 0 && (
+                <span className="text-[10px] font-black bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full">
+                  {personPrayerRequests.filter(pr => pr.status === 'Active').length} Active
+                </span>
+              )}
+            </div>
+            {personPrayerRequests.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No prayer requests recorded.</p>
+            ) : (
+              <div className="space-y-2">
+                {personPrayerRequests.map(pr => (
+                  <div key={pr.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        pr.status === 'Answered' 
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                          : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                      }`}>
+                        {pr.status}
+                      </span>
+                      <span className="text-[10px] text-slate-400">{formatDate(pr.date)}</span>
+                    </div>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                      {pr.request}
+                    </p>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-700/60">
+                      <span className="text-[10px] text-slate-400">{pr.category || 'General'}</span>
+                      <button
+                        onClick={() => handleTogglePrayerAnswered(pr)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                      >
+                        <CheckSquare className="w-3 h-3" />
+                        {pr.status === 'Answered' ? 'Re-open Request' : 'Mark Answered'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Custom Field Data ── */}
+          {person.field_data && person.field_data.length > 0 && (
+            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-indigo-500" />
+                Custom Profile Attributes
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {person.field_data.map((f, idx) => (
+                  <div key={idx} className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60 text-xs">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block truncate">{f.field_definition?.name || 'Custom Field'}</span>
+                    <span className="font-semibold text-slate-800 dark:text-white mt-0.5 block truncate">{f.value || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Contact Details ── */}
           <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
@@ -497,30 +920,30 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           )}
 
           {/* ── Current Risk Status ── */}
-          {person.riskProfile && (
+          {riskProfile && (
             <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide mb-3">Current Risk Profile</h3>
               <div className="flex items-center gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black ${
-                  person.riskProfile.category === 'Healthy'       ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' :
-                  person.riskProfile.category === 'At Risk'       ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' :
+                  riskProfile.category === 'Healthy'       ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                  riskProfile.category === 'At Risk'       ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' :
                   'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'
                 }`}>
-                  {person.riskProfile.score}
+                  {riskProfile.score}
                 </div>
                 <div>
                   <span className={`text-sm font-black ${
-                    person.riskProfile.category === 'Healthy'     ? 'text-emerald-600 dark:text-emerald-400' :
-                    person.riskProfile.category === 'At Risk'     ? 'text-amber-600 dark:text-amber-400' :
+                    riskProfile.category === 'Healthy'     ? 'text-emerald-600 dark:text-emerald-400' :
+                    riskProfile.category === 'At Risk'     ? 'text-amber-600 dark:text-amber-400' :
                     'text-rose-600 dark:text-rose-400'
                   }`}>
-                    {person.riskProfile.category}
+                    {riskProfile.category}
                   </span>
                 </div>
               </div>
-              {person.riskProfile.factors && person.riskProfile.factors.length > 0 && (
+              {riskProfile.factors && riskProfile.factors.length > 0 && (
                 <ul className="space-y-1">
-                  {person.riskProfile.factors.map((f, i) => (
+                  {riskProfile.factors.map((f, i) => (
                     <li key={i} className="text-xs text-slate-600 dark:text-slate-300 flex gap-2">
                       <span className="text-rose-500">•</span> {f}
                     </li>
@@ -529,6 +952,48 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               )}
             </div>
           )}
+
+          {/* ── Serving Involvement ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <HeartHandshake className="w-4 h-4 text-indigo-500" />
+                Serving Involvement
+              </h3>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                {timesServed} in last 90 days
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Weekly Serving Avg</span>
+                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
+                  {servingStats?.timesPerWeek ?? (timesServed / (90 / 7)).toFixed(2)}x / week
+                </span>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Next Service Date</span>
+                <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
+                  {servingStats?.nextServiceDate ? formatDate(servingStats.nextServiceDate) : 'None scheduled'}
+                </span>
+              </div>
+            </div>
+
+            {servingStats?.recentServices && servingStats.recentServices.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">Recent Confirmed Services:</span>
+                <div className="space-y-1">
+                  {servingStats.recentServices.slice(0, 5).map((srv, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 px-3 py-2 rounded-xl text-xs border border-slate-100 dark:border-slate-700/60">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{srv.teamName || srv.serviceTypeName || 'Service Team'}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{formatDate(srv.date)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* ── Risk Timeline ── */}
           <div>

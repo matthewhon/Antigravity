@@ -235,6 +235,8 @@ export interface PcoPerson {
         recentServices?: { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[];
     };
     field_data?: { field_definition: { name: string }, value: string }[];
+    primaryCampusId?: string | null;
+    primaryCampusName?: string | null;
 }
 
 export interface PcoGroup {
