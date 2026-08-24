@@ -321,10 +321,16 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
       }
 
       // 2. Fetch total money given to the campaign fund within the date range [effectiveStartDate, effectiveEndDate]
+      const pcoReceivedFromPledges = c.attributes?.received_total_from_pledges_cents || 0;
+      const pcoReceivedOutsidePledges = c.attributes?.received_total_outside_of_pledges_cents || 0;
+      const pcoTotalReceivedCents = pcoReceivedFromPledges + pcoReceivedOutsidePledges;
+
       let totalReceivedCents = 0;
       let donorsCount = 0;
 
-      if (fundId) {
+      const hasCustomDateOverride = !!(customConfig.startDate || customConfig.endDate);
+
+      if (hasCustomDateOverride && fundId) {
         try {
           const donationsSnap = await db.collection('donations')
             .where('churchId', '==', churchId)
@@ -380,9 +386,9 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         }
       }
 
-      // Check if PCO attributes supplied total_cents
-      if (totalReceivedCents === 0 && c.attributes?.total_cents && !effectiveStartDate && !effectiveEndDate) {
-        totalReceivedCents = c.attributes.total_cents;
+      // If no custom date override was set or custom query returned 0, use PCO's official total
+      if (!hasCustomDateOverride || totalReceivedCents === 0) {
+        totalReceivedCents = pcoTotalReceivedCents > 0 ? pcoTotalReceivedCents : totalReceivedCents;
       }
 
       const churchCenterUrl = subdomain
@@ -483,10 +489,16 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       console.warn(`[publicApi] Could not fetch pledges for campaign ${campaignId}:`, err);
     }
 
+    const pcoReceivedFromPledges = c.attributes?.received_total_from_pledges_cents || 0;
+    const pcoReceivedOutsidePledges = c.attributes?.received_total_outside_of_pledges_cents || 0;
+    const pcoTotalReceivedCents = pcoReceivedFromPledges + pcoReceivedOutsidePledges;
+
     let totalReceivedCents = 0;
     let donorsCount = 0;
 
-    if (fundId) {
+    const hasCustomDateOverride = !!(customConfig.startDate || customConfig.endDate);
+
+    if (hasCustomDateOverride && fundId) {
       try {
         const donationsSnap = await db.collection('donations')
           .where('churchId', '==', churchId)
@@ -541,8 +553,8 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       }
     }
 
-    if (totalReceivedCents === 0 && c.attributes?.total_cents && !effectiveStartDate && !effectiveEndDate) {
-      totalReceivedCents = c.attributes.total_cents;
+    if (!hasCustomDateOverride || totalReceivedCents === 0) {
+      totalReceivedCents = pcoTotalReceivedCents > 0 ? pcoTotalReceivedCents : totalReceivedCents;
     }
 
     const churchCenterUrl = subdomain
