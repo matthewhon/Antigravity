@@ -326,12 +326,20 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
       const pcoReceivedOutsidePledges = c.attributes?.received_total_outside_of_pledges_cents || 0;
       const pcoTotalReceivedCents = pcoReceivedFromPledges + pcoReceivedOutsidePledges;
 
+      const pcoStartsStr = pcoStartsAt ? pcoStartsAt.slice(0, 10) : '';
+      const pcoEndsStr = pcoEndsAt ? pcoEndsAt.slice(0, 10) : '';
+      const isCustomDate = Boolean(
+        (customConfig.startDate && customConfig.startDate !== pcoStartsStr) ||
+        (customConfig.endDate && customConfig.endDate !== pcoEndsStr)
+      );
+
       let totalReceivedCents = 0;
       let donorsCount = 0;
 
-      const hasCustomDateOverride = !!(customConfig.startDate || customConfig.endDate);
-
-      if (hasCustomDateOverride && fundId) {
+      if (!isCustomDate) {
+        // Use Planning Center's officially computed live campaign totals directly
+        totalReceivedCents = pcoTotalReceivedCents;
+      } else if (fundId) {
         try {
           const donationsSnap = await db.collection('donations')
             .where('churchId', '==', churchId)
@@ -360,7 +368,7 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
             if (effectiveEndDate) {
               url += `&where[received_at][lte]=${effectiveEndDate}T23:59:59Z`;
             }
-            const liveDonations = await fetchAllFromPco(churchId, url, 5);
+            const liveDonations = await fetchAllFromPco(churchId, url, 10);
             const liveIncluded = liveDonations.included || [];
             const uniqueLiveDonors = new Set<string>();
 
@@ -385,11 +393,10 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         } catch (e) {
           console.warn(`[publicApi] Error calculating donations for fund ${fundId}:`, e);
         }
-      }
 
-      // If no custom date override was set or custom query returned 0, use PCO's official total
-      if (!hasCustomDateOverride || totalReceivedCents === 0) {
-        totalReceivedCents = pcoTotalReceivedCents > 0 ? pcoTotalReceivedCents : totalReceivedCents;
+        if (totalReceivedCents === 0 && !customConfig.startDate && !customConfig.endDate) {
+          totalReceivedCents = pcoTotalReceivedCents;
+        }
       }
 
       const churchCenterUrl = subdomain
@@ -495,12 +502,20 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
     const pcoReceivedOutsidePledges = c.attributes?.received_total_outside_of_pledges_cents || 0;
     const pcoTotalReceivedCents = pcoReceivedFromPledges + pcoReceivedOutsidePledges;
 
+    const pcoStartsStr = pcoStartsAt ? pcoStartsAt.slice(0, 10) : '';
+    const pcoEndsStr = pcoEndsAt ? pcoEndsAt.slice(0, 10) : '';
+    const isCustomDate = Boolean(
+      (customConfig.startDate && customConfig.startDate !== pcoStartsStr) ||
+      (customConfig.endDate && customConfig.endDate !== pcoEndsStr)
+    );
+
     let totalReceivedCents = 0;
     let donorsCount = 0;
 
-    const hasCustomDateOverride = !!(customConfig.startDate || customConfig.endDate);
-
-    if (hasCustomDateOverride && fundId) {
+    if (!isCustomDate) {
+      // Use Planning Center's officially computed live campaign totals directly
+      totalReceivedCents = pcoTotalReceivedCents;
+    } else if (fundId) {
       try {
         const donationsSnap = await db.collection('donations')
           .where('churchId', '==', churchId)
@@ -528,7 +543,7 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
           if (effectiveEndDate) {
             url += `&where[received_at][lte]=${effectiveEndDate}T23:59:59Z`;
           }
-          const liveDonations = await fetchAllFromPco(churchId, url, 5);
+          const liveDonations = await fetchAllFromPco(churchId, url, 10);
           const liveIncluded = liveDonations.included || [];
           const uniqueLiveDonors = new Set<string>();
 
@@ -553,10 +568,10 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       } catch (e) {
         console.warn(`[publicApi] Error calculating donations for fund ${fundId}:`, e);
       }
-    }
 
-    if (!hasCustomDateOverride || totalReceivedCents === 0) {
-      totalReceivedCents = pcoTotalReceivedCents > 0 ? pcoTotalReceivedCents : totalReceivedCents;
+      if (totalReceivedCents === 0 && !customConfig.startDate && !customConfig.endDate) {
+        totalReceivedCents = pcoTotalReceivedCents;
+      }
     }
 
     const churchCenterUrl = subdomain
