@@ -276,6 +276,12 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
 
   const firstName = personName.split(' ')[0] || 'Friend';
 
+  // Safe scripture anchor
+  const scriptureAnchorObj = giftsProfile?.insights?.scriptureAnchor || discProfile?.themeVerseKjv || {
+    verse: 'Matthew 5:16 (KJV)',
+    text: 'Let your light so shine before men, that they may see your good works, and glorify your Father which is in heaven.'
+  };
+
   // Dynamic outreach scripts tailored to their profiles
   const outreachScripts = [
     {
@@ -296,7 +302,7 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
     {
       title: 'Scripture Blessing for Their Journey',
       description: 'A tailored KJV Bible verse to anchor their faith.',
-      text: `Hi ${firstName}! I wanted to share this verse with you today from God's Word: "${giftsProfile?.insights?.scriptureAnchor?.text || discProfile?.biblicalActionPrinciples?.[0]?.verseText || 'Let your light so shine before men, that they may see your good works, and glorify your Father which is in heaven.'}" (${giftsProfile?.insights?.scriptureAnchor?.verse || discProfile?.biblicalActionPrinciples?.[0]?.verseReference || 'Matthew 5:16 KJV'}). Praying this strengthens you today!`
+      text: `Hi ${firstName}! I wanted to share this verse with you today from God's Word: "${scriptureAnchorObj.text}" (${scriptureAnchorObj.verse}). Praying this strengthens you today!`
     }
   ];
 
@@ -307,6 +313,24 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
   };
 
   const handleCopySummary = () => {
+    const howToSpeakLines = [
+      ...(discProfile?.communicationPreferences?.howToSpeakToYou ? [discProfile.communicationPreferences.howToSpeakToYou] : []),
+      ...(giftsProfile?.insights?.communicationAdvice || [])
+    ];
+    if (howToSpeakLines.length === 0) howToSpeakLines.push('Be authentic, warm, and clear.');
+
+    const avoidLines = giftsProfile?.insights?.whatToAvoid || [
+      'Avoid vague instructions or shifting expectations without warning.',
+      'Avoid public criticism or dismissing their concerns abruptly.',
+      'Avoid demanding instant answers if they need reflection time.'
+    ];
+
+    const servingRoles = [
+      ...(giftsProfile?.def?.recommendedServingAreas || []),
+      ...(discProfile?.idealServingRoles || []),
+      ...(mbtiProfile?.idealServingRoles || [])
+    ];
+
     const summaryLines = [
       `=== PASTORAL ENGAGEMENT SUMMARY: ${personName} ===`,
       giftsResponse ? `• Spiritual Gifts: Primary: ${giftsResponse.primaryGift}${giftsResponse.secondaryGift ? `, Secondary: ${giftsResponse.secondaryGift}` : ''}` : '',
@@ -314,13 +338,13 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
       mbtiResponse ? `• MBTI Personality: ${mbtiResponse.mbtiType} (${mbtiProfile?.name})` : '',
       '',
       '--- HOW TO COMMUNICATE WITH THEM ---',
-      ...(discProfile?.communicationPreferences?.howToSpeakToYou || giftsProfile?.insights?.communicationAdvice || ['Be authentic, warm, and clear.']).map(s => `• ${s}`),
+      ...howToSpeakLines.map(s => `• ${s}`),
       '',
       '--- WHAT TO AVOID ---',
-      ...(discProfile?.communicationPreferences?.whatToAvoid || giftsProfile?.insights?.whatToAvoid || ['Avoid dismissive or overly rigid approaches.']).map(s => `• ${s}`),
+      ...avoidLines.map(s => `• ${s}`),
       '',
       '--- RECOMMENDED MINISTRY ROLES ---',
-      ...(giftsProfile?.def?.recommendedServingAreas || mbtiProfile?.idealServingRoles || []).map(r => `• ${r}`)
+      ...servingRoles.map(r => `• ${r}`)
     ].filter(Boolean).join('\n');
 
     navigator.clipboard.writeText(summaryLines);
@@ -497,26 +521,27 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
                     How to Speak & Engage With {firstName}
                   </h4>
                 </div>
+
+                {discProfile?.communicationPreferences?.howToSpeakToYou && (
+                  <div className="p-3.5 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-emerald-200/60 dark:border-emerald-800/60 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+                    <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 block mb-1">
+                      DISC Behavioral Communication Rule
+                    </span>
+                    {discProfile.communicationPreferences.howToSpeakToYou}
+                  </div>
+                )}
+
                 <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-                  {discProfile?.communicationPreferences?.howToSpeakToYou ? (
-                    discProfile.communicationPreferences.howToSpeakToYou.map((tip, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-emerald-600 font-bold">•</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))
-                  ) : (
-                    (giftsProfile?.insights?.communicationAdvice || [
-                      'Be clear, warm, and direct about ministry goals.',
-                      'Listen attentively to their feedback and acknowledge their perspective.',
-                      'Follow up conversations with clear, actionable next steps.'
-                    ]).map((tip, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-emerald-600 font-bold">•</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))
-                  )}
+                  {(giftsProfile?.insights?.communicationAdvice || [
+                    'Be clear, warm, and direct about ministry goals.',
+                    'Listen attentively to their feedback and acknowledge their perspective.',
+                    'Follow up conversations with clear, actionable next steps.'
+                  ]).map((tip, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-emerald-600 font-bold">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
                   {mbtiProfile?.communicationStyle && (
                     <li className="flex items-start gap-2 pt-1 border-t border-emerald-200/50 dark:border-emerald-800/50 font-medium">
                       <span className="text-emerald-600 font-bold">MBTI Tone:</span>
@@ -535,25 +560,16 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
                   </h4>
                 </div>
                 <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-                  {discProfile?.communicationPreferences?.whatToAvoid ? (
-                    discProfile.communicationPreferences.whatToAvoid.map((avoid, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-rose-600 font-bold">✕</span>
-                        <span>{avoid}</span>
-                      </li>
-                    ))
-                  ) : (
-                    (giftsProfile?.insights?.whatToAvoid || [
-                      'Avoid overly vague or ambiguous instructions.',
-                      'Avoid public criticism or dismissing their concerns abruptly.',
-                      'Avoid demanding instant answers if they need reflection time.'
-                    ]).map((avoid, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-rose-600 font-bold">✕</span>
-                        <span>{avoid}</span>
-                      </li>
-                    ))
-                  )}
+                  {(giftsProfile?.insights?.whatToAvoid || [
+                    'Avoid overly vague or ambiguous instructions.',
+                    'Avoid public criticism or dismissing their concerns abruptly.',
+                    'Avoid demanding instant answers if they need reflection time.'
+                  ]).map((avoid, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-rose-600 font-bold">✕</span>
+                      <span>{avoid}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -635,13 +651,13 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
               </div>
 
               {/* Scripture Anchor */}
-              {(giftsProfile?.insights?.scriptureAnchor || discProfile?.biblicalActionPrinciples?.[0]) && (
+              {(giftsProfile?.insights?.scriptureAnchor || discProfile?.themeVerseKjv) && (
                 <div className="p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border-l-4 border-emerald-600 space-y-1.5">
                   <p className="text-xs italic text-emerald-950 dark:text-emerald-200 font-serif leading-relaxed">
-                    “{giftsProfile?.insights?.scriptureAnchor?.text || discProfile?.biblicalActionPrinciples?.[0]?.verseText}”
+                    “{giftsProfile?.insights?.scriptureAnchor?.text || discProfile?.themeVerseKjv?.text}”
                   </p>
                   <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-right">
-                    — {giftsProfile?.insights?.scriptureAnchor?.verse || discProfile?.biblicalActionPrinciples?.[0]?.verseReference}
+                    — {giftsProfile?.insights?.scriptureAnchor?.verse || discProfile?.themeVerseKjv?.verse}
                   </p>
                 </div>
               )}
@@ -664,7 +680,7 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(giftsProfile?.def?.recommendedServingAreas || mbtiProfile?.idealServingRoles || [
+                  {(giftsProfile?.def?.recommendedServingAreas || discProfile?.idealServingRoles || mbtiProfile?.idealServingRoles || [
                     'Guest Services & Welcome Team',
                     'Care & Follow-Up Team',
                     'Small Group Leadership',
@@ -682,16 +698,16 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
                 </div>
               </div>
 
-              {/* Work Style Tendencies & Blind Spots */}
+              {/* Work Style Tendencies & Ministry Strengths / Blind Spots */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Work Style Tendencies */}
-                {discProfile?.workStyleTendencies && (
+                {/* Baptist Ministry Strengths / Tendencies */}
+                {(discProfile?.baptistMinistryStrengths || discProfile?.workStyleTendencies) && (
                   <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                     <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                      Work & Team Dynamics
+                      Ministry Strengths & Work Tendencies
                     </h4>
                     <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                      {discProfile.workStyleTendencies.map((tend, idx) => (
+                      {(discProfile.baptistMinistryStrengths || discProfile.workStyleTendencies || []).map((tend, idx) => (
                         <li key={idx} className="flex items-start gap-2">
                           <span className="text-indigo-600 font-bold">✓</span>
                           <span>{tend}</span>
@@ -702,13 +718,13 @@ export const PastoralEngagementModal: React.FC<PastoralEngagementModalProps> = (
                 )}
 
                 {/* Discipleship & Growth Areas */}
-                {mbtiProfile?.growthAreas && (
+                {(discProfile?.spiritualGrowthAreas || mbtiProfile?.growthAreas) && (
                   <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                     <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
                       Spiritual Growth & Blind Spots
                     </h4>
                     <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                      {mbtiProfile.growthAreas.map((growth, idx) => (
+                      {(discProfile?.spiritualGrowthAreas || mbtiProfile?.growthAreas || []).map((growth, idx) => (
                         <li key={idx} className="flex items-start gap-2">
                           <span className="text-amber-500 font-bold">•</span>
                           <span>{growth}</span>
