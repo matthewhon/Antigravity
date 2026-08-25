@@ -35,6 +35,12 @@ import { fetchCensusDataForTenant } from '../services/censusService';
 import { generateCommunityStrategy, generateCareAdvice } from '../services/geminiService';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
+import { computeAssessmentAggregates, AssessmentAggregates } from '../services/assessmentAnalyticsService';
+import { PastoralBriefingWidget } from './widgets/PastoralBriefingWidget';
+import { GiftPlacementGapWidget } from './widgets/GiftPlacementGapWidget';
+import { CareVulnerabilityWidget } from './widgets/CareVulnerabilityWidget';
+import { DiscipleshipPathwayWidget } from './widgets/DiscipleshipPathwayWidget';
+import { PastoralEngagementModal } from './PastoralEngagementModal';
 import Markdown from 'react-markdown';
 
 interface PastoralViewProps {
@@ -429,6 +435,31 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const [isGeneratingCare, setIsGeneratingCare] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isAddingPrayer, setIsAddingPrayer] = useState(false);
+
+  // Assessment Analytics & Pastoral Engagement State
+  const [assessmentAnalytics, setAssessmentAnalytics] = useState<AssessmentAggregates | null>(null);
+  const [selectedEngagementPerson, setSelectedEngagementPerson] = useState<{
+    personName: string;
+    email?: string;
+    phone?: string;
+    primaryGift?: string;
+    discStyle?: string;
+    mbtiType?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!church?.id) return;
+    Promise.all([
+      firestore.getGiftsTestResponses(church.id),
+      firestore.getDiscResponses(church.id),
+      firestore.getMbtiResponses(church.id)
+    ]).then(([gifts, disc, mbti]) => {
+      const agg = computeAssessmentAggregates(gifts, disc, mbti, peopleData?.allPeople || []);
+      setAssessmentAnalytics(agg);
+    }).catch(err => {
+      console.error('Failed to compute assessment aggregates for PastoralView:', err);
+    });
+  }, [church?.id, peopleData?.allPeople]);
 
   const [newNote, setNewNote] = useState<Partial<PastoralNote>>({
       type: 'Note',
@@ -1188,6 +1219,49 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       <StatCard label="Serving" value="420" color="violet" source="PCO" subValue="Est." />
                   </div>
               ) : null;
+          case 'member_pastoral_briefing':
+              return (
+                  <div key="member_pastoral_briefing" className="col-span-1 md:col-span-2 lg:col-span-4">
+                      <PastoralBriefingWidget analytics={assessmentAnalytics} />
+                  </div>
+              );
+          case 'member_gift_placement_gap':
+              return (
+                  <div key="member_gift_placement_gap" className="col-span-1 lg:col-span-2">
+                      <GiftPlacementGapWidget 
+                          analytics={assessmentAnalytics} 
+                          onOpenEngagementModal={(m) => setSelectedEngagementPerson({
+                              personName: m.personName,
+                              email: m.email,
+                              phone: m.phone,
+                              primaryGift: m.primaryGift,
+                              discStyle: m.discStyle
+                          })}
+                      />
+                  </div>
+              );
+          case 'member_care_vulnerability_index':
+              return (
+                  <div key="member_care_vulnerability_index" className="col-span-1 lg:col-span-2">
+                      <CareVulnerabilityWidget 
+                          analytics={assessmentAnalytics}
+                          onOpenEngagementModal={(v) => setSelectedEngagementPerson({
+                              personName: v.personName,
+                              email: v.email,
+                              phone: v.phone,
+                              primaryGift: v.primaryGift,
+                              discStyle: v.discStyle,
+                              mbtiType: v.mbtiType
+                          })}
+                      />
+                  </div>
+              );
+          case 'member_discipleship_pathway':
+              return (
+                  <div key="member_discipleship_pathway" className="col-span-1 lg:col-span-2">
+                      <DiscipleshipPathwayWidget analytics={assessmentAnalytics} />
+                  </div>
+              );
           case 'member_map':
               return (
                   <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source={usingLeaflet || !googleMapsApiKey ? "OpenStreetMap" : "Google Maps"}>
@@ -2111,6 +2185,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   </div>
               </div>
           </div>
+      )}
+
+      {selectedEngagementPerson && (
+        <PastoralEngagementModal
+          personName={selectedEngagementPerson.personName}
+          email={selectedEngagementPerson.email}
+          phone={selectedEngagementPerson.phone}
+          primaryGift={selectedEngagementPerson.primaryGift}
+          discStyle={selectedEngagementPerson.discStyle}
+          mbtiType={selectedEngagementPerson.mbtiType}
+          onClose={() => setSelectedEngagementPerson(null)}
+        />
       )}
 
     </div>

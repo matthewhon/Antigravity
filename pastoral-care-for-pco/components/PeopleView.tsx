@@ -15,6 +15,12 @@ import { PeopleReportsTab } from './PeopleReportsTab';
 import { GiftsTestManager } from './GiftsTestManager';
 import { MbtiTestManager } from './MbtiTestManager';
 import { DiscTestManager } from './DiscTestManager';
+import { SpiritualGiftsDistWidget } from './widgets/SpiritualGiftsDistWidget';
+import { DiscClimateWidget } from './widgets/DiscClimateWidget';
+import { MbtiTemperamentWidget } from './widgets/MbtiTemperamentWidget';
+import { AssessmentFunnelWidget } from './widgets/AssessmentFunnelWidget';
+import { computeAssessmentAggregates, AssessmentAggregates } from '../services/assessmentAnalyticsService';
+import { Copy, Check, Send, Sparkles, Compass, Brain, X } from 'lucide-react';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
@@ -97,6 +103,25 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   apiBaseUrl,
 }) => {
   const activeTab = activePage ?? 'overview';
+
+  // ---- Assessment Analytics State ----
+  const [assessmentAnalytics, setAssessmentAnalytics] = useState<AssessmentAggregates | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!churchId) return;
+    Promise.all([
+      firestore.getGiftsTestResponses(churchId),
+      firestore.getDiscResponses(churchId),
+      firestore.getMbtiResponses(churchId)
+    ]).then(([gifts, disc, mbti]) => {
+      const agg = computeAssessmentAggregates(gifts, disc, mbti, data?.allPeople || []);
+      setAssessmentAnalytics(agg);
+    }).catch(err => {
+      console.error('Failed to load assessment aggregates in PeopleView:', err);
+    });
+  }, [churchId, data?.allPeople]);
 
   // ---- Registrations: show Firestore cache instantly, then trigger server-side sync ----
   const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
@@ -1051,6 +1076,52 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                 </div>
             );
 
+        case 'people_spiritual_gifts_dist':
+            return (
+                <div key="people_spiritual_gifts_dist" className="col-span-1 lg:col-span-2">
+                    <SpiritualGiftsDistWidget 
+                        analytics={assessmentAnalytics} 
+                        onNavigateToGifts={() => {
+                            window.location.hash = '#/people/gifts-test';
+                        }} 
+                    />
+                </div>
+            );
+
+        case 'people_disc_climate':
+            return (
+                <div key="people_disc_climate" className="col-span-1 lg:col-span-2">
+                    <DiscClimateWidget 
+                        analytics={assessmentAnalytics} 
+                        onNavigateToDisc={() => {
+                            window.location.hash = '#/people/disc-test';
+                        }} 
+                    />
+                </div>
+            );
+
+        case 'people_mbti_temperament':
+            return (
+                <div key="people_mbti_temperament" className="col-span-1">
+                    <MbtiTemperamentWidget 
+                        analytics={assessmentAnalytics} 
+                        onNavigateToMbti={() => {
+                            window.location.hash = '#/people/mbti-test';
+                        }} 
+                    />
+                </div>
+            );
+
+        case 'people_assessment_funnel':
+            return (
+                <div key="people_assessment_funnel" className="col-span-1">
+                    <AssessmentFunnelWidget 
+                        analytics={assessmentAnalytics} 
+                        onOpenSendModal={() => setIsShareModalOpen(true)} 
+                    />
+                </div>
+            );
+
         default:
             return null;
     }
@@ -1132,7 +1203,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
             if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
             
             let spanClass = "col-span-1";
-          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations' || id === 'assimilation_rate') spanClass = "col-span-1 lg:col-span-2";
+          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations' || id === 'assimilation_rate' || id === 'people_spiritual_gifts_dist' || id === 'people_disc_climate') spanClass = "col-span-1 lg:col-span-2";
           if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
           
           return (
@@ -1157,6 +1228,118 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           )}
       </div>
       )}
+
+      {/* Share / Invite Modal for Churchwide Tests */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                  <Send className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900 dark:text-white">Church Assessment Links</h4>
+                  <p className="text-xs text-slate-400">Share test links with members or leaders</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Spiritual Gifts Link */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Spiritual Gifts Test (Romans 12)</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/gifts-test/${churchId || church?.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLink('gifts');
+                      setTimeout(() => setCopiedLink(null), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    {copiedLink === 'gifts' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedLink === 'gifts' ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  {`${window.location.origin}/gifts-test/${churchId || church?.id}`}
+                </p>
+              </div>
+
+              {/* DISC Link */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>Faith-Based DISC Assessment</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/disc-test/${churchId || church?.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLink('disc');
+                      setTimeout(() => setCopiedLink(null), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    {copiedLink === 'disc' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedLink === 'disc' ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  {`${window.location.origin}/disc-test/${churchId || church?.id}`}
+                </p>
+              </div>
+
+              {/* MBTI Link */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
+                    <Brain className="w-3.5 h-3.5" />
+                    <span>Myers-Briggs (MBTI) Test</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/mbti-test/${churchId || church?.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLink('mbti');
+                      setTimeout(() => setCopiedLink(null), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    {copiedLink === 'mbti' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedLink === 'mbti' ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  {`${window.location.origin}/mbti-test/${churchId || church?.id}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

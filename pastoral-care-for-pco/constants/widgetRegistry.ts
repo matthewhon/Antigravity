@@ -27,6 +27,10 @@ export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'recent', label: 'New People', icon: '✨', size: 'sm', description: 'Recently added people.' },
     { id: 'zip', label: 'Top Zip Codes', icon: '📮', size: 'sm', description: 'Top ZIP codes by number of people.' },
     { id: 'upcoming_registrations', label: 'Upcoming Registrations', icon: '🎟️', size: 'md', description: 'Upcoming event registrations.' },
+    { id: 'people_spiritual_gifts_dist', label: 'Spiritual Gifts Profile', icon: '✨', size: 'md', description: 'Romans 12 Spiritual Gifts distribution across the congregation.' },
+    { id: 'people_disc_climate', label: 'DISC Church Climate', icon: '🧭', size: 'md', description: 'Congregational behavioral culture and pace.' },
+    { id: 'people_mbti_temperament', label: 'MBTI Temperaments', icon: '🧠', size: 'sm', description: 'Cognitive and social energy mix.' },
+    { id: 'people_assessment_funnel', label: 'Assessment Discovery', icon: '🥞', size: 'sm', description: 'Assessment completion and engagement funnel.' },
 ];
 
 export const PEOPLE_HOUSEHOLD_WIDGETS: WidgetDefinition[] = [
@@ -162,6 +166,10 @@ export const PASTORAL_CHURCH_WIDGETS: WidgetDefinition[] = [
 
 export const PASTORAL_MEMBERSHIP_WIDGETS: WidgetDefinition[] = [
     { id: 'member_headline_stats', label: 'Member Stats', icon: '📊', size: 'full', description: 'Membership headline stats.' },
+    { id: 'member_pastoral_briefing', label: 'Pastoral Strategic Briefing', icon: '📜', size: 'full', description: 'Synthesized preaching tone, change management, and leadership alignment.' },
+    { id: 'member_gift_placement_gap', label: 'Ministry Placement Matcher', icon: '🎯', size: 'lg', description: 'Matches unassigned member gifts to open serving teams.' },
+    { id: 'member_care_vulnerability_index', label: 'Care Vulnerability Watchlist', icon: '🛡️', size: 'lg', description: 'Identifies high-empathy or withdrawing at-risk members needing pastoral care.' },
+    { id: 'member_discipleship_pathway', label: 'Discipleship & Equipping Tracks', icon: '🌱', size: 'md', description: 'Sermon and curriculum tracks addressing congregational blind spots.' },
     { id: 'member_history_chart', label: 'Membership Over Time', icon: '📈', size: 'full', description: 'Track membership growth, additions, departures, and retention over time.' },
     { id: 'member_map', label: 'Member Map', icon: '🗺️', size: 'full', description: 'Map of where members live.' },
     { id: 'member_age_chart', label: 'Generational Mix', icon: '🥧', size: 'sm', description: 'Generational mix of members.' },
@@ -256,8 +264,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
     return {
         // People
         people: isPeople || isPastor
-            ? ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
-            : ['people_stats', 'assimilation_rate', 'people_engagement', 'gender', 'age', 'map'],
+            ? ['people_stats', 'people_spiritual_gifts_dist', 'people_disc_climate', 'people_mbti_temperament', 'people_assessment_funnel', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
+            : ['people_stats', 'people_spiritual_gifts_dist', 'people_disc_climate', 'assimilation_rate', 'people_engagement', 'gender', 'age', 'map'],
         people_households: ['householdSummary', 'householdComp', 'householdSize'],
         people_risk: isPeople || isPastor
             ? ['riskDistribution', 'atRiskList', 'riskChanges', 'people_directory']
@@ -286,8 +294,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             ? ['church_growth_stats', 'church_spiritual_stats', 'church_attendance_chart', 'church_guest_funnel']
             : ['church_growth_stats', 'church_attendance_chart'],
         pastoral_membership: isPastor || isCare
-            ? ['member_headline_stats', 'member_history_chart', 'member_map', 'member_age_chart', 'member_unconnected', 'member_pastoral_touches']
-            : ['member_headline_stats', 'member_history_chart', 'member_map'],
+            ? ['member_headline_stats', 'member_pastoral_briefing', 'member_gift_placement_gap', 'member_care_vulnerability_index', 'member_discipleship_pathway', 'member_history_chart', 'member_map', 'member_age_chart', 'member_unconnected', 'member_pastoral_touches']
+            : ['member_headline_stats', 'member_pastoral_briefing', 'member_history_chart', 'member_map'],
         pastoral_community: ['censusHero', 'culturalMosaic', 'ministrySignals', 'economicHealth'],
         pastoral_care: isCare
             ? ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list']
@@ -297,7 +305,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
-        case 'people': return ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
+        case 'people': return ['people_stats', 'people_spiritual_gifts_dist', 'people_disc_climate', 'people_mbti_temperament', 'people_assessment_funnel', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
         case 'groups': return ['groups_ai_agent', 'groups_connection_rate', 'groups_health_distribution', 'groups_action_center', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
@@ -309,6 +317,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'giving_overview': return ['keyMetrics', 'recurring_revenue', 'giving_forecast', 'trendsComparison', 'payment_methods', 'funds', 'givingByStatus', 'averageGiving'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];
         case 'pastoral': return ['church_growth_stats', 'church_spiritual_stats', 'member_headline_stats', 'member_map'];
+        case 'pastoral_membership': return ['member_headline_stats', 'member_pastoral_briefing', 'member_gift_placement_gap', 'member_care_vulnerability_index', 'member_discipleship_pathway', 'member_history_chart', 'member_map'];
         case 'pastoral_care': return ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list'];
         case 'metrics': return ['census_pop', 'census_income', 'census_age', 'census_poverty', 'missional_gap', 'city_penetration'];
         default: return [];
