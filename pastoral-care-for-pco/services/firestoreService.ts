@@ -28,7 +28,8 @@ import {
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot, DigitalBulletin,
-    GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse
+    GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse,
+    DiscTestResponse
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -2461,6 +2462,83 @@ class FirestoreService {
   async deleteMbtiResponse(responseId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'mbti_test_responses', responseId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Faith-Based DISC Personality Assessment Responses ---
+
+  async saveDiscResponse(response: DiscTestResponse): Promise<void> {
+    try {
+      await setDoc(doc(db, 'disc_test_responses', response.id), {
+        ...response,
+        submittedAt: response.submittedAt || Date.now()
+      });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async getDiscResponses(churchId: string, personId?: string): Promise<DiscTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'disc_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'disc_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+    } catch (e) {
+      console.warn('[FirestoreService] getDiscResponses ordered query failed, trying unindexed fallback:', e);
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'disc_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'disc_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('[FirestoreService] getDiscResponses failed completely:', err);
+        return [];
+      }
+    }
+  }
+
+  async getDiscResponseById(responseId: string): Promise<DiscTestResponse | null> {
+    try {
+      const snap = await getDoc(doc(db, 'disc_test_responses', responseId));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as DiscTestResponse) : null;
+    } catch (e) {
+      console.warn('[FirestoreService] getDiscResponseById failed:', e);
+      return null;
+    }
+  }
+
+  async deleteDiscResponse(responseId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'disc_test_responses', responseId));
     } catch (e) {
       this.handleFirestoreError(e);
     }

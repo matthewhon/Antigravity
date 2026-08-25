@@ -75,6 +75,7 @@ import { PublicVolunteerHistoryView } from './components/PublicVolunteerHistoryV
 import { PublicBulletinView } from './components/PublicBulletinView';
 import { PublicGiftsTestView } from './components/PublicGiftsTestView';
 import { PublicMbtiTestView } from './components/PublicMbtiTestView';
+import { PublicDiscTestView } from './components/PublicDiscTestView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -111,6 +112,7 @@ const App: React.FC = () => {
      if (path.startsWith('/people/risk')) return 'people-risk';
      if (path.startsWith('/people/gifts-test')) return 'people-gifts-test';
      if (path.startsWith('/people/mbti-test')) return 'people-mbti-test';
+     if (path.startsWith('/people/disc-test')) return 'people-disc-test';
      if (path.startsWith('/people/reports')) return 'people-reports';
      if (path.startsWith('/people')) return 'people';
      if (path.startsWith('/groups')) return 'groups';
@@ -651,6 +653,7 @@ const App: React.FC = () => {
               'people-risk': '/people/risk',
               'people-gifts-test': '/people/gifts-test',
               'people-mbti-test': '/people/mbti-test',
+              'people-disc-test': '/people/disc-test',
               'people-reports': '/people/reports',
               'groups': '/groups',
               'groups-reports': '/groups/reports',
@@ -1049,6 +1052,12 @@ const App: React.FC = () => {
   if (mbtiMatch) {
     const isEmbedded = window.location.search.includes('embedded=true');
     return <PublicMbtiTestView churchId={mbtiMatch[1]} isEmbedded={isEmbedded} />;
+  }
+
+  // ─── Public Faith-Based DISC Assessment Route (no auth required) ───────────
+  const discMatch = window.location.pathname.match(/^\/disc-test\/([^/]+)/);
+  if (discMatch) {
+    return <PublicDiscTestView churchId={discMatch[1]} />;
   }
 
   if (loading) {

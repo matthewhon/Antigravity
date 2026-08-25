@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Send, Mail, Phone, MessageSquare, Users, User, Search, 
   Check, X, Copy, QrCode, Download, Loader2, Sparkles, 
-  Brain, AlertCircle, CheckCircle2, ListFilter, ExternalLink
+  Brain, Compass, AlertCircle, CheckCircle2, ListFilter, ExternalLink
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { pcoService } from '../services/pcoService';
@@ -11,7 +10,7 @@ import { Church, User as UserType, PcoPerson } from '../types';
 interface SendAssessmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  assessmentType: 'gifts' | 'mbti';
+  assessmentType: 'gifts' | 'mbti' | 'disc';
   church: Church;
   user: UserType;
   allPeople: PcoPerson[];
@@ -63,8 +62,20 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
   const isGifts = assessmentType === 'gifts';
-  const assessmentName = isGifts ? 'Spiritual Gifts Test' : 'Myers-Briggs Personality Assessment';
-  const basePath = isGifts ? '/gifts-test' : '/mbti-test';
+  const isMbti = assessmentType === 'mbti';
+  const isDisc = assessmentType === 'disc';
+
+  const assessmentName = isGifts 
+    ? 'Spiritual Gifts Test' 
+    : isMbti 
+    ? 'Myers-Briggs Personality Assessment' 
+    : 'Faith-Based DISC Assessment';
+
+  const basePath = isGifts 
+    ? '/gifts-test' 
+    : isMbti 
+    ? '/mbti-test' 
+    : '/disc-test';
 
   const basePublicUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -173,12 +184,16 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
       setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Spiritual Gifts Test to discover how God has uniquely gifted you for service: ${targetUrl}`);
       setEmailSubject(`Discover Your Spiritual Gifts at ${churchName}`);
       setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our church Spiritual Gifts Assessment. God has given each of us unique gifts to encourage one another and build up the body of Christ (1 Peter 4:10).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
-    } else {
+    } else if (isMbti) {
       setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Myers-Briggs (MBTI) Personality Assessment to discover your 16 personality profile: ${targetUrl}`);
       setEmailSubject(`Discover Your Personality Profile – ${churchName}`);
       setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our Myers-Briggs Personality Assessment. Understanding how God has wired your personality, communication style, and strengths helps us grow and serve together in unity.\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
+    } else {
+      setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Faith-Based DISC Personality Assessment (KJV) to discover your biblical leadership & ministry style: ${targetUrl}`);
+      setEmailSubject(`Discover Your Biblical DISC Ministry Style – ${churchName}`);
+      setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our church Faith-Based DISC Personality Assessment. Grounded in Scripture (King James Version) and Christian fellowship, this tool helps us understand how God has uniquely equipped you with leadership, relational, service, and administrative strengths for the body of Christ (1 Corinthians 12:4–7).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
     }
-  }, [isGifts, church.name, selectedPerson, recipientMode, targetUrl]);
+  }, [isGifts, isMbti, isDisc, church.name, selectedPerson, recipientMode, targetUrl]);
 
   // Filtered search people
   const searchResults = useMemo(() => {
@@ -386,9 +401,9 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
         <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md ${
-              isGifts ? 'bg-indigo-600' : 'bg-violet-600'
+              isGifts ? 'bg-indigo-600' : isMbti ? 'bg-violet-600' : 'bg-emerald-600'
             }`}>
-              {isGifts ? <Sparkles className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
+              {isGifts ? <Sparkles className="w-5 h-5" /> : isMbti ? <Brain className="w-5 h-5" /> : <Compass className="w-5 h-5" />}
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
@@ -746,7 +761,11 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
             disabled={sending}
             onClick={handleSend}
             className={`px-6 py-2.5 rounded-xl text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-md transition cursor-pointer disabled:opacity-50 ${
-              isGifts ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-violet-600 hover:bg-violet-700 shadow-violet-600/20'
+              isGifts 
+                ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' 
+                : isMbti 
+                ? 'bg-violet-600 hover:bg-violet-700 shadow-violet-600/20' 
+                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
             }`}
           >
             {sending ? (

@@ -14,10 +14,11 @@ import { CommunityComparison } from './CommunityComparison';
 import { PeopleReportsTab } from './PeopleReportsTab';
 import { GiftsTestManager } from './GiftsTestManager';
 import { MbtiTestManager } from './MbtiTestManager';
+import { DiscTestManager } from './DiscTestManager';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
-  activePage?: 'overview' | 'households' | 'risk' | 'reports' | 'gifts-test' | 'mbti-test';
+  activePage?: 'overview' | 'households' | 'risk' | 'reports' | 'gifts-test' | 'mbti-test' | 'disc-test';
   overviewWidgets: string[];
   householdWidgets: string[];
   riskWidgets: string[];
@@ -1069,6 +1070,16 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   if (activePage === 'mbti-test') {
     return (
       <MbtiTestManager 
+        church={church!} 
+        user={user!} 
+        allPeople={data.allPeople} 
+      />
+    );
+  }
+
+  if (activePage === 'disc-test') {
+    return (
+      <DiscTestManager 
         church={church!} 
         user={user!} 
         allPeople={data.allPeople} 

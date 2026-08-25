@@ -39,6 +39,7 @@ export const PeoplePage: React.FC<PeoplePageProps> = ({
         subpath === 'reports'    ? 'reports'    :
         subpath === 'gifts-test' ? 'gifts-test' :
         subpath === 'mbti-test'  ? 'mbti-test'  :
+        subpath === 'disc-test'  ? 'disc-test'  :
         'overview';
 
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);

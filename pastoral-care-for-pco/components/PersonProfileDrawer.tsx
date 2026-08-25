@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee, GiftsTestResponse, MbtiTestResponse } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee, GiftsTestResponse, MbtiTestResponse, DiscTestResponse } from '../types';
 import { SPIRITUAL_GIFTS_DEFINITIONS, SPIRITUAL_GIFTS_QUESTIONS } from '../constants/spiritualGiftsTestData';
 import { MBTI_TYPE_PROFILES, MBTI_QUESTIONS } from '../constants/mbtiTestData';
+import { DISC_PROFILES, DISC_QUESTIONS, DISC_DIMENSIONS_INFO, DiscDimension } from '../constants/discTestData';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
@@ -145,6 +146,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [mbtiResponses, setMbtiResponses] = useState<MbtiTestResponse[]>([]);
   const [selectedMbtiModal, setSelectedMbtiModal] = useState<MbtiTestResponse | null>(null);
   const [copiedMbtiLink, setCopiedMbtiLink] = useState(false);
+  const [discResponses, setDiscResponses] = useState<DiscTestResponse[]>([]);
+  const [selectedDiscModal, setSelectedDiscModal] = useState<DiscTestResponse | null>(null);
+  const [copiedDiscLink, setCopiedDiscLink] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Suggestion selections & actions
@@ -301,8 +305,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setTimeline([]);
       setGiftsResponses([]);
       setMbtiResponses([]);
+      setDiscResponses([]);
       try {
-        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees, fetchedGifts, fetchedMbti] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees, fetchedGifts, fetchedMbti, fetchedDisc] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
@@ -315,6 +320,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           firestore.getRegistrationAttendees(churchId),
           firestore.getGiftsTestResponses(churchId),
           firestore.getMbtiResponses(churchId),
+          firestore.getDiscResponses(churchId),
         ]);
         setAllPeople(people);
         setGroups(fetchedGroups);
@@ -338,6 +344,12 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             (pEmail && m.email && m.email.toLowerCase() === pEmail.toLowerCase())
           );
           setMbtiResponses(matchedMbti);
+
+          const matchedDisc = (fetchedDisc || []).filter(d =>
+            d.personId === personId ||
+            (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase())
+          );
+          setDiscResponses(matchedDisc);
         }
         setTimeline(changes);
 
@@ -1673,6 +1685,145 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             )}
           </div>
 
+          {/* ── Faith-Based DISC Personality (KJV) ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-emerald-500" />
+                Faith-Based DISC Profile (KJV)
+              </h3>
+              {discResponses.length > 0 && (
+                <span className="text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                  Completed
+                </span>
+              )}
+            </div>
+
+            {discResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestDisc = discResponses[0];
+                  const discProf = DISC_PROFILES[latestDisc.styleCode] || DISC_PROFILES[latestDisc.primaryDimension] || DISC_PROFILES['D'];
+
+                  return (
+                    <>
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="px-2.5 py-1 rounded-lg text-sm font-black text-white shadow-xs"
+                              style={{ backgroundColor: discProf.color }}
+                            >
+                              {latestDisc.styleCode}
+                            </span>
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                {discProf.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Primary: {DISC_DIMENSIONS_INFO[latestDisc.primaryDimension]?.name.split(' ')[0]}
+                                {latestDisc.secondaryDimension && ` • Secondary: ${DISC_DIMENSIONS_INFO[latestDisc.secondaryDimension]?.name.split(' ')[0]}`}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                          {discProf.summary}
+                        </p>
+
+                        {/* Theme KJV Verse */}
+                        {discProf.themeVerseKjv && (
+                          <div className="p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border-l-2 border-emerald-600 text-[10px] italic text-slate-700 dark:text-slate-300 font-serif">
+                            “{discProf.themeVerseKjv.text}” <span className="font-bold font-sans not-italic text-emerald-700 dark:text-emerald-400">— {discProf.themeVerseKjv.verse}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4 Dimension Percentage Sliders */}
+                      {latestDisc.percentages && (
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                            DISC Dimension Distribution
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(d => {
+                              const info = DISC_DIMENSIONS_INFO[d];
+                              const pct = latestDisc.percentages[d] || 0;
+                              const score = latestDisc.scores?.[d] || 0;
+                              return (
+                                <div key={d} className="space-y-0.5">
+                                  <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                    <span>{info.name.split(' ')[0]} ({d})</span>
+                                    <span className="font-mono">{pct}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                    <div className="h-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken on {new Date(latestDisc.submittedAt).toLocaleDateString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDiscModal(latestDisc)}
+                          className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>View Full Profile (28 Statements)</span>
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-4 space-y-2 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No Faith-Based DISC Assessment on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/disc-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      navigator.clipboard.writeText(testUrl);
+                      setCopiedDiscLink(true);
+                      setTimeout(() => setCopiedDiscLink(false), 2500);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedDiscLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedDiscLink ? 'Link Copied!' : 'Copy Test Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/disc-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Faith-Based DISC Personality Assessment (KJV) to discover your biblical leadership & ministry style: ${testUrl}`);
+                      setShowNextStepsModal(false);
+                      const smsElem = document.getElementById('sms-composer-section');
+                      if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── Household & Family ── */}
           {(person.householdName || householdMembers.length > 0) && (
             <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
@@ -2458,6 +2609,147 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               </div>
                             </div>
                             <span className="w-6 h-6 rounded-lg bg-violet-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                              {ans}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+          {/* ── Faith-Based DISC Modal Breakdown ── */}
+          {selectedDiscModal && createPortal(
+            <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md font-black text-sm"
+                      style={{ backgroundColor: DISC_PROFILES[selectedDiscModal.styleCode]?.color || '#10b981' }}
+                    >
+                      {selectedDiscModal.styleCode}
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900 dark:text-white">
+                        DISC Profile: {person.name}
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        {DISC_PROFILES[selectedDiscModal.styleCode]?.name} • Taken {new Date(selectedDiscModal.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedDiscModal(null)}
+                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Summary */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                      Summary & Ministry Overview
+                    </span>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                      {DISC_PROFILES[selectedDiscModal.styleCode]?.summary}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {DISC_PROFILES[selectedDiscModal.styleCode]?.fullDescription}
+                    </p>
+                  </div>
+
+                  {/* KJV Theme Verse */}
+                  {DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv && (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-l-4 border-emerald-600 space-y-1">
+                      <p className="text-xs italic text-slate-800 dark:text-slate-200 font-serif">
+                        “{DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv.text}”
+                      </p>
+                      <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 text-right">
+                        — {DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv.verse}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 4 Dimension Percentage Bars */}
+                  {selectedDiscModal.percentages && (
+                    <div className="space-y-3">
+                      <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                        DISC Dimension Distribution
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
+                          const info = DISC_DIMENSIONS_INFO[dim];
+                          const score = selectedDiscModal.scores?.[dim] || 0;
+                          const pct = selectedDiscModal.percentages?.[dim] || 0;
+
+                          return (
+                            <div key={dim} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex justify-between text-xs font-bold">
+                                <span>{info.name.split(' ')[0]}</span>
+                                <span className="font-mono">{pct}% ({score}/35)</span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Baptist Ministry Strengths & Roles */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2">
+                      <h6 className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">
+                        Ministry Strengths
+                      </h6>
+                      <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                        {DISC_PROFILES[selectedDiscModal.styleCode]?.baptistMinistryStrengths.map((s, idx) => (
+                          <li key={idx}>• {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
+                      <h6 className="text-[11px] font-black uppercase text-indigo-700 dark:text-indigo-300">
+                        Serving Areas
+                      </h6>
+                      <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                        {DISC_PROFILES[selectedDiscModal.styleCode]?.idealServingRoles.map((r, idx) => (
+                          <li key={idx}>• {r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* All 28 Statement Ratings */}
+                  <div className="space-y-3 pt-2">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      Individual Ratings for all 28 Statements (1–5 Scale)
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {DISC_QUESTIONS.map(q => {
+                        const ans = selectedDiscModal.answers?.[q.id] || 0;
+                        return (
+                          <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">
+                                #{q.id} • Dimension {q.dimension} ({q.trait})
+                              </div>
+                              <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                                {q.text}
+                              </div>
+                            </div>
+                            <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
                               {ans}
                             </span>
                           </div>

@@ -2396,4 +2396,40 @@ export interface MbtiTestResponse {
     syncedToPco?: boolean;
 }
 
+// ─── Faith-Based DISC Personality Assessment Types ───────────────────────────
+export interface DiscDimensionScores {
+    D: number; // 0-35
+    I: number; // 0-35
+    S: number; // 0-35
+    C: number; // 0-35
+}
+
+export interface DiscDimensionPercentages {
+    D: number; // 0-100%
+    I: number; // 0-100%
+    S: number; // 0-100%
+    C: number; // 0-100%
+}
+
+export interface DiscTestResponse {
+    id: string;
+    churchId: string;
+    personId?: string | null;
+    personName?: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string | null;
+    answers: Record<number, number>; // 1-28 statement ID -> 1-5 score
+    styleCode: string; // e.g. "D", "DI", "SC"
+    styleName: string; // e.g. "The Bold Pioneer (High Dominance)"
+    primaryDimension: 'D' | 'I' | 'S' | 'C';
+    secondaryDimension?: 'D' | 'I' | 'S' | 'C';
+    scores: DiscDimensionScores;
+    percentages: DiscDimensionPercentages;
+    submittedAt: number; // epoch ms
+    syncedToPco?: boolean;
+}
+
+
 
