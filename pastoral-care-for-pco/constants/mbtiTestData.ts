@@ -324,7 +324,7 @@ export const MBTI_TYPE_PROFILES: Record<string, MbtiTypeProfile> = {
     temperament: 'Sentinel',
     tagline: 'Warm-hearted, dedicated guardians who tirelessly care for others behind the scenes.',
     shortDescription: 'Humble, compassionate, and conscientious servants who express Christ’s love through faithful acts of service and care.',
-    fullDescription: 'ISFJs combine a heart of deep pastoral compassion with practical, hands-on diligence. They remember birthdays, notice who is absent, prepare communion, and care for the vulnerable with joyful humility.',
+    fullDescription: 'ISFJs combine a heart of deep pastoral compassion with practical, hands-on diligence. They remember birthdays, notice who is absent, prepare the Lord’s Supper, and care for the vulnerable with joyful humility.',
     ministryStrengths: [
       'Selfless behind-the-scenes service and hospitality',
       'Remembering personal details and history of church members',
@@ -340,7 +340,7 @@ export const MBTI_TYPE_PROFILES: Record<string, MbtiTypeProfile> = {
     idealServingRoles: [
       'Meal Trains & Benevolence Ministry',
       'Children’s Nursery & Early Childhood Care',
-      'Communion Preparation & Altar Guild',
+      'Trustees / Building & Grounds Committee (Sanctuary & Facilities Upkeep)',
       'Shut-in Visitation & Care Teams'
     ],
     color: '#0284c7',
