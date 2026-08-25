@@ -36,56 +36,157 @@ export interface DiscStyleProfile {
   communicationTips: string;
   color: string;
   badgeBg: string;
+
+  // ── Extended 3-Part Report Fields ──────────────────────────────
+  workStyleTendencies: string[]; // Optimal ministry/work environments
+  motivations: string[]; // What spiritually energizes and drives this profile
+  stressors: string[]; // What drains energy, causes frustration, or leads to burnout
+  communicationPreferences: {
+    howYouSpeak: string; // Expressive outward voice
+    howToSpeakToYou: string; // How pastors/leaders/peers should communicate with you
+  };
+  styleToStyleStrategies: {
+    withD: string; // Interaction strategy with High Dominance
+    withI: string; // Interaction strategy with High Influence
+    withS: string; // Interaction strategy with High Steadiness
+    withC: string; // Interaction strategy with High Conscientiousness
+  };
+  biblicalActionPrinciples: string[]; // Practical scriptural action & conflict resolution principles
 }
 
-export const DISC_DIMENSIONS_INFO: Record<DiscDimension, {
+export interface DiscFoundationalOverview {
+  dimension: DiscDimension;
   name: string;
-  color: string;
+  title: string;
   motto: string;
+  color: string;
+  bgLight: string;
+  bgDark: string;
+  textColor: string;
+  borderColor: string;
   kjvScripture: { verse: string; text: string };
-  description: string;
-}> = {
+  behavioralLens: string;
+  coreStrengths: string[];
+  blindSpots: string[];
+  inTheBodyOfChrist: string;
+}
+
+export const DISC_FOUNDATIONAL_INFO: Record<DiscDimension, DiscFoundationalOverview> = {
   'D': {
-    name: 'Dominance (Decisive & Driving)',
-    color: '#ef4444',
+    dimension: 'D',
+    name: 'Dominance',
+    title: 'The Decisive & Pioneering Driver',
     motto: 'Direct, Goal-Oriented, Pioneering, Bold in Action',
+    color: '#ef4444',
+    bgLight: 'bg-red-50 text-red-700',
+    bgDark: 'dark:bg-red-950/40 dark:text-red-300',
+    textColor: 'text-red-600 dark:text-red-400',
+    borderColor: 'border-red-200 dark:border-red-800',
     kjvScripture: {
       verse: '1 Corinthians 16:13 (KJV)',
       text: 'Watch ye, stand fast in the faith, quit you like men, be strong.'
     },
-    description: 'Motivated by overcoming obstacles, seeing practical results, taking initiative, and leading courageously for the advancement of the Kingdom.'
+    behavioralLens: 'Sees the church through the lens of challenges to overcome, vision to achieve, and kingdom frontiers to advance.',
+    coreStrengths: [
+      'Decisive crisis leadership and initiative',
+      'Courageous defense of biblical truth',
+      'Goal-oriented execution and overcoming roadblocks',
+      'Mobilizing church growth and expansion projects'
+    ],
+    blindSpots: [
+      'Can appear impatient or blunt with gentler members',
+      'May move ahead before praying through counsel',
+      'Risk of steamrolling slower, thoughtful consensus'
+    ],
+    inTheBodyOfChrist: 'God places High D believers in the church to cast courageous vision, lead difficult outreach projects, and ensure the congregation moves boldly forward in obedience to the Great Commission.'
   },
   'I': {
-    name: 'Influence (Inspiring & Interactive)',
-    color: '#f59e0b',
+    dimension: 'I',
+    name: 'Influence',
+    title: 'The Inspiring & Relational Connector',
     motto: 'Enthusiastic, Relational, Encouraging, Friendly in Outreach',
+    color: '#f59e0b',
+    bgLight: 'bg-amber-50 text-amber-700',
+    bgDark: 'dark:bg-amber-950/40 dark:text-amber-300',
+    textColor: 'text-amber-600 dark:text-amber-400',
+    borderColor: 'border-amber-200 dark:border-amber-800',
     kjvScripture: {
       verse: 'Proverbs 18:24 (KJV)',
       text: 'A man that hath friends must shew himself friendly: and there is a friend that sticketh closer than a brother.'
     },
-    description: 'Motivated by building relationships, encouraging brethren, sharing the Gospel with warmth, and fostering joyful church fellowship.'
+    behavioralLens: 'Sees the church through the lens of people, joy, fellowship, and winning souls through genuine warmth.',
+    coreStrengths: [
+      'Evangelistic zeal and warm hospitality',
+      'Connecting newcomers and making people feel loved',
+      'Inspiring, upbeat communication from the stage or in groups',
+      'Fostering joyful, welcoming church culture'
+    ],
+    blindSpots: [
+      'May avoid solemn or difficult confrontation',
+      'Prone to overcommitting and dropping administrative details',
+      'Can seek approval of men over faithful obedience'
+    ],
+    inTheBodyOfChrist: 'God places High I believers in the church to bring warmth, joy, and evangelistic magnetism, ensuring no newcomer feels isolated and that the body rejoices together in the Lord.'
   },
   'S': {
-    name: 'Steadiness (Supportive & Stable)',
-    color: '#10b981',
+    dimension: 'S',
+    name: 'Steadiness',
+    title: 'The Faithful & Supportive Cornerstone',
     motto: 'Loyal, Patient, Peaceful, Dependable in Service',
+    color: '#10b981',
+    bgLight: 'bg-emerald-50 text-emerald-700',
+    bgDark: 'dark:bg-emerald-950/40 dark:text-emerald-300',
+    textColor: 'text-emerald-600 dark:text-emerald-400',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
     kjvScripture: {
       verse: '1 Corinthians 15:58 (KJV)',
       text: 'Therefore, my beloved brethren, be ye stedfast, unmoveable, always abounding in the work of the Lord, forasmuch as ye know that your labour is not in vain in the Lord.'
     },
-    description: 'Motivated by quiet faithfulness, supporting the flock, providing consistency, listening with compassion, and serving diligently behind the scenes.'
+    behavioralLens: 'Sees the church through the lens of faithful service, loving relationships, calm stability, and quiet loyalty.',
+    coreStrengths: [
+      'Unfailing weekly dependability and humble service',
+      'Compassionate listening and emotional support',
+      'Calming presence during seasons of church change',
+      'Faithful behind-the-scenes execution of vital duties'
+    ],
+    blindSpots: [
+      'Hesitation to embrace necessary change or risk',
+      'Tendency to bottle up personal frustrations',
+      'Reluctance to step into public leadership when called'
+    ],
+    inTheBodyOfChrist: 'God places High S believers in the church as the dependable pillars who preserve unity, care for the hurting, and faithfully carry out the week-to-week ministries that sustain the congregation.'
   },
   'C': {
-    name: 'Conscientiousness (Careful & Discerning)',
-    color: '#3b82f6',
+    dimension: 'C',
+    name: 'Conscientiousness',
+    title: 'The Discerning & Doctrinal Guardian',
     motto: 'Systematic, Accurate, Doctrinally Sound, Orderly in Stewardship',
+    color: '#3b82f6',
+    bgLight: 'bg-blue-50 text-blue-700',
+    bgDark: 'dark:bg-blue-950/40 dark:text-blue-300',
+    textColor: 'text-blue-600 dark:text-blue-400',
+    borderColor: 'border-blue-200 dark:border-blue-800',
     kjvScripture: {
       verse: '2 Timothy 2:15 (KJV)',
       text: 'Study to shew thyself approved unto God, a workman that needeth not to be ashamed, rightly dividing the word of truth.'
     },
-    description: 'Motivated by biblical truth, high standards of excellence, careful stewardship of church resources, and doing all things decently and in order.'
+    behavioralLens: 'Sees the church through the lens of biblical truth, sound doctrine, orderly processes, and responsible stewardship.',
+    coreStrengths: [
+      'Expository depth and doctrinal discernment',
+      'Meticulous financial, legal, and operational stewardship',
+      'Organized systems that prevent chaos and errors',
+      'High standards of excellence in ministry delivery'
+    ],
+    blindSpots: [
+      'Can slip into critical legalism or perfectionism',
+      'May struggle to extend grace to messy, imperfect people',
+      'Over-analyzing decisions leading to delayed action'
+    ],
+    inTheBodyOfChrist: 'God places High C believers in the church to guard the pulpit and Sunday school against theological error, maintain ethical integrity in finances, and ensure that all things are done decently and in order.'
   }
 };
+
+export const DISC_DIMENSIONS_INFO = DISC_FOUNDATIONAL_INFO;
 
 // ─── 28 Calibrated Faith-Based Assessment Statements (7 per dimension) ──────
 export const DISC_QUESTIONS: DiscQuestion[] = [
@@ -322,8 +423,10 @@ export const DISC_QUESTIONS: DiscQuestion[] = [
   }
 ];
 
-// ─── 12 DISC Pattern Profiles (Faith-Based & Baptist Distinctives) ───────────
+// ─── 12 Calibrated Faith-Based DISC Personality Profiles ─────────────────────
+
 export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
+  // ── 1. High D ─────────────────────────────────────────────────────────────
   'D': {
     code: 'D',
     name: 'The Bold Pioneer (High Dominance)',
@@ -332,11 +435,11 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
       verse: '1 Corinthians 16:13 (KJV)',
       text: 'Watch ye, stand fast in the faith, quit you like men, be strong.'
     },
-    summary: 'Direct, decisive, and courageous leader driven to accomplish major kingdom objectives and overcome ministry hurdles.',
-    fullDescription: 'You possess a God-given boldness to lead, initiate, and confront challenges head-on. Like Nehemiah confronting the broken walls of Jerusalem, you look at obstacles not as dead ends, but as opportunities to trust God and mobilize for action. You value efficiency, results, and truth delivered plainly.',
+    summary: 'Decisive, courageous, and goal-oriented leader who tackles big challenges and advances the Kingdom with boldness.',
+    fullDescription: 'You possess a God-given boldness to confront difficult obstacles, take righteous initiative, and lead people toward clear kingdom objectives. Like Nehemiah confronting the broken walls of Jerusalem, you are motivated by seeing tangible progress, standing firm in spiritual battles, and mobilizing resources to achieve victory for Christ.',
     biblicalExemplar: {
       name: 'Nehemiah & The Apostle Paul',
-      description: 'Nehemiah refused to be deterred by mocking enemies when rebuilding the wall, while Paul boldly planted churches across the Roman Empire despite persecution.',
+      description: 'Nehemiah overcame mockery and opposition to rebuild Jerusalem’s walls in 52 days, while Paul pressed forward through shipwrecks, prisons, and trials to plant churches across the Roman Empire.',
       kjvPassage: 'Nehemiah 6:3 (KJV) — "I am doing a great work, so that I cannot come down."'
     },
     baptistMinistryStrengths: [
@@ -358,9 +461,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be concise and direct. State the bottom line first, outline the goal, and focus on practical solutions.',
     color: '#ef4444',
-    badgeBg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+    badgeBg: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800',
+
+    workStyleTendencies: [
+      'Thrives in fast-paced, autonomous environments with minimal bureaucracy',
+      'Excels when given full ownership of challenging ministry problems and clear targets',
+      'Prefers leading pioneering initiatives rather than maintaining routine, repetitive tasks',
+      'Maintains high energy when overcoming roadblocks and driving visible progress'
+    ],
+    motivations: [
+      'Seeing measurable salvations, church growth, and spiritual milestones',
+      'Overcoming formidable obstacles for the glory of Christ',
+      'Having the authority to take initiative and eliminate bottlenecks',
+      'Being challenged with ambitious kingdom goals'
+    ],
+    stressors: [
+      'Indecision, endless committee debates, and slow bureaucratic meetings',
+      'Micromanagement or having decision-making authority withheld',
+      'Apathy, complacency, or lack of commitment in ministry teams',
+      'Loss of control over key projects or being forced to proceed without clear direction'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Direct, candid, concise, and focused on the bottom line. You speak with authority, state goals clearly, and prefer addressing issues immediately without unnecessary pleasantries.',
+      howToSpeakToYou: 'Be brief, direct, and prepared with solutions. State the primary point first, outline the objective, avoid emotional rabbit trails, and ask for a clear decision.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Respect their leadership, establish boundaries early, state facts concisely, and focus on mutual kingdom goals rather than competing for dominance.',
+      withI: 'Acknowledge their enthusiasm and relational warmth, allow a few moments of friendly connection, but guide discussions toward actionable deadlines and measurable commitments.',
+      withS: 'Slow your pace, tone down intensity, listen patiently, and provide step-by-step clarity rather than demanding instant changes or snapping at hesitation.',
+      withC: 'Provide solid facts, logical rationale, and written details; give them time to analyze data before demanding an immediate verdict.'
+    },
+    biblicalActionPrinciples: [
+      'James 1:19 (KJV) — "Wherefore, my beloved brethren, let every man be swift to hear, slow to speak, slow to wrath."',
+      'Ephesians 4:2 (KJV) — "With all lowliness and meekness, with longsuffering, forbearing one another in love."',
+      'Proverbs 15:1 (KJV) — "A soft answer turneth away wrath: but grievous words stir up anger."'
+    ]
   },
 
+  // ── 2. DI ─────────────────────────────────────────────────────────────────
   'DI': {
     code: 'DI',
     name: 'The Inspiring Trailblazer (Dominance / Influence)',
@@ -396,9 +534,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Keep presentations fast-paced, inspiring, and focused on big-picture impact and eternal value.',
     color: '#f97316',
-    badgeBg: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800'
+    badgeBg: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800',
+
+    workStyleTendencies: [
+      'Flourishes in dynamic, high-energy settings where creative ideas can be implemented quickly',
+      'Excels at public persuasion, volunteer recruitment, and launching exciting church initiatives',
+      'Prefers delegating detailed operational routines to conscientious teammates',
+      'Loves fast momentum, dynamic stage presence, and outward community involvement'
+    ],
+    motivations: [
+      'Rallying large groups toward bold evangelistic campaigns',
+      'Public affirmation, spiritual excitement, and visible ministry breakthroughs',
+      'Freedom to innovate and pioneer fresh ways to engage the unchurched',
+      'Seeing lukewarm believers catch fire for the Lord'
+    ],
+    stressors: [
+      'Pessimism, negativity, or resistance to forward-moving vision',
+      'Tedious spreadsheets, rigid paperwork, and isolating administrative duties',
+      'Slow-moving committee meetings that squash enthusiasm',
+      'Micromanagement and excessive procedural constraints'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Energetic, persuasive, expressive, and visionary. You talk with passion about big ideas, use humor and engaging stories, and motivate people to jump on board.',
+      howToSpeakToYou: 'Match their energy and optimism. Focus on the big-picture vision, celebrate past wins, give them freedom to innovate, and keep administrative requests clear and concise.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Keep discussions focused on high-level strategy, respect their drive, avoid emotional debates, and align on mutual victory.',
+      withI: 'Share in their excitement and celebrate ideas, but gently establish clear deadlines and accountability checks to ensure follow-through.',
+      withS: 'Express personal appreciation, give them time to adapt to changes, and don’t overwhelm them with sudden shifts in direction.',
+      withC: 'Bring clear facts and structured data to support your ideas; show respect for their desire to do things properly and orderly.'
+    },
+    biblicalActionPrinciples: [
+      'Hebrews 10:24 (KJV) — "And let us consider one another to provoke unto love and to good works."',
+      'Proverbs 16:3 (KJV) — "Commit thy works unto the Lord, and thy thoughts shall be established."',
+      'Philippians 2:3 (KJV) — "Let nothing be done through strife or vainglory; but in lowliness of mind let each esteem other better than themselves."'
+    ]
   },
 
+  // ── 3. DC ─────────────────────────────────────────────────────────────────
   'DC': {
     code: 'DC',
     name: 'The Strategic Director (Dominance / Conscientiousness)',
@@ -434,9 +607,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Provide clear facts, logical frameworks, and well-defined timelines without fluff.',
     color: '#8b5cf6',
-    badgeBg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+    badgeBg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
+
+    workStyleTendencies: [
+      'Thrives in structured, goal-driven environments requiring strategic planning and doctrinal fidelity',
+      'Excels at analyzing complex logistical or financial challenges and developing systematic solutions',
+      'Prefers working with competent, disciplined teammates who respect deadlines and standards',
+      'Expects excellence, thorough preparation, and high accountability in all church operations'
+    ],
+    motivations: [
+      'Building enduring, structurally sound church ministries and systems',
+      'Upholding uncompromising biblical standards and fiscal integrity',
+      'Solving complex organizational puzzles and eliminating inefficiency',
+      'Clear metrics, high quality, and tangible progress'
+    ],
+    stressors: [
+      'Disorganization, sloppy workmanship, and theological flippancy',
+      'Emotional decisions that ignore facts, budgets, or biblical guidelines',
+      'Vague goals, lack of clear metrics, or broken commitments',
+      'Being pressured into ill-conceived, hasty decisions without analysis'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Logical, direct, objective, and precise. You focus on facts, systematic reasoning, and practical feasibility, expecting conversations to stay on topic.',
+      howToSpeakToYou: 'Come prepared with written outlines, accurate data, and logical arguments. Be concise, respect their time, and present clear pros and cons.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Focus on mutual strategic objectives, back your positions with solid facts, and negotiate timelines logically without emotional confrontation.',
+      withI: 'Appreciate their enthusiasm and outreach ability, but help them anchor their ideas with concrete logistics, budgets, and operational schedules.',
+      withS: 'Be mindful of your direct tone, communicate changes with sufficient lead time, and reassure them of security and consistency.',
+      withC: 'Enjoy shared analytical rigor, align on high standards, and establish clear division of responsibilities to avoid territorial friction.'
+    },
+    biblicalActionPrinciples: [
+      'Colossians 4:6 (KJV) — "Let your speech be alway with grace, seasoned with salt, that ye may know how ye ought to answer every man."',
+      'Proverbs 18:13 (KJV) — "He that answereth a matter before he heareth it, it is folly and shame unto him."',
+      '1 Corinthians 14:40 (KJV) — "Let all things be done decently and in order."'
+    ]
   },
 
+  // ── 4. High I ─────────────────────────────────────────────────────────────
   'I': {
     code: 'I',
     name: 'The Joyful Encourager (High Influence)',
@@ -471,9 +679,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be warm, expressive, friendly, and allow time for personal relational connection.',
     color: '#f59e0b',
-    badgeBg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+    badgeBg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+
+    workStyleTendencies: [
+      'Thrives in people-centered, collaborative, and socially vibrant environments',
+      'Excels at hospitality, greeting, public storytelling, and generating community enthusiasm',
+      'Works best in team settings with opportunities for verbal brainstorming and fellowship',
+      'Struggles with prolonged isolation, heavy paperwork, or rigid solitary tasks'
+    ],
+    motivations: [
+      'Warm fellowship, brotherly love, and seeing newcomers feel genuinely welcomed',
+      'Public affirmation, encouragement, and collaborative team unity',
+      'Sharing God’s goodness and testimonies of salvation with others',
+      'Fun, celebratory church events and joyful worship'
+    ],
+    stressors: [
+      'Social isolation, rejection, or cold, uninviting church environments',
+      'Strict, repetitive paperwork without human interaction',
+      'Harsh criticism, conflict, or legalistic skepticism',
+      'Rigid agendas that leave no room for spontaneous fellowship'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Warm, expressive, enthusiastic, and highly relational. You share personal stories, speak with optimism, use vocal variety, and seek emotional connection.',
+      howToSpeakToYou: 'Be warm, friendly, and take time for relational check-ins. Ask for their ideas, affirm their contributions publicly, and keep written instructions light and engaging.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Be punctual, get to the main point quickly, avoid excessive storytelling, and show how your ideas produce practical kingdom results.',
+      withI: 'Enjoy mutual joy and shared fellowship, but agree on written next steps and deadlines to ensure great ideas turn into reality.',
+      withS: 'Slow down, listen carefully to their quiet thoughts, show genuine care for their feelings, and avoid overwhelming them with sudden changes.',
+      withC: 'Respect their need for precision, show up on time, come prepared with facts, and don’t dismiss their detailed questions as negativity.'
+    },
+    biblicalActionPrinciples: [
+      '1 Thessalonians 5:11 (KJV) — "Wherefore comfort yourselves together, and edify one another, even as also ye do."',
+      'Proverbs 27:17 (KJV) — "Iron sharpeneth iron; so a man sharpeneth the countenance of his friend."',
+      'Ephesians 4:29 (KJV) — "Let no corrupt communication proceed out of your mouth, but that which is good to the use of edifying, that it may minister grace unto the hearers."'
+    ]
   },
 
+  // ── 5. IS ─────────────────────────────────────────────────────────────────
   'IS': {
     code: 'IS',
     name: 'The Caring Shepherd (Influence / Steadiness)',
@@ -509,9 +752,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be gentle, genuine, supportive, and communicate with personal warmth and active listening.',
     color: '#10b981',
-    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+
+    workStyleTendencies: [
+      'Thrives in supportive, caring ministry environments where genuine relationships are prioritized',
+      'Excels at pastoral counseling, hospital visitation, grief support, and small group shepherding',
+      'Prefers peaceful, collaborative team dynamics where conflict is resolved gently',
+      'Works diligently when knowing their personal contributions directly comfort others'
+    ],
+    motivations: [
+      'Comforting hurting believers and watching lives restored by God’s grace',
+      'Deep, authentic Christian friendships and harmonious fellowship',
+      'Helping new believers grow in Christ at a patient, supportive pace',
+      'Being trusted with personal confidences and spiritual burdens'
+    ],
+    stressors: [
+      'Hostility, harsh interpersonal arguments, and church factionalism',
+      'Demanding, high-pressure environments that treat people like numbers',
+      'Overextending emotional energy without setting boundaries for personal rest',
+      'Having to deliver harsh reprimands or engage in divisive confrontations'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Gentle, affirming, empathetic, and encouraging. You speak with genuine warmth, validate emotions, listen deeply, and offer prayerful comfort.',
+      howToSpeakToYou: 'Be supportive, gentle, and respectful. Avoid aggressive or rushed demands, affirm their faithful heart, and give them a safe space to share.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Do not take their bluntness personally; state your recommendations calmly and show how caring for people strengthens the overall mission.',
+      withI: 'Enjoy the warmth and shared enthusiasm, and collaborate on hospitality and welcoming new families into church life.',
+      withS: 'Share in their mutual love for quiet faithfulness, pray together, and support one another in patient service.',
+      withC: 'Appreciate their doctrinal care and accuracy; remind them gently of the pastoral need to season truth with grace.'
+    },
+    biblicalActionPrinciples: [
+      'Ephesians 4:32 (KJV) — "And be ye kind one to another, tenderhearted, forgiving one another, even as God for Christ\'s sake hath forgiven you."',
+      'Galatians 6:2 (KJV) — "Bear ye one another\'s burdens, and so fulfil the law of Christ."',
+      'Colossians 3:12 (KJV) — "Put on therefore, as the elect of God, holy and beloved, bowels of mercies, kindness, humbleness of mind, meekness, longsuffering."'
+    ]
   },
 
+  // ── 6. ID ─────────────────────────────────────────────────────────────────
   'ID': {
     code: 'ID',
     name: 'The Dynamic Catalyst (Influence / Dominance)',
@@ -547,9 +825,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be dynamic, engaging, and focus on exciting outcomes and inspiring testimonies.',
     color: '#e11d48',
-    badgeBg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+    badgeBg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
+
+    workStyleTendencies: [
+      'Thrives in fast-paced, outward-focused environments with frequent public engagement',
+      'Excels at rally events, youth campaigns, revival meetings, and community outreach',
+      'Enjoys pitching bold initiatives, casting vision, and persuading others to join the work',
+      'Requires operational support to ensure fine administrative details are managed'
+    ],
+    motivations: [
+      'Public platforms to proclaim Christ and win souls',
+      'High-energy ministry projects with visible, immediate momentum',
+      'Inspiring people to take bold faith-filled steps',
+      'Freedom to lead with creative flair and spontaneity'
+    ],
+    stressors: [
+      'Routine administrative maintenance and tedious paperwork',
+      'Excessive criticism or rigid traditionalism that stifles outreach innovation',
+      'Quiet, solitary work environments without human energy',
+      'Micromanagement and strict, slow-moving approval processes'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Charismatic, fast-paced, persuasive, and bold. You use vivid illustrations, humor, and compelling urgency to move people to action.',
+      howToSpeakToYou: 'Be upbeat, open-minded, and express confidence in their leadership. Discuss big-picture goals, celebrate progress, and keep administrative checkpoints brief.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Align on shared kingdom objectives, respect their authority, and leverage your relational persuasion alongside their executive drive.',
+      withI: 'Brainstorm creatively, celebrate vision, but establish mutually agreed-upon checkpoints so tasks cross the finish line.',
+      withS: 'Slow your pace, reassure them of stability, and provide step-by-step guidance rather than sweeping them into sudden shifts.',
+      withC: 'Bring clear biblical backing and logical evidence to your ideas; appreciate their desire for doctrinal and structural soundness.'
+    },
+    biblicalActionPrinciples: [
+      'Acts 18:28 (KJV) — "For he mightily convinced the Jews, and that publickly, shewing by the scriptures that Jesus was Christ."',
+      'Proverbs 25:11 (KJV) — "A word fitly spoken is like apples of gold in pictures of silver."',
+      '1 Peter 5:5 (KJV) — "Yea, all of you be subject one to another, and be clothed with humility: for God resisteth the proud, and giveth grace to the humble."'
+    ]
   },
 
+  // ── 7. High S ─────────────────────────────────────────────────────────────
   'S': {
     code: 'S',
     name: 'The Faithful Servant (High Steadiness)',
@@ -584,9 +897,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be courteous, gentle, respectful, and provide clear step-by-step clarity without rushing.',
     color: '#10b981',
-    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+
+    workStyleTendencies: [
+      'Thrives in peaceful, predictable, and cooperative ministry environments',
+      'Excels at weekly operational continuity, behind-the-scenes support, and long-term service',
+      'Prefers clear guidelines, established routines, and collaborative team harmony',
+      'Works diligently when given sufficient time to complete tasks without sudden disruption'
+    ],
+    motivations: [
+      'Quiet, faithful service that genuinely helps the church family run smoothly',
+      'Sincere personal appreciation from pastors and leaders for faithful labor',
+      'Stable, harmonious relationships free from discord and strife',
+      'Deep, long-standing friendships built on trust and mutual care'
+    ],
+    stressors: [
+      'Sudden, unannounced changes in church schedule, leadership, or procedures',
+      'Conflict, yelling, or intense aggressive confrontation among brethren',
+      'Being rushed into decisions without time to process or prepare',
+      'Feeling unappreciated or taken for granted after years of loyal service'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Calm, humble, respectful, and patient. You listen attentively, speak gently, avoid self-promotion, and express genuine care for others.',
+      howToSpeakToYou: 'Be courteous, sincere, and unhurried. Explain the reasons behind changes, provide clear step-by-step instructions, and express heartfelt appreciation for their loyalty.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Do not be intimidated by their directness; state your progress calmly, communicate realistic timelines, and speak up when help is needed.',
+      withI: 'Enjoy their joyful energy, but gently help them maintain focus on agreed schedules and consistent follow-through.',
+      withS: 'Share in mutual loyalty and support, pray together, and encourage one another to step out in faith when God calls.',
+      withC: 'Appreciate their thoroughness and order; work together to establish dependable systems that serve the church family.'
+    },
+    biblicalActionPrinciples: [
+      'Galatians 6:9 (KJV) — "And let us not be weary in well doing: for in due season we shall reap, if we faint not."',
+      'Proverbs 3:3 (KJV) — "Let not mercy and truth forsake thee: bind them about thy neck; write them upon the table of thine heart."',
+      'Romans 12:18 (KJV) — "If it be possible, as much as lieth in you, live peaceably with all men."'
+    ]
   },
 
+  // ── 8. SC ─────────────────────────────────────────────────────────────────
   'SC': {
     code: 'SC',
     name: 'The Diligent Steward (Steadiness / Conscientiousness)',
@@ -622,9 +970,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Provide structured details, written agendas, and realistic timelines in a calm, respectful tone.',
     color: '#06b6d4',
-    badgeBg: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800'
+    badgeBg: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800',
+
+    workStyleTendencies: [
+      'Thrives in quiet, organized, and methodical environments where thoroughness is valued',
+      'Excels at data management, financial counting, church archives, and technical setups',
+      'Prefers working steadily through well-defined checklists without sudden emergencies',
+      'Ensures consistent accuracy, dependability, and humble adherence to policy'
+    ],
+    motivations: [
+      'Knowing that church operations, records, and finances are accurate and above reproach',
+      'A calm, structured, and predictable ministry environment',
+      'Serving the Lord with quiet, uncompromised craftsmanship',
+      'Being given sufficient time to complete assignments to the highest standard'
+    ],
+    stressors: [
+      'Last-minute chaos, disorganization, and rushed deadlines',
+      'Ambiguous directions, shifting expectations, or sloppy record-keeping',
+      'Aggressive conflict or loud confrontations in church meetings',
+      'Having to make snap decisions without verifying the facts'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Thoughtful, calm, precise, and modest. You speak with careful accuracy, avoid exaggeration, provide helpful details, and prefer written documentation.',
+      howToSpeakToYou: 'Be clear, organized, and respectful. Provide written agendas and guidelines in advance, speak in a calm tone, and avoid springing last-minute surprises.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Present your completed work cleanly with key summary metrics; reassure them that the details are handled so they can focus on big decisions.',
+      withI: 'Appreciate their joyful energy; help keep them grounded by managing the schedules and tracking logistics they may overlook.',
+      withS: 'Share in dependable, quiet partnership; pray together and encourage each other in faithful behind-the-scenes service.',
+      withC: 'Collaborate seamlessly on high standards, sound doctrine, and orderly processes, enjoying mutual respect for accuracy.'
+    },
+    biblicalActionPrinciples: [
+      '1 Peter 4:10 (KJV) — "As every man hath received the gift, even so minister the same one to another, as good stewards of the manifold grace of God."',
+      'Philippians 4:6–7 (KJV) — "Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God."',
+      '1 Thessalonians 4:11 (KJV) — "And that ye study to be quiet, and to do your own business, and to work with your own hands, as we commanded you."'
+    ]
   },
 
+  // ── 9. SI ─────────────────────────────────────────────────────────────────
   'SI': {
     code: 'SI',
     name: 'The Peacemaking Servant (Steadiness / Influence)',
@@ -660,9 +1043,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be supportive, encourage their input, and acknowledge their humble contributions.',
     color: '#14b8a6',
-    badgeBg: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800'
+    badgeBg: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800',
+
+    workStyleTendencies: [
+      'Thrives in warm, harmonious, and supportive church team environments',
+      'Excels at hospitality, caring for the elderly, preparing fellowship meals, and greeting',
+      'Prefers cooperative, friendly workflows where everyone supports each other',
+      'Works diligently with patient, steady loyalty to encourage church unity'
+    ],
+    motivations: [
+      'Promoting genuine peace, warmth, and brotherly love in the church',
+      'Helping practical needs behind the scenes (meals, rides, visitations)',
+      'A welcoming environment where newcomers and lonely members feel loved',
+      'Working alongside humble, friendly brothers and sisters in Christ'
+    ],
+    stressors: [
+      'Divisive politics, gossip, or angry arguments within the church body',
+      'High-pressure environments that disregard people’s feelings and well-being',
+      'Being forced into harsh confrontational roles without support',
+      'Feeling unappreciated or having their gentle nature taken advantage of'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Kind, encouraging, welcoming, and considerate. You speak gently, check on how people are doing, express gratitude, and avoid harsh speech.',
+      howToSpeakToYou: 'Be warm, encouraging, and friendly. Speak with a gentle tone, validate their dedicated service, and invite their perspective without putting them on the spot.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Do not fear their direct approach; share how taking care of team morale helps them accomplish their leadership objectives faster.',
+      withI: 'Enjoy the vibrant fellowship and shared love for people; work together on welcoming guests and organizing church fellowship meals.',
+      withS: 'Enjoy steady, peaceful ministry partnership; pray together and encourage each other to speak up when decisions are made.',
+      withC: 'Appreciate their desire for orderly church processes; gently remind them to speak the truth in love and keep people at the center.'
+    },
+    biblicalActionPrinciples: [
+      'Matthew 5:9 (KJV) — "Blessed are the peacemakers: for they shall be called the children of God."',
+      'Proverbs 16:24 (KJV) — "Pleasant words are as an honeycomb, sweet to the soul, and health to the bones."',
+      'Romans 14:19 (KJV) — "Let us therefore follow after the things which make for peace, and things wherewith one may edify another."'
+    ]
   },
 
+  // ── 10. High C ────────────────────────────────────────────────────────────
   'C': {
     code: 'C',
     name: 'The Doctrinal Guardian (High Conscientiousness)',
@@ -697,9 +1115,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Provide accurate facts, scriptural backing, written details, and logical reasons.',
     color: '#3b82f6',
-    badgeBg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+    badgeBg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
+
+    workStyleTendencies: [
+      'Thrives in organized, intellectually rigorous environments where accuracy is prioritized',
+      'Excels at theological research, curriculum evaluation, financial auditing, and compliance',
+      'Prefers clear standards, well-documented procedures, and solitary study time',
+      'Ensures uncompromised doctrinal integrity and precision in all church materials'
+    ],
+    motivations: [
+      'Sound doctrine, biblical accuracy, and upholding historic Baptist distinctives',
+      'Orderly stewardship, financial transparency, and systematic church processes',
+      'Discovering deeper biblical insights through disciplined expository study',
+      'Excellence and quality in every facet of ministry administration'
+    ],
+    stressors: [
+      'Theological compromise, sloppy teaching, and superficial doctrine',
+      'Disorganization, lack of planning, and sudden haphazard changes',
+      'Subjective, emotional arguments that ignore Scripture and factual evidence',
+      'Unrealistic deadlines that compromise quality and accuracy'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Analytical, objective, measured, and scripturally grounded. You present facts, cite scripture references, point out logical flaws, and avoid superficial fluff.',
+      howToSpeakToYou: 'Be precise, logical, and provide written documentation and scriptural backing. Respect their expertise, give them time to research, and avoid emotional manipulation.'
+    },
+    styleToStyleStrategies: {
+      withD: 'State conclusions concisely, support your analysis with facts and metrics, and show how sound preparation prevents costly mistakes.',
+      withI: 'Appreciate their evangelistic enthusiasm; gently provide the theological depth and operational structure that will make their outreach sustainable.',
+      withS: 'Enjoy steady, dependable collaboration; respect their loyalty and communicate doctrinal or procedural adjustments with patience.',
+      withC: 'Engage in rich theological and logistical discussions; celebrate shared commitment to truth and accuracy while maintaining brotherly grace.'
+    },
+    biblicalActionPrinciples: [
+      'Ephesians 4:15 (KJV) — "But speaking the truth in love, may grow up into him in all things, which is the head, even Christ."',
+      'Titus 2:7–8 (KJV) — "In all things shewing thyself a pattern of good works: in doctrine shewing uncorruptness, gravity, sincerity, Sound speech, that cannot be condemned."',
+      '1 Corinthians 13:2 (KJV) — "And though I have the gift of prophecy, and understand all mysteries, and all knowledge... and have not charity, I am nothing."'
+    ]
   },
 
+  // ── 11. CS ────────────────────────────────────────────────────────────────
   'CS': {
     code: 'CS',
     name: 'The Quiet Architect (Conscientiousness / Steadiness)',
@@ -735,9 +1188,44 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Communicate with clear structure, respect their need for time to process, and avoid sudden surprises.',
     color: '#4f46e5',
-    badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
+    badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800',
+
+    workStyleTendencies: [
+      'Thrives in calm, orderly, and well-structured ministry environments',
+      'Excels at database administration, technical systems (A/V, live stream), and curriculum design',
+      'Prefers predictable workflows with clear guidelines and sufficient preparation time',
+      'Works with quiet excellence, dependability, and conscientious attention to detail'
+    ],
+    motivations: [
+      'Creating reliable, seamless systems that support the ministry without failing',
+      'Orderly execution of church operations and technological systems',
+      'Preserving sound doctrinal standards and church historical records',
+      'Working in a peaceful, respectful environment with competent leaders'
+    ],
+    stressors: [
+      'Haphazard planning, last-minute emergencies, and sudden technological failures',
+      'Disorder, broken ministry processes, and inconsistent leadership directives',
+      'Loud, high-pressure environments that demand immediate answers without preparation',
+      'Having to defend necessary procedures against impatient pushback'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Quiet, systematic, accurate, and respectful. You present well-organized thoughts, provide written summaries, and prefer substance over flashiness.',
+      howToSpeakToYou: 'Provide written agendas, give advance notice of upcoming needs, speak calmly, and respect their thoughtful technical and administrative recommendations.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Deliver structured executive summaries with clear bottom-line recommendations, showing how your systems keep the church running smoothly.',
+      withI: 'Help organize their dynamic outreach events by setting up the sound, media, and registration systems behind the scenes.',
+      withS: 'Share in quiet, faithful fellowship; collaborate seamlessly on routine church operations and pray for one another.',
+      withC: 'Enjoy shared analytical rigor, align on high standards of excellence, and work together on church policies and archives.'
+    },
+    biblicalActionPrinciples: [
+      'Proverbs 22:29 (KJV) — "Seest thou a man diligent in his business? he shall stand before kings; he shall not stand before mean men."',
+      'Ecclesiastes 9:10 (KJV) — "Whatsoever thy hand findeth to do, do it with thy might."',
+      'Colossians 3:23 (KJV) — "And whatsoever ye do, do it heartily, as to the Lord, and not unto men."'
+    ]
   },
 
+  // ── 12. CD ────────────────────────────────────────────────────────────────
   'CD': {
     code: 'CD',
     name: 'The Reformer & Logician (Conscientiousness / Dominance)',
@@ -773,7 +1261,41 @@ export const DISC_PROFILES: Record<string, DiscStyleProfile> = {
     ],
     communicationTips: 'Be logical, provide scriptural evidence, outline facts, and demonstrate clear practical competence.',
     color: '#6366f1',
-    badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
+    badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800',
+
+    workStyleTendencies: [
+      'Thrives in challenging environments that require strategic reform, problem-solving, and doctrinal defense',
+      'Excels at identifying operational bottlenecks, drafting church policies, and executing audits',
+      'Prefers autonomous authority to diagnose problems and implement structured fixes',
+      'Demands high accountability, factual rigor, and adherence to biblical standards'
+    ],
+    motivations: [
+      'Restoring biblical order, structural integrity, and doctrinal purity in ministries',
+      'Solving complex organizational vulnerabilities and legal/safety risks',
+      'Defending Christian truth with rigorous apologetics and sound logic',
+      'Seeing ministries operate with high excellence and measurable impact'
+    ],
+    stressors: [
+      'Compromised standards, unchecked disorder, and intellectual laziness',
+      'Illogical decisions based on emotional impulses rather than Scripture and data',
+      'Incompetence or lack of follow-through from ministry partners',
+      'Resistance to necessary structural reforms due to complacent tradition'
+    ],
+    communicationPreferences: {
+      howYouSpeak: 'Logical, candid, incisive, and direct. You present facts, highlight discrepancies, point out structural flaws, and challenge assumptions.',
+      howToSpeakToYou: 'Be objective, direct, and back assertions with verifiable facts and Scripture. Respect their analytical intellect and present reasoned solutions rather than emotional appeals.'
+    },
+    styleToStyleStrategies: {
+      withD: 'Engage them with direct, factual clarity; respect their authority while offering calculated solutions that advance leadership goals.',
+      withI: 'Acknowledge their relational gift, but keep discussions tethered to biblical doctrine, feasibility, and structured implementation.',
+      withS: 'Soft-pedal your critique, recognize their faithful service, and guide them through changes with gentle reassurance.',
+      withC: 'Enjoy shared analytical rigor and doctrinal depth; ensure you maintain humility and avoid debates over non-essential details.'
+    },
+    biblicalActionPrinciples: [
+      '2 Timothy 2:24–25 (KJV) — "And the servant of the Lord must not strive; but be gentle unto all men, apt to teach, patient, In meekness instructing those that oppose themselves..."',
+      'Proverbs 15:2 (KJV) — "The tongue of the wise useth knowledge aright: but the mouth of fools poureth out foolishness."',
+      'Philippians 1:9–10 (KJV) — "And this I pray, that your love may abound yet more and more in knowledge and in all judgment; That ye may approve things that are excellent."'
+    ]
   }
 };
 
@@ -797,17 +1319,17 @@ export function calculateDiscScores(answers: Record<number, number>): DiscCalcul
   };
 
   DISC_QUESTIONS.forEach(q => {
-    const rawVal = answers[q.id] || 0;
+    const rawVal = Number(answers[q.id]) || 3; // neutral default if missing
     scores[q.dimension] += rawVal;
   });
 
   const maxScorePerDimension = 35; // 7 questions * 5 max points
 
   const percentages: Record<DiscDimension, number> = {
-    'D': Math.round((scores.D / maxScorePerDimension) * 100),
-    'I': Math.round((scores.I / maxScorePerDimension) * 100),
-    'S': Math.round((scores.S / maxScorePerDimension) * 100),
-    'C': Math.round((scores.C / maxScorePerDimension) * 100)
+    'D': Math.min(100, Math.max(0, Math.round((scores.D / maxScorePerDimension) * 100))),
+    'I': Math.min(100, Math.max(0, Math.round((scores.I / maxScorePerDimension) * 100))),
+    'S': Math.min(100, Math.max(0, Math.round((scores.S / maxScorePerDimension) * 100))),
+    'C': Math.min(100, Math.max(0, Math.round((scores.C / maxScorePerDimension) * 100)))
   };
 
   // Sort dimensions by score descending
@@ -815,12 +1337,12 @@ export function calculateDiscScores(answers: Record<number, number>): DiscCalcul
   const primary = sorted[0];
   const secondary = sorted[1];
 
-  // If secondary is within 5 points (or >= 70% of max), create blend style
+  // If secondary is within 6 points and >= 20 points, create blend style
   let styleCode = primary;
   const primaryScore = scores[primary];
   const secondaryScore = scores[secondary];
 
-  if (secondaryScore >= 22 && (primaryScore - secondaryScore) <= 6) {
+  if (secondaryScore >= 20 && (primaryScore - secondaryScore) <= 6) {
     const candidateCode = `${primary}${secondary}`;
     if (DISC_PROFILES[candidateCode]) {
       styleCode = candidateCode;

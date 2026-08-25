@@ -3,7 +3,8 @@ import {
   Compass, Check, ArrowRight, ArrowLeft, RefreshCw, Printer, 
   Sparkles, Award, BookOpen, Heart, User, Shield, Users, 
   CheckCircle2, AlertCircle, Share2, HelpCircle, ChevronRight,
-  Flame, Target, Scale, Zap, Info, Loader2, ExternalLink
+  Flame, Target, Scale, Zap, Info, Loader2, ExternalLink,
+  MessageSquare, ShieldAlert, Layers, Activity, FileText
 } from 'lucide-react';
 import { 
   DISC_QUESTIONS,
@@ -760,16 +761,129 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
       </header>
 
       {/* Main Results Body */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-8 print:p-0 print:space-y-6">
-        {/* Hero Card */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-10 print:p-0 print:space-y-6">
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PART I: UNDERSTANDING THE DISC MODEL                                   */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        <section className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-wider mb-2">
+              <Layers className="w-3.5 h-3.5" />
+              <span>Part I: Understanding the DISC Model</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+              The Four Behavioral Lenses in the Body of Christ
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+              God created each believer with distinct gifts, temperaments, and behavioral lenses. Understanding the four core DISC styles helps us appreciate why different brethren perceive situations differently, communicate with varied emphases, and serve in diverse yet complementary roles.
+            </p>
+          </div>
+
+          {/* Scriptural Anchor for Part I */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 flex items-start gap-3.5">
+            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs sm:text-sm italic font-serif text-slate-800 dark:text-slate-200 leading-relaxed">
+                “For as the body is one, and hath many members, and all the members of that one body, being many, are one body: so also is Christ... Now ye are the body of Christ, and members in particular.”
+              </p>
+              <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 mt-1 uppercase tracking-wider">
+                — 1 Corinthians 12:12, 27 (KJV)
+              </p>
+            </div>
+          </div>
+
+          {/* 4 Core Styles Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+            {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
+              const info = DISC_FOUNDATIONAL_INFO[dim];
+              const isUserPrimary = results.primaryDimension === dim;
+              const isUserSecondary = results.secondaryDimension === dim;
+
+              return (
+                <div 
+                  key={dim} 
+                  className={`p-5 sm:p-6 rounded-2xl border-2 transition-all space-y-4 ${
+                    isUserPrimary 
+                      ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md ring-2 ring-emerald-500/20' 
+                      : isUserSecondary
+                      ? 'border-indigo-400 bg-indigo-50/20 dark:bg-indigo-950/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span 
+                        className="w-9 h-9 rounded-xl text-white font-black text-base flex items-center justify-center shrink-0 shadow-sm"
+                        style={{ backgroundColor: info.color }}
+                      >
+                        {dim}
+                      </span>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                          {info.name}
+                        </h4>
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                          {info.title}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                      {isUserPrimary && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm">
+                          Your Primary
+                        </span>
+                      )}
+                      {isUserSecondary && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-sm">
+                          Your Secondary
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* KJV Verse */}
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 italic font-serif">
+                    “{info.kjvScripture.text}”
+                    <span className="block text-[10px] font-black text-slate-500 dark:text-slate-400 not-italic font-sans mt-1">
+                      — {info.kjvScripture.verse}
+                    </span>
+                  </div>
+
+                  {/* Behavioral Lens */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                      Behavioral Lens
+                    </span>
+                    <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                      {info.behavioralLens}
+                    </p>
+                  </div>
+
+                  {/* Body of Christ Role */}
+                  <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 text-xs text-slate-700 dark:text-slate-300">
+                    <strong className="text-slate-900 dark:text-white block font-bold text-[11px] mb-0.5">Role in the Church Body:</strong>
+                    {info.inTheBodyOfChrist}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PART II: YOUR UNIQUE BEHAVIORAL PROFILE                                */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        <section className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
             <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Official Ministry Assessment
-              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-wider mb-1">
+                <User className="w-3.5 h-3.5" />
+                <span>Part II: Your Unique Behavioral Profile</span>
+              </div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {takerName}’s Biblical DISC Profile
+                {takerName}’s Ministry & Behavioral Pattern
               </h2>
             </div>
 
@@ -785,18 +899,19 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
 
           {/* Profile Name & Summary */}
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
+            <div 
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider shadow-sm"
               style={{ backgroundColor: `${profile.color}15`, color: profile.color }}
             >
-              <Award className="w-3.5 h-3.5" />
+              <Award className="w-4 h-4" />
               <span>{profile.name}</span>
             </div>
 
-            <p className="text-base sm:text-lg text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
+            <p className="text-base sm:text-lg text-slate-800 dark:text-slate-100 font-bold leading-relaxed">
               {profile.summary}
             </p>
 
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               {profile.fullDescription}
             </p>
           </div>
@@ -818,12 +933,12 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
           <div className="space-y-4 pt-2">
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
               <Scale className="w-4 h-4 text-emerald-600" />
-              <span>Your 4 Dimension Distribution</span>
+              <span>Your Behavioral Dimension Distribution</span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
-                const info = DISC_DIMENSIONS_INFO[dim];
+                const info = DISC_FOUNDATIONAL_INFO[dim];
                 const score = results.scores[dim];
                 const pct = results.percentages[dim];
                 const isPrimary = results.primaryDimension === dim;
@@ -840,7 +955,7 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
                           {dim}
                         </span>
                         <div>
-                          <span className="text-xs font-bold text-slate-900 dark:text-white">{info.name.split(' ')[0]}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">{info.name}</span>
                           {isPrimary && (
                             <span className="ml-1.5 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                               Primary
@@ -891,6 +1006,88 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
             </p>
           </div>
 
+          {/* Work Style Tendencies */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-600" />
+              <span>Your Work & Ministry Style Tendencies</span>
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Environments and operational frameworks where you are naturally most effective and fruitful.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {profile.workStyleTendencies.map((tendency, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-medium flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{tendency}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Motivations & Stressors Side-by-Side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {/* Motivations (Energizers) */}
+            <div className="p-5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <Flame className="w-4 h-4 text-emerald-600" />
+                <span>What Spiritually Energizes & Drives You</span>
+              </h4>
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                {profile.motivations.map((m, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-bold">•</span>
+                    <span>{m}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Stressors (Drainers) */}
+            <div className="p-5 rounded-2xl bg-rose-50/40 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-600" />
+                <span>What Drains Your Energy & Causes Stress</span>
+              </h4>
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                {profile.stressors.map((s, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-rose-600 font-bold">•</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Dual Communication Preferences */}
+          <div className="space-y-4 pt-2">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-indigo-600" />
+              <span>Communication Preferences & Guidelines</span>
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block">
+                  How You Naturally Speak
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                  {profile.communicationPreferences.howYouSpeak}
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-violet-50/40 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300 block">
+                  How Others Should Communicate With You
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                  {profile.communicationPreferences.howToSpeakToYou}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Baptist Ministry Strengths & Serving Recommendations */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             {/* Ministry Strengths */}
@@ -926,43 +1123,140 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
             </div>
           </div>
 
-          {/* Spiritual Growth & Communication */}
-          <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <div className="p-5 rounded-2xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 space-y-2">
-              <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                <Heart className="w-4 h-4 text-amber-600" />
-                <span>Spiritual Growth & Sanctification Focus</span>
-              </h4>
-              <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-                {profile.spiritualGrowthAreas.map((g, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>{g}</span>
-                  </li>
-                ))}
-              </ul>
+          {/* Spiritual Growth & Sanctification Focus */}
+          <div className="p-5 rounded-2xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 space-y-3 pt-2">
+            <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <Heart className="w-4 h-4 text-amber-600" />
+              <span>Spiritual Growth & Sanctification Focus</span>
+            </h4>
+            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+              {profile.spiritualGrowthAreas.map((g, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-amber-600 font-bold">•</span>
+                  <span>{g}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        {/* PART III: RELATIONSHIP & ACTION STRATEGIES                             */}
+        {/* ══════════════════════════════════════════════════════════════════════ */}
+        <section className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-wider mb-2">
+              <Users className="w-3.5 h-3.5" />
+              <span>Part III: Relationship & Action Strategies</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+              Style-to-Style Collaboration & Conflict Strategies
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+              Assessment insights are most valuable when applied to biblical fellowship. Use these style-to-style strategies to build mutual trust, avoid misunderstandings, and resolve friction with brothers and sisters of every temperament.
+            </p>
+          </div>
+
+          {/* 4 Style-to-Style Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* With High D */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-red-200/80 dark:border-red-900/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-red-600 text-white font-black text-xs flex items-center justify-center">
+                  D
+                </span>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  When Working with High D (Dominance) Brethren
+                </h4>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
+                {profile.styleToStyleStrategies.withD}
+              </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-start gap-3">
-              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Communication with Brethren
+            {/* With High I */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-amber-200/80 dark:border-amber-900/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-amber-500 text-white font-black text-xs flex items-center justify-center">
+                  I
                 </span>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                  {profile.communicationTips}
-                </p>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  When Working with High I (Influence) Brethren
+                </h4>
               </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
+                {profile.styleToStyleStrategies.withI}
+              </p>
+            </div>
+
+            {/* With High S */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-emerald-200/80 dark:border-emerald-900/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
+                  S
+                </span>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  When Working with High S (Steadiness) Brethren
+                </h4>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
+                {profile.styleToStyleStrategies.withS}
+              </p>
+            </div>
+
+            {/* With High C */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-blue-200/80 dark:border-blue-900/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                  C
+                </span>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  When Working with High C (Conscientiousness) Brethren
+                </h4>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
+                {profile.styleToStyleStrategies.withC}
+              </p>
             </div>
           </div>
 
-          {/* Footer Note */}
-          <div className="text-center pt-4 border-t border-slate-100 dark:border-slate-800">
+          {/* Biblical Conflict Resolution & Action Principles */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>Biblical Action & Harmony Principles</span>
+            </h4>
+            <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300 font-serif italic leading-relaxed">
+              {profile.biblicalActionPrinciples.map((verse, idx) => (
+                <div key={idx} className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/40">
+                  {verse}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Retake / Footer Note */}
+          <div className="text-center pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-3">
             <p className="text-xs text-slate-400">
               Scriptures taken from the King James Version (KJV). Recorded for {church?.name || 'Pastoral Care'}.
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Would you like to reset and retake the assessment?')) {
+                  setAnswers({});
+                  setCurrentQuestionIndex(0);
+                  setStep('intro');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline cursor-pointer print:hidden"
+            >
+              Retake Faith-Based DISC Personality Assessment
+            </button>
           </div>
-        </div>
+        </section>
+
       </main>
     </div>
   );

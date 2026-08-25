@@ -4,7 +4,8 @@ import {
   Check, Search, Filter, RefreshCw, ChevronRight, X,
   Trash2, ExternalLink, Award, FileText, ArrowUpDown,
   BookOpen, HelpCircle, CheckCircle2, MessageSquare, AlertCircle,
-  Scale, Shield, Heart, Target
+  Scale, Shield, Heart, Target, Flame, ShieldAlert, Activity,
+  Layers, User as UserIcon
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid
@@ -15,6 +16,7 @@ import {
   DISC_QUESTIONS,
   DISC_PROFILES,
   DISC_DIMENSIONS_INFO,
+  DISC_FOUNDATIONAL_INFO,
   DiscDimension,
   DiscStyleProfile
 } from '../constants/discTestData';
@@ -520,83 +522,204 @@ export const DiscTestManager: React.FC<DiscTestManagerProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Summary */}
-              <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
-                <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
-                  Summary & Ministry Overview
-                </span>
-                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
-                  {DISC_PROFILES[selectedDetailResponse.styleCode]?.summary}
-                </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {DISC_PROFILES[selectedDetailResponse.styleCode]?.fullDescription}
-                </p>
-              </div>
+              {/* Profile Header & Summary */}
+              {(() => {
+                const p = DISC_PROFILES[selectedDetailResponse.styleCode] || DISC_PROFILES[selectedDetailResponse.primaryDimension] || DISC_PROFILES['D'];
+                return (
+                  <>
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-300 tracking-wider">
+                          {p.name}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-800 dark:text-slate-200 font-bold leading-relaxed">
+                        {p.summary}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        {p.fullDescription}
+                      </p>
+                    </div>
 
-              {/* KJV Theme Verse */}
-              {DISC_PROFILES[selectedDetailResponse.styleCode]?.themeVerseKjv && (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-l-4 border-emerald-600 space-y-1">
-                  <p className="text-xs italic text-slate-800 dark:text-slate-200 font-serif">
-                    “{DISC_PROFILES[selectedDetailResponse.styleCode]?.themeVerseKjv.text}”
-                  </p>
-                  <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 text-right">
-                    — {DISC_PROFILES[selectedDetailResponse.styleCode]?.themeVerseKjv.verse}
-                  </p>
-                </div>
-              )}
+                    {/* KJV Theme Verse */}
+                    {p.themeVerseKjv && (
+                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-l-4 border-emerald-600 space-y-1">
+                        <p className="text-xs italic text-slate-800 dark:text-slate-200 font-serif">
+                          “{p.themeVerseKjv.text}”
+                        </p>
+                        <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 text-right">
+                          — {p.themeVerseKjv.verse}
+                        </p>
+                      </div>
+                    )}
 
-              {/* 4 Dimension Percentage Bars */}
-              {selectedDetailResponse.percentages && (
-                <div className="space-y-3">
-                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                    Dimension Breakdown (Max 35 pts per dimension)
-                  </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
-                      const info = DISC_DIMENSIONS_INFO[dim];
-                      const score = selectedDetailResponse.scores?.[dim] || 0;
-                      const pct = selectedDetailResponse.percentages?.[dim] || 0;
+                    {/* 4 Dimension Percentage Bars */}
+                    {selectedDetailResponse.percentages && (
+                      <div className="space-y-3">
+                        <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                          Dimension Breakdown (Max 35 pts per dimension)
+                        </h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
+                            const info = DISC_FOUNDATIONAL_INFO[dim];
+                            const score = selectedDetailResponse.scores?.[dim] || 0;
+                            const pct = selectedDetailResponse.percentages?.[dim] || 0;
+                            const isPrimary = selectedDetailResponse.primaryDimension === dim;
 
-                      return (
-                        <div key={dim} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5">
-                          <div className="flex justify-between text-xs font-bold">
-                            <span>{info.name.split(' ')[0]}</span>
-                            <span className="font-mono">{pct}% ({score}/35)</span>
+                            return (
+                              <div key={dim} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                                <div className="flex justify-between text-xs font-bold">
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{info.name}</span>
+                                    {isPrimary && (
+                                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                        Primary
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-mono">{pct}% ({score}/35)</span>
+                                </div>
+                                <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Work Style Tendencies */}
+                    {p.workStyleTendencies && p.workStyleTendencies.length > 0 && (
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Work & Ministry Style Tendencies</span>
+                        </h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {p.workStyleTendencies.map((tendency, idx) => (
+                            <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-start gap-2">
+                              <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                              <span className="text-slate-700 dark:text-slate-300 text-[11px]">{tendency}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Motivations & Stressors */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Motivations */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2">
+                        <h6 className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                          <Flame className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Motivations & Energizers</span>
+                        </h6>
+                        <ul className="text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
+                          {p.motivations?.map((m, idx) => (
+                            <li key={idx} className="text-[11px] flex items-start gap-1.5">
+                              <span className="text-emerald-600 font-bold">•</span>
+                              <span>{m}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Stressors */}
+                      <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 space-y-2">
+                        <h6 className="text-[11px] font-black uppercase text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Stressors & Frustrations</span>
+                        </h6>
+                        <ul className="text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
+                          {p.stressors?.map((s, idx) => (
+                            <li key={idx} className="text-[11px] flex items-start gap-1.5">
+                              <span className="text-rose-600 font-bold">•</span>
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Dual Communication Preferences */}
+                    {p.communicationPreferences && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 space-y-1">
+                          <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300 block">
+                            How They Speak
+                          </span>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                            {p.communicationPreferences.howYouSpeak}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-violet-50/50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30 space-y-1">
+                          <span className="text-[10px] font-black uppercase text-violet-700 dark:text-violet-300 block">
+                            How Leaders Should Speak to Them
+                          </span>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                            {p.communicationPreferences.howToSpeakToYou}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Baptist Ministry Strengths & Roles */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2">
+                        <h6 className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">
+                          Ministry Strengths
+                        </h6>
+                        <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                          {p.baptistMinistryStrengths.map((s, idx) => (
+                            <li key={idx} className="text-[11px]">• {s}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
+                        <h6 className="text-[11px] font-black uppercase text-indigo-700 dark:text-indigo-300">
+                          Serving Areas
+                        </h6>
+                        <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                          {p.idealServingRoles.map((r, idx) => (
+                            <li key={idx} className="text-[11px]">• {r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Style-to-Style Guide for Leaders */}
+                    {p.styleToStyleStrategies && (
+                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-3">
+                        <h6 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                          Style-to-Style Collaboration Strategies
+                        </h6>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <strong className="text-red-600 block font-bold">With High D:</strong>
+                            {p.styleToStyleStrategies.withD}
                           </div>
-                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <strong className="text-amber-600 block font-bold">With High I:</strong>
+                            {p.styleToStyleStrategies.withI}
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <strong className="text-emerald-600 block font-bold">With High S:</strong>
+                            {p.styleToStyleStrategies.withS}
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                            <strong className="text-blue-600 block font-bold">With High C:</strong>
+                            {p.styleToStyleStrategies.withC}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Baptist Ministry Strengths & Roles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2">
-                  <h6 className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">
-                    Ministry Strengths
-                  </h6>
-                  <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
-                    {DISC_PROFILES[selectedDetailResponse.styleCode]?.baptistMinistryStrengths.map((s, idx) => (
-                      <li key={idx}>• {s}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
-                  <h6 className="text-[11px] font-black uppercase text-indigo-700 dark:text-indigo-300">
-                    Serving Areas
-                  </h6>
-                  <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
-                    {DISC_PROFILES[selectedDetailResponse.styleCode]?.idealServingRoles.map((r, idx) => (
-                      <li key={idx}>• {r}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* All 28 Statement Ratings */}
               <div className="space-y-3 pt-2">
