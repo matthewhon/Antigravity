@@ -147,6 +147,17 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
+  // Next Steps direct SMS composer box
+  const [activeSmsPathway, setActiveSmsPathway] = useState<{
+    pathway: 'group' | 'team' | 'event';
+    targetName: string;
+    messageText: string;
+    autoLogNote: boolean;
+  } | null>(null);
+  const [sendingPathwaySms, setSendingPathwaySms] = useState(false);
+  const [pathwaySmsError, setPathwaySmsError] = useState('');
+  const [pathwaySmsSuccess, setPathwaySmsSuccess] = useState(false);
+
   // SMS state
   const [smsBody, setSmsBody] = useState('');
   const [sendingSms, setSendingSms] = useState(false);
@@ -492,11 +503,108 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
     setTimeout(() => setCopiedItemId(null), 2500);
   };
 
-  const handleApplySmsTemplate = (templateText: string) => {
-    setSmsBody(templateText);
-    setFeedbackToast('Message template loaded into SMS composer below.');
-    const el = document.getElementById('person-sms-section');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  const handleOpenPathwaySms = (pathway: 'group' | 'team' | 'event', targetName: string, defaultText: string) => {
+    setPathwaySmsError('');
+    setPathwaySmsSuccess(false);
+    setActiveSmsPathway({
+      pathway,
+      targetName,
+      messageText: defaultText,
+      autoLogNote: true,
+    });
+  };
+
+  const handleSendPathwaySms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSmsPathway) return;
+    const targetPhone = getPersonPhone(person);
+    if (!targetPhone) {
+      setPathwaySmsError('This person has no phone number on file.');
+      return;
+    }
+    if (!activeSmsPathway.messageText.trim()) {
+      setPathwaySmsError('Please enter an SMS message.');
+      return;
+    }
+
+    setSendingPathwaySms(true);
+    setPathwaySmsError('');
+    setPathwaySmsSuccess(false);
+
+    try {
+      const cleanedPhone = targetPhone.replace(/[^\d+]/g, '');
+      const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          churchId,
+          toPhone: cleanedPhone,
+          body: activeSmsPathway.messageText.trim(),
+          sentBy: user?.id || null,
+          sentByName: user?.name || null,
+          personId: person?.id,
+          personName: person?.name,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Failed to send SMS (HTTP ${res.status})`);
+      }
+
+      setPathwaySmsSuccess(true);
+
+      // Auto-log pastoral note if checked
+      if (activeSmsPathway.autoLogNote && person) {
+        try {
+          const now = new Date();
+          const noteTypeVal: PastoralNote['type'] = 
+            activeSmsPathway.pathway === 'group' ? 'Call' : 
+            activeSmsPathway.pathway === 'team' ? 'Meeting' : 'Note';
+
+          const pathwayTitle = 
+            activeSmsPathway.pathway === 'group' ? 'Small Group Invite' :
+            activeSmsPathway.pathway === 'team' ? 'Service Team Outreach' : 'Event Registration Invite';
+
+          const autoNote: PastoralNote = {
+            id: `note_${Date.now()}`,
+            churchId,
+            personId: person.id,
+            personName: person.name,
+            authorId: user?.id || 'system',
+            authorName: user?.name || 'Staff',
+            date: now.toISOString().split('T')[0],
+            type: noteTypeVal,
+            content: `[SMS Outreach: ${pathwayTitle}]\nTarget: ${activeSmsPathway.targetName}\nMessage: "${activeSmsPathway.messageText.trim()}"`,
+            isCompleted: true,
+            tags: ['Next Steps', 'SMS Outreach'],
+          } as any;
+
+          await firestore.savePastoralNote(autoNote);
+          setNotes(prev => [autoNote, ...prev]);
+
+          if (pcoConnected) {
+            try {
+              await pcoService.addNoteToPerson(churchId, person.id, `[Pastoral Care SMS: ${pathwayTitle}]\n${autoNote.content}`);
+            } catch (pcoErr) {
+              console.warn('PCO note sync failed:', pcoErr);
+            }
+          }
+        } catch (noteErr) {
+          console.warn('Auto-logging note failed:', noteErr);
+        }
+      }
+
+      if (person?.id) {
+        window.dispatchEvent(new CustomEvent('careFollowUpCompleted', { detail: person.id }));
+      }
+
+      setFeedbackToast(`SMS sent to ${person.name} via church messaging system!`);
+    } catch (err: any) {
+      setPathwaySmsError(err.message || 'An error occurred while sending the message.');
+    } finally {
+      setSendingPathwaySms(false);
+    }
   };
 
   const handleApplyNoteTemplate = (content: string, type: PastoralNote['type'] = 'Note') => {
@@ -672,6 +780,115 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
                 {/* Popout Scrollable Content */}
                 <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-4 pr-1">
+                  {/* Direct SMS Outreach Box on the Popout Window */}
+                  {activeSmsPathway && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border-2 border-indigo-300 dark:border-indigo-700/60 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <Send className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                              Send SMS via Church System
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Recipient: <span className="font-bold text-slate-800 dark:text-slate-200">{person.name}</span>{' '}
+                              {resolvedPhone ? (
+                                <span className="text-indigo-600 dark:text-indigo-400 font-bold">({resolvedPhone})</span>
+                              ) : (
+                                <span className="text-rose-500 font-bold">(No Phone on file)</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          {activeSmsPathway.pathway === 'group' ? `🌱 Group: ${activeSmsPathway.targetName}` :
+                           activeSmsPathway.pathway === 'team' ? `🤝 Team: ${activeSmsPathway.targetName}` :
+                           `🎟️ Event: ${activeSmsPathway.targetName}`}
+                        </span>
+                      </div>
+
+                      <form onSubmit={handleSendPathwaySms} className="space-y-3">
+                        <div>
+                          <textarea
+                            value={activeSmsPathway.messageText}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setActiveSmsPathway(prev => prev ? { ...prev, messageText: val } : null);
+                              if (pathwaySmsError) setPathwaySmsError('');
+                              if (pathwaySmsSuccess) setPathwaySmsSuccess(false);
+                            }}
+                            placeholder="Type your SMS message..."
+                            rows={4}
+                            maxLength={1600}
+                            disabled={sendingPathwaySms || !resolvedPhone}
+                            className="w-full text-xs sm:text-sm rounded-xl border border-indigo-200 dark:border-indigo-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 p-3 outline-none resize-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors disabled:opacity-50"
+                          />
+                          <div className="flex justify-between items-center mt-1 text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide px-1">
+                            <span>{activeSmsPathway.messageText.length} characters</span>
+                            <span>{Math.ceil(activeSmsPathway.messageText.length / 160) || 0} SMS segment{Math.ceil(activeSmsPathway.messageText.length / 160) !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="auto-log-pathway-note"
+                            checked={activeSmsPathway.autoLogNote}
+                            onChange={e => setActiveSmsPathway(prev => prev ? { ...prev, autoLogNote: e.target.checked } : null)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700"
+                          />
+                          <label htmlFor="auto-log-pathway-note" className="text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
+                            Automatically record a pastoral care note & sync to PCO
+                          </label>
+                        </div>
+
+                        {pathwaySmsError && (
+                          <div className="flex items-start gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-xl p-3">
+                            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>{pathwaySmsError}</span>
+                          </div>
+                        )}
+
+                        {pathwaySmsSuccess && (
+                          <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3">
+                            <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>Message sent successfully through our church SMS system!</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setActiveSmsPathway(null)}
+                            disabled={sendingPathwaySms}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={sendingPathwaySms || !resolvedPhone || !activeSmsPathway.messageText.trim()}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition shadow-sm cursor-pointer"
+                          >
+                            {sendingPathwaySms ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Sending via SMS System...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Send SMS Now</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
                   {/* Suggestion 1: Small Group */}
                   {isNotInGroup ? (
                     <div className="bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 space-y-3">
@@ -719,14 +936,13 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                             type="button"
                             onClick={() => {
                               const groupName = activeTargetGroup?.name || 'one of our community groups';
-                              const msg = `Hi ${firstName}, we'd love to invite you to connect with a small group! Are you interested in checking out ${groupName}?`;
-                              handleApplySmsTemplate(msg);
-                              setShowNextStepsModal(false);
+                              const msg = `Hi ${firstName}, we'd love to invite you to connect with a small group at church! Are you interested in checking out ${groupName}?`;
+                              handleOpenPathwaySms('group', groupName, msg);
                             }}
                             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-                            title="Prefill SMS invite in drawer"
+                            title="Open SMS composer to invite via church system"
                           >
-                            <Send className="w-3.5 h-3.5" /> Text Invite
+                            <Send className="w-3.5 h-3.5" /> Send SMS Invite
                           </button>
                           <button
                             type="button"
@@ -793,13 +1009,12 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                             onClick={() => {
                               const teamName = activeTargetTeam?.name || 'our service ministry';
                               const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
-                              handleApplySmsTemplate(msg);
-                              setShowNextStepsModal(false);
+                              handleOpenPathwaySms('team', teamName, msg);
                             }}
                             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-                            title="Prefill SMS serving invitation in drawer"
+                            title="Open SMS composer to invite to service team via church system"
                           >
-                            <Send className="w-3.5 h-3.5" /> Text Opportunity
+                            <Send className="w-3.5 h-3.5" /> Send SMS Outreach
                           </button>
                           <button
                             type="button"
@@ -863,13 +1078,12 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               const eventName = activeTargetEvent?.name || 'our upcoming church event';
                               const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
                               const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` You can register here: ${link}` : ''}`;
-                              handleApplySmsTemplate(msg);
-                              setShowNextStepsModal(false);
+                              handleOpenPathwaySms('event', eventName, msg);
                             }}
                             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
-                            title="Prefill SMS event invitation in drawer"
+                            title="Open SMS composer to invite to event via church system"
                           >
-                            <Send className="w-3.5 h-3.5" /> Text Invite
+                            <Send className="w-3.5 h-3.5" /> Send SMS Invite
                           </button>
 
                           {activeTargetEvent?.publicUrl && (
