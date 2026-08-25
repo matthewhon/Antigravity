@@ -17,6 +17,7 @@ import {
   SPIRITUAL_GIFTS_SCRIPTURES
 } from '../constants/spiritualGiftsTestData';
 import { PersonProfileDrawer } from './PersonProfileDrawer';
+import { SendAssessmentModal } from './SendAssessmentModal';
 
 interface GiftsTestManagerProps {
   churchId: string;
@@ -743,147 +744,15 @@ export const GiftsTestManager: React.FC<GiftsTestManagerProps> = ({
         </div>
       )}
 
-      {/* ─── Modal 2: Send / Share Test Link ──────────────────────────────── */}
-      {showShareModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6 animate-in zoom-in-95">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
-                  <Share2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-black text-slate-900 dark:text-white">
-                    Send Spiritual Gifts Test Link
-                  </h4>
-                  <p className="text-xs text-slate-400">
-                    Send directly to an individual or copy link
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Direct Copy Box */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                Public Test URL
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={testPublicUrl}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-700 dark:text-slate-300 outline-none"
-                />
-                <button
-                  onClick={() => handleCopyLink()}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1 shrink-0 hover:bg-indigo-700 transition cursor-pointer"
-                >
-                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* SMS Outreach Form */}
-            <div className="space-y-3 pt-2">
-              <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Send Invitation via Church SMS</span>
-              </h5>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Select Person from Directory
-                </label>
-                <select
-                  value={sendSmsTargetPersonId}
-                  onChange={e => {
-                    const pid = e.target.value;
-                    setSendSmsTargetPersonId(pid);
-                    const p = people.find(item => item.id === pid);
-                    if (p) {
-                      setSendSmsCustomPhone(p.e164Phone || p.phone || '');
-                      // Update SMS body with personalized query param
-                      const personalizedUrl = `${testPublicUrl}?personId=${p.id}&name=${encodeURIComponent(p.name)}`;
-                      setSendSmsBody(`Hi ${p.name.split(' ')[0]}! Please take our church Spiritual Gifts Test online to discover how God has gifted you: ${personalizedUrl}`);
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-600 cursor-pointer"
-                >
-                  <option value="">-- Choose a person or type phone below --</option>
-                  {people.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {p.phone || p.e164Phone ? `(${p.phone || p.e164Phone})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Target Mobile Phone Number
-                </label>
-                <input
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={sendSmsCustomPhone}
-                  onChange={e => setSendSmsCustomPhone(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  SMS Message Body
-                </label>
-                <textarea
-                  rows={3}
-                  value={sendSmsBody}
-                  onChange={e => setSendSmsBody(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-600 resize-none"
-                />
-              </div>
-
-              {smsResultToast && (
-                <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                  smsResultToast.type === 'success'
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
-                }`}>
-                  {smsResultToast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  <span>{smsResultToast.message}</span>
-                </div>
-              )}
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowShareModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  disabled={sendingSms}
-                  onClick={handleSendSms}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow transition cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{sendingSms ? 'Sending SMS...' : 'Send SMS Now'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─── Modal 2: Send / Share Test Link (Search, PCO List, SMS & Email) ─── */}
+      <SendAssessmentModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        assessmentType="gifts"
+        church={church}
+        user={user}
+        allPeople={people}
+      />
 
       {/* ─── Modal 3: View All 42 Questions ───────────────────────────────── */}
       {showQuestionsModal && (

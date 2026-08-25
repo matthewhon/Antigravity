@@ -17,6 +17,7 @@ import {
   MBTI_TEMPERAMENT_COLORS,
   MbtiTypeProfile
 } from '../constants/mbtiTestData';
+import { SendAssessmentModal } from './SendAssessmentModal';
 
 interface MbtiTestManagerProps {
   church: Church;
@@ -654,143 +655,15 @@ export const MbtiTestManager: React.FC<MbtiTestManagerProps> = ({ church, user, 
         </div>
       )}
 
-      {/* ── Send / Share Modal ── */}
-      {showShareModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center">
-                  <Send className="w-4 h-4" />
-                </div>
-                <h4 className="text-base font-black text-slate-900 dark:text-white">
-                  Send Myers-Briggs Test Link
-                </h4>
-              </div>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-400 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Direct Copy Link */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Public Test URL
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={publicTestUrl}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 select-all outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(publicTestUrl);
-                    setCopiedLink(true);
-                    setTimeout(() => setCopiedLink(false), 2500);
-                  }}
-                  className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                >
-                  {copiedLink ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Send SMS Outreach */}
-            <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Send Invitation via Church SMS
-              </label>
-
-              {/* Select Directory Person */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  Select Contact from Directory (Optional)
-                </label>
-                <select
-                  value={targetPersonId}
-                  onChange={e => handleSelectPersonForSms(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 focus:outline-none"
-                >
-                  <option value="">— Manual Phone Number Entry —</option>
-                  {allPeople.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} {p.phone ? `(${p.phone})` : '(no phone)'}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  Recipient Mobile Phone
-                </label>
-                <input
-                  type="tel"
-                  placeholder="(555) 000-0000"
-                  value={targetPhone}
-                  onChange={e => setTargetPhone(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  SMS Message Body
-                </label>
-                <textarea
-                  rows={3}
-                  value={shareSmsText}
-                  onChange={e => setShareSmsText(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 focus:outline-none"
-                />
-              </div>
-
-              {smsError && (
-                <p className="text-xs text-rose-500 font-bold">{smsError}</p>
-              )}
-              {smsSuccess && (
-                <p className="text-xs text-emerald-500 font-bold">✓ SMS invitation sent successfully!</p>
-              )}
-
-              <button
-                type="button"
-                disabled={sendingSms || !targetPhone.trim()}
-                onClick={handleSendSmsInvitation}
-                className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer"
-              >
-                {sendingSms ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                <span>Send SMS Invitation</span>
-              </button>
-            </div>
-
-            {/* QR Code */}
-            {qrCodeDataUrl && (
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img src={qrCodeDataUrl} alt="QR Code" className="w-14 h-14 rounded-xl border border-slate-200 dark:border-slate-700" />
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-900 dark:text-white">QR Code for Slides & Bulletins</h5>
-                    <p className="text-[10px] text-slate-400">Display on sanctuary screens or print handouts.</p>
-                  </div>
-                </div>
-                <a
-                  href={qrCodeDataUrl}
-                  download={`MBTI-Test-QR-${church.id}.png`}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" />
-                  <span>Download</span>
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ── Send / Share Modal (Directory Search, PCO List, SMS & Email) ── */}
+      <SendAssessmentModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        assessmentType="mbti"
+        church={church}
+        user={user}
+        allPeople={allPeople}
+      />
 
       {/* ── Questions Reference Modal ── */}
       {showQuestionsModal && (
