@@ -922,6 +922,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 churchId={churchId}
                 campaignSubject={localCampaign.subject || localCampaign.name}
                 churchName={church?.name}
+                senderName={localCampaign.fromName}
                 onImportPco={() => setIsPcoDrawerOpen(true)}
                 onOpenPastoralCare={() => setIsPastoralCareDrawerOpen(true)}
                 onOpenDataChart={() => setIsDataChartDrawerOpen(true)}

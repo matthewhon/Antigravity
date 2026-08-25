@@ -938,6 +938,9 @@ export const generateEmailContent = async (
         selectedBlockText?: string;
         campaignSubject?: string;
         churchName?: string;
+        senderName?: string;
+        allBlocksSummary?: string;
+        isPastorSummaryMode?: boolean;
     }
 ): Promise<{ html: string }> => {
     const toneGuide = context?.tone
@@ -948,6 +951,10 @@ export const generateEmailContent = async (
         ? `\n\nThe user has the following existing email block content selected:\n"""\n${context.selectedBlockText}\n"""\nIf the request is about improving or rewriting it, use this as your base.`
         : '';
 
+    const allBlocksCtx = context?.allBlocksSummary
+        ? `\n\nCONTENT BLOCKS IN THE EMAIL:\nThe email currently contains the following blocks of content:\n"""\n${context.allBlocksSummary}\n"""\nUse these blocks as context. If drafting a pastor's message or email overview, weave the themes, announcements, events, worship services, or initiatives from these blocks together into a cohesive, heartfelt pastoral letter.`
+        : '';
+
     const subjectCtx = context?.campaignSubject
         ? `\n\nThe email subject / campaign name is: "${context.campaignSubject}". Keep content consistent with this theme.`
         : '';
@@ -956,11 +963,25 @@ export const generateEmailContent = async (
         ? `You are writing content for ${context.churchName}.`
         : 'You are writing content for a local church.';
 
-    const systemInstruction = `You are an expert church email copywriter and communications director. ${churchCtx}
+    const senderCtx = context?.senderName
+        ? `The pastor or sender's name is "${context.senderName}". You may sign off using this name (e.g. "Pastor ${context.senderName}" or "Blessings, ${context.senderName}").`
+        : 'Sign off warmly on behalf of the pastor or pastoral team (e.g. "Grace & Peace, Pastor [Name]" or "Your Pastoral Team").';
 
-Your job is to help write compelling, concise email content for church email campaigns — announcements, newsletters, invitations, devotionals, and more.
+    const pastorModeInstruction = context?.isPastorSummaryMode
+        ? `\n\nSPECIAL INSTRUCTION — PASTOR'S LETTER:
+You are drafting a personal, inspiring, and pastoral letter/intro from the Senior Pastor to the church congregation.
+- Open with a warm pastoral greeting (e.g., "Dear Church Family," or using the merge tag "@first-name").
+- Provide an encouraging pastoral reflection or spiritual thought fitting the church's focus.
+- Naturally connect and highlight the key events, worship service, small groups, stewardship/pledge campaigns, or announcements present in the blocks without merely reading like a dry bulleted list.
+- Conclude with a warm pastoral benediction/blessing and sign-off.`
+        : '';
 
-${toneGuide}${blockCtx}${subjectCtx}
+    const systemInstruction = `You are an expert church pastor, communications director, and email copywriter. ${churchCtx}
+
+Your job is to help write compelling, concise, and inspiring email content for church email campaigns — announcements, newsletters, invitations, pastor's letters, devotionals, and more.
+
+${toneGuide}${pastorModeInstruction}${allBlocksCtx}${blockCtx}${subjectCtx}
+${senderCtx}
 
 CRITICAL OUTPUT RULES:
 1. Output ONLY clean HTML using these allowed tags: <p>, <h1>, <h2>, <h3>, <strong>, <em>, <ul>, <ol>, <li>, <a href="...">

@@ -566,6 +566,7 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
               onOpenSettings={() => setShowSettings(true)}
               churchId={churchId}
               churchName={church?.name}
+              campaignSubject={activeBulletin.title}
             />
           </div>
 

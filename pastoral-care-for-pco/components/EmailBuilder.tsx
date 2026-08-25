@@ -18,7 +18,8 @@ import {
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
-  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone, DollarSign
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone, DollarSign,
+  ArrowUpToLine
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ interface EmailBuilderProps {
   churchId?: string;
   campaignSubject?: string;
   churchName?: string;
+  senderName?: string;
   /** 'email' (default) hides the embedded_note/poll/form palette; 'bulletin' shows them */
   context?: 'email' | 'bulletin';
 }
@@ -1825,6 +1827,143 @@ const PcoQuickPicker: React.FC<{
 
 // ─── AI Writing Panel ────────────────────────────────────────────────────────
 
+// ─── Extract Summary Across All Blocks ────────────────────────────────────────
+
+export const extractEmailBlocksSummary = (blocks: EmailBlock[]): string => {
+  if (!blocks || blocks.length === 0) return '';
+
+  const stripHtml = (html: string) =>
+    html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+
+  const summaries: string[] = [];
+
+  blocks.forEach((block, index) => {
+    const c = block.content || {};
+    const num = index + 1;
+
+    switch (block.type) {
+      case 'text':
+      case 'header': {
+        const text = stripHtml(c.text || c.html || '');
+        if (text) {
+          summaries.push(`Block ${num} [${block.type === 'header' ? 'Heading' : 'Text'}]: "${text}"`);
+        }
+        break;
+      }
+      case 'button': {
+        if (c.text) {
+          summaries.push(`Block ${num} [Button CTA]: "${c.text}" (URL: ${c.url || '#'})`);
+        }
+        break;
+      }
+      case 'pco_event': {
+        const parts = [`Block ${num} [Church Event]: "${c.name || c.title || 'Untitled Event'}"`];
+        if (c.date) parts.push(`Date/Time: ${c.date}`);
+        if (c.location) parts.push(`Location: ${c.location}`);
+        if (c.description) parts.push(`Details: ${stripHtml(c.description)}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_registration': {
+        const parts = [`Block ${num} [Event Registration]: "${c.name || c.title || 'Registration'}"`];
+        if (c.date) parts.push(`Date: ${c.date}`);
+        if (c.description) parts.push(`Details: ${stripHtml(c.description)}`);
+        if (c.url) parts.push(`Link: ${c.url}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_service_plan': {
+        const plan = c.rawPlan;
+        const parts = [`Block ${num} [Worship Service Plan]:`];
+        if (plan?.seriesTitle) parts.push(`Series: "${plan.seriesTitle}"`);
+        if (plan?.title) parts.push(`Plan: "${plan.title}"`);
+        if (plan?.serviceTypeName) parts.push(`Service: ${plan.serviceTypeName}`);
+        if (plan?.sortDate) {
+          const d = new Date(plan.sortDate);
+          if (!isNaN(d.getTime())) parts.push(`Date: ${d.toLocaleDateString()}`);
+        }
+        if (plan?.items && Array.isArray(plan.items)) {
+          const songs = plan.items.filter((it: any) => it.type === 'song').map((it: any) => it.title);
+          const headers = plan.items.filter((it: any) => it.type === 'header').map((it: any) => it.title);
+          if (headers.length > 0) parts.push(`Order: ${headers.slice(0, 4).join(', ')}`);
+          if (songs.length > 0) parts.push(`Songs: ${songs.slice(0, 4).join(', ')}`);
+        }
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_group':
+      case 'pco_groups_widget': {
+        const parts = [`Block ${num} [Group / Ministry]: "${c.name || 'Group'}"`];
+        if (c.schedule || c.meta) parts.push(`Schedule: ${stripHtml(c.schedule || c.meta || '')}`);
+        if (c.location) parts.push(`Location: ${c.location}`);
+        if (c.description) parts.push(`Description: ${stripHtml(c.description)}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_announcement': {
+        const parts = [`Block ${num} [Announcement]: "${c.name || c.title || 'Announcement'}"`];
+        if (c.description || c.body) parts.push(`Content: ${stripHtml(c.description || c.body || '')}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_pledge_campaign': {
+        const parts = [`Block ${num} [Pledge / Stewardship Campaign]: "${c.headline || c.name || 'Pledge Campaign'}"`];
+        if (c.goalCents) parts.push(`Goal: $${Math.round(c.goalCents / 100).toLocaleString()}`);
+        if (c.totalReceivedCents) parts.push(`Received: $${Math.round(c.totalReceivedCents / 100).toLocaleString()}`);
+        if (c.totalPledgedCents) parts.push(`Pledged: $${Math.round(c.totalPledgedCents / 100).toLocaleString()}`);
+        if (c.description) parts.push(`Details: ${stripHtml(c.description)}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'pco_giving_form':
+      case 'pco_form': {
+        const parts = [`Block ${num} [Form / Giving]: "${c.title || c.name || 'Form'}"`];
+        if (c.description) parts.push(`Details: ${stripHtml(c.description)}`);
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'columns': {
+        if (c.columns && Array.isArray(c.columns)) {
+          const colTexts: string[] = [];
+          c.columns.forEach((col: any) => {
+            if (col.blocks && Array.isArray(col.blocks)) {
+              col.blocks.forEach((mb: any) => {
+                if (mb.type === 'text' && mb.content?.text) {
+                  colTexts.push(stripHtml(mb.content.text));
+                } else if (mb.type === 'button' && mb.content?.text) {
+                  colTexts.push(`Button: ${mb.content.text}`);
+                }
+              });
+            }
+          });
+          if (colTexts.length > 0) {
+            summaries.push(`Block ${num} [Columns]: ${colTexts.join('; ')}`);
+          }
+        }
+        break;
+      }
+      case 'embedded_note':
+      case 'embedded_poll':
+      case 'embedded_form': {
+        const parts = [`Block ${num} [Interactive ${block.type.replace('embedded_', '')}]: "${c.title || c.question || ''}"`];
+        if (c.content || c.description) parts.push(stripHtml(c.content || c.description));
+        summaries.push(parts.join(' | '));
+        break;
+      }
+      case 'file': {
+        if (c.name) summaries.push(`Block ${num} [Attached File]: "${c.name}"`);
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  return summaries.join('\n');
+};
+
+// ─── AI Writing Panel ────────────────────────────────────────────────────────
+
 type AiMessage = { role: 'user' | 'model'; text: string; html?: string };
 const AI_TONES = ['Warm & Pastoral', 'Formal', 'Friendly', 'Inspirational', 'Urgent'] as const;
 type AiTone = typeof AI_TONES[number];
@@ -1835,8 +1974,11 @@ const EmailAIPanel: React.FC<{
   selectedBlock: EmailBlock | null;
   campaignSubject?: string;
   churchName?: string;
+  senderName?: string;
+  allBlocks?: EmailBlock[];
   onInsert: (html: string, replaceSelectedBlock: boolean) => void;
-}> = ({ isOpen, onClose, selectedBlock, campaignSubject, churchName, onInsert }) => {
+  onInsertAtTop?: (html: string) => void;
+}> = ({ isOpen, onClose, selectedBlock, campaignSubject, churchName, senderName, allBlocks = [], onInsert, onInsertAtTop }) => {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [input, setInput] = useState('');
   const [tone, setTone] = useState<AiTone>('Warm & Pastoral');
@@ -1866,14 +2008,17 @@ const EmailAIPanel: React.FC<{
     ? stripHtml(selectedBlock.content?.text || selectedBlock.content?.html || '')
     : undefined;
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const blocksSummary = extractEmailBlocksSummary(allBlocks);
+  const nonEmptyBlockCount = allBlocks.length;
+
+  const handleSend = async (customPrompt?: string, isPastorMode = false) => {
+    const trimmed = (customPrompt !== undefined ? customPrompt : input).trim();
     if (!trimmed || loading) return;
     setError(null);
     const userMsg: AiMessage = { role: 'user', text: trimmed };
     const newHistory = [...messages, userMsg];
     setMessages(newHistory);
-    setInput('');
+    if (customPrompt === undefined) setInput('');
     setLoading(true);
     try {
       const { html } = await generateEmailContent(
@@ -1883,6 +2028,9 @@ const EmailAIPanel: React.FC<{
           selectedBlockText,
           campaignSubject,
           churchName,
+          senderName,
+          allBlocksSummary: blocksSummary,
+          isPastorSummaryMode: isPastorMode || trimmed.toLowerCase().includes('pastor'),
         }
       );
       const modelMsg: AiMessage = { role: 'model', text: stripHtml(html), html };
@@ -1893,6 +2041,13 @@ const EmailAIPanel: React.FC<{
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDraftPastorEmail = () => {
+    const promptText = nonEmptyBlockCount > 0
+      ? `Write a warm, inspiring email from the pastor to the congregation based on all the content blocks in this email.`
+      : `Write a warm and encouraging email from the pastor to the congregation.`;
+    handleSend(promptText, true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1922,6 +2077,13 @@ const EmailAIPanel: React.FC<{
         'Make this more compelling',
         'Add a clear call to action',
         'Rewrite in a more formal tone',
+      ]
+    : nonEmptyBlockCount > 0
+    ? [
+        'Suggest a Pastor\'s letter summarizing all blocks',
+        'Write a welcome message for new visitors',
+        'Announce our upcoming service series',
+        'Write a giving appeal for the general fund',
       ]
     : [
         'Write a welcome message for new visitors',
@@ -1998,18 +2160,49 @@ const EmailAIPanel: React.FC<{
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
             {messages.length === 0 && !loading && (
               <>
-                <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/40 dark:to-violet-900/40 flex items-center justify-center mb-3">
-                    <Sparkles size={24} className="text-indigo-500" />
+                {/* ── Pastor's Email from All Blocks Action Card ── */}
+                {nonEmptyBlockCount > 0 && (
+                  <div className="p-3 bg-gradient-to-br from-indigo-50 via-violet-50 to-purple-50 dark:from-indigo-950/40 dark:via-violet-950/40 dark:to-purple-950/40 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs mb-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sparkles size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200">Email from the Pastor</span>
+                      <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                        {nonEmptyBlockCount} block{nonEmptyBlockCount === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed mb-2.5">
+                      Analyzes all events, service plans, giving campaigns, and announcements in this email to craft a cohesive pastoral letter.
+                    </p>
+                    <button
+                      onClick={handleDraftPastorEmail}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold shadow-sm hover:shadow transition group"
+                    >
+                      <Sparkles size={12} className="group-hover:animate-pulse" />
+                      Suggest Pastor's Email
+                    </button>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">What would you like to write?</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Describe your content and I'll draft it for you.</p>
+                )}
+
+                <div className="flex flex-col items-center justify-center py-4 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/40 dark:to-violet-900/40 flex items-center justify-center mb-2">
+                    <Sparkles size={20} className="text-indigo-500" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">What would you like to write?</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Describe your content or pick an idea below.</p>
                 </div>
                 <div className="space-y-1.5">
                   {suggestions.map(s => (
                     <button
                       key={s}
-                      onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                      onClick={() => {
+                        if (s.startsWith('Suggest a Pastor')) {
+                          handleDraftPastorEmail();
+                        } else {
+                          setInput(s);
+                          inputRef.current?.focus();
+                        }
+                      }}
                       className="w-full text-left text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
                     >
                       {s}
@@ -2035,7 +2228,17 @@ const EmailAIPanel: React.FC<{
                     </div>
                     {/* Action row for latest model message */}
                     {idx === messages.length - 1 && msg.html && (
-                      <div className="flex items-center gap-1.5 px-1">
+                      <div className="flex flex-wrap items-center gap-1.5 px-1 pt-0.5">
+                        {onInsertAtTop && (
+                          <button
+                            onClick={() => onInsertAtTop(msg.html!)}
+                            title="Insert as intro block at the top of the email"
+                            className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg transition shadow-xs"
+                          >
+                            <ArrowUpToLine size={10} />
+                            Insert at Top
+                          </button>
+                        )}
                         <button
                           onClick={() => onInsert(msg.html!, !!selectedBlock)}
                           className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
@@ -2095,7 +2298,7 @@ const EmailAIPanel: React.FC<{
                 disabled={loading}
               />
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!input.trim() || loading}
                 title="Send"
                 className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white transition shrink-0 self-end"
@@ -2115,7 +2318,7 @@ const EmailAIPanel: React.FC<{
 
 export const EmailBuilder: React.FC<EmailBuilderProps> = ({
   blocks = [], setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
-  campaignSubject, churchName, context = 'email',
+  campaignSubject, churchName, senderName, context = 'email',
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -2231,6 +2434,17 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
       setBlocks(prev => [...prev, newBlock]);
       setSelectedId(newBlock.id);
     }
+  };
+
+  // Handle AI insert at top: prepend as the very first block
+  const handleAiInsertAtTop = (html: string) => {
+    const newBlock: EmailBlock = {
+      id: `block_${Date.now()}`,
+      type: 'text',
+      content: { text: html, html },
+    };
+    setBlocks(prev => [newBlock, ...prev]);
+    setSelectedId(newBlock.id);
   };
 
   return (
@@ -2536,7 +2750,10 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
         selectedBlock={selectedIsTextBlock ? selectedBlock : null}
         campaignSubject={campaignSubject}
         churchName={churchName}
+        senderName={senderName}
+        allBlocks={blocks}
         onInsert={handleAiInsert}
+        onInsertAtTop={handleAiInsertAtTop}
       />
     </div>
   );
