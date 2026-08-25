@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Sparkles, Award, CheckCircle2, ArrowRight, ArrowLeft,
   ChevronRight, RefreshCw, Printer, BookOpen, Heart, 
-  HelpCircle, Check, Loader2, Share2, Info, Star, Compass
+  HelpCircle, Check, Loader2, Share2, Info, Star, Compass,
+  AlertCircle
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { Church, GiftsTestResponse, SpiritualGiftType } from '../types';

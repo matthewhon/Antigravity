@@ -3,7 +3,8 @@ import {
   Sparkles, Award, CheckCircle2, ArrowRight, ArrowLeft,
   ChevronRight, RefreshCw, Printer, BookOpen, Heart, 
   HelpCircle, Check, Loader2, Share2, Info, Star, Compass,
-  Brain, Users, Zap, Shield, Target, MessageSquare
+  Brain, Users, Zap, Shield, Target, MessageSquare,
+  AlertCircle
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { Church, MbtiTestResponse } from '../types';
