@@ -207,10 +207,33 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
     }
   }, [feedbackToast]);
 
+  const handleOpenNativeSms = (textToSend?: string) => {
+    const targetPhone = getPersonPhone(person);
+    const msg = (textToSend !== undefined ? textToSend : smsBody).trim();
+    if (!targetPhone) {
+      if (msg) {
+        navigator.clipboard.writeText(msg);
+        setFeedbackToast('Message copied to clipboard (no phone number on file).');
+      }
+      return;
+    }
+    const cleaned = targetPhone.replace(/[^\d+]/g, '');
+    const smsUri = `sms:${cleaned}?&body=${encodeURIComponent(msg)}`;
+    window.open(smsUri, '_system');
+    setFeedbackToast('Opening messaging app...');
+  };
+
   const handleSendSms = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetPhone = getPersonPhone(person);
-    if (!targetPhone || !smsBody.trim()) return;
+    if (!targetPhone) {
+      setSmsError('This person has no phone number on file.');
+      return;
+    }
+    if (!smsBody.trim()) {
+      setSmsError('Please enter a message to send.');
+      return;
+    }
     setSendingSms(true);
     setSmsError('');
     setSmsSuccess(false);
@@ -230,12 +253,15 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || `Send failed (HTTP ${res.status})`);
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Send failed (HTTP ${res.status})`);
+      }
       setSmsSuccess(true);
       setSmsBody('');
       if (person?.id) {
         window.dispatchEvent(new CustomEvent('careFollowUpCompleted', { detail: person.id }));
       }
+      setFeedbackToast(`SMS successfully sent to ${person.name}!`);
     } catch (err: any) {
       setSmsError(err.message || 'An error occurred while sending the message.');
     } finally {
@@ -1508,9 +1534,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                     onClick={() => {
                       const testUrl = `${window.location.origin}/gifts-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
                       setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Spiritual Gifts Test to discover how God has gifted you: ${testUrl}`);
-                      setShowNextStepsModal(false);
-                      // Scroll to SMS composer
-                      const smsElem = document.getElementById('sms-composer-section');
+                      setFeedbackToast('Spiritual gifts test link loaded into SMS composer below.');
+                      const smsElem = document.getElementById('person-sms-section');
                       if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
@@ -1671,8 +1696,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                     onClick={() => {
                       const testUrl = `${window.location.origin}/mbti-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
                       setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Myers-Briggs Personality Assessment to discover your 16 personality profile: ${testUrl}`);
-                      setShowNextStepsModal(false);
-                      const smsElem = document.getElementById('sms-composer-section');
+                      setFeedbackToast('MBTI test link loaded into SMS composer below.');
+                      const smsElem = document.getElementById('person-sms-section');
                       if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
@@ -1810,8 +1835,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                     onClick={() => {
                       const testUrl = `${window.location.origin}/disc-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
                       setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Faith-Based DISC Personality Assessment (KJV) to discover your biblical leadership & ministry style: ${testUrl}`);
-                      setShowNextStepsModal(false);
-                      const smsElem = document.getElementById('sms-composer-section');
+                      setFeedbackToast('DISC test link loaded into SMS composer below.');
+                      const smsElem = document.getElementById('person-sms-section');
                       if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
@@ -2220,56 +2245,138 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             ) : null}
           </div>
 
-          {/* ── Send SMS ── */}
-          {church?.smsSettings?.smsEnabled && (
-            <div id="person-sms-section" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
-              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide">Send SMS Message</h3>
-              {!person.phone ? (
-                <p className="text-xs text-slate-500 italic">SMS sending is unavailable because this person has no phone number.</p>
+          {/* ── Send SMS Message ── */}
+          <div id="person-sms-section" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5 text-indigo-500" />
+                Send SMS Message
+              </h3>
+              {resolvedPhone ? (
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  To: <span className="text-indigo-600 dark:text-indigo-400 font-bold">{resolvedPhone}</span>
+                </span>
               ) : (
-                <form onSubmit={handleSendSms} className="space-y-3">
-                  <div>
-                    <textarea
-                      value={smsBody}
-                      onChange={e => { setSmsBody(e.target.value); if (smsError) setSmsError(''); if (smsSuccess) setSmsSuccess(false); }}
-                      placeholder={`Type a message to ${person.name}...`}
-                      rows={3}
-                      maxLength={1600}
-                      className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 p-3 outline-none resize-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors"
-                      disabled={sendingSms}
-                    />
-                    <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-wide px-1">
-                      <span>{smsBody.length} characters</span>
-                      <span>{Math.ceil(smsBody.length / 160) || 0} segment{Math.ceil(smsBody.length / 160) !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-
-                  {smsError && (
-                    <div className="flex items-start gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-xl p-3">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><span>{smsError}</span>
-                    </div>
-                  )}
-                  {smsSuccess && (
-                    <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3">
-                      <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><span>Message sent successfully!</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={sendingSms || !smsBody.trim()}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    {sendingSms ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" />Sending...</>
-                    ) : (
-                      <><Send className="w-4 h-4" />Send SMS</>
-                    )}
-                  </button>
-                </form>
+                <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wide">
+                  No Phone on File
+                </span>
               )}
             </div>
-          )}
+
+            {!resolvedPhone ? (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                <p className="font-bold">No phone number on record for {person.name}.</p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  Add a phone number in Planning Center People to send SMS outreach.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSendSms} className="space-y-3">
+                <div>
+                  <textarea
+                    value={smsBody}
+                    onChange={e => { 
+                      setSmsBody(e.target.value); 
+                      if (smsError) setSmsError(''); 
+                      if (smsSuccess) setSmsSuccess(false); 
+                    }}
+                    placeholder={`Type a personal SMS message to ${person.name}...`}
+                    rows={3}
+                    maxLength={1600}
+                    className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 p-3 outline-none resize-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors"
+                    disabled={sendingSms}
+                  />
+                  <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-wide px-1">
+                    <span>{smsBody.length} characters</span>
+                    <span>{Math.ceil(smsBody.length / 160) || 0} SMS segment{Math.ceil(smsBody.length / 160) !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+
+                {smsError && (
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-xl p-3">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Church SMS Send Failed:</span>
+                        <span>{smsError}</span>
+                      </div>
+                    </div>
+                    {resolvedPhone && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNativeSms()}
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Send via Device Messaging App (`sms:`) instead</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {smsSuccess && (
+                  <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3">
+                    <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>Message sent successfully via church SMS system!</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                  {church?.smsSettings?.smsEnabled ? (
+                    <>
+                      <button
+                        type="submit"
+                        disabled={sendingSms || !smsBody.trim()}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                      >
+                        {sendingSms ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" />Sending via Church SMS...</>
+                        ) : (
+                          <><Send className="w-4 h-4" />Send via Church SMS</>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNativeSms()}
+                        disabled={!smsBody.trim()}
+                        className="py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        title="Open device messaging app with this message"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Text from Device</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNativeSms()}
+                        disabled={!smsBody.trim()}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>Send via Device Messaging App (`sms:`)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(smsBody);
+                          setFeedbackToast('Message copied to clipboard!');
+                        }}
+                        disabled={!smsBody.trim()}
+                        className="py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            )}
+          </div>
 
           {/* ── Serving Involvement & History ── */}
           <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
