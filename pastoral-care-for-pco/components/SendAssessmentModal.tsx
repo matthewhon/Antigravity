@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Send, Mail, Phone, MessageSquare, Users, User, Search, 
   Check, X, Copy, QrCode, Download, Loader2, Sparkles, 
