@@ -4,7 +4,8 @@ import {
   Sparkles, Award, BookOpen, Heart, User, Shield, Users, 
   CheckCircle2, AlertCircle, Share2, HelpCircle, ChevronRight,
   Flame, Target, Scale, Zap, Info, Loader2, ExternalLink,
-  MessageSquare, ShieldAlert, Layers, Activity, FileText
+  MessageSquare, ShieldAlert, Layers, Activity, FileText,
+  RotateCcw
 } from 'lucide-react';
 import { 
   DISC_QUESTIONS,
@@ -50,12 +51,94 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
   const [submitting, setSubmitting] = useState(false);
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
+  // Saved draft state
+  const [savedDraft, setSavedDraft] = useState<{
+    answers: Record<number, number>;
+    currentQuestionIndex: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    savedAt: number;
+  } | null>(null);
+
   // Results state
   const [calculatedResults, setCalculatedResults] = useState<DiscCalculationResult | null>(null);
   const [submittedResponse, setSubmittedResponse] = useState<DiscTestResponse | null>(null);
 
   const questionCardRef = useRef<HTMLDivElement | null>(null);
   const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const storageKey = `pco_disc_test_draft_${churchId || 'default'}`;
+
+  // Check and load saved draft on initial mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.answers && Object.keys(parsed.answers).length > 0) {
+          setSavedDraft(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read saved DISC draft from localStorage:', e);
+    }
+  }, [storageKey]);
+
+  // Auto-save progress whenever answers or info changes
+  useEffect(() => {
+    if (step === 'results' || submitting) return;
+    const answeredTotal = Object.keys(answers).length;
+    if (answeredTotal > 0) {
+      try {
+        const payload = {
+          answers,
+          currentQuestionIndex,
+          firstName,
+          lastName,
+          email,
+          phone,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        setSavedDraft(payload);
+      } catch (e) {
+        console.warn('Could not save DISC draft to localStorage:', e);
+      }
+    }
+  }, [answers, currentQuestionIndex, firstName, lastName, email, phone, step, submitting, storageKey]);
+
+  const handleResumeSavedProgress = () => {
+    if (!savedDraft) return;
+    setAnswers(savedDraft.answers || {});
+    const firstMissing = DISC_QUESTIONS.findIndex(q => savedDraft.answers[q.id] === undefined);
+    const resumeIdx = firstMissing !== -1 ? firstMissing : (savedDraft.currentQuestionIndex || 0);
+    setCurrentQuestionIndex(Math.max(0, Math.min(DISC_QUESTIONS.length - 1, resumeIdx)));
+    if (savedDraft.firstName) setFirstName(savedDraft.firstName);
+    if (savedDraft.lastName) setLastName(savedDraft.lastName);
+    if (savedDraft.email) setEmail(savedDraft.email);
+    if (savedDraft.phone) setPhone(savedDraft.phone);
+    setStep('questions');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleClearSavedProgress = () => {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (e) {}
+    setSavedDraft(null);
+    setAnswers({});
+    setCurrentQuestionIndex(0);
+  };
+
+  const handleResetAssessment = () => {
+    if (window.confirm('Are you sure you want to start over from the beginning? All your answers will be cleared.')) {
+      handleClearSavedProgress();
+      setStep('intro');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Clear timers on unmount
   useEffect(() => {
@@ -193,6 +276,10 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
       };
 
       await firestore.saveDiscResponse(responseRecord);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {}
+      setSavedDraft(null);
       setSubmittedResponse(responseRecord);
       setStep('results');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -211,6 +298,8 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
 
   // ─── Step 1: Render Intro ──────────────────────────────────────────────────
   if (step === 'intro') {
+    const savedCount = savedDraft ? Object.keys(savedDraft.answers || {}).length : 0;
+
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans">
         {/* Header */}
@@ -237,7 +326,49 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
         </header>
 
         {/* Hero & Intro Content */}
-        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-8">
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-6">
+          {/* Resume In-Progress Banner */}
+          {savedCount > 0 && (
+            <div className="bg-emerald-50/90 dark:bg-emerald-950/50 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
+                    <RotateCcw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      Resume In-Progress Assessment?
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                      You have an active test with <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{savedCount} of {totalQuestions} statements</strong> answered.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">
+                  Auto-Saved
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResumeSavedProgress}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                >
+                  <span>Resume Where You Left Off</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSavedProgress}
+                  className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Start Over from Beginning</span>
+                </button>
+              </div>
+            </div>
+          )}
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800/60 text-xs font-black uppercase tracking-wider">
               <Compass className="w-3.5 h-3.5 text-emerald-600" />
@@ -486,9 +617,20 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
                   {answeredCount} answered
                 </span>
               </div>
-              <span className="font-black text-slate-900 dark:text-white">
-                {progressPercent}%
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleResetAssessment}
+                  className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold flex items-center gap-1 transition cursor-pointer text-[11px]"
+                  title="Reset and start from question 1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">Start Over</span>
+                </button>
+                <span className="font-black text-slate-900 dark:text-white">
+                  {progressPercent}%
+                </span>
+              </div>
             </div>
 
             {/* Progress Bar */}

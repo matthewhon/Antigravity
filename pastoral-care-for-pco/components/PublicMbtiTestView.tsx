@@ -4,7 +4,7 @@ import {
   ChevronRight, RefreshCw, Printer, BookOpen, Heart, 
   HelpCircle, Check, Loader2, Share2, Info, Star, Compass,
   Brain, Users, Zap, Shield, Target, MessageSquare,
-  AlertCircle
+  AlertCircle, RotateCcw
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { Church, MbtiTestResponse } from '../types';
@@ -24,8 +24,8 @@ interface PublicMbtiTestViewProps {
 
 const SCALE_LABELS = [
   { value: 1, label: 'Disagree Strongly', desc: 'Completely inaccurate for me' },
-  { value: 2, label: 'Disagree', desc: 'Generally not true for me' },
-  { value: 3, label: 'Neutral', desc: 'Sometimes or neutral' },
+  { value: 2, label: 'Disagree', desc: 'Mostly inaccurate' },
+  { value: 3, label: 'Neutral / In Between', desc: 'Sometimes true, sometimes not' },
   { value: 4, label: 'Agree', desc: 'Generally true for me' },
   { value: 5, label: 'Agree Strongly', desc: 'Strongly & consistently true' },
 ];
@@ -46,6 +46,17 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
+  // Saved draft state
+  const [savedDraft, setSavedDraft] = useState<{
+    answers: Record<number, number>;
+    currentQuestionIndex: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    savedAt: number;
+  } | null>(null);
+
   // Submitting / Result state
   const [submitting, setSubmitting] = useState(false);
   const [calculatedResults, setCalculatedResults] = useState<CalculatedMbtiResult | null>(null);
@@ -53,6 +64,77 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
 
   const questionCardRef = useRef<HTMLDivElement | null>(null);
   const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const storageKey = `pco_mbti_test_draft_${churchId || 'default'}`;
+
+  // Check and load saved draft on initial mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.answers && Object.keys(parsed.answers).length > 0) {
+          setSavedDraft(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read saved MBTI draft from localStorage:', e);
+    }
+  }, [storageKey]);
+
+  // Auto-save progress whenever answers or info changes
+  useEffect(() => {
+    if (step === 'results' || submitting) return;
+    const answeredTotal = Object.keys(answers).length;
+    if (answeredTotal > 0) {
+      try {
+        const payload = {
+          answers,
+          currentQuestionIndex,
+          firstName,
+          lastName,
+          email,
+          phone,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        setSavedDraft(payload);
+      } catch (e) {
+        console.warn('Could not save MBTI draft to localStorage:', e);
+      }
+    }
+  }, [answers, currentQuestionIndex, firstName, lastName, email, phone, step, submitting, storageKey]);
+
+  const handleResumeSavedProgress = () => {
+    if (!savedDraft) return;
+    setAnswers(savedDraft.answers || {});
+    const firstMissing = MBTI_QUESTIONS.findIndex(q => savedDraft.answers[q.id] === undefined);
+    const resumeIdx = firstMissing !== -1 ? firstMissing : (savedDraft.currentQuestionIndex || 0);
+    setCurrentQuestionIndex(Math.max(0, Math.min(MBTI_QUESTIONS.length - 1, resumeIdx)));
+    if (savedDraft.firstName) setFirstName(savedDraft.firstName);
+    if (savedDraft.lastName) setLastName(savedDraft.lastName);
+    if (savedDraft.email) setEmail(savedDraft.email);
+    if (savedDraft.phone) setPhone(savedDraft.phone);
+    setStep('questions');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleClearSavedProgress = () => {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (e) {}
+    setSavedDraft(null);
+    setAnswers({});
+    setCurrentQuestionIndex(0);
+  };
+
+  const handleResetAssessment = () => {
+    if (window.confirm('Are you sure you want to start over from the beginning? All your answers will be cleared.')) {
+      handleClearSavedProgress();
+      setStep('intro');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Clear timers on unmount
   useEffect(() => {
@@ -196,6 +278,10 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
       };
 
       await firestore.saveMbtiResponse(responseRecord);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {}
+      setSavedDraft(null);
       setSubmittedResponse(responseRecord);
       setStep('results');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -214,6 +300,8 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
 
   // ─── Render Intro Step ─────────────────────────────────────────────────────
   if (step === 'intro') {
+    const savedCount = savedDraft ? Object.keys(savedDraft.answers || {}).length : 0;
+
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans">
         <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-6 px-6 sm:px-12">
@@ -238,7 +326,49 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
           </div>
         </header>
 
-        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-8">
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 space-y-6">
+          {/* Resume In-Progress Banner */}
+          {savedCount > 0 && (
+            <div className="bg-violet-50/90 dark:bg-violet-950/50 border-2 border-violet-200 dark:border-violet-800 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
+                    <RotateCcw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      Resume In-Progress Assessment?
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                      You have an active test with <strong className="text-violet-600 dark:text-violet-400 font-bold">{savedCount} of {totalQuestions} statements</strong> answered.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300">
+                  Auto-Saved
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResumeSavedProgress}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-violet-600/20 transition cursor-pointer"
+                >
+                  <span>Resume Where You Left Off</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearSavedProgress}
+                  className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Start Over from Beginning</span>
+                </button>
+              </div>
+            </div>
+          )}
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800/60 text-xs font-black uppercase tracking-wider">
               <Brain className="w-3.5 h-3.5 text-violet-600" />
@@ -465,9 +595,20 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
                   {answeredCount} answered
                 </span>
               </div>
-              <span className="font-black text-slate-900 dark:text-white">
-                {progressPercent}%
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleResetAssessment}
+                  className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold flex items-center gap-1 transition cursor-pointer text-[11px]"
+                  title="Reset and start from question 1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">Start Over</span>
+                </button>
+                <span className="font-black text-slate-900 dark:text-white">
+                  {progressPercent}%
+                </span>
+              </div>
             </div>
 
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
