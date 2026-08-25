@@ -2853,7 +2853,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         Ministry Strengths
                       </h6>
                       <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
-                        {DISC_PROFILES[selectedDiscModal.styleCode]?.baptistMinistryStrengths.map((s, idx) => (
+                        {DISC_PROFILES[selectedDiscModal.styleCode]?.baptistMinistryStrengths?.map((s, idx) => (
                           <li key={idx}>• {s}</li>
                         ))}
                       </ul>
@@ -2864,7 +2864,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         Serving Areas
                       </h6>
                       <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
-                        {DISC_PROFILES[selectedDiscModal.styleCode]?.idealServingRoles.map((r, idx) => (
+                        {DISC_PROFILES[selectedDiscModal.styleCode]?.idealServingRoles?.map((r, idx) => (
                           <li key={idx}>• {r}</li>
                         ))}
                       </ul>
