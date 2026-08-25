@@ -8,13 +8,15 @@ import { SPIRITUAL_GIFTS_DEFINITIONS, SPIRITUAL_GIFTS_QUESTIONS } from '../const
 import { MBTI_TYPE_PROFILES, MBTI_QUESTIONS } from '../constants/mbtiTestData';
 import { DISC_PROFILES, DISC_QUESTIONS, DISC_DIMENSIONS_INFO, DiscDimension } from '../constants/discTestData';
 import { useTenantData } from '../contexts/TenantDataContext';
+import { PastoralEngagementModal } from './PastoralEngagementModal';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
   NotebookPen, ChevronDown, ChevronUp, Plus, X,
   ShieldAlert, Activity, HeartHandshake, CalendarCheck, UserCheck,
   Users, Church as ChurchIcon, Sparkles, DollarSign,
   Heart, Clock, Tag, Check, Calendar, CheckSquare,
-  Compass, ExternalLink, Copy, Share2, Award, QrCode, Brain
+  Compass, ExternalLink, Copy, Share2, Award, QrCode, Brain,
+  MessageSquare
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -149,6 +151,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [discResponses, setDiscResponses] = useState<DiscTestResponse[]>([]);
   const [selectedDiscModal, setSelectedDiscModal] = useState<DiscTestResponse | null>(null);
   const [copiedDiscLink, setCopiedDiscLink] = useState(false);
+  const [showEngagementModal, setShowEngagementModal] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
 
   // Suggestion selections & actions
@@ -1496,14 +1499,24 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         <span className="text-[10px] text-slate-400 font-medium">
                           Taken on {new Date(latestGifts.submittedAt).toLocaleDateString()}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGiftsModal(latestGifts)}
-                          className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Compass className="w-3.5 h-3.5" />
-                          <span>View Full Test (42 Qs)</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGiftsModal(latestGifts)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Full Test (42 Qs)</span>
+                          </button>
+                        </div>
                       </div>
                     </>
                   );
@@ -1658,14 +1671,24 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         <span className="text-[10px] text-slate-400 font-medium">
                           Taken on {new Date(latestMbti.submittedAt).toLocaleDateString()}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedMbtiModal(latestMbti)}
-                          className="text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Compass className="w-3.5 h-3.5" />
-                          <span>View Full Profile (28 Qs)</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMbtiModal(latestMbti)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Full Test (28 Qs)</span>
+                          </button>
+                        </div>
                       </div>
                     </>
                   );
@@ -1797,14 +1820,24 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         <span className="text-[10px] text-slate-400 font-medium">
                           Taken on {new Date(latestDisc.submittedAt).toLocaleDateString()}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDiscModal(latestDisc)}
-                          className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Compass className="w-3.5 h-3.5" />
-                          <span>View Full Profile (28 Statements)</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDiscModal(latestDisc)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Full Test (28 Statements)</span>
+                          </button>
+                        </div>
                       </div>
                     </>
                   );
@@ -2868,6 +2901,22 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               </div>
             </div>,
             document.body
+          )}
+
+          {/* ── Pastoral Engagement & Communication Strategy Modal ── */}
+          {showEngagementModal && (
+            <PastoralEngagementModal
+              isOpen={showEngagementModal}
+              onClose={() => setShowEngagementModal(false)}
+              personName={person.name}
+              email={person.primary_email}
+              phone={person.primary_phone}
+              personId={person.id}
+              churchId={churchId}
+              giftsResponse={giftsResponses[0] || null}
+              mbtiResponse={mbtiResponses[0] || null}
+              discResponse={discResponses[0] || null}
+            />
           )}
 
         </div>
