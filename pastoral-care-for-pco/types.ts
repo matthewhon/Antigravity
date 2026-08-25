@@ -39,10 +39,20 @@ export interface DashboardPreferences {
     trendsLookback?: string;
 }
 
+export interface AttendanceRiskConfig {
+    /** Whether check-ins for a child in Planning Center credit to parents for attendance risk scoring */
+    includeChildCheckIns?: boolean;
+    /** Aggregation strategy: 'max' uses highest child check-in count, 'sum' adds all children's check-ins */
+    childAttendanceMode?: 'max' | 'sum';
+    /** Percentage weight (0-100) applied to child check-ins when scoring parent attendance (default: 100) */
+    childAttendanceWeight?: number;
+}
+
 export interface RiskSettings {
     weights: { attendance: number, groups: number, serving: number, giving: number, membership: number };
     thresholds: { healthyMin: number, atRiskMin: number };
     targets?: { serving90Days: number };
+    attendanceConfig?: AttendanceRiskConfig;
 }
 
 export interface ChurchRiskSettings {
@@ -315,6 +325,12 @@ export interface RiskProfile {
     score: number;
     category: 'Healthy' | 'At Risk' | 'Disconnected';
     factors: string[];
+    attendanceBreakdown?: {
+        directCheckIns: number;
+        childCheckIns: number;
+        effectiveCheckIns: number;
+        attributedFromChildren: boolean;
+    };
 }
 
 export interface PcoPerson {
@@ -334,8 +350,11 @@ export interface PcoPerson {
     salvationDate?: string | null;
     baptismDate?: string | null;
     createdAt: string;
+    child?: boolean;
     addresses?: { city?: string, state?: string, zip?: string, street?: string, location?: string, lat?: number, lng?: number }[];
     checkInCount?: number;
+    effectiveCheckInCount?: number;
+    childCheckInCount?: number;
     householdId?: string;
     householdName?: string;
     groupIds?: string[];

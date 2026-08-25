@@ -45,6 +45,23 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
     setIsDirty(true);
   };
 
+  const handleAttendanceConfigChange = <K extends keyof NonNullable<RiskSettings['attendanceConfig']>>(
+    key: K,
+    val: NonNullable<RiskSettings['attendanceConfig']>[K]
+  ) => {
+    setLocalSettings(prev => ({
+        ...prev,
+        attendanceConfig: {
+            includeChildCheckIns: true,
+            childAttendanceMode: 'max',
+            childAttendanceWeight: 100,
+            ...(prev.attendanceConfig || {}),
+            [key]: val
+        }
+    }));
+    setIsDirty(true);
+  };
+
   const handleSave = () => {
       onSave(localSettings);
       setIsDirty(false);
@@ -79,12 +96,65 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
             </div>
             
             <div className="space-y-6">
-                <WeightSlider 
-                    label="Attendance Frequency" 
-                    description="Impact of check-ins on health score."
-                    value={localSettings.weights.attendance} 
-                    onChange={(v) => handleWeightChange('attendance', v)} 
-                />
+                <div>
+                    <WeightSlider 
+                        label="Attendance Frequency" 
+                        description="Impact of check-ins on health score."
+                        value={localSettings.weights.attendance} 
+                        onChange={(v) => handleWeightChange('attendance', v)} 
+                    />
+                    
+                    <div className="pl-6 ml-2 border-l-2 border-slate-100 dark:border-slate-800 mt-3 pb-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Include Child Check-ins for Parents</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Credit kid & youth check-ins toward parent attendance</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox"
+                                    checked={localSettings.attendanceConfig?.includeChildCheckIns !== false}
+                                    onChange={(e) => handleAttendanceConfigChange('includeChildCheckIns', e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+
+                        {localSettings.attendanceConfig?.includeChildCheckIns !== false && (
+                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">Attribution Strategy</label>
+                                    <select 
+                                        value={localSettings.attendanceConfig?.childAttendanceMode || 'max'}
+                                        onChange={(e) => handleAttendanceConfigChange('childAttendanceMode', e.target.value as 'max' | 'sum')}
+                                        className="w-full bg-slate-50 dark:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="max">Highest Child Check-in Count (Family Attendance)</option>
+                                        <option value="sum">Sum All Children's Check-ins</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Child Check-in Credit Weight</span>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Percentage credit applied to parent (0 - 100%)</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                        <input 
+                                            type="number"
+                                            min="10" max="100" step="5"
+                                            value={localSettings.attendanceConfig?.childAttendanceWeight ?? 100}
+                                            onChange={(e) => handleAttendanceConfigChange('childAttendanceWeight', parseInt(e.target.value, 10) || 0)}
+                                            className="w-16 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-sm font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-bold text-slate-400">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
                 <WeightSlider 
                     label="Small Group" 
                     description="Impact of group participation."

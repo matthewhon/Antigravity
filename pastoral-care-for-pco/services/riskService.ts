@@ -15,6 +15,11 @@ export const DEFAULT_RISK_SETTINGS: RiskSettings = {
     },
     targets: {
         serving90Days: 4
+    },
+    attendanceConfig: {
+        includeChildCheckIns: true,
+        childAttendanceMode: 'max',
+        childAttendanceWeight: 100
     }
 };
 
@@ -48,18 +53,25 @@ export const DEFAULT_GROUP_RISK_SETTINGS: GroupRiskSettings = {
 const calculatePersonRisk = (
     person: PcoPerson, 
     settings: RiskSettings, 
-    context: { isDonor: boolean, isGroupMember: boolean, timesServed: number }
+    context: { 
+        isDonor: boolean; 
+        isGroupMember: boolean; 
+        timesServed: number;
+        effectiveCheckIns?: number;
+        directCheckIns?: number;
+        childCheckIns?: number;
+        attributedFromChildren?: boolean;
+    }
 ): RiskProfile => {
     let score = 0;
     const factors: string[] = [];
 
-    // 1. Attendance (Check-ins)
-    // Normalized: >8 is Core (100%), >2 is Regular (70%), else low
-    const checkIns = person.checkInCount || 0;
+    // 1. Attendance (Check-ins) - utilizes effective check-ins (including child attribution for parents)
+    const effectiveCheckIns = context.effectiveCheckIns !== undefined ? context.effectiveCheckIns : (person.checkInCount || 0);
     let attendanceScore = 0;
-    if (checkIns >= 8) attendanceScore = 1;
-    else if (checkIns >= 3) attendanceScore = 0.7;
-    else if (checkIns >= 1) attendanceScore = 0.3;
+    if (effectiveCheckIns >= 8) attendanceScore = 1;
+    else if (effectiveCheckIns >= 3) attendanceScore = 0.7;
+    else if (effectiveCheckIns >= 1) attendanceScore = 0.3;
     
     score += attendanceScore * settings.weights.attendance;
     if (attendanceScore < 0.3) factors.push('Low Attendance');
@@ -94,7 +106,13 @@ const calculatePersonRisk = (
     return {
         score: Math.round(score),
         category,
-        factors
+        factors,
+        attendanceBreakdown: {
+            directCheckIns: context.directCheckIns ?? (person.checkInCount || 0),
+            childCheckIns: context.childCheckIns ?? 0,
+            effectiveCheckIns,
+            attributedFromChildren: context.attributedFromChildren ?? false
+        }
     };
 };
 
@@ -109,6 +127,21 @@ export const calculateBulkRisk = (
     // Pre-process context data for speed
     const donorIds = new Set(donations.map(d => d.donorId));
     
+    // Pre-process household relationships to attribute child check-ins to parents
+    const householdChildMap = new Map<string, { maxChildCheckIns: number; totalChildCheckIns: number; childCount: number }>();
+    people.forEach(person => {
+        if (!person.householdId) return;
+        const isChild = person.child === true || (person.age !== undefined && person.age < 18);
+        if (isChild) {
+            const checkIns = person.checkInCount || 0;
+            const current = householdChildMap.get(person.householdId) || { maxChildCheckIns: 0, totalChildCheckIns: 0, childCount: 0 };
+            current.maxChildCheckIns = Math.max(current.maxChildCheckIns, checkIns);
+            current.totalChildCheckIns += checkIns;
+            current.childCount += 1;
+            householdChildMap.set(person.householdId, current);
+        }
+    });
+
     // Determine volunteers based strictly on recent plan scheduling (confirmed positions)
     const volunteerCounts = new Map<string, number>();
     const volunteerRecentPlans = new Map<string, { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[]>();
@@ -139,15 +172,54 @@ export const calculateBulkRisk = (
         });
     });
 
+    const attConfig = settings.attendanceConfig;
+    const shouldIncludeChild = attConfig?.includeChildCheckIns !== false; // Enabled by default
+
     return people.map(person => {
         const isDonor = donorIds.has(person.id);
         const timesServed = volunteerCounts.get(person.id) || 0;
         const isGroupMember = !!(person.groupIds && person.groupIds.length > 0);
 
-        const profile = calculatePersonRisk(person, settings, { isDonor, isGroupMember, timesServed });
+        const isChild = person.child === true || (person.age !== undefined && person.age < 18);
+        const ownCheckIns = person.checkInCount || 0;
         
-        // Calculate Engagement Status based on checkInCount
-        const count = person.checkInCount || 0;
+        let childCheckInCount = 0;
+        let effectiveCheckIns = ownCheckIns;
+        let attributedFromChildren = false;
+
+        if (!isChild && person.householdId && shouldIncludeChild) {
+            const hhData = householdChildMap.get(person.householdId);
+            if (hhData && hhData.childCount > 0) {
+                const mode = attConfig?.childAttendanceMode || 'max';
+                const weightPct = typeof attConfig?.childAttendanceWeight === 'number' ? attConfig.childAttendanceWeight : 100;
+                const rawChildAtt = mode === 'sum' ? hhData.totalChildCheckIns : hhData.maxChildCheckIns;
+                childCheckInCount = rawChildAtt;
+                
+                const weightedChildAtt = Math.round((rawChildAtt * weightPct) / 100);
+                if (mode === 'sum') {
+                    effectiveCheckIns = ownCheckIns + weightedChildAtt;
+                } else {
+                    effectiveCheckIns = Math.max(ownCheckIns, weightedChildAtt);
+                }
+
+                if (effectiveCheckIns > ownCheckIns) {
+                    attributedFromChildren = true;
+                }
+            }
+        }
+
+        const profile = calculatePersonRisk(person, settings, { 
+            isDonor, 
+            isGroupMember, 
+            timesServed,
+            effectiveCheckIns,
+            directCheckIns: ownCheckIns,
+            childCheckIns: childCheckInCount,
+            attributedFromChildren
+        });
+        
+        // Calculate Engagement Status based on effective attendance count
+        const count = effectiveCheckIns;
         let engagementStatus = 'Inactive';
         if (count > 8) engagementStatus = 'Core';
         else if (count >= 4) engagementStatus = 'Regular';
@@ -159,6 +231,8 @@ export const calculateBulkRisk = (
 
         return {
             ...person,
+            effectiveCheckInCount: effectiveCheckIns,
+            childCheckInCount: childCheckInCount > 0 ? childCheckInCount : undefined,
             riskProfile: profile,
             isDonor, // Flag person as donor for frontend filtering
             engagementStatus,

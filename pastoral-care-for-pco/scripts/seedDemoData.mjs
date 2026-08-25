@@ -107,8 +107,8 @@ function makePerson(index) {
   const gender    = GENDERS[index % GENDERS.length];
   const createdDaysAgo = index < 6 ? rand(1, 29) : rand(1, 1095);
   const zip       = pick(['30301','30302','30303','30318','30319']);
-  const city      = 'Atlanta';
-  const state     = 'GA';
+  const age       = 2026 - bYear;
+  const isChild   = age < 18;
 
   return {
     id:              docId,
@@ -120,6 +120,8 @@ function makePerson(index) {
     membership:      pick(MEMBER_STATUS),
     status:          'active',
     birthdate:       `${bYear}-${String(bMonth).padStart(2,'0')}-${String(bDay).padStart(2,'0')}`,
+    age,
+    child:           isChild,
     createdAt:       dateStr(createdDaysAgo),
     lastUpdated:     now,
     addresses:       [{ city, state, zip, location: 'Home' }],

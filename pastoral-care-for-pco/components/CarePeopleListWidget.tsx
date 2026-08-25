@@ -95,7 +95,7 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
         
         switch (factor) {
             case 'attendance':
-                const checkIns = person.checkInCount || 0;
+                const checkIns = person.effectiveCheckInCount !== undefined ? person.effectiveCheckInCount : (person.checkInCount || 0);
                 if (checkIns >= 8) score = weight;
                 else if (checkIns >= 3) score = weight * 0.7;
                 else if (checkIns >= 1) score = Math.round(weight * 0.3);

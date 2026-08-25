@@ -569,7 +569,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 shrink-0 border border-current shadow-xs">
                 🏛️ {person.primaryCampusName}
               </span>
-              {/* ── Suggested Next Steps Trigger Banner ── */}
+            )}
+          </div>
+
+          {/* ── Suggested Next Steps Trigger Banner ── */}
           <div className="p-3.5 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-purple-950/20 shadow-xs flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
