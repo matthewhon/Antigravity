@@ -11,6 +11,28 @@ const apiBaseUrl = typeof window !== 'undefined' && window.location.origin && wi
     ? 'https://pastoralcare.barnabassoftware.com'
     : 'http://localhost:8080');
 
+export const formatShortDate = (val?: string | number | Date | null): string => {
+  if (!val) return '';
+  try {
+    if (typeof val === 'string') {
+      const clean = val.trim();
+      const isoMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) {
+        const [, yyyy, mm, dd] = isoMatch;
+        return `${mm}/${dd}/${yyyy.slice(-2)}`;
+      }
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${mm}/${dd}/${yy}`;
+  } catch {
+    return String(val);
+  }
+};
+
 interface PledgeCampaignWidgetProps {
   churchId: string;
   campaignId?: string;
@@ -161,11 +183,75 @@ export function PledgeCampaignWidget({
   const pledgedPercentStr = goalDollars > 0 ? ((pledgedDollars / goalDollars) * 100).toFixed(1) : '0';
   const receivedPercentStr = goalDollars > 0 ? ((receivedDollars / goalDollars) * 100).toFixed(1) : '0';
 
-  const daysLeft = useMemo(() => {
-    const end = campaign?.endDate || campaign?.endsAt;
-    if (!end) return null;
-    const diff = differenceInDays(new Date(end), new Date());
-    return Math.max(0, diff);
+  // Real-time live countdown calculation
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    hasEnded: boolean;
+    formatted: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const endRaw = campaign?.endDate || campaign?.endsAt;
+    if (!endRaw) {
+      setTimeLeft(null);
+      return;
+    }
+
+    let targetDate: Date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(endRaw).trim())) {
+      const [y, m, d] = String(endRaw).trim().split('-').map(Number);
+      targetDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+    } else {
+      targetDate = new Date(endRaw);
+    }
+
+    if (isNaN(targetDate.getTime())) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = Date.now();
+      const diff = targetDate.getTime() - now;
+
+      if (diff <= 0) {
+        setTimeLeft({
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0,
+          hasEnded: true,
+          formatted: 'Campaign Ended'
+        });
+        return;
+      }
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / (3600 * 24));
+      const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      const formatted = days > 0
+        ? `${days}d ${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
+        : `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+
+      setTimeLeft({
+        days,
+        hours,
+        minutes,
+        seconds,
+        hasEnded: false,
+        formatted
+      });
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
   }, [campaign?.endDate, campaign?.endsAt]);
 
   // Current commitment calculation in form
@@ -267,15 +353,20 @@ export function PledgeCampaignWidget({
                 <Target size={13} className="text-indigo-400" /> {campaign.fundName}
               </span>
             )}
-            {(campaign.startDate || campaign.endDate) && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/40 backdrop-blur-md border border-white/10 text-slate-300">
+            {(campaign.startDate || campaign.endDate || campaign.startsAt || campaign.endsAt) && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-black/40 backdrop-blur-md border border-white/10 text-slate-300">
                 <Calendar size={13} className="text-indigo-300" /> 
-                {campaign.startDate || 'Start'} → {campaign.endDate || 'Ongoing'}
+                {formatShortDate(campaign.startDate || campaign.startsAt) || 'Open'} → {formatShortDate(campaign.endDate || campaign.endsAt) || 'Ongoing'}
               </span>
             )}
-            {daysLeft !== null && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/40 backdrop-blur-md border border-white/10 text-amber-300">
-                <Clock size={13} /> {daysLeft === 0 ? 'Last Day' : `${daysLeft} Days Left`}
+            {timeLeft !== null && (
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border ${
+                timeLeft.hasEnded
+                  ? 'bg-rose-950/60 border-rose-500/30 text-rose-300'
+                  : 'bg-black/40 border-white/10 text-amber-300'
+              }`}>
+                <Clock size={13} className={timeLeft.hasEnded ? 'text-rose-400' : 'text-amber-400 animate-pulse'} />
+                <span className="font-mono font-black">{timeLeft.formatted}</span>
               </span>
             )}
           </div>

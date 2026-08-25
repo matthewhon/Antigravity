@@ -8,7 +8,7 @@ import {
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../services/firebase';
 import { Church } from '../types';
-import { PledgeCampaignWidget } from './widgets/PledgeCampaignWidget';
+import { PledgeCampaignWidget, formatShortDate } from './widgets/PledgeCampaignWidget';
 
 const apiBaseUrl = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
   ? window.location.origin
@@ -420,7 +420,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                             {(camp.startDate || camp.endDate || camp.startsAt || camp.endsAt) && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md shrink-0">
                                 <Calendar size={11} className="text-indigo-500" />
-                                {camp.startDate || camp.startsAt?.slice(0, 10) || 'Open'} → {camp.endDate || camp.endsAt?.slice(0, 10) || 'Ongoing'}
+                                {formatShortDate(camp.startDate || camp.startsAt) || 'Open'} → {formatShortDate(camp.endDate || camp.endsAt) || 'Ongoing'}
                               </span>
                             )}
                           </div>
@@ -1116,8 +1116,8 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-slate-400">
-                            {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          <td className="px-4 py-3 text-right text-slate-400 font-mono">
+                            {sub.submittedAt ? formatShortDate(sub.submittedAt) : '—'}
                           </td>
                         </tr>
                       );
