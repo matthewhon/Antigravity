@@ -179,20 +179,22 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
   // Update default message drafts whenever person, assessment, or channel changes
   useEffect(() => {
     const churchName = church.name || 'our church';
-    const recipientFirstName = selectedPerson?.name?.split(' ')[0] || (recipientMode === 'pco_list' ? 'friend' : 'there');
+    const recipientGreeting = recipientMode === 'pco_list' 
+      ? '{firstName}' 
+      : (selectedPerson?.name?.split(' ')[0] || '{firstName}');
 
     if (isGifts) {
-      setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Spiritual Gifts Test to discover how God has uniquely gifted you for service: ${targetUrl}`);
-      setEmailSubject(`Discover Your Spiritual Gifts at ${churchName}`);
-      setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our church Spiritual Gifts Assessment. God has given each of us unique gifts to encourage one another and build up the body of Christ (1 Peter 4:10).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
+      setSmsBody(`Hi ${recipientGreeting}! Please take ${churchName}'s Spiritual Gifts Test to discover how God has uniquely gifted you for service: ${targetUrl}`);
+      setEmailSubject(`Discover Your Spiritual Gifts, ${recipientGreeting} – ${churchName}`);
+      setEmailBody(`Hi ${recipientGreeting},\n\nWe invite you to take our church Spiritual Gifts Assessment. God has given each of us unique gifts to encourage one another and build up the body of Christ (1 Peter 4:10).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
     } else if (isMbti) {
-      setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Myers-Briggs (MBTI) Personality Assessment to discover your 16 personality profile: ${targetUrl}`);
-      setEmailSubject(`Discover Your Personality Profile – ${churchName}`);
-      setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our Myers-Briggs Personality Assessment. Understanding how God has wired your personality, communication style, and strengths helps us grow and serve together in unity.\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
+      setSmsBody(`Hi ${recipientGreeting}! Please take ${churchName}'s Myers-Briggs (MBTI) Personality Assessment to discover your 16 personality profile: ${targetUrl}`);
+      setEmailSubject(`Discover Your Personality Profile, ${recipientGreeting} – ${churchName}`);
+      setEmailBody(`Hi ${recipientGreeting},\n\nWe invite you to take our Myers-Briggs Personality Assessment. Understanding how God has wired your personality, communication style, and strengths helps us grow and serve together in unity.\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
     } else {
-      setSmsBody(`Hi ${recipientFirstName}! Please take ${churchName}'s Faith-Based DISC Personality Assessment (KJV) to discover your biblical leadership & ministry style: ${targetUrl}`);
-      setEmailSubject(`Discover Your Biblical DISC Ministry Style – ${churchName}`);
-      setEmailBody(`Hi ${recipientFirstName},\n\nWe invite you to take our church Faith-Based DISC Personality Assessment. Grounded in Scripture (King James Version) and Christian fellowship, this tool helps us understand how God has uniquely equipped you with leadership, relational, service, and administrative strengths for the body of Christ (1 Corinthians 12:4–7).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
+      setSmsBody(`Hi ${recipientGreeting}! Please take ${churchName}'s Faith-Based DISC Personality Assessment (KJV) to discover your biblical leadership & ministry style: ${targetUrl}`);
+      setEmailSubject(`Discover Your Biblical DISC Ministry Style, ${recipientGreeting} – ${churchName}`);
+      setEmailBody(`Hi ${recipientGreeting},\n\nWe invite you to take our church Faith-Based DISC Personality Assessment. Grounded in Scripture (King James Version) and Christian fellowship, this tool helps us understand how God has uniquely equipped you with leadership, relational, service, and administrative strengths for the body of Christ (1 Corinthians 12:4–7).\n\nPlease click the link below to take the 5-minute assessment online:\n${targetUrl}\n\nBlessings,\n${churchName}`);
     }
   }, [isGifts, isMbti, isDisc, church.name, selectedPerson, recipientMode, targetUrl]);
 
@@ -238,6 +240,8 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
     setSuccessCount(null);
 
     try {
+      const churchName = church.name || 'our church';
+
       if (channel === 'sms') {
         if (recipientMode === 'individual') {
           const phoneToSend = selectedPerson?.phone || manualPhone.trim();
@@ -245,13 +249,20 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
             throw new Error('Please select a person with a mobile phone or enter a valid mobile number.');
           }
 
+          const firstName = selectedPerson?.name?.split(' ')[0] || 'Friend';
+          const fullName = selectedPerson?.name || firstName;
+          const resolvedSmsBody = smsBody
+            .replace(/\{contact\.firstName\}|\{firstName\}|\{first_name\}/gi, firstName)
+            .replace(/\{contact\.fullName\}|\{fullName\}|\{name\}/gi, fullName)
+            .replace(/\{church\.name\}|\{churchName\}/gi, churchName);
+
           const res = await fetch('/api/messaging/send-individual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               churchId: church.id,
               toPhone: phoneToSend,
-              body: smsBody,
+              body: resolvedSmsBody,
               sentBy: user.id,
               sentByName: user.name || user.email,
               personId: selectedPerson?.id || null,
@@ -267,7 +278,7 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
           setSendSuccess(true);
           setSuccessCount(1);
         } else {
-          // Send to PCO List via SMS
+          // Send to PCO List via SMS (backend resolves {firstName} per person automatically)
           if (!selectedListId) throw new Error('Please select a Planning Center list.');
           const currentList = pcoLists.find(l => l.id === selectedListId);
 
@@ -301,12 +312,23 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
             throw new Error('Please select a person with an email address or enter a valid email.');
           }
 
+          const firstName = selectedPerson?.name?.split(' ')[0] || 'Friend';
+          const fullName = selectedPerson?.name || firstName;
+          const resolvedSubject = emailSubject
+            .replace(/\{contact\.firstName\}|\{firstName\}|\{first_name\}/gi, firstName)
+            .replace(/\{contact\.fullName\}|\{fullName\}|\{name\}/gi, fullName)
+            .replace(/\{church\.name\}|\{churchName\}/gi, churchName);
+          const resolvedEmailBody = emailBody
+            .replace(/\{contact\.firstName\}|\{firstName\}|\{first_name\}/gi, firstName)
+            .replace(/\{contact\.fullName\}|\{fullName\}|\{name\}/gi, fullName)
+            .replace(/\{church\.name\}|\{churchName\}/gi, churchName);
+
           // Build nice HTML template
           const formattedHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; line-height: 1.6;">
               <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px;">
-                <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800;">${emailSubject}</h2>
-                <div style="white-space: pre-wrap; font-size: 14px; color: #334155; margin-bottom: 24px;">${emailBody}</div>
+                <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800;">${resolvedSubject}</h2>
+                <div style="white-space: pre-wrap; font-size: 14px; color: #334155; margin-bottom: 24px;">${resolvedEmailBody}</div>
                 <div style="text-align: center; margin: 28px 0;">
                   <a href="${targetUrl}" style="background-color: #6366f1; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 14px; display: inline-block;">
                     Take the ${assessmentName} →
@@ -325,7 +347,7 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
             body: JSON.stringify({
               churchId: church.id,
               toAddresses: [emailToSend],
-              subject: emailSubject,
+              subject: resolvedSubject,
               htmlContent: formattedHtml,
               sentBy: user.id
             })
@@ -339,10 +361,23 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
           setSendSuccess(true);
           setSuccessCount(1);
         } else {
-          // Send to PCO List via Email
+          // Send to PCO List via Email with personalized name tags
           if (!listRecipientEmails.length) {
             throw new Error('No valid email addresses found for the members of this list.');
           }
+
+          const personData: Record<string, any> = {};
+          listMembers.forEach(m => {
+            const email = m.emails?.[0];
+            if (email) {
+              personData[email] = {
+                personName: m.name || '',
+                email,
+                phone: m.phones?.[0] || '',
+                pcoPersonId: m.id || null
+              };
+            }
+          });
 
           const formattedHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; line-height: 1.6;">
@@ -369,6 +404,7 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
               toAddresses: listRecipientEmails,
               subject: emailSubject,
               htmlContent: formattedHtml,
+              personData,
               sentBy: user.id
             })
           });
@@ -651,9 +687,25 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   SMS Message Text
                 </label>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {smsBody.length} characters
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 font-bold mr-1">Insert:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSmsBody(prev => `${prev} {firstName}`)}
+                    className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 text-[10px] font-mono font-bold transition cursor-pointer"
+                    title="Insert recipient's first name"
+                  >
+                    +{"{firstName}"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSmsBody(prev => `${prev} {fullName}`)}
+                    className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 text-[10px] font-mono font-bold transition cursor-pointer"
+                    title="Insert recipient's full name"
+                  >
+                    +{"{fullName}"}
+                  </button>
+                </div>
               </div>
               <textarea
                 rows={3}
@@ -661,13 +713,27 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
                 onChange={e => setSmsBody(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white leading-relaxed focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span>Variables like <code className="text-indigo-500">{"{firstName}"}</code> auto-fill each person's name when sending to a PCO list.</span>
+                <span className="font-mono">{smsBody.length} chars</span>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Email Subject
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Email Subject
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEmailSubject(prev => `${prev} {firstName}`)}
+                    className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 text-[10px] font-mono font-bold transition cursor-pointer"
+                    title="Insert recipient's first name"
+                  >
+                    +{"{firstName}"}
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={emailSubject}
@@ -677,15 +743,39 @@ export const SendAssessmentModal: React.FC<SendAssessmentModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Email Message Body
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Email Message Body
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-bold mr-1">Insert:</span>
+                    <button
+                      type="button"
+                      onClick={() => setEmailBody(prev => `${prev} {firstName}`)}
+                      className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 text-[10px] font-mono font-bold transition cursor-pointer"
+                      title="Insert recipient's first name"
+                    >
+                      +{"{firstName}"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmailBody(prev => `${prev} {fullName}`)}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 text-[10px] font-mono font-bold transition cursor-pointer"
+                      title="Insert recipient's full name"
+                    >
+                      +{"{fullName}"}
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   rows={4}
                   value={emailBody}
                   onChange={e => setEmailBody(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white leading-relaxed focus:outline-none"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Tags like <code className="text-indigo-500">{"{firstName}"}</code> are personalized for each recipient in the PCO list.
+                </p>
               </div>
             </div>
           )}

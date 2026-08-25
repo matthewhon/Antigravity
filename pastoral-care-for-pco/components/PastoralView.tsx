@@ -39,6 +39,7 @@ import { computeAssessmentAggregates, AssessmentAggregates } from '../services/a
 import { PastoralBriefingWidget } from './widgets/PastoralBriefingWidget';
 import { GiftPlacementGapWidget } from './widgets/GiftPlacementGapWidget';
 import { CareVulnerabilityWidget } from './widgets/CareVulnerabilityWidget';
+import { CareCoverageVelocityWidget } from './widgets/CareCoverageVelocityWidget';
 import { DiscipleshipPathwayWidget } from './widgets/DiscipleshipPathwayWidget';
 import { PastoralEngagementModal } from './PastoralEngagementModal';
 import Markdown from 'react-markdown';
@@ -512,9 +513,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   }, [activeTab, allowedWidgetIds]);
 
   useEffect(() => {
-      if ((activeTab === 'Care' || activeTab === 'Reports') && church.id) {
-          // Only fetch from Firestore the first time we open Care/Reports for this
-          // church. Subsequent tab switches between Care and Reports reuse the
+      if (church?.id) {
+          // Only fetch from Firestore the first time we load data for this
+          // church. Subsequent tab switches reuse the
           // already-loaded (and possibly locally-updated) in-memory state, avoiding
           // a race where a just-saved note gets overwritten by a stale Firestore read.
           if (careDataFetchedForChurch.current === church.id) return;
@@ -562,7 +563,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   .catch(() => {});
           });
       }
-  }, [activeTab, church.id]);
+  }, [church?.id]);
 
   const handleMarkFollowedUp = async (personId: string) => {
       const existing = followUpLog.find(e => e.personId === personId);
@@ -1426,29 +1427,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   />
               );
           case 'member_pastoral_touches':
+          case 'care_coverage_velocity':
               return (
-                  <WidgetWrapper title="Pastoral Touches" onRemove={() => handleRemoveWidget(id)} source="Care Log">
-                      <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recent Care Touches</span>
-                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{notes.length} Total</span>
-                          </div>
-                          <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                              {notes.slice(0, 5).map((n, idx) => (
-                                  <div key={idx} className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                          <span>{n.type === 'Visit' ? '🏠' : n.type === 'Call' ? '📞' : n.type === 'Meeting' ? '🤝' : n.type === 'Hospital' ? '🏥' : '📝'}</span>
-                                          <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{n.personName || 'Member'}</span>
-                                      </div>
-                                      <span className="text-[10px] text-slate-400 shrink-0">{n.date || 'Recent'}</span>
-                                  </div>
-                              ))}
-                              {notes.length === 0 && (
-                                  <p className="text-xs text-slate-400 text-center py-4">No pastoral touches recorded yet.</p>
-                              )}
-                          </div>
-                      </div>
-                  </WidgetWrapper>
+                  <div key={id} className="col-span-1 lg:col-span-2">
+                      <CareCoverageVelocityWidget
+                          people={peopleData?.allPeople || []}
+                          notes={notes}
+                          followUpLog={followUpLog}
+                          smsConversations={smsConversations}
+                          prayerRequests={prayerRequests}
+                          onRemove={() => handleRemoveWidget(id)}
+                      />
+                  </div>
               );
           case 'member_attrition_chart':
               return (

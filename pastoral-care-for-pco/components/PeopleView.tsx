@@ -20,7 +20,8 @@ import { DiscClimateWidget } from './widgets/DiscClimateWidget';
 import { MbtiTemperamentWidget } from './widgets/MbtiTemperamentWidget';
 import { AssessmentFunnelWidget } from './widgets/AssessmentFunnelWidget';
 import { computeAssessmentAggregates, AssessmentAggregates } from '../services/assessmentAnalyticsService';
-import { Copy, Check, Send, Sparkles, Compass, Brain, X } from 'lucide-react';
+import { Copy, Check, Send, Sparkles, Compass, Brain, X, Mail } from 'lucide-react';
+import { SendAssessmentModal } from './SendAssessmentModal';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
@@ -107,6 +108,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   // ---- Assessment Analytics State ----
   const [assessmentAnalytics, setAssessmentAnalytics] = useState<AssessmentAggregates | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [activeSendAssessmentType, setActiveSendAssessmentType] = useState<'gifts' | 'disc' | 'mbti' | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1253,24 +1255,36 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
 
             <div className="space-y-3">
               {/* Spiritual Gifts Link */}
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Spiritual Gifts Test (Romans 12)</span>
                   </span>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/gifts-test/${churchId || church?.id}`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedLink('gifts');
-                      setTimeout(() => setCopiedLink(null), 2000);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                  >
-                    {copiedLink === 'gifts' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedLink === 'gifts' ? 'Copied!' : 'Copy Link'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setIsShareModalOpen(false);
+                        setActiveSendAssessmentType('gifts');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>Send to PCO List</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/gifts-test/${churchId || church?.id}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink('gifts');
+                        setTimeout(() => setCopiedLink(null), 2000);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      {copiedLink === 'gifts' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedLink === 'gifts' ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   {`${window.location.origin}/gifts-test/${churchId || church?.id}`}
@@ -1278,24 +1292,36 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
               </div>
 
               {/* DISC Link */}
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                     <Compass className="w-3.5 h-3.5" />
                     <span>Faith-Based DISC Assessment</span>
                   </span>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/disc-test/${churchId || church?.id}`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedLink('disc');
-                      setTimeout(() => setCopiedLink(null), 2000);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                  >
-                    {copiedLink === 'disc' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedLink === 'disc' ? 'Copied!' : 'Copy Link'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setIsShareModalOpen(false);
+                        setActiveSendAssessmentType('disc');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>Send to PCO List</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/disc-test/${churchId || church?.id}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink('disc');
+                        setTimeout(() => setCopiedLink(null), 2000);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      {copiedLink === 'disc' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedLink === 'disc' ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   {`${window.location.origin}/disc-test/${churchId || church?.id}`}
@@ -1303,24 +1329,36 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
               </div>
 
               {/* MBTI Link */}
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
                     <Brain className="w-3.5 h-3.5" />
                     <span>Myers-Briggs (MBTI) Test</span>
                   </span>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/mbti-test/${churchId || church?.id}`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedLink('mbti');
-                      setTimeout(() => setCopiedLink(null), 2000);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                  >
-                    {copiedLink === 'mbti' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedLink === 'mbti' ? 'Copied!' : 'Copy Link'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setIsShareModalOpen(false);
+                        setActiveSendAssessmentType('mbti');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-400 hover:bg-violet-100 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>Send to PCO List</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/mbti-test/${churchId || church?.id}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink('mbti');
+                        setTimeout(() => setCopiedLink(null), 2000);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      {copiedLink === 'mbti' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedLink === 'mbti' ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   {`${window.location.origin}/mbti-test/${churchId || church?.id}`}
@@ -1338,6 +1376,18 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Send Assessment Modal via SMS / Email with PCO List Name Support */}
+      {activeSendAssessmentType && (
+        <SendAssessmentModal
+          isOpen={!!activeSendAssessmentType}
+          onClose={() => setActiveSendAssessmentType(null)}
+          assessmentType={activeSendAssessmentType}
+          church={church || { id: churchId, name: 'Our Church' } as Church}
+          user={data?.user || { id: 'admin', name: 'Pastoral Staff' } as User}
+          allPeople={data?.allPeople || []}
+        />
       )}
 
     </div>

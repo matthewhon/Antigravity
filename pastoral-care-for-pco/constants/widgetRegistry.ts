@@ -174,7 +174,7 @@ export const PASTORAL_MEMBERSHIP_WIDGETS: WidgetDefinition[] = [
     { id: 'member_map', label: 'Member Map', icon: '🗺️', size: 'full', description: 'Map of where members live.' },
     { id: 'member_age_chart', label: 'Generational Mix', icon: '🥧', size: 'sm', description: 'Generational mix of members.' },
     { id: 'member_attrition_chart', label: 'Attrition', icon: '📉', size: 'lg', description: 'Membership attrition over time.' },
-    { id: 'member_pastoral_touches', label: 'Pastoral Touches', icon: 'hand', size: 'sm', description: 'Pastoral care touches logged.' },
+    { id: 'member_pastoral_touches', label: 'Care Coverage & Velocity', icon: '📈', size: 'lg', description: 'Track pastoral touch cadence, multi-channel touchpoints, and congregational care coverage.' },
     { id: 'member_unconnected', label: 'Unconnected', icon: '🔗', size: 'sm', description: 'Members not connected to groups.' },
     { id: 'member_geo_list', label: 'City Penetration', icon: '🏙️', size: 'lg', description: 'City-by-city membership penetration.' },
     { id: 'member_missional_gap', label: 'Missional Gap', icon: '🎯', size: 'sm', description: 'Gap between members and community need.' },
@@ -196,6 +196,7 @@ export const PASTORAL_COMMUNITY_WIDGETS: WidgetDefinition[] = [
 ];
 
 export const PASTORAL_CARE_WIDGETS: WidgetDefinition[] = [
+    { id: 'care_coverage_velocity', label: 'Care Coverage & Velocity', icon: '📈', size: 'lg', description: 'Pastoral touch velocity, channel breakdown, and 30/90-day coverage reach.' },
     { id: 'care_recommended_followups', label: 'Recommended Follow-Ups', icon: '✨', size: 'full', description: 'AI-recommended people to follow up with.' },
     { id: 'care_log', label: 'Care Log', icon: '📝', size: 'lg', description: 'Log of pastoral care interactions.' },
     { id: 'prayer_requests', label: 'Prayer Requests', icon: '🙏', size: 'lg', description: 'Incoming prayer requests.' },

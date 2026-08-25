@@ -126,19 +126,19 @@ function resolveMergeTags(body: string, person: PersonInfo, church?: any): strin
         : rawChurchPhone;
 
     return body
-        .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
-        .replace(/\{contact\.lastName\}|\{lastName\}/gi,    lastName)
-        .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}/gi,    person.personName || '')
+        .replace(/\{contact\.firstName\}|\{firstName\}|\{first_name\}|\{first name\}/gi,   firstName || 'Friend')
+        .replace(/\{contact\.lastName\}|\{lastName\}|\{last_name\}|\{last name\}/gi,    lastName)
+        .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}|\{full_name\}|\{name\}/gi,    person.personName || firstName || 'Friend')
         .replace(/\{contact\.email\}|\{email\}/gi,       person.email      || '')
         .replace(/\{contact\.phone\}|\{phone\}/gi,       formattedPhone)
         .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
         .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
         .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
         .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '')
-        .replace(/\{church\.name\}|\{churchName\}/gi,       church?.name || '')
-        .replace(/\{church\.phone\}|\{churchPhone\}/gi,       formattedChurchPhone)
-        .replace(/\{church\.address\}|\{churchAddress\}/gi,   church?.address || '')
-        .replace(/\{church\.website\}|\{churchWebsite\}/gi,   church?.website || '');
+        .replace(/\{church\.name\}|\{churchName\}|\{church_name\}/gi,       church?.name || '')
+        .replace(/\{church\.phone\}|\{churchPhone\}|\{church_phone\}/gi,       formattedChurchPhone)
+        .replace(/\{church\.address\}|\{churchAddress\}|\{church_address\}/gi,   church?.address || '')
+        .replace(/\{church\.website\}|\{churchWebsite\}|\{church_website\}/gi,   church?.website || '');
 }
 
 async function resolveDefaultNumberId(db: any, churchId: string): Promise<string | null> {
