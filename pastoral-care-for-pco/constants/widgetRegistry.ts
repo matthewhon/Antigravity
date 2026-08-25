@@ -77,6 +77,9 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
 
 export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'services_stats', label: 'Services Stats', icon: '📊', size: 'full', description: 'Weekend attendance and serving headline numbers.' },
+    { id: 'struggling_teams', label: 'Struggling Teams Radar', icon: '🚨', size: 'full', description: 'Health diagnostic of struggling, understaffed, and high-burnout serving teams.' },
+    { id: 'team_talent_matcher', label: 'Team Candidate Matcher', icon: '🎯', size: 'lg', description: 'Assessment-based volunteer recommendations (Gifts, DISC, MBTI) with leader outreach.' },
+    { id: 'team_fit_reallocation', label: 'Team Fit & Reallocation', icon: '🔄', size: 'lg', description: 'Evaluates current volunteer fit and recommends better-suited teams.' },
     { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈', size: 'sm', description: 'Attendance trend over recent weeks.' },
     { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌', size: 'sm', description: 'First-time guests each week.' },
     { id: 'volunteer_health', label: 'Volunteer Health', icon: '❤️‍🩹', size: 'sm', description: 'Health of your volunteer base.' },
@@ -106,6 +109,9 @@ export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
 ];
 
 export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
+    { id: 'struggling_teams', label: 'Struggling Teams Radar', icon: '🚨', size: 'full', description: 'Health diagnostic of struggling, understaffed, and high-burnout serving teams.' },
+    { id: 'team_talent_matcher', label: 'Team Candidate Matcher', icon: '🎯', size: 'lg', description: 'Assessment-based volunteer recommendations (Gifts, DISC, MBTI) with leader outreach.' },
+    { id: 'team_fit_reallocation', label: 'Team Fit & Reallocation', icon: '🔄', size: 'lg', description: 'Evaluates current volunteer fit and recommends better-suited teams.' },
     { id: 'services_teams_list', label: 'Teams Directory', icon: '📋', size: 'full', description: 'Directory of all serving teams.' },
     { id: 'team_roster', label: 'Team Roster', icon: '👥', size: 'lg', description: 'Roster for a serving team.' },
     { id: 'burnout_watchlist', label: 'Burnout Watchlist (>2x Weekly)', icon: '🔥', size: 'lg', description: 'Volunteers serving too frequently.' },
@@ -277,12 +283,12 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['groups_connection_rate', 'groups_health_distribution', 'groups_health', 'groups_stats', 'event_attendance'],
         // Services
         services_overview: isServices || isPastor
-            ? ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history']
-            : ['services_stats', 'attendance_growth', 'first_time_guests', 'upcoming_plans_list'],
+            ? ['services_stats', 'struggling_teams', 'team_talent_matcher', 'team_fit_reallocation', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history']
+            : ['services_stats', 'struggling_teams', 'attendance_growth', 'first_time_guests', 'upcoming_plans_list'],
         services_attendance: ['checkin_history', 'attendance_growth', 'first_time_guests', 'digital_vs_physical', 'events', 'services_stats'],
         services_teams: isServices
-            ? ['services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster']
-            : ['services_teams_list', 'volunteer_health'],
+            ? ['struggling_teams', 'team_talent_matcher', 'team_fit_reallocation', 'services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster']
+            : ['struggling_teams', 'team_talent_matcher', 'services_teams_list', 'volunteer_health'],
         // Giving
         giving_overview: isGiving || isPastor
             ? ['keyMetrics', 'recurring_revenue', 'giving_forecast', 'budgetProgress', 'trendsComparison', 'payment_methods', 'funds', 'topGivers', 'donorLifecycle', 'givingByStatus', 'averageGiving']
@@ -310,10 +316,10 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
         case 'groups': return ['groups_ai_agent', 'groups_connection_rate', 'groups_health_distribution', 'groups_action_center', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
-        case 'services': return ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
-        case 'services_overview': return ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
+        case 'services': return ['services_stats', 'struggling_teams', 'team_talent_matcher', 'team_fit_reallocation', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
+        case 'services_overview': return ['services_stats', 'struggling_teams', 'team_talent_matcher', 'team_fit_reallocation', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
         case 'services_attendance': return ['checkin_history', 'attendance_growth', 'first_time_guests', 'digital_vs_physical', 'events', 'services_stats'];
-        case 'services_teams': return ['services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster'];
+        case 'services_teams': return ['struggling_teams', 'team_talent_matcher', 'team_fit_reallocation', 'services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster'];
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];
         case 'giving_overview': return ['keyMetrics', 'recurring_revenue', 'giving_forecast', 'trendsComparison', 'payment_methods', 'funds', 'givingByStatus', 'averageGiving'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];

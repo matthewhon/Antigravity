@@ -1338,7 +1338,7 @@ export function calculateDiscScores(answers: Record<number, number>): DiscCalcul
   const secondary = sorted[1];
 
   // If secondary is within 6 points and >= 20 points, create blend style
-  let styleCode = primary;
+  let styleCode: string = primary;
   const primaryScore = scores[primary];
   const secondaryScore = scores[secondary];
 

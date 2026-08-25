@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ServicesDashboardData, ServicesFilter, PcoPerson, GlobalStats, ServicePlanSnapshot, WeatherRecord } from '../types';
+import { ServicesDashboardData, ServicesFilter, PcoPerson, GlobalStats, ServicePlanSnapshot, WeatherRecord, GiftsTestResponse, DiscTestResponse, MbtiTestResponse, ServicesTeam, TeamCandidateSuggestion, TeamFitReallocation } from '../types';
 import { firestore } from '../services/firestoreService';
 import { 
     ResponsiveContainer,
@@ -15,6 +15,11 @@ import { syncServicesData, syncCheckInsData } from '../services/pcoSyncService';
 import ServicesRemindersTab from './ServicesRemindersTab';
 import ServicesPlansTab from './ServicesPlansTab';
 import { AttendancePredictionWidget } from './widgets/AttendancePredictionWidget';
+import { StrugglingTeamsWidget } from './widgets/StrugglingTeamsWidget';
+import { TeamTalentMatcherWidget } from './widgets/TeamTalentMatcherWidget';
+import { TeamFitReallocationWidget } from './widgets/TeamFitReallocationWidget';
+import { TeamLeaderOutreachModal } from './TeamLeaderOutreachModal';
+import { analyzeTeamHealth, suggestCandidatesForTeam, analyzeTeamFitAndReallocations } from '../services/teamAssessmentMatcherService';
 
 interface ServicesViewProps {
   data: ServicesDashboardData | null;
@@ -101,6 +106,26 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   const [expandedBurnoutPersonId, setExpandedBurnoutPersonId] = useState<string | null>(null);
   const [weatherByDate, setWeatherByDate] = useState<Map<string, WeatherRecord>>(new Map());
 
+  // Assessment test responses for talent matchmaking & fit diagnostics
+  const [giftsResponses, setGiftsResponses] = useState<GiftsTestResponse[]>([]);
+  const [discResponses, setDiscResponses] = useState<DiscTestResponse[]>([]);
+  const [mbtiResponses, setMbtiResponses] = useState<MbtiTestResponse[]>([]);
+  const [selectedTalentTeamId, setSelectedTalentTeamId] = useState<string | null>(null);
+
+  // Outreach Modal State
+  const [outreachModalState, setOutreachModalState] = useState<{
+    isOpen: boolean;
+    team: ServicesTeam | null;
+    candidate: TeamCandidateSuggestion | TeamFitReallocation | null;
+    isReallocation: boolean;
+    currentTeamName?: string;
+  }>({
+    isOpen: false,
+    team: null,
+    candidate: null,
+    isReallocation: false
+  });
+
   // Fetch weather data for upcoming plans overlay
   useEffect(() => {
       if (!churchId) return;
@@ -113,6 +138,71 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       }).catch(() => {});
       return () => { cancelled = true; };
   }, [churchId]);
+
+  // Fetch assessment responses for talent matchmaking & team fit
+  useEffect(() => {
+      const cid = churchId || (people.length > 0 ? people[0].churchId : null);
+      if (!cid) return;
+      let cancelled = false;
+      Promise.all([
+          firestore.getGiftsTestResponses(cid),
+          firestore.getDiscResponses(cid),
+          firestore.getMbtiResponses(cid)
+      ]).then(([gifts, disc, mbti]) => {
+          if (cancelled) return;
+          setGiftsResponses(gifts);
+          setDiscResponses(disc);
+          setMbtiResponses(mbti);
+      }).catch(err => {
+          console.error('[ServicesView] Failed to fetch assessment responses:', err);
+      });
+      return () => { cancelled = true; };
+  }, [churchId, people]);
+
+  // ── Struggling Teams Health Diagnostics ──
+  const teamHealthDiagnostics = useMemo(() => {
+      if (!data?.teams) return [];
+      return analyzeTeamHealth(data.teams, data.futurePlans, people);
+  }, [data?.teams, data?.futurePlans, people]);
+
+  // Set default selected talent team to the highest urgency / struggling team
+  useEffect(() => {
+      if (!selectedTalentTeamId && teamHealthDiagnostics.length > 0) {
+          setSelectedTalentTeamId(teamHealthDiagnostics[0].teamId);
+      }
+  }, [teamHealthDiagnostics, selectedTalentTeamId]);
+
+  const effectiveTalentTeam = useMemo(() => {
+      if (!data?.teams || data.teams.length === 0) return null;
+      if (selectedTalentTeamId) {
+          return data.teams.find(t => t.id === selectedTalentTeamId) || data.teams[0];
+      }
+      return data.teams[0];
+  }, [data?.teams, selectedTalentTeamId]);
+
+  // ── Assessment-Based Candidate Suggestions for Selected Team ──
+  const candidateSuggestions = useMemo(() => {
+      if (!effectiveTalentTeam) return [];
+      return suggestCandidatesForTeam(
+          effectiveTalentTeam,
+          people,
+          giftsResponses,
+          discResponses,
+          mbtiResponses
+      );
+  }, [effectiveTalentTeam, people, giftsResponses, discResponses, mbtiResponses]);
+
+  // ── Team Fit & Reallocation Opportunities ──
+  const teamFitReallocations = useMemo(() => {
+      if (!data?.teams) return [];
+      return analyzeTeamFitAndReallocations(
+          data.teams,
+          people,
+          giftsResponses,
+          discResponses,
+          mbtiResponses
+      );
+  }, [data?.teams, people, giftsResponses, discResponses, mbtiResponses]);
 
   const availableWidgets = useMemo(() => {
     let widgets: any[] = [];
@@ -668,6 +758,77 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             subValue="Unfilled/Needed"
                         />
                     </div>
+                </div>
+            );
+        case 'struggling_teams':
+            return (
+                <div key="struggling_teams" className="col-span-1 md:col-span-2 lg:col-span-4">
+                    <StrugglingTeamsWidget
+                        diagnostics={teamHealthDiagnostics}
+                        onSelectTeamForMatching={(teamId) => {
+                            setSelectedTalentTeamId(teamId);
+                        }}
+                        onOpenOutreachModal={(teamId) => {
+                            const team = data.teams.find(t => t.id === teamId);
+                            if (!team) return;
+                            const suggestions = suggestCandidatesForTeam(team, people, giftsResponses, discResponses, mbtiResponses);
+                            const topCandidate = suggestions[0] || null;
+                            if (topCandidate) {
+                                setOutreachModalState({
+                                    isOpen: true,
+                                    team,
+                                    candidate: topCandidate,
+                                    isReallocation: false
+                                });
+                            } else {
+                                setSelectedTalentTeamId(teamId);
+                                alert(`No candidate matches for ${team.name} yet. Check the Team Candidate Matcher to explore members who took assessments.`);
+                            }
+                        }}
+                        onRemove={() => handleRemoveWidget('struggling_teams')}
+                    />
+                </div>
+            );
+        case 'team_talent_matcher':
+            return (
+                <div key="team_talent_matcher" className="col-span-1 lg:col-span-2">
+                    <TeamTalentMatcherWidget
+                        teams={data.teams}
+                        selectedTeamId={effectiveTalentTeam?.id || null}
+                        onSelectTeamId={(teamId) => setSelectedTalentTeamId(teamId)}
+                        suggestions={candidateSuggestions}
+                        onOpenOutreachModal={(candidate, team) => {
+                            setOutreachModalState({
+                                isOpen: true,
+                                team,
+                                candidate,
+                                isReallocation: false
+                            });
+                        }}
+                        onRemove={() => handleRemoveWidget('team_talent_matcher')}
+                    />
+                </div>
+            );
+        case 'team_fit_reallocation':
+            return (
+                <div key="team_fit_reallocation" className="col-span-1 lg:col-span-2">
+                    <TeamFitReallocationWidget
+                        reallocations={teamFitReallocations}
+                        onOpenOutreachModal={(reallocation) => {
+                            const targetTeam = data.teams.find(t => t.id === reallocation.recommendedTeamId) ||
+                                               data.teams.find(t => t.name.toLowerCase().includes(reallocation.recommendedTeamName.toLowerCase())) ||
+                                               data.teams.find(t => t.id === reallocation.currentTeamId) ||
+                                               data.teams[0];
+                            setOutreachModalState({
+                                isOpen: true,
+                                team: targetTeam,
+                                candidate: reallocation,
+                                isReallocation: true,
+                                currentTeamName: reallocation.currentTeamName
+                            });
+                        }}
+                        onRemove={() => handleRemoveWidget('team_fit_reallocation')}
+                    />
                 </div>
             );
         case 'staffing_needs':
@@ -2028,6 +2189,22 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                   })}
               />
           </div>
+      )}
+
+      {/* Team Leader Outreach Modal */}
+      {outreachModalState.isOpen && outreachModalState.team && outreachModalState.candidate && (
+          <TeamLeaderOutreachModal
+              isOpen={outreachModalState.isOpen}
+              onClose={() => setOutreachModalState(prev => ({ ...prev, isOpen: false }))}
+              churchId={getChurchId() || ''}
+              team={outreachModalState.team}
+              leaderOptions={(outreachModalState.team.leaderPersonIds || [])
+                  .map(id => getPersonDetails(id))
+                  .filter(Boolean) as PcoPerson[]}
+              candidate={outreachModalState.candidate}
+              isReallocation={outreachModalState.isReallocation}
+              currentTeamName={outreachModalState.currentTeamName}
+          />
       )}
     </div>
   );

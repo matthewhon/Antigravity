@@ -517,6 +517,82 @@ export interface ServicesTeam {
     campusName?: string | null;
 }
 
+export type TeamHealthStatus = 'Healthy' | 'Moderate' | 'Struggling' | 'Critical';
+
+export interface TeamHealthDiagnostic {
+    teamId: string;
+    teamName: string;
+    serviceTypeName?: string;
+    healthScore: number; // 0 - 100
+    status: TeamHealthStatus;
+    fillRate: number; // 0 - 100
+    openSlotsCount: number; // in upcoming window
+    filledSlotsCount: number;
+    rosterSize: number;
+    activeVolunteersCount: number;
+    burnoutCount: number;
+    burnoutRate: number; // % of active volunteers with high serving risk
+    leaderCount: number;
+    leaderPersonIds: string[];
+    leaderNames: string[];
+    riskReasons: string[];
+    urgency: 'Low' | 'Medium' | 'High' | 'Critical';
+}
+
+export interface TeamCandidateSuggestion {
+    personId: string;
+    personName: string;
+    email?: string;
+    phone?: string;
+    avatar?: string;
+    matchScore: number; // 0 - 100
+    primaryGift?: string;
+    discStyle?: string;
+    mbtiType?: string;
+    isCurrentlyServing: boolean;
+    currentTeams: string[];
+    matchingReasons: string[];
+    temperamentSummary: string;
+    suggestedRoles: string[];
+}
+
+export interface TeamFitReallocation {
+    personId: string;
+    personName: string;
+    email?: string;
+    phone?: string;
+    avatar?: string;
+    currentTeamId: string;
+    currentTeamName: string;
+    currentFitLevel: 'Low' | 'Moderate';
+    currentFitReason: string;
+    recommendedTeamId?: string;
+    recommendedTeamName: string;
+    recommendedFitReason: string;
+    primaryGift?: string;
+    discStyle?: string;
+    mbtiType?: string;
+    riskLevel?: string;
+}
+
+export interface TeamLeaderOutreachPayload {
+    churchId: string;
+    teamId: string;
+    teamName: string;
+    leaderPersonId: string;
+    leaderName: string;
+    leaderPhone?: string;
+    leaderEmail?: string;
+    channel: 'sms' | 'email';
+    subject?: string;
+    messageBody: string;
+    candidateName: string;
+    candidatePersonId?: string;
+    candidateGift?: string;
+    candidateDisc?: string;
+    isReallocation?: boolean;
+}
+
 export interface SongUsage {
     id: string;
     title: string;
