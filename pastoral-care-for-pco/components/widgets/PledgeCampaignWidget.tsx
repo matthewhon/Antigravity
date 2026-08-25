@@ -3,7 +3,7 @@ import {
   Target, Award, Calendar, DollarSign, Users, Clock, ArrowRight, 
   CheckCircle2, Sparkles, Heart, AlertCircle, Loader2, X, ExternalLink 
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, addMonths } from 'date-fns';
 
 const apiBaseUrl = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
   ? window.location.origin
@@ -183,8 +183,11 @@ export function PledgeCampaignWidget({
   const pledgedPercentStr = goalDollars > 0 ? ((pledgedDollars / goalDollars) * 100).toFixed(1) : '0';
   const receivedPercentStr = goalDollars > 0 ? ((receivedDollars / goalDollars) * 100).toFixed(1) : '0';
 
-  // Real-time live countdown calculation
+  // Real-time live countdown calculation (years, months, days, hours, minutes, seconds)
   const [timeLeft, setTimeLeft] = useState<{
+    years: number;
+    months: number;
+    totalMonths: number;
     days: number;
     hours: number;
     minutes: number;
@@ -214,11 +217,14 @@ export function PledgeCampaignWidget({
     }
 
     const updateCountdown = () => {
-      const now = Date.now();
-      const diff = targetDate.getTime() - now;
+      const now = new Date();
+      const diffMs = targetDate.getTime() - now.getTime();
 
-      if (diff <= 0) {
+      if (diffMs <= 0) {
         setTimeLeft({
+          years: 0,
+          months: 0,
+          totalMonths: 0,
           days: 0,
           hours: 0,
           minutes: 0,
@@ -229,23 +235,47 @@ export function PledgeCampaignWidget({
         return;
       }
 
-      const totalSeconds = Math.floor(diff / 1000);
-      const days = Math.floor(totalSeconds / (3600 * 24));
-      const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
+      let temp = new Date(now.getTime());
+      let totalMonths = 0;
 
-      const formatted = days > 0
-        ? `${days}d ${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
-        : `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+      while (true) {
+        const next = addMonths(temp, 1);
+        if (next.getTime() <= targetDate.getTime()) {
+          temp = next;
+          totalMonths++;
+        } else {
+          break;
+        }
+      }
+
+      const remainingMs = targetDate.getTime() - temp.getTime();
+      const totalRemainingSeconds = Math.floor(remainingMs / 1000);
+      const days = Math.floor(totalRemainingSeconds / (3600 * 24));
+      const hours = Math.floor((totalRemainingSeconds % (3600 * 24)) / 3600);
+      const minutes = Math.floor((totalRemainingSeconds % 3600) / 60);
+      const seconds = totalRemainingSeconds % 60;
+
+      const years = Math.floor(totalMonths / 12);
+      const months = totalMonths % 12;
+
+      const parts: string[] = [];
+      if (years > 0) parts.push(`${years}y`);
+      if (months > 0 || (years > 0 && (days > 0 || hours > 0))) parts.push(`${months}mo`);
+      if (days > 0 || totalMonths > 0) parts.push(`${days}d`);
+      parts.push(`${hours}h`);
+      parts.push(`${String(minutes).padStart(2, '0')}m`);
+      parts.push(`${String(seconds).padStart(2, '0')}s`);
 
       setTimeLeft({
+        years,
+        months,
+        totalMonths,
         days,
         hours,
         minutes,
         seconds,
         hasEnded: false,
-        formatted
+        formatted: parts.join(' ')
       });
     };
 
