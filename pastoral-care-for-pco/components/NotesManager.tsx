@@ -66,7 +66,7 @@ const mapPcoRegistration = (item: any): PcoItem => ({
   id: item.id,
   name: item.attributes?.name || 'Unnamed Event',
   description: item.attributes?.description || '',
-  date: formatPcoDate(item.attributes?.open_at || item.attributes?.close_at),
+  date: formatPcoDate(item.attributes?.starts_at || item.attributes?.open_at || item.attributes?.close_at),
   imageUrl: item.attributes?.logo_url || item.attributes?.image_url,
   meta: item.attributes?.archived ? 'Archived' : 'Active registration',
   raw: item,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendSeries } from '../../services/dashboardService';
+import { TrendSeries, weekStartKey } from '../../services/dashboardService';
 import { Card, EmptyNote, Section, SectionControls, Sparkline, fmtValue } from './DashboardPrimitives';
 
 /**
@@ -104,25 +104,22 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                 >
                     {series.map(s => {
                         const isGiving = s.id === 'giving';
-                        const windowedPoints = s.points.slice(-selectedOption.weeks);
+                        // Filter out current incomplete week
+                        const currentWeekMonday = weekStartKey(new Date());
+                        const completedPoints = s.points.filter(p => p.weekStart < currentWeekMonday);
+                        const pointsToUse = completedPoints.length > 0 ? completedPoints : s.points;
+                        const windowedPoints = pointsToUse.slice(-selectedOption.weeks);
                         const hasPoints = windowedPoints.length > 0;
-                        const lastPoint = hasPoints ? windowedPoints[windowedPoints.length - 1] : null;
-                        const prevPoint = windowedPoints.length >= 2 ? windowedPoints[windowedPoints.length - 2] : null;
+                        const lastPoint = hasPoints ? windowedPoints[windowedPoints.length - 1] : { weekStart: '', value: 0 };
 
-                        // If the latest week bucket is 0 (e.g. current week before Sunday services), fall back to latest completed week
-                        const isCurrentWeekEmpty = !!(lastPoint && lastPoint.value === 0 && prevPoint && prevPoint.value > 0);
-                        const displayPoint = isCurrentWeekEmpty ? prevPoint! : (lastPoint || { weekStart: '', value: 0 });
-
-                        // Compute change percentage over completed weeks to prevent partial mid-week zeros from skewing to -100%
-                        const evalPoints = isCurrentWeekEmpty ? windowedPoints.slice(0, -1) : windowedPoints;
-                        const pct = changeAcross(evalPoints);
+                        const pct = changeAcross(windowedPoints);
 
                         const periodTotal = windowedPoints.reduce((sum, p) => sum + p.value, 0);
                         const periodCount = windowedPoints.reduce((sum, p) => sum + (p.count || 0), 0);
                         const avgPerWeek = windowedPoints.length > 0 ? periodTotal / windowedPoints.length : 0;
                         const avgGiftSize = periodCount > 0 ? Math.round(periodTotal / periodCount) : 0;
 
-                        const heroValue = isGiving ? Math.round(avgPerWeek) : displayPoint.value;
+                        const heroValue = isGiving ? Math.round(avgPerWeek) : lastPoint.value;
 
                         return (
                             <Card key={s.id} className="p-6 print:p-3 flex flex-col justify-between">
@@ -165,11 +162,11 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                                         {isGiving ? (
                                             <>
                                                 <span>Avg gift: {fmtValue(avgGiftSize, true)}</span>
-                                                <span>Latest wk: {fmtValue(displayPoint.value, true)}</span>
+                                                <span>Latest wk: {fmtValue(lastPoint.value, true)}</span>
                                             </>
                                         ) : (
                                             <>
-                                                <span>{isCurrentWeekEmpty ? 'latest completed week' : 'latest week'}</span>
+                                                <span>Latest completed week</span>
                                                 <span>avg {fmtValue(Math.round(avgPerWeek), s.isCurrency)}/wk</span>
                                             </>
                                         )}

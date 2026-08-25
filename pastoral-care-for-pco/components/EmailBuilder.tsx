@@ -1607,12 +1607,10 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
     icon: <ClipboardList size={14} />,
     fetch: (id) => pcoService.getRegistrations(id),
     map: (item) => {
-      // The Signup resource has no top-level starts_at; dates are in included SignupTimes.
-      // pcoService.getRegistrations includes signup_times so they'll be in the raw response included array.
-      // However since we're mapping raw items (not the full page), use open_at as a fallback date.
       const attrs = item.attributes || {};
-      const dateStr = attrs.open_at
-        ? new Date(attrs.open_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      const targetDate = attrs.starts_at || attrs.open_at;
+      const dateStr = targetDate
+        ? new Date(targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : undefined;
       return {
         id: item.id,

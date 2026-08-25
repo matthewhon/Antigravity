@@ -182,23 +182,28 @@ const lastSundayAttendance = (attendance: AttendanceRecord[], now: Date): number
 };
 
 /** Monday of the week containing `d`, as YYYY-MM-DD. */
-const weekStartKey = (d: Date): string => {
+export const weekStartKey = (d: Date): string => {
     const monday = new Date(d);
     monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     return toDateStr(monday);
 };
 
-/** Buckets values into the last `weeks` calendar weeks, oldest → newest. */
-const weeklySeries = (
+/** Buckets values into the last `weeks` completed calendar weeks (excluding the current incomplete week), oldest → newest. */
+export const weeklySeries = (
     entries: { date: string | number; value: number; count?: number }[],
     weeks: number,
     now: Date
 ): { weekStart: string; value: number; count: number }[] => {
+    const currentMonday = new Date(now);
+    currentMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    currentMonday.setHours(0, 0, 0, 0);
+
     const buckets = new Map<string, { value: number; count: number }>();
     const keys: string[] = [];
-    for (let i = weeks - 1; i >= 0; i--) {
-        const d = new Date(now.getTime() - i * WEEK);
-        const k = weekStartKey(d);
+    for (let i = weeks; i >= 1; i--) {
+        const d = new Date(currentMonday);
+        d.setDate(currentMonday.getDate() - i * 7);
+        const k = toDateStr(d);
         if (!buckets.has(k)) { buckets.set(k, { value: 0, count: 0 }); keys.push(k); }
     }
     const earliest = keys[0];

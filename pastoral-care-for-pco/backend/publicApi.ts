@@ -162,10 +162,11 @@ export async function getPublicRegistrations(req: any, res: any) {
 
   try {
     const url = includeArchived 
-      ? 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100'
-      : 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&filter=unarchived';
+      ? 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&include=signup_times'
+      : 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&filter=unarchived&include=signup_times';
       
     const data = await fetchFromPco(churchId, url);
+    const included = data.included || [];
     
     // Filter out archived registration events (fallback if attribute exists)
     let rawEvents = data.data || [];
@@ -177,16 +178,33 @@ export async function getPublicRegistrations(req: any, res: any) {
     const churchDoc = await db.collection('churches').doc(churchId).get();
     const churchData = churchDoc.exists ? churchDoc.data() : null;
     const subdomain = churchData?.subdomain || '';
-    const events = rawEvents.map((e: any) => ({
-      id: e.id,
-      name: e.attributes.name,
-      description: e.attributes.description,
-      logoUrl: e.attributes.logo_url || null,
-      signupsCount: e.attributes.signups_count || 0,
-      startsAt: e.attributes.starts_at || e.attributes.event_time || null,
-      location: e.attributes.location || e.attributes.location_name || null,
-      publicUrl: e.attributes.church_center_url || e.attributes.public_url || e.attributes.public_church_center_web_url || (subdomain ? `https://${subdomain}.churchcenter.com/registrations/events/${e.id}` : null),
-    }));
+    const events = rawEvents.map((e: any) => {
+      const signupTimeRefs: any[] = e.relationships?.signup_times?.data || [];
+      const signupTimes = signupTimeRefs
+        .map((ref: any) => included.find((i: any) => i.type === 'SignupTime' && i.id === ref.id))
+        .filter(Boolean)
+        .sort((a: any, b: any) => {
+          const aDate = a.attributes?.starts_at || a.attributes?.created_at || '';
+          const bDate = b.attributes?.starts_at || b.attributes?.created_at || '';
+          return aDate.localeCompare(bDate);
+        });
+
+      const nowIso = new Date().toISOString();
+      const upcomingTime = signupTimes.find((t: any) => (t.attributes?.starts_at || '') >= nowIso);
+      const chosenTime = upcomingTime || signupTimes[0] || signupTimes[signupTimes.length - 1];
+      const startsAt = chosenTime?.attributes?.starts_at || e.attributes.starts_at || e.attributes.open_at || e.attributes.event_time || null;
+
+      return {
+        id: e.id,
+        name: e.attributes.name,
+        description: e.attributes.description,
+        logoUrl: e.attributes.logo_url || null,
+        signupsCount: e.attributes.signups_count || 0,
+        startsAt,
+        location: e.attributes.location || e.attributes.location_name || null,
+        publicUrl: e.attributes.church_center_url || e.attributes.public_url || e.attributes.public_church_center_web_url || (subdomain ? `https://${subdomain}.churchcenter.com/registrations/events/${e.id}` : null),
+      };
+    });
     cache[cacheKey] = { data: events, timestamp: Date.now() };
     res.json(events);
   } catch (e: any) {

@@ -202,15 +202,42 @@ export const pcoService = {
     async getRegistrations(churchId: string): Promise<any[]> {
         if (isSimulated(churchId)) {
             return [
-                { id: 'c1_reg0001', type: 'Signup', attributes: { name: 'Summer Family Camp 2025', signup_count: 62, signup_limit: 80 } },
-                { id: 'c1_reg0002', type: 'Signup', attributes: { name: 'Marriage Enrichment Retreat', signup_count: 18, signup_limit: 20 } }
+                { id: 'c1_reg0001', type: 'Signup', attributes: { name: 'Summer Family Camp 2025', signup_count: 62, signup_limit: 80, starts_at: '2025-07-15T09:00:00Z' } },
+                { id: 'c1_reg0002', type: 'Signup', attributes: { name: 'Marriage Enrichment Retreat', signup_count: 18, signup_limit: 20, starts_at: '2025-08-20T18:00:00Z' } }
             ];
         }
         // PCO Registrations API v2 — events are called "signups" in the API resource name
         // The old /events endpoint does not exist; use /signups instead.
         try {
             const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&include=signup_times`);
-            return safeData(data);
+            const items = safeData(data);
+            const included: any[] = Array.isArray(data?.included) ? data.included : [];
+            return items.map(item => {
+                const signupTimeRefs: any[] = item.relationships?.signup_times?.data || [];
+                const signupTimes = signupTimeRefs
+                    .map((ref: any) => included.find((i: any) => i.type === 'SignupTime' && i.id === ref.id))
+                    .filter(Boolean)
+                    .sort((a: any, b: any) => {
+                        const aDate = a.attributes?.starts_at || a.attributes?.created_at || '';
+                        const bDate = b.attributes?.starts_at || b.attributes?.created_at || '';
+                        return aDate.localeCompare(bDate);
+                    });
+
+                const nowIso = new Date().toISOString();
+                const upcomingTime = signupTimes.find((t: any) => (t.attributes?.starts_at || '') >= nowIso);
+                const chosenTime = upcomingTime || signupTimes[0] || signupTimes[signupTimes.length - 1];
+                const startsAt = chosenTime?.attributes?.starts_at || null;
+                const endsAt = chosenTime?.attributes?.ends_at || null;
+
+                return {
+                    ...item,
+                    attributes: {
+                        ...item.attributes,
+                        starts_at: startsAt,
+                        ends_at: endsAt
+                    }
+                };
+            });
         } catch (e: any) {
             // If the scoped endpoint fails, re-throw with original error
             throw e;

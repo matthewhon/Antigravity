@@ -43,14 +43,13 @@ const firstImageUrl = (attrs: any): string | undefined => {
 
 // Map a raw PCO Registrations API Signup item into our flat PcoItem shape.
 // The Signup resource uses: name, description, logo_url, open_at, close_at, archived, new_registration_url
-// (NOT starts_at — event dates live in the related SignupTime resource)
+// (Event dates live in related SignupTime resources and are attached to item.attributes.starts_at)
 const mapRegistration = (item: any): PcoItem => ({
   id: item.id,
   name: item.attributes?.name || 'Unnamed Event',
   description: item.attributes?.description || '',
   date: (() => {
-    // Use open_at (registration window open) as the display date if no SignupTime is resolved
-    const start = item.attributes?.open_at || item.attributes?.close_at;
+    const start = item.attributes?.starts_at || item.attributes?.open_at || item.attributes?.close_at;
     return start ? formatDate(start) : '';
   })(),
   imageUrl: firstImageUrl(item.attributes),
