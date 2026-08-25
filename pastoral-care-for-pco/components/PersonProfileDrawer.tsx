@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
@@ -628,23 +629,23 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             </button>
           </div>
 
-          {/* ── Suggested Next Steps Popout Window Modal ── */}
-          {showNextStepsModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          {/* ── Suggested Next Steps Popout Window Modal (Rendered via React Portal) ── */}
+          {showNextStepsModal && typeof document !== 'undefined' && createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="absolute inset-0" onClick={() => setShowNextStepsModal(false)} />
-              <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[85vh] z-10 animate-in zoom-in-95 duration-200">
+              <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[90vh] z-10 animate-in zoom-in-95 duration-200">
                 {/* Popout Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
-                      <Compass className="w-5 h-5" />
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shrink-0">
+                      <Compass className="w-6 h-6" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-black text-slate-900 dark:text-white">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white">
                           Suggested Next Steps for {person.name}
                         </h3>
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                        <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
                           Discipleship Pathways
                         </span>
                       </div>
@@ -655,9 +656,9 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                   </div>
                   <button
                     onClick={() => setShowNextStepsModal(false)}
-                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition cursor-pointer"
+                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
 
@@ -673,10 +674,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                 <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-4 pr-1">
                   {/* Suggestion 1: Small Group */}
                   {isNotInGroup ? (
-                    <div className="bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 space-y-3">
+                    <div className="bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                             <Users className="w-5 h-5" />
                           </div>
                           <div>
@@ -693,7 +694,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                         {availableGroups.length > 0 ? (
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <label className="text-xs font-bold text-slate-400 uppercase shrink-0">Group:</label>
@@ -722,7 +723,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplySmsTemplate(msg);
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
                             title="Prefill SMS invite in drawer"
                           >
                             <Send className="w-3.5 h-3.5" /> Text Invite
@@ -734,7 +735,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}. Follow up in 1-2 weeks.`, 'Call');
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
+                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
                             title="Log note in drawer"
                           >
                             <NotebookPen className="w-3.5 h-3.5" /> Log Note
@@ -746,10 +747,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
                   {/* Suggestion 2: Service Team */}
                   {isNotServing ? (
-                    <div className="bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 space-y-3">
+                    <div className="bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                             <HeartHandshake className="w-5 h-5" />
                           </div>
                           <div>
@@ -766,7 +767,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                         {availableTeams.length > 0 ? (
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <label className="text-xs font-bold text-slate-400 uppercase shrink-0">Team:</label>
@@ -795,7 +796,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplySmsTemplate(msg);
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
                             title="Prefill SMS serving invitation in drawer"
                           >
                             <Send className="w-3.5 h-3.5" /> Text Opportunity
@@ -807,7 +808,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving opportunities on the ${teamName} team.`, 'Meeting');
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
+                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
                             title="Log note in drawer"
                           >
                             <NotebookPen className="w-3.5 h-3.5" /> Log Note
@@ -819,10 +820,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
                   {/* Suggestion 3: Event Registration */}
                   {unregisteredUpcomingEvents.length > 0 ? (
-                    <div className="bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 space-y-3">
+                    <div className="bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                             <CalendarCheck className="w-5 h-5" />
                           </div>
                           <div>
@@ -839,7 +840,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <label className="text-xs font-bold text-slate-400 uppercase shrink-0">Event:</label>
                           <select
@@ -865,7 +866,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplySmsTemplate(msg);
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition shadow-sm cursor-pointer"
                             title="Prefill SMS event invitation in drawer"
                           >
                             <Send className="w-3.5 h-3.5" /> Text Invite
@@ -901,7 +902,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                               handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
                               setShowNextStepsModal(false);
                             }}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
+                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 transition cursor-pointer"
                             title="Log note in drawer"
                           >
                             <NotebookPen className="w-3.5 h-3.5" /> Log Note
@@ -913,7 +914,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
                   {/* Celebration state if all 3 are in place */}
                   {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
-                    <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/30 rounded-2xl p-4 flex items-center gap-3">
+                    <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/30 rounded-2xl p-4 sm:p-5 flex items-center gap-3">
                       <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
                         <h4 className="text-sm font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
@@ -936,7 +937,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* ── Status & Engagement Overview Grid ── */}

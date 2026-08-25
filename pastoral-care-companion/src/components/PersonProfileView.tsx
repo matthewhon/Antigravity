@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest, 
   DetailedDonation, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee 
@@ -538,7 +539,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           </div>
 
           {/* ── Suggested Next Steps Popout Modal Window ── */}
-          {showNextStepsModal && (
+          {showNextStepsModal && typeof document !== 'undefined' && createPortal(
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="absolute inset-0" onClick={() => setShowNextStepsModal(false)} />
               <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh] z-10 animate-in zoom-in-95 duration-200">
@@ -797,7 +798,8 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* ── Status & Engagement Overview Grid ── */}
