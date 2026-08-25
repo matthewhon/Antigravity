@@ -131,6 +131,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   const [savingNote, setSavingNote] = useState(false);
 
   // Suggestion state
+  const [showNextStepsModal, setShowNextStepsModal] = useState<boolean>(false);
   const [selectedGroupSuggestion, setSelectedGroupSuggestion] = useState<string>('');
   const [selectedTeamSuggestion, setSelectedTeamSuggestion] = useState<string>('');
   const [selectedEventSuggestion, setSelectedEventSuggestion] = useState<string>('');
@@ -341,6 +342,8 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
     return !isAttendee;
   });
 
+  const pendingSuggestionsCount = (isNotInGroup ? 1 : 0) + (isNotServing ? 1 : 0) + (unregisteredUpcomingEvents.length > 0 ? 1 : 0);
+
   useEffect(() => {
     if (groups.length > 0 && !selectedGroupSuggestion) {
       const firstActive = groups.find(g => !g.archivedAt);
@@ -377,6 +380,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   };
 
   const handleApplySmsTemplate = (templateText: string) => {
+    setShowNextStepsModal(false);
     if (resolvedPhone) {
       const cleaned = resolvedPhone.replace(/[^\d+]/g, '');
       const smsUri = `sms:${cleaned}?&body=${encodeURIComponent(templateText)}`;
@@ -389,6 +393,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   };
 
   const handleApplyNoteTemplate = (content: string, type: PastoralNote['type'] = 'Note') => {
+    setShowNextStepsModal(false);
     setNoteType(type);
     setNoteContent(content);
     setFeedbackToast('Care note filled with suggested action.');
@@ -481,243 +486,319 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
             )}
           </div>
 
-          {/* ── Suggested Next Steps (Touch & Mobile Optimized) ── */}
-          <div className="bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-zinc-900 dark:to-purple-950/20 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/40 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                  <Compass size={13} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black text-slate-800 dark:text-zinc-100 uppercase tracking-wider">
-                    Suggested Next Steps
+          {/* ── Compact Suggested Next Steps Trigger Banner ── */}
+          <div className="p-3.5 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-zinc-900 dark:to-purple-950/20 shadow-xs flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Compass size={14} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs font-black uppercase text-slate-800 dark:text-zinc-100 tracking-wider truncate">
+                    Next Steps
                   </h3>
-                  <p className="text-[9px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
-                    Risk-based discipleship actions
-                  </p>
+                  {pendingSuggestionsCount > 0 ? (
+                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-600 text-white shrink-0">
+                      {pendingSuggestionsCount} Action{pendingSuggestionsCount > 1 ? 's' : ''}
+                    </span>
+                  ) : (
+                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 shrink-0">
+                      ✓ Active
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  {isNotInGroup && (
+                    <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300">
+                      Group
+                    </span>
+                  )}
+                  {isNotServing && (
+                    <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300">
+                      Serving
+                    </span>
+                  )}
+                  {unregisteredUpcomingEvents.length > 0 && (
+                    <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
+                      Event ({unregisteredUpcomingEvents.length})
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {feedbackToast && (
-              <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in duration-150">
-                <Check size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span>{feedbackToast}</span>
-              </div>
-            )}
-
-            <div className="space-y-2.5">
-              {/* 1. Small Group Suggestion */}
-              {isNotInGroup && (
-                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-                        <Users size={14} />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Small Group</h4>
-                        <p className="text-[10px] text-slate-400 leading-tight truncate">Not enrolled in any small group</p>
-                      </div>
-                    </div>
-                    <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasGroupRiskFactor ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30'}`}>
-                      {hasGroupRiskFactor ? 'Priority' : 'Pathway'}
-                    </span>
-                  </div>
-
-                  {availableGroups.length > 0 && (
-                    <select
-                      value={selectedGroupSuggestion || (activeTargetGroup?.id || '')}
-                      onChange={e => setSelectedGroupSuggestion(e.target.value)}
-                      className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                    >
-                      {availableGroups.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.name} ({g.membersCount || 0} members)
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  <div className="flex gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const groupName = activeTargetGroup?.name || 'a small group';
-                        const msg = `Hi ${firstName}, we'd love to invite you to join one of our small groups! Are you interested in checking out ${groupName}?`;
-                        handleApplySmsTemplate(msg);
-                      }}
-                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
-                    >
-                      <Send size={11} /> Text Invite
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const groupName = activeTargetGroup?.name || 'Small Group';
-                        handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}.`, 'Call');
-                      }}
-                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
-                    >
-                      Log Note
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. Service Team Suggestion */}
-              {isNotServing && (
-                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <HeartHandshake size={14} />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Connect to Service Team</h4>
-                        <p className="text-[10px] text-slate-400 leading-tight truncate">0 serving times in last 90 days</p>
-                      </div>
-                    </div>
-                    <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasServingRiskFactor ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
-                      {hasServingRiskFactor ? 'Need' : 'Serving'}
-                    </span>
-                  </div>
-
-                  {availableTeams.length > 0 && (
-                    <select
-                      value={selectedTeamSuggestion || (activeTargetTeam?.id || '')}
-                      onChange={e => setSelectedTeamSuggestion(e.target.value)}
-                      className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                    >
-                      {availableTeams.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  <div className="flex gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const teamName = activeTargetTeam?.name || 'our service ministry';
-                        const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
-                        handleApplySmsTemplate(msg);
-                      }}
-                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
-                    >
-                      <Send size={11} /> Text Opportunity
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const teamName = activeTargetTeam?.name || 'Service Team';
-                        handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving on ${teamName}.`, 'Meeting');
-                      }}
-                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
-                    >
-                      Log Note
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Event Registration Suggestion */}
-              {unregisteredUpcomingEvents.length > 0 && (
-                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                        <CalendarCheck size={14} />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Registration Event</h4>
-                        <p className="text-[10px] text-slate-400 leading-tight truncate">Upcoming church event open for signups</p>
-                      </div>
-                    </div>
-                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 shrink-0">
-                      Event
-                    </span>
-                  </div>
-
-                  <select
-                    value={selectedEventSuggestion || (activeTargetEvent?.id || '')}
-                    onChange={e => setSelectedEventSuggestion(e.target.value)}
-                    className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                  >
-                    {unregisteredUpcomingEvents.map(ev => (
-                      <option key={ev.id} value={ev.id}>
-                        {ev.name} {ev.startsAt ? `(${formatDate(ev.startsAt)})` : ''}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div className="flex gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const eventName = activeTargetEvent?.name || 'our church event';
-                        const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
-                        const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` Sign up: ${link}` : ''}`;
-                        handleApplySmsTemplate(msg);
-                      }}
-                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
-                    >
-                      <Send size={11} /> Text Invite
-                    </button>
-
-                    {activeTargetEvent?.publicUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText(activeTargetEvent.publicUrl!, `mob_event_${activeTargetEvent.id}`, 'Event link')}
-                        className="py-1.5 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-lg active:scale-95 transition"
-                        title="Copy event signup link"
-                      >
-                        {copiedItemId === `mob_event_${activeTargetEvent.id}` ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                      </button>
-                    )}
-
-                    {activeTargetEvent?.publicUrl && (
-                      <a
-                        href={activeTargetEvent.publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-1.5 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-lg active:scale-95 transition flex items-center justify-center"
-                        title="Open signup page"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const eventName = activeTargetEvent?.name || 'Event';
-                        handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
-                      }}
-                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
-                    >
-                      Log Note
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Celebration state if all 3 are in place */}
-              {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
-                <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3 flex items-center gap-2.5">
-                  <Check size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
-                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400/80 leading-tight mt-0.5">
-                      Person is in a small group, serving on a team, and up to date on event registrations.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowNextStepsModal(true)}
+              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition shadow-sm active:scale-95 shrink-0"
+            >
+              <span>View</span>
+              <ExternalLink size={11} />
+            </button>
           </div>
+
+          {/* ── Suggested Next Steps Popout Modal Window ── */}
+          {showNextStepsModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="absolute inset-0" onClick={() => setShowNextStepsModal(false)} />
+              <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh] z-10 animate-in zoom-in-95 duration-200">
+                {/* Popout Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <Compass size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 dark:text-zinc-100">
+                        Suggested Next Steps
+                      </h3>
+                      <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
+                        Risk-based discipleship actions
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowNextStepsModal(false)}
+                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 flex items-center justify-center transition"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Toast Feedback */}
+                {feedbackToast && (
+                  <div className="my-2.5 flex items-center gap-2 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in duration-150">
+                    <Check size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span>{feedbackToast}</span>
+                  </div>
+                )}
+
+                {/* Popout Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3 pr-0.5">
+                  {/* 1. Small Group Suggestion */}
+                  {isNotInGroup && (
+                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                            <Users size={14} />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Small Group</h4>
+                            <p className="text-[10px] text-slate-400 leading-tight truncate">Not enrolled in any small group</p>
+                          </div>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasGroupRiskFactor ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30'}`}>
+                          {hasGroupRiskFactor ? 'Priority' : 'Pathway'}
+                        </span>
+                      </div>
+
+                      {availableGroups.length > 0 && (
+                        <select
+                          value={selectedGroupSuggestion || (activeTargetGroup?.id || '')}
+                          onChange={e => setSelectedGroupSuggestion(e.target.value)}
+                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                        >
+                          {availableGroups.map(g => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.membersCount || 0} members)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const groupName = activeTargetGroup?.name || 'a small group';
+                            const msg = `Hi ${firstName}, we'd love to invite you to join one of our small groups! Are you interested in checking out ${groupName}?`;
+                            handleApplySmsTemplate(msg);
+                          }}
+                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
+                        >
+                          <Send size={11} /> Text Invite
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const groupName = activeTargetGroup?.name || 'Small Group';
+                            handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}.`, 'Call');
+                          }}
+                          className="py-2 px-3.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
+                        >
+                          Log Note
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. Service Team Suggestion */}
+                  {isNotServing && (
+                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                            <HeartHandshake size={14} />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Connect to Service Team</h4>
+                            <p className="text-[10px] text-slate-400 leading-tight truncate">0 serving times in last 90 days</p>
+                          </div>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasServingRiskFactor ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
+                          {hasServingRiskFactor ? 'Need' : 'Serving'}
+                        </span>
+                      </div>
+
+                      {availableTeams.length > 0 && (
+                        <select
+                          value={selectedTeamSuggestion || (activeTargetTeam?.id || '')}
+                          onChange={e => setSelectedTeamSuggestion(e.target.value)}
+                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                        >
+                          {availableTeams.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const teamName = activeTargetTeam?.name || 'our service ministry';
+                            const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
+                            handleApplySmsTemplate(msg);
+                          }}
+                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
+                        >
+                          <Send size={11} /> Text Opportunity
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const teamName = activeTargetTeam?.name || 'Service Team';
+                            handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving on ${teamName}.`, 'Meeting');
+                          }}
+                          className="py-2 px-3.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
+                        >
+                          Log Note
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Event Registration Suggestion */}
+                  {unregisteredUpcomingEvents.length > 0 && (
+                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <CalendarCheck size={14} />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Registration Event</h4>
+                            <p className="text-[10px] text-slate-400 leading-tight truncate">Upcoming church event open for signups</p>
+                          </div>
+                        </div>
+                        <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 shrink-0">
+                          Event
+                        </span>
+                      </div>
+
+                      <select
+                        value={selectedEventSuggestion || (activeTargetEvent?.id || '')}
+                        onChange={e => setSelectedEventSuggestion(e.target.value)}
+                        className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                      >
+                        {unregisteredUpcomingEvents.map(ev => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.name} {ev.startsAt ? `(${formatDate(ev.startsAt)})` : ''}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="flex gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const eventName = activeTargetEvent?.name || 'our church event';
+                            const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
+                            const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` Sign up: ${link}` : ''}`;
+                            handleApplySmsTemplate(msg);
+                          }}
+                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
+                        >
+                          <Send size={11} /> Text Invite
+                        </button>
+
+                        {activeTargetEvent?.publicUrl && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(activeTargetEvent.publicUrl!, `mob_event_${activeTargetEvent.id}`, 'Event link')}
+                            className="py-2 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl active:scale-95 transition"
+                            title="Copy event signup link"
+                          >
+                            {copiedItemId === `mob_event_${activeTargetEvent.id}` ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                          </button>
+                        )}
+
+                        {activeTargetEvent?.publicUrl && (
+                          <a
+                            href={activeTargetEvent.publicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="py-2 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl active:scale-95 transition flex items-center justify-center"
+                            title="Open signup page"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const eventName = activeTargetEvent?.name || 'Event';
+                            handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
+                          }}
+                          className="py-2 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
+                        >
+                          Log Note
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Celebration state if all 3 are in place */}
+                  {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
+                    <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-3.5 flex items-center gap-2.5">
+                      <Check size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
+                        <p className="text-[10px] text-emerald-700 dark:text-emerald-400/80 leading-tight mt-0.5">
+                          Person is in a small group, serving on a team, and up to date on event registrations.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Popout Footer */}
+                <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex justify-end shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowNextStepsModal(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Status & Engagement Overview Grid ── */}
           <div className="grid grid-cols-3 gap-2">
