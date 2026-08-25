@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation } from '../types';
+import { 
+  PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest, 
+  DetailedDonation, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee 
+} from '../types';
 import { firestore } from '../services/firestoreService';
 import { 
   Phone, MessageSquare, MapPin, Calendar, 
   Plus, X, Mail, Loader2, Sparkles, CalendarCheck,
   ShieldAlert, Activity, HeartHandshake, Users,
   Church as ChurchIcon, DollarSign, Heart, Clock, Tag,
-  CheckSquare
+  CheckSquare, Compass, Copy, ExternalLink, Check, Send
 } from 'lucide-react';
 
 function getEngagementStatus(person: PcoPerson): string {
@@ -71,12 +74,13 @@ export function getPersonEmail(person?: PcoPerson | null): string | null {
   if (person.email && typeof person.email === 'string' && person.email.trim().length > 0) {
     return person.email.trim();
   }
-  if (Array.isArray(person.emails) && person.emails.length > 0) {
-    const primaryObj = person.emails.find((e: any) => e?.primary && e?.address);
+  const emailsArr = (person as any).emails;
+  if (Array.isArray(emailsArr) && emailsArr.length > 0) {
+    const primaryObj = emailsArr.find((e: any) => e?.primary && e?.address);
     if (primaryObj?.address) return primaryObj.address.trim();
-    const firstObj = person.emails.find((e: any) => e?.address);
+    const firstObj = emailsArr.find((e: any) => e?.address);
     if (firstObj?.address) return firstObj.address.trim();
-    const firstStr = person.emails.find((e: any) => typeof e === 'string' && e.trim().length > 0);
+    const firstStr = emailsArr.find((e: any) => typeof e === 'string' && e.trim().length > 0);
     if (firstStr) return (firstStr as string).trim();
   }
   return null;
@@ -90,10 +94,11 @@ export function getPersonPhone(person?: PcoPerson | null): string | null {
   if (person.e164Phone && typeof person.e164Phone === 'string' && person.e164Phone.trim().length > 0) {
     return person.e164Phone.trim();
   }
-  if (Array.isArray(person.phoneNumbers) && person.phoneNumbers.length > 0) {
-    const primaryObj = person.phoneNumbers.find((p: any) => p?.primary && p?.number);
+  const phonesArr = (person as any).phoneNumbers;
+  if (Array.isArray(phonesArr) && phonesArr.length > 0) {
+    const primaryObj = phonesArr.find((p: any) => p?.primary && p?.number);
     if (primaryObj?.number) return primaryObj.number.trim();
-    const firstObj = person.phoneNumbers.find((p: any) => p?.number);
+    const firstObj = phonesArr.find((p: any) => p?.number);
     if (firstObj?.number) return firstObj.number.trim();
   }
   return null;
@@ -114,6 +119,9 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
 }) => {
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [groups, setGroups] = useState<PcoGroup[]>([]);
+  const [teams, setTeams] = useState<ServicesTeam[]>([]);
+  const [registrations, setRegistrations] = useState<PcoRegistrationEvent[]>([]);
+  const [attendees, setAttendees] = useState<PcoRegistrationAttendee[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [donations, setDonations] = useState<DetailedDonation[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -122,23 +130,36 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   const [followUpDate, setFollowUpDate] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
+  // Suggestion state
+  const [selectedGroupSuggestion, setSelectedGroupSuggestion] = useState<string>('');
+  const [selectedTeamSuggestion, setSelectedTeamSuggestion] = useState<string>('');
+  const [selectedEventSuggestion, setSelectedEventSuggestion] = useState<string>('');
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+
   const canAccessGiving = canViewGiving(currentUser);
 
-  // Load notes, groups, prayer requests, and donations on mount/change
+  // Load notes, groups, teams, registrations, prayer requests, and donations on mount/change
   useEffect(() => {
     const fetchExtraData = async () => {
       setLoadingNotes(true);
       try {
-        const [list, fetchedGroups, fetchedPrayers, fetchedDonations] = await Promise.all([
+        const [list, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees] = await Promise.all([
           firestore.getPastoralNotes(churchId, person.id),
           firestore.getGroups(churchId),
           firestore.getPrayerRequests(churchId),
           canAccessGiving ? firestore.getDetailedDonations(churchId) : Promise.resolve([]),
+          firestore.getServicesTeams(churchId),
+          firestore.getRegistrations(churchId),
+          firestore.getRegistrationAttendees(churchId),
         ]);
         setNotes(list);
         setGroups(fetchedGroups);
         setPrayerRequests(fetchedPrayers);
         setDonations(fetchedDonations || []);
+        setTeams(fetchedTeams || []);
+        setRegistrations(fetchedRegistrations || []);
+        setAttendees(fetchedAttendees || []);
       } catch (e) {
         console.error("Failed to load profile data:", e);
       } finally {
@@ -291,6 +312,90 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
     }
   };
 
+  // ── Next Steps Suggestions Logic ──
+  const isNotInGroup = personGroups.length === 0;
+  const hasGroupRiskFactor = riskProfile?.factors?.some(f => 
+    f.toLowerCase().includes('group') || f.toLowerCase().includes('connect')
+  ) || (riskProfile && riskProfile.category !== 'Healthy' && isNotInGroup);
+  const availableGroups = groups.filter(g => !g.archivedAt);
+
+  const isNotServing = (servingStats?.last90DaysCount ?? timesServed ?? 0) === 0 && !teams.some(t => t.memberIds?.includes(person?.id || '') || t.scheduledMemberIds?.includes(person?.id || ''));
+  const hasServingRiskFactor = riskProfile?.factors?.some(f => 
+    f.toLowerCase().includes('serv') || f.toLowerCase().includes('volunteer')
+  ) || (riskProfile && riskProfile.category !== 'Healthy' && isNotServing);
+  const availableTeams = teams.filter(t => t.name);
+
+  const nowIso = new Date().toISOString().slice(0, 10);
+  const upcomingEvents = registrations.filter(r => {
+    if (r.visibility === 'archived') return false;
+    const eventDate = r.startsAt || r.openAt;
+    if (!eventDate) return true;
+    return eventDate.slice(0, 10) >= nowIso || (!r.endsAt || r.endsAt.slice(0, 10) >= nowIso);
+  });
+
+  const unregisteredUpcomingEvents = upcomingEvents.filter(ev => {
+    const isAttendee = attendees.some(a => 
+      (a.eventId === ev.id || a.pcoEventId === ev.pcoId) && 
+      ((a.personId && a.personId === person?.id) || (a.name && person?.name && a.name.trim().toLowerCase() === person.name.trim().toLowerCase()))
+    );
+    return !isAttendee;
+  });
+
+  useEffect(() => {
+    if (groups.length > 0 && !selectedGroupSuggestion) {
+      const firstActive = groups.find(g => !g.archivedAt);
+      if (firstActive) setSelectedGroupSuggestion(firstActive.id);
+    }
+    if (teams.length > 0 && !selectedTeamSuggestion) {
+      setSelectedTeamSuggestion(teams[0].id);
+    }
+  }, [groups, teams, selectedGroupSuggestion, selectedTeamSuggestion]);
+
+  useEffect(() => {
+    if (unregisteredUpcomingEvents.length > 0 && !selectedEventSuggestion) {
+      setSelectedEventSuggestion(unregisteredUpcomingEvents[0].id);
+    }
+  }, [unregisteredUpcomingEvents, selectedEventSuggestion]);
+
+  useEffect(() => {
+    if (feedbackToast) {
+      const timer = setTimeout(() => setFeedbackToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [feedbackToast]);
+
+  const activeTargetGroup = groups.find(g => g.id === selectedGroupSuggestion) || groups.find(g => !g.archivedAt) || groups[0];
+  const activeTargetTeam = teams.find(t => t.id === selectedTeamSuggestion) || teams[0];
+  const activeTargetEvent = unregisteredUpcomingEvents.find(e => e.id === selectedEventSuggestion) || unregisteredUpcomingEvents[0];
+  const firstName = person?.name ? person.name.split(' ')[0] : 'there';
+
+  const handleCopyText = (text: string, id: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedItemId(id);
+    setFeedbackToast(`${label} copied to clipboard!`);
+    setTimeout(() => setCopiedItemId(null), 2500);
+  };
+
+  const handleApplySmsTemplate = (templateText: string) => {
+    if (resolvedPhone) {
+      const cleaned = resolvedPhone.replace(/[^\d+]/g, '');
+      const smsUri = `sms:${cleaned}?&body=${encodeURIComponent(templateText)}`;
+      window.open(smsUri, '_system');
+      setFeedbackToast('Opening SMS messaging app...');
+    } else {
+      navigator.clipboard.writeText(templateText);
+      setFeedbackToast('Message copied to clipboard (no phone on file).');
+    }
+  };
+
+  const handleApplyNoteTemplate = (content: string, type: PastoralNote['type'] = 'Note') => {
+    setNoteType(type);
+    setNoteContent(content);
+    setFeedbackToast('Care note filled with suggested action.');
+    const formEl = document.getElementById('companion-note-box');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
@@ -374,6 +479,244 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
                 🏛️ {person.primaryCampusName}
               </span>
             )}
+          </div>
+
+          {/* ── Suggested Next Steps (Touch & Mobile Optimized) ── */}
+          <div className="bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-zinc-900 dark:to-purple-950/20 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/40 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                  <Compass size={13} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-800 dark:text-zinc-100 uppercase tracking-wider">
+                    Suggested Next Steps
+                  </h3>
+                  <p className="text-[9px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
+                    Risk-based discipleship actions
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {feedbackToast && (
+              <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in duration-150">
+                <Check size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span>{feedbackToast}</span>
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              {/* 1. Small Group Suggestion */}
+              {isNotInGroup && (
+                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                        <Users size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Small Group</h4>
+                        <p className="text-[10px] text-slate-400 leading-tight truncate">Not enrolled in any small group</p>
+                      </div>
+                    </div>
+                    <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasGroupRiskFactor ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30'}`}>
+                      {hasGroupRiskFactor ? 'Priority' : 'Pathway'}
+                    </span>
+                  </div>
+
+                  {availableGroups.length > 0 && (
+                    <select
+                      value={selectedGroupSuggestion || (activeTargetGroup?.id || '')}
+                      onChange={e => setSelectedGroupSuggestion(e.target.value)}
+                      className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                    >
+                      {availableGroups.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} ({g.membersCount || 0} members)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="flex gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const groupName = activeTargetGroup?.name || 'a small group';
+                        const msg = `Hi ${firstName}, we'd love to invite you to join one of our small groups! Are you interested in checking out ${groupName}?`;
+                        handleApplySmsTemplate(msg);
+                      }}
+                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
+                    >
+                      <Send size={11} /> Text Invite
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const groupName = activeTargetGroup?.name || 'Small Group';
+                        handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}.`, 'Call');
+                      }}
+                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
+                    >
+                      Log Note
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Service Team Suggestion */}
+              {isNotServing && (
+                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <HeartHandshake size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Connect to Service Team</h4>
+                        <p className="text-[10px] text-slate-400 leading-tight truncate">0 serving times in last 90 days</p>
+                      </div>
+                    </div>
+                    <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasServingRiskFactor ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
+                      {hasServingRiskFactor ? 'Need' : 'Serving'}
+                    </span>
+                  </div>
+
+                  {availableTeams.length > 0 && (
+                    <select
+                      value={selectedTeamSuggestion || (activeTargetTeam?.id || '')}
+                      onChange={e => setSelectedTeamSuggestion(e.target.value)}
+                      className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                    >
+                      {availableTeams.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="flex gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const teamName = activeTargetTeam?.name || 'our service ministry';
+                        const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
+                        handleApplySmsTemplate(msg);
+                      }}
+                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
+                    >
+                      <Send size={11} /> Text Opportunity
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const teamName = activeTargetTeam?.name || 'Service Team';
+                        handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving on ${teamName}.`, 'Meeting');
+                      }}
+                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
+                    >
+                      Log Note
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Event Registration Suggestion */}
+              {unregisteredUpcomingEvents.length > 0 && (
+                <div className="bg-white dark:bg-zinc-800/80 rounded-xl p-3 border border-slate-100 dark:border-zinc-700/60 space-y-2">
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <CalendarCheck size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Registration Event</h4>
+                        <p className="text-[10px] text-slate-400 leading-tight truncate">Upcoming church event open for signups</p>
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 shrink-0">
+                      Event
+                    </span>
+                  </div>
+
+                  <select
+                    value={selectedEventSuggestion || (activeTargetEvent?.id || '')}
+                    onChange={e => setSelectedEventSuggestion(e.target.value)}
+                    className="w-full text-[11px] p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-bold text-slate-800 dark:text-zinc-200 outline-none"
+                  >
+                    {unregisteredUpcomingEvents.map(ev => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name} {ev.startsAt ? `(${formatDate(ev.startsAt)})` : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const eventName = activeTargetEvent?.name || 'our church event';
+                        const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
+                        const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` Sign up: ${link}` : ''}`;
+                        handleApplySmsTemplate(msg);
+                      }}
+                      className="flex-1 py-1.5 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-lg flex items-center justify-center gap-1 active:scale-95 transition"
+                    >
+                      <Send size={11} /> Text Invite
+                    </button>
+
+                    {activeTargetEvent?.publicUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(activeTargetEvent.publicUrl!, `mob_event_${activeTargetEvent.id}`, 'Event link')}
+                        className="py-1.5 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-lg active:scale-95 transition"
+                        title="Copy event signup link"
+                      >
+                        {copiedItemId === `mob_event_${activeTargetEvent.id}` ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                      </button>
+                    )}
+
+                    {activeTargetEvent?.publicUrl && (
+                      <a
+                        href={activeTargetEvent.publicUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-1.5 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-lg active:scale-95 transition flex items-center justify-center"
+                        title="Open signup page"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const eventName = activeTargetEvent?.name || 'Event';
+                        handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
+                      }}
+                      className="py-1.5 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-lg active:scale-95 transition"
+                    >
+                      Log Note
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Celebration state if all 3 are in place */}
+              {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
+                <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3 flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400/80 leading-tight mt-0.5">
+                      Person is in a small group, serving on a team, and up to date on event registrations.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Status & Engagement Overview Grid ── */}
@@ -792,7 +1135,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           </div>
 
           {/* Add Care Note */}
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-5 border border-slate-200/50 dark:border-zinc-800 shadow-sm space-y-4">
+          <div id="companion-note-box" className="bg-white dark:bg-zinc-900 rounded-3xl p-5 border border-slate-200/50 dark:border-zinc-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Compose Care Note</h3>
               <Sparkles size={14} className="text-indigo-500 animate-pulse" />

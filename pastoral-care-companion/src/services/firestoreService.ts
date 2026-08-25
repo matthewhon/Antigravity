@@ -20,7 +20,8 @@ import {
   Church, User, UserRole, 
   PcoPerson, PcoGroup, SystemSettings, 
   PastoralNote, PrayerRequest, PcoList,
-  OutreachSession, OutreachSlot, DetailedDonation
+  OutreachSession, OutreachSlot, DetailedDonation,
+  ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee
 } from '../types';
 
 class FirestoreService {
@@ -179,6 +180,49 @@ class FirestoreService {
       return snapshot.docs.map(d => d.data() as DetailedDonation);
     } catch (e) {
       console.warn('getDetailedDonations error:', e);
+      return [];
+    }
+  }
+
+  // --- Services Teams ---
+  async getServicesTeams(churchId: string): Promise<ServicesTeam[]> {
+    try {
+      const q = query(collection(db, 'teams'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as ServicesTeam);
+    } catch (e) {
+      console.warn('getServicesTeams error:', e);
+      return [];
+    }
+  }
+
+  // --- Registrations ---
+  async getRegistrations(churchId: string): Promise<PcoRegistrationEvent[]> {
+    try {
+      const q = query(collection(db, 'pco_registrations'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(d => d.data() as PcoRegistrationEvent)
+        .sort((a, b) => {
+          if (!a.startsAt) return 1;
+          if (!b.startsAt) return -1;
+          return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+        });
+    } catch (e) {
+      console.warn('getRegistrations error:', e);
+      return [];
+    }
+  }
+
+  async getRegistrationAttendees(churchId: string, eventId?: string): Promise<PcoRegistrationAttendee[]> {
+    try {
+      const constraints: any[] = [where('churchId', '==', churchId)];
+      if (eventId) constraints.push(where('eventId', '==', eventId));
+      const q = query(collection(db, 'pco_registration_attendees'), ...constraints);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as PcoRegistrationAttendee);
+    } catch (e) {
+      console.warn('getRegistrationAttendees error:', e);
       return [];
     }
   }

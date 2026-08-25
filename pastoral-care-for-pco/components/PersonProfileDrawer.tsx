@@ -2,14 +2,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee } from '../types';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
   NotebookPen, ChevronDown, ChevronUp, Plus, X,
   ShieldAlert, Activity, HeartHandshake, CalendarCheck, UserCheck,
   Users, Church as ChurchIcon, Sparkles, DollarSign,
-  Heart, Clock, Tag, Check, Calendar, CheckSquare
+  Heart, Clock, Tag, Check, Calendar, CheckSquare,
+  Compass, ExternalLink, Copy, Share2
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -128,11 +129,21 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [person, setPerson] = useState<PcoPerson | null>(null);
   const [allPeople, setAllPeople] = useState<PcoPerson[]>([]);
   const [groups, setGroups] = useState<PcoGroup[]>([]);
+  const [teams, setTeams] = useState<ServicesTeam[]>([]);
+  const [registrations, setRegistrations] = useState<PcoRegistrationEvent[]>([]);
+  const [attendees, setAttendees] = useState<PcoRegistrationAttendee[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [donations, setDonations] = useState<DetailedDonation[]>([]);
   const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Suggestion selections & actions
+  const [selectedGroupSuggestion, setSelectedGroupSuggestion] = useState<string>('');
+  const [selectedTeamSuggestion, setSelectedTeamSuggestion] = useState<string>('');
+  const [selectedEventSuggestion, setSelectedEventSuggestion] = useState<string>('');
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
   // SMS state
   const [smsBody, setSmsBody] = useState('');
@@ -163,6 +174,13 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       return () => clearTimeout(t);
     }
   }, [noteSaveSuccess]);
+
+  useEffect(() => {
+    if (feedbackToast) {
+      const t = setTimeout(() => setFeedbackToast(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [feedbackToast]);
 
   const handleSendSms = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +279,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setNotes([]);
       setTimeline([]);
       try {
-        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
@@ -269,11 +287,17 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           firestore.getGroups(churchId),
           firestore.getPrayerRequests(churchId),
           canAccessGiving ? firestore.getDetailedDonations(churchId) : Promise.resolve([]),
+          firestore.getServicesTeams(churchId),
+          firestore.getRegistrations(churchId),
+          firestore.getRegistrationAttendees(churchId),
         ]);
         setAllPeople(people);
         setGroups(fetchedGroups);
         setPrayerRequests(fetchedPrayers);
         setDonations(fetchedDonations || []);
+        setTeams(fetchedTeams || []);
+        setRegistrations(fetchedRegistrations || []);
+        setAttendees(fetchedAttendees || []);
         const p = people.find(p => p.id === personId);
         if (p) setPerson(p);
         setTimeline(changes);
@@ -407,6 +431,79 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
     }
   };
 
+  // ── Next Steps Suggestions Logic ──
+  const isNotInGroup = personGroups.length === 0;
+  const hasGroupRiskFactor = riskProfile?.factors?.some(f => 
+    f.toLowerCase().includes('group') || f.toLowerCase().includes('connect')
+  ) || (riskProfile && riskProfile.category !== 'Healthy' && isNotInGroup);
+  const availableGroups = groups.filter(g => !g.archivedAt);
+
+  const isNotServing = (servingStats?.last90DaysCount ?? timesServed ?? 0) === 0 && !teams.some(t => t.memberIds?.includes(person?.id || '') || t.scheduledMemberIds?.includes(person?.id || ''));
+  const hasServingRiskFactor = riskProfile?.factors?.some(f => 
+    f.toLowerCase().includes('serv') || f.toLowerCase().includes('volunteer')
+  ) || (riskProfile && riskProfile.category !== 'Healthy' && isNotServing);
+  const availableTeams = teams.filter(t => t.name);
+
+  const nowIso = new Date().toISOString().slice(0, 10);
+  const upcomingEvents = registrations.filter(r => {
+    if (r.visibility === 'archived') return false;
+    const eventDate = r.startsAt || r.openAt;
+    if (!eventDate) return true;
+    return eventDate.slice(0, 10) >= nowIso || (!r.endsAt || r.endsAt.slice(0, 10) >= nowIso);
+  });
+
+  const unregisteredUpcomingEvents = upcomingEvents.filter(ev => {
+    const isAttendee = attendees.some(a => 
+      (a.eventId === ev.id || a.pcoEventId === ev.pcoId) && 
+      ((a.personId && a.personId === person?.id) || (a.name && person?.name && a.name.trim().toLowerCase() === person.name.trim().toLowerCase()))
+    );
+    return !isAttendee;
+  });
+
+  useEffect(() => {
+    if (groups.length > 0 && !selectedGroupSuggestion) {
+      const firstActive = groups.find(g => !g.archivedAt);
+      if (firstActive) setSelectedGroupSuggestion(firstActive.id);
+    }
+    if (teams.length > 0 && !selectedTeamSuggestion) {
+      setSelectedTeamSuggestion(teams[0].id);
+    }
+  }, [groups, teams, selectedGroupSuggestion, selectedTeamSuggestion]);
+
+  useEffect(() => {
+    if (unregisteredUpcomingEvents.length > 0 && !selectedEventSuggestion) {
+      setSelectedEventSuggestion(unregisteredUpcomingEvents[0].id);
+    }
+  }, [unregisteredUpcomingEvents, selectedEventSuggestion]);
+
+  const activeTargetGroup = groups.find(g => g.id === selectedGroupSuggestion) || groups.find(g => !g.archivedAt) || groups[0];
+  const activeTargetTeam = teams.find(t => t.id === selectedTeamSuggestion) || teams[0];
+  const activeTargetEvent = unregisteredUpcomingEvents.find(e => e.id === selectedEventSuggestion) || unregisteredUpcomingEvents[0];
+  const firstName = person?.name ? person.name.split(' ')[0] : 'there';
+
+  const handleCopyText = (text: string, id: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedItemId(id);
+    setFeedbackToast(`${label} copied to clipboard!`);
+    setTimeout(() => setCopiedItemId(null), 2500);
+  };
+
+  const handleApplySmsTemplate = (templateText: string) => {
+    setSmsBody(templateText);
+    setFeedbackToast('Message template loaded into SMS composer below.');
+    const el = document.getElementById('person-sms-section');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleApplyNoteTemplate = (content: string, type: PastoralNote['type'] = 'Note') => {
+    setShowNoteForm(true);
+    setNoteType(type);
+    setNoteContent(content);
+    setFeedbackToast('Care note form opened with suggested action prefilled.');
+    const el = document.getElementById('person-notes-section');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <Drawer isOpen={!!personId} onClose={onClose} title="Person Profile">
       {loading ? (
@@ -470,6 +567,290 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                 🏛️ {person.primaryCampusName}
               </span>
             )}
+          </div>
+
+          {/* ── Suggested Next Steps (Based on Risk Profile & Involvement) ── */}
+          <div className="p-4 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-indigo-950/25 dark:via-slate-900 dark:to-purple-950/20 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-xs font-black uppercase text-slate-800 dark:text-white tracking-wider">
+                      Suggested Next Steps
+                    </h3>
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                      Discipleship Pathways
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                    Proactive outreach recommendations based on risk factors & ministry involvement
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Feedback Alert if action clicked */}
+            {feedbackToast && (
+              <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                <CheckCircle className="w-4 h-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                <span>{feedbackToast}</span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {/* Suggestion 1: Small Group */}
+              {isNotInGroup ? (
+                <div className="bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">Invite to Small Group</h4>
+                          <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${hasGroupRiskFactor ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40' : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'}`}>
+                            {hasGroupRiskFactor ? 'Risk Factor Priority' : 'Community'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Not enrolled in any small group. Connecting with a group builds vital discipleship support.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Selector & Action Buttons */}
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    {availableGroups.length > 0 ? (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Group:</label>
+                        <select
+                          value={selectedGroupSuggestion || (activeTargetGroup?.id || '')}
+                          onChange={e => setSelectedGroupSuggestion(e.target.value)}
+                          className="text-xs font-medium bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 outline-none w-full truncate"
+                        >
+                          {availableGroups.map(g => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.membersCount || 0} members)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">No public groups listed</span>
+                    )}
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const groupName = activeTargetGroup?.name || 'one of our community groups';
+                          const msg = `Hi ${firstName}, we'd love to invite you to connect with a small group! Are you interested in checking out ${groupName}?`;
+                          handleApplySmsTemplate(msg);
+                        }}
+                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                        title="Prefill SMS invite"
+                      >
+                        <Send className="w-3 h-3" /> Text Invite
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const groupName = activeTargetGroup?.name || 'Small Group';
+                          handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}. Follow up in 1-2 weeks.`, 'Call');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition cursor-pointer"
+                        title="Log note for this step"
+                      >
+                        <NotebookPen className="w-3 h-3" /> Log Note
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Suggestion 2: Service Team */}
+              {isNotServing ? (
+                <div className="bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <HeartHandshake className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">Connect to a Service Team</h4>
+                          <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${hasServingRiskFactor ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'}`}>
+                            {hasServingRiskFactor ? 'Serving Need' : 'Ministry'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Not currently serving on any ministry team (0 times in last 90 days). Serving deepens connection.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Team Selector & Action Buttons */}
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    {availableTeams.length > 0 ? (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Team:</label>
+                        <select
+                          value={selectedTeamSuggestion || (activeTargetTeam?.id || '')}
+                          onChange={e => setSelectedTeamSuggestion(e.target.value)}
+                          className="text-xs font-medium bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 outline-none w-full truncate"
+                        >
+                          {availableTeams.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">No service teams configured</span>
+                    )}
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const teamName = activeTargetTeam?.name || 'our service ministry';
+                          const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
+                          handleApplySmsTemplate(msg);
+                        }}
+                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                        title="Prefill SMS serving invitation"
+                      >
+                        <Send className="w-3 h-3" /> Text Opportunity
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const teamName = activeTargetTeam?.name || 'Service Team';
+                          handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving opportunities on the ${teamName} team.`, 'Meeting');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition cursor-pointer"
+                        title="Log note for this step"
+                      >
+                        <NotebookPen className="w-3 h-3" /> Log Note
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Suggestion 3: Event Registration */}
+              {unregisteredUpcomingEvents.length > 0 ? (
+                <div className="bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <CalendarCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">Invite to Registration Event</h4>
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
+                            Upcoming Event
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Not registered for upcoming church event{unregisteredUpcomingEvents.length > 1 ? ` (${unregisteredUpcomingEvents.length} available)` : ''}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Event Selector & Action Buttons */}
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Event:</label>
+                      <select
+                        value={selectedEventSuggestion || (activeTargetEvent?.id || '')}
+                        onChange={e => setSelectedEventSuggestion(e.target.value)}
+                        className="text-xs font-medium bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 outline-none w-full truncate"
+                      >
+                        {unregisteredUpcomingEvents.map(ev => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.name} {ev.startsAt ? `(${formatDate(ev.startsAt)})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const eventName = activeTargetEvent?.name || 'our upcoming church event';
+                          const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
+                          const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` You can register here: ${link}` : ''}`;
+                          handleApplySmsTemplate(msg);
+                        }}
+                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                        title="Prefill SMS event invitation"
+                      >
+                        <Send className="w-3 h-3" /> Text Invite
+                      </button>
+
+                      {activeTargetEvent?.publicUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(activeTargetEvent.publicUrl!, `event_${activeTargetEvent.id}`, 'Event link')}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition cursor-pointer"
+                          title="Copy registration link"
+                        >
+                          {copiedItemId === `event_${activeTargetEvent.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      )}
+
+                      {activeTargetEvent?.publicUrl && (
+                        <a
+                          href={activeTargetEvent.publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition cursor-pointer"
+                          title="Open registration page"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const eventName = activeTargetEvent?.name || 'Registration Event';
+                          handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 transition cursor-pointer"
+                        title="Log note for this step"
+                      >
+                        <NotebookPen className="w-3 h-3" /> Log Note
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Celebration state if all 3 are in place */}
+              {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
+                <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/30 rounded-2xl p-3 flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400/80 mt-0.5">
+                      This person is actively connected in a small group, participating in serving, and up to date on church events.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Status & Engagement Overview Grid ── */}
@@ -823,7 +1204,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           </div>
 
           {/* ── Pastoral Care Notes ── */}
-          <div className="p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/10 space-y-4">
+          <div id="person-notes-section" className="p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/10 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <NotebookPen className="w-4 h-4 text-indigo-500" />
@@ -990,7 +1371,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
           {/* ── Send SMS ── */}
           {church?.smsSettings?.smsEnabled && (
-            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div id="person-sms-section" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
               <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide">Send SMS Message</h3>
               {!person.phone ? (
                 <p className="text-xs text-slate-500 italic">SMS sending is unavailable because this person has no phone number.</p>
