@@ -10,6 +10,7 @@ import {
   DISC_QUESTIONS,
   DISC_PROFILES,
   DISC_DIMENSIONS_INFO,
+  DISC_FOUNDATIONAL_INFO,
   calculateDiscScores,
   DiscCalculationResult,
   DiscDimension
@@ -185,7 +186,7 @@ export const PublicDiscTestView: React.FC<PublicDiscTestViewProps> = ({ churchId
         styleCode: results.styleCode,
         styleName: results.profile.name,
         primaryDimension: results.primaryDimension,
-        secondaryDimension: results.secondaryDimension,
+        secondaryDimension: results.secondaryDimension || null,
         scores: results.scores,
         percentages: results.percentages,
         submittedAt: Date.now()

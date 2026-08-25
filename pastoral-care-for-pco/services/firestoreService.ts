@@ -2471,10 +2471,11 @@ class FirestoreService {
 
   async saveDiscResponse(response: DiscTestResponse): Promise<void> {
     try {
-      await setDoc(doc(db, 'disc_test_responses', response.id), {
+      const payload = JSON.parse(JSON.stringify({
         ...response,
         submittedAt: response.submittedAt || Date.now()
-      });
+      }));
+      await setDoc(doc(db, 'disc_test_responses', response.id), payload);
     } catch (e) {
       this.handleFirestoreError(e);
     }
