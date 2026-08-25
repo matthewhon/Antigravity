@@ -100,12 +100,31 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
   const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
   const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
 
+  const unansweredQuestions = useMemo(() => {
+    return SPIRITUAL_GIFTS_QUESTIONS.filter(q => answers[q.id] === undefined);
+  }, [answers]);
+
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
+
+  const jumpToFirstUnanswered = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const firstMissingIdx = SPIRITUAL_GIFTS_QUESTIONS.findIndex(q => answers[q.id] === undefined);
+    if (firstMissingIdx !== -1) {
+      setCurrentQuestionIndex(firstMissingIdx);
+      setValidationWarning(`Jumping to unanswered statement #${SPIRITUAL_GIFTS_QUESTIONS[firstMissingIdx].id}`);
+      setTimeout(() => setValidationWarning(null), 3500);
+      if (questionCardRef.current) {
+        questionCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  };
+
   const currentQ = SPIRITUAL_GIFTS_QUESTIONS[currentQuestionIndex] || SPIRITUAL_GIFTS_QUESTIONS[0];
 
   const handleSelectScore = (questionId: number, score: number) => {
     setAnswers(prev => ({ ...prev, [questionId]: score }));
 
-    // Auto advance smoothly to next unanswered question after a brief delay
+    // Auto advance smoothly to next question after a brief delay
     if (currentQuestionIndex < totalQuestions - 1) {
       setTimeout(() => {
         setCurrentQuestionIndex(prev => prev + 1);
@@ -118,7 +137,7 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
 
   const handleFinalSubmit = async () => {
     if (answeredCount < totalQuestions) {
-      alert(`Please answer all ${totalQuestions} questions before submitting (currently answered ${answeredCount}/${totalQuestions}).`);
+      jumpToFirstUnanswered();
       return;
     }
 
@@ -497,12 +516,21 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
                     <span>Next</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
+                ) : answeredCount < totalQuestions ? (
+                  <button
+                    type="button"
+                    onClick={jumpToFirstUnanswered}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-amber-600/20 transition cursor-pointer"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Go to Unanswered ({totalQuestions - answeredCount} left)</span>
+                  </button>
                 ) : (
                   <button
                     type="button"
-                    disabled={submitting || answeredCount < totalQuestions}
+                    disabled={submitting}
                     onClick={handleFinalSubmit}
-                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                    className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
                   >
                     {submitting ? (
                       <>
@@ -519,15 +547,45 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
                 )}
               </div>
             </div>
+
+            {/* Unanswered Questions Warning Banner */}
+            {unansweredQuestions.length > 0 && (currentQuestionIndex === totalQuestions - 1 || validationWarning) && (
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 animate-in fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider">
+                      {unansweredQuestions.length} Unanswered {unansweredQuestions.length === 1 ? 'Statement' : 'Statements'} Remaining
+                    </div>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                      All {totalQuestions} statements must be answered to calculate your score. Missing: {unansweredQuestions.slice(0, 7).map(q => `#${q.id}`).join(', ')}{unansweredQuestions.length > 7 ? ` +${unansweredQuestions.length - 7} more` : ''}.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={jumpToFirstUnanswered}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-md transition cursor-pointer"
+                >
+                  <span>Go to Question #{unansweredQuestions[0]?.id}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Quick Jump Matrix */}
           <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Question Quick Jump:
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <span>Question Quick Jump:</span>
+                {unansweredQuestions.length > 0 && (
+                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/40">
+                    {unansweredQuestions.length} remaining
+                  </span>
+                )}
               </span>
-              {answeredCount === totalQuestions && (
+              {answeredCount === totalQuestions ? (
                 <button
                   type="button"
                   onClick={handleFinalSubmit}
@@ -536,6 +594,15 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
                 >
                   <span>Ready to submit ({answeredCount}/{totalQuestions})</span>
                   <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={jumpToFirstUnanswered}
+                  className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Jump to next missing (#{unansweredQuestions[0]?.id})</span>
+                  <ArrowRight className="w-3 h-3" />
                 </button>
               )}
             </div>
@@ -548,15 +615,19 @@ export const PublicGiftsTestView: React.FC<PublicGiftsTestViewProps> = ({ church
                     key={q.id}
                     type="button"
                     onClick={() => setCurrentQuestionIndex(idx)}
-                    className={`h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                    className={`h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer relative ${
                       isCurrent
-                        ? 'ring-2 ring-indigo-600 bg-indigo-600 text-white font-black'
+                        ? 'ring-2 ring-indigo-600 bg-indigo-600 text-white font-black shadow-sm'
                         : isAnswered
                         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50'
-                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                        : 'bg-amber-50/70 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/40 hover:bg-amber-100'
                     }`}
+                    title={isAnswered ? `Question ${q.id} (Answered)` : `Question ${q.id} (Unanswered)`}
                   >
-                    {q.id}
+                    <span>{q.id}</span>
+                    {!isAnswered && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 absolute top-1 right-1" />
+                    )}
                   </button>
                 );
               })}
