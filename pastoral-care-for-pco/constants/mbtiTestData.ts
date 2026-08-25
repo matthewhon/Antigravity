@@ -665,22 +665,22 @@ export function calculateMbtiType(answers: Record<number, number>): CalculatedMb
     }
   });
 
-  // Calculate percentages
-  const eTotal = eScore + iScore;
-  const sTotal = sScore + nScore;
-  const tTotal = tScore + fScore;
-  const jTotal = jScore + pScore;
+  // Calculate percentages with division-by-zero safeguards
+  const eTotal = (eScore + iScore) || 1;
+  const sTotal = (sScore + nScore) || 1;
+  const tTotal = (tScore + fScore) || 1;
+  const jTotal = (jScore + pScore) || 1;
 
-  const ePercent = Math.round((eScore / eTotal) * 100);
+  const ePercent = Math.min(100, Math.max(0, Math.round((eScore / eTotal) * 100)));
   const iPercent = 100 - ePercent;
 
-  const sPercent = Math.round((sScore / sTotal) * 100);
+  const sPercent = Math.min(100, Math.max(0, Math.round((sScore / sTotal) * 100)));
   const nPercent = 100 - sPercent;
 
-  const tPercent = Math.round((tScore / tTotal) * 100);
+  const tPercent = Math.min(100, Math.max(0, Math.round((tScore / tTotal) * 100)));
   const fPercent = 100 - tPercent;
 
-  const jPercent = Math.round((jScore / jTotal) * 100);
+  const jPercent = Math.min(100, Math.max(0, Math.round((jScore / jTotal) * 100)));
   const pPercent = 100 - jPercent;
 
   // Determine letters (ties default to E, N, F, J)

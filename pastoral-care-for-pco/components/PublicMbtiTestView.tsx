@@ -51,6 +51,16 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
   const [submittedResponse, setSubmittedResponse] = useState<MbtiTestResponse | null>(null);
 
   const questionCardRef = useRef<HTMLDivElement | null>(null);
+  const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear timers on unmount
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+      }
+    };
+  }, []);
 
   // 1. Read URL query parameters for prefilled recipient data
   useEffect(() => {
@@ -106,8 +116,22 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
 
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
+  const goToQuestion = (idx: number) => {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+    }
+    const safeIdx = Math.max(0, Math.min(totalQuestions - 1, idx));
+    setCurrentQuestionIndex(safeIdx);
+    if (questionCardRef.current) {
+      questionCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const jumpToFirstUnanswered = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+    }
     const firstMissingIdx = MBTI_QUESTIONS.findIndex(q => answers[q.id] === undefined);
     if (firstMissingIdx !== -1) {
       setCurrentQuestionIndex(firstMissingIdx);
@@ -119,20 +143,23 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
     }
   };
 
-  const currentQ = MBTI_QUESTIONS[currentQuestionIndex] || MBTI_QUESTIONS[0];
+  const safeIndex = Math.max(0, Math.min(totalQuestions - 1, currentQuestionIndex));
+  const currentQ = MBTI_QUESTIONS[safeIndex] || MBTI_QUESTIONS[0];
 
   const handleSelectScore = (questionId: number, score: number) => {
     setAnswers(prev => ({ ...prev, [questionId]: score }));
 
-    // Auto advance smoothly to next question
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setTimeout(() => {
-        setCurrentQuestionIndex(prev => prev + 1);
-        if (questionCardRef.current) {
-          questionCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 180);
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
     }
+
+    // Auto advance smoothly to next question
+    advanceTimerRef.current = setTimeout(() => {
+      setCurrentQuestionIndex(prev => Math.min(totalQuestions - 1, prev + 1));
+      if (questionCardRef.current) {
+        questionCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 200);
   };
 
   const handleFinalSubmit = async () => {
@@ -509,8 +536,8 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
               <button
                 type="button"
-                disabled={currentQuestionIndex === 0}
-                onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                disabled={safeIndex === 0}
+                onClick={() => goToQuestion(safeIndex - 1)}
                 className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 dark:text-slate-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -518,10 +545,10 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
               </button>
 
               <div className="flex items-center gap-2">
-                {currentQuestionIndex < totalQuestions - 1 ? (
+                {safeIndex < totalQuestions - 1 ? (
                   <button
                     type="button"
-                    onClick={() => setCurrentQuestionIndex(prev => Math.min(totalQuestions - 1, prev + 1))}
+                    onClick={() => goToQuestion(safeIndex + 1)}
                     className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <span>Next</span>
@@ -560,7 +587,7 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
             </div>
 
             {/* Unanswered Statements Warning Banner */}
-            {unansweredQuestions.length > 0 && (currentQuestionIndex === totalQuestions - 1 || validationWarning) && (
+            {unansweredQuestions.length > 0 && (safeIndex === totalQuestions - 1 || validationWarning) && (
               <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 animate-in fade-in">
                 <div className="flex items-start gap-2.5">
                   <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -573,14 +600,16 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={jumpToFirstUnanswered}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-md transition cursor-pointer"
-                >
-                  <span>Go to Question #{unansweredQuestions[0]?.id}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                {unansweredQuestions[0] && (
+                  <button
+                    type="button"
+                    onClick={jumpToFirstUnanswered}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-md transition cursor-pointer"
+                  >
+                    <span>Go to Question #{unansweredQuestions[0].id}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -612,7 +641,7 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
                   onClick={jumpToFirstUnanswered}
                   className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Jump to next missing (#{unansweredQuestions[0]?.id})</span>
+                  <span>Jump to next missing {unansweredQuestions[0] ? `(#${unansweredQuestions[0].id})` : ''}</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
               )}
@@ -620,12 +649,12 @@ export const PublicMbtiTestView: React.FC<PublicMbtiTestViewProps> = ({ churchId
             <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5">
               {MBTI_QUESTIONS.map((q, idx) => {
                 const isAnswered = answers[q.id] !== undefined;
-                const isCurrent = currentQuestionIndex === idx;
+                const isCurrent = safeIndex === idx;
                 return (
                   <button
                     key={q.id}
                     type="button"
-                    onClick={() => setCurrentQuestionIndex(idx)}
+                    onClick={() => goToQuestion(idx)}
                     className={`h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer relative ${
                       isCurrent
                         ? 'ring-2 ring-violet-600 bg-violet-600 text-white font-black shadow-sm'
