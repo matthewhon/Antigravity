@@ -2320,3 +2320,80 @@ export interface DigitalBulletin {
     createdAt: number;
     updatedAt: number;
 }
+
+// ─── Spiritual Gifts Test ───────────────────────────────────────────────────
+
+export type SpiritualGiftType = 'Helps' | 'Teaching' | 'Encouragement' | 'Administration' | 'Mercy' | 'Giving';
+
+export interface SpiritualGiftsScore {
+    helps: number;
+    teaching: number;
+    encouragement: number;
+    administration: number;
+    mercy: number;
+    giving: number;
+}
+
+export interface GiftsTestResponse {
+    id: string;
+    churchId: string;
+    personId?: string | null;
+    personName?: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string | null;
+    answers: Record<number, number>; // 1-42 question ID -> 1-5 score
+    scores: SpiritualGiftsScore;
+    primaryGift: SpiritualGiftType;
+    secondaryGift: SpiritualGiftType;
+    rankedGifts: {
+        gift: SpiritualGiftType;
+        score: number;
+        percentage: number;
+    }[];
+    submittedAt: number; // epoch ms
+    syncedToPco?: boolean;
+    syncedNoteId?: string;
+}
+
+// ─── Myers-Briggs Type Indicator (MBTI) ─────────────────────────────────────
+
+export interface MbtiDimensionScore {
+    eScore: number;
+    iScore: number;
+    sScore: number;
+    nScore: number;
+    tScore: number;
+    fScore: number;
+    jScore: number;
+    pScore: number;
+}
+
+export interface MbtiTraitPercentages {
+    energy: { type: 'E' | 'I'; percent: number; ePercent: number; iPercent: number };
+    information: { type: 'S' | 'N'; percent: number; sPercent: number; nPercent: number };
+    decisions: { type: 'T' | 'F'; percent: number; tPercent: number; fPercent: number };
+    structure: { type: 'J' | 'P'; percent: number; jPercent: number; pPercent: number };
+}
+
+export interface MbtiTestResponse {
+    id: string;
+    churchId: string;
+    personId?: string | null;
+    personName?: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string | null;
+    answers: Record<number, number>; // 1-28 question ID -> 1-5 score
+    mbtiType: string; // e.g. "ENFJ"
+    typeName: string; // e.g. "The Mentor / Protagonist"
+    temperament: 'Analyst' | 'Diplomat' | 'Sentinel' | 'Explorer';
+    dimensionScores: MbtiDimensionScore;
+    traitPercentages: MbtiTraitPercentages;
+    submittedAt: number; // epoch ms
+    syncedToPco?: boolean;
+}
+
+

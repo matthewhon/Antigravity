@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee } from '../types';
+import { PcoPerson, RiskChangeRecord, PastoralNote, PcoGroup, PrayerRequest, DetailedDonation, User, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee, GiftsTestResponse, MbtiTestResponse } from '../types';
+import { SPIRITUAL_GIFTS_DEFINITIONS, SPIRITUAL_GIFTS_QUESTIONS } from '../constants/spiritualGiftsTestData';
+import { MBTI_TYPE_PROFILES, MBTI_QUESTIONS } from '../constants/mbtiTestData';
 import { useTenantData } from '../contexts/TenantDataContext';
 import {
   Mail, Phone, Send, Loader2, CheckCircle, AlertCircle,
@@ -11,7 +13,7 @@ import {
   ShieldAlert, Activity, HeartHandshake, CalendarCheck, UserCheck,
   Users, Church as ChurchIcon, Sparkles, DollarSign,
   Heart, Clock, Tag, Check, Calendar, CheckSquare,
-  Compass, ExternalLink, Copy, Share2
+  Compass, ExternalLink, Copy, Share2, Award, QrCode, Brain
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -137,6 +139,12 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
   const [donations, setDonations] = useState<DetailedDonation[]>([]);
   const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
   const [notes, setNotes] = useState<PastoralNote[]>([]);
+  const [giftsResponses, setGiftsResponses] = useState<GiftsTestResponse[]>([]);
+  const [selectedGiftsModal, setSelectedGiftsModal] = useState<GiftsTestResponse | null>(null);
+  const [copiedGiftsLink, setCopiedGiftsLink] = useState(false);
+  const [mbtiResponses, setMbtiResponses] = useState<MbtiTestResponse[]>([]);
+  const [selectedMbtiModal, setSelectedMbtiModal] = useState<MbtiTestResponse | null>(null);
+  const [copiedMbtiLink, setCopiedMbtiLink] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Suggestion selections & actions
@@ -291,8 +299,10 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setPerson(null);
       setNotes([]);
       setTimeline([]);
+      setGiftsResponses([]);
+      setMbtiResponses([]);
       try {
-        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees, fetchedGifts, fetchedMbti] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
@@ -303,6 +313,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           firestore.getServicesTeams(churchId),
           firestore.getRegistrations(churchId),
           firestore.getRegistrationAttendees(churchId),
+          firestore.getGiftsTestResponses(churchId),
+          firestore.getMbtiResponses(churchId),
         ]);
         setAllPeople(people);
         setGroups(fetchedGroups);
@@ -312,7 +324,21 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
         setRegistrations(fetchedRegistrations || []);
         setAttendees(fetchedAttendees || []);
         const p = people.find(p => p.id === personId);
-        if (p) setPerson(p);
+        if (p) {
+          setPerson(p);
+          const pEmail = getPersonEmail(p);
+          const matchedGifts = (fetchedGifts || []).filter(g => 
+            g.personId === personId || 
+            (pEmail && g.email && g.email.toLowerCase() === pEmail.toLowerCase())
+          );
+          setGiftsResponses(matchedGifts);
+
+          const matchedMbti = (fetchedMbti || []).filter(m =>
+            m.personId === personId ||
+            (pEmail && m.email && m.email.toLowerCase() === pEmail.toLowerCase())
+          );
+          setMbtiResponses(matchedMbti);
+        }
         setTimeline(changes);
 
         const outreachNotes: PastoralNote[] = outreachSlots
@@ -1332,6 +1358,321 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
             </div>
           </div>
 
+          {/* ── Spiritual Gifts Assessment ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-indigo-500" />
+                Spiritual Gifts Profile
+              </h3>
+              {giftsResponses.length > 0 && (
+                <span className="text-[10px] font-black bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                  Completed
+                </span>
+              )}
+            </div>
+
+            {giftsResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestGifts = giftsResponses[0];
+                  const primDef = SPIRITUAL_GIFTS_DEFINITIONS[latestGifts.primaryGift];
+                  const secDef = latestGifts.secondaryGift ? SPIRITUAL_GIFTS_DEFINITIONS[latestGifts.secondaryGift] : null;
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-1">
+                          <span className="text-[9px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">
+                            Primary Gift
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: primDef?.color || '#6366f1' }} />
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              {latestGifts.primaryGift}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              ({latestGifts.scores?.[latestGifts.primaryGift.toLowerCase() as keyof typeof latestGifts.scores] || 0}/35)
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                            {primDef?.shortDescription}
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-1">
+                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                            Secondary Gift
+                          </span>
+                          {latestGifts.secondaryGift ? (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: secDef?.color || '#94a3b8' }} />
+                                <span className="text-sm font-black text-slate-900 dark:text-white">
+                                  {latestGifts.secondaryGift}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  ({latestGifts.scores?.[latestGifts.secondaryGift.toLowerCase() as keyof typeof latestGifts.scores] || 0}/35)
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                                {secDef?.shortDescription}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400 block pt-1">None specified</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Mini Score Bars */}
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                          6 Spiritual Gifts Breakdown
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {(['Helps', 'Teaching', 'Encouragement', 'Administration', 'Mercy', 'Giving'] as const).map(g => {
+                            const score = latestGifts.scores?.[g.toLowerCase() as keyof typeof latestGifts.scores] || 0;
+                            const pct = Math.round((score / 35) * 100);
+                            const gDef = SPIRITUAL_GIFTS_DEFINITIONS[g];
+                            return (
+                              <div key={g} className="space-y-0.5">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-slate-700 dark:text-slate-300">{g}</span>
+                                  <span className="text-slate-900 dark:text-white">{score}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full" 
+                                    style={{ width: `${Math.max(4, pct)}%`, backgroundColor: gDef.color }} 
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken on {new Date(latestGifts.submittedAt).toLocaleDateString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGiftsModal(latestGifts)}
+                          className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>View Full Test (42 Qs)</span>
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-4 space-y-2 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No Spiritual Gifts Test on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/gifts-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      navigator.clipboard.writeText(testUrl);
+                      setCopiedGiftsLink(true);
+                      setTimeout(() => setCopiedGiftsLink(false), 2500);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedGiftsLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedGiftsLink ? 'Link Copied!' : 'Copy Test Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/gifts-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Spiritual Gifts Test to discover how God has gifted you: ${testUrl}`);
+                      setShowNextStepsModal(false);
+                      // Scroll to SMS composer
+                      const smsElem = document.getElementById('sms-composer-section');
+                      if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Myers-Briggs (MBTI) Personality ── */}
+          <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wide flex items-center gap-1.5">
+                <Brain className="w-4 h-4 text-violet-500" />
+                Myers-Briggs (MBTI) Profile
+              </h3>
+              {mbtiResponses.length > 0 && (
+                <span className="text-[10px] font-black bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
+                  Completed
+                </span>
+              )}
+            </div>
+
+            {mbtiResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestMbti = mbtiResponses[0];
+                  const mbtiProf = MBTI_TYPE_PROFILES[latestMbti.mbtiType] || MBTI_TYPE_PROFILES['ENFJ'];
+
+                  return (
+                    <>
+                      <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="px-2.5 py-1 rounded-lg text-sm font-black text-white shadow-xs"
+                              style={{ backgroundColor: mbtiProf.color }}
+                            >
+                              {latestMbti.mbtiType}
+                            </span>
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                {mbtiProf.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Temperament: {latestMbti.temperament || mbtiProf.temperament}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                          {mbtiProf.tagline}
+                        </p>
+                      </div>
+
+                      {/* Mini 4-Dimension Percentage Sliders */}
+                      {latestMbti.traitPercentages && (
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                            Cognitive Traits
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            {/* E vs I */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.energy.type === 'E' ? 'Extravert (E)' : 'Introvert (I)'}</span>
+                                <span>{latestMbti.traitPercentages.energy.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-violet-600" style={{ width: `${latestMbti.traitPercentages.energy.ePercent}%` }} />
+                                <div className="h-full bg-indigo-400" style={{ width: `${latestMbti.traitPercentages.energy.iPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* S vs N */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.information.type === 'S' ? 'Sensing (S)' : 'Intuitive (N)'}</span>
+                                <span>{latestMbti.traitPercentages.information.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-sky-600" style={{ width: `${latestMbti.traitPercentages.information.sPercent}%` }} />
+                                <div className="h-full bg-cyan-400" style={{ width: `${latestMbti.traitPercentages.information.nPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* T vs F */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.decisions.type === 'T' ? 'Thinking (T)' : 'Feeling (F)'}</span>
+                                <span>{latestMbti.traitPercentages.decisions.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-amber-500" style={{ width: `${latestMbti.traitPercentages.decisions.tPercent}%` }} />
+                                <div className="h-full bg-pink-400" style={{ width: `${latestMbti.traitPercentages.decisions.fPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* J vs P */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.structure.type === 'J' ? 'Judging (J)' : 'Perceiving (P)'}</span>
+                                <span>{latestMbti.traitPercentages.structure.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-emerald-600" style={{ width: `${latestMbti.traitPercentages.structure.jPercent}%` }} />
+                                <div className="h-full bg-teal-400" style={{ width: `${latestMbti.traitPercentages.structure.pPercent}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken on {new Date(latestMbti.submittedAt).toLocaleDateString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMbtiModal(latestMbti)}
+                          className="text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>View Full Profile (28 Qs)</span>
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-4 space-y-2 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No MBTI Personality Test on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/mbti-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      navigator.clipboard.writeText(testUrl);
+                      setCopiedMbtiLink(true);
+                      setTimeout(() => setCopiedMbtiLink(false), 2500);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedMbtiLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedMbtiLink ? 'Link Copied!' : 'Copy Test Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const testUrl = `${window.location.origin}/mbti-test/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+                      setSmsBody(`Hi ${person.name.split(' ')[0]}! Please take our church Myers-Briggs Personality Assessment to discover your 16 personality profile: ${testUrl}`);
+                      setShowNextStepsModal(false);
+                      const smsElem = document.getElementById('sms-composer-section');
+                      if (smsElem) smsElem.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── Household & Family ── */}
           {(person.householdName || householdMembers.length > 0) && (
             <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-3">
@@ -1869,6 +2210,266 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               </div>
             )}
           </div>
+
+          {/* ── Spiritual Gifts Modal Breakdown ── */}
+          {selectedGiftsModal && createPortal(
+            <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md"
+                      style={{ backgroundColor: SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.primaryGift]?.color || '#6366f1' }}
+                    >
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900 dark:text-white">
+                        Spiritual Gifts: {person.name}
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Taken on {new Date(selectedGiftsModal.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedGiftsModal(null)}
+                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1">
+                      <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">Primary Gift</span>
+                      <div className="text-lg font-black text-slate-900 dark:text-white">
+                        {selectedGiftsModal.primaryGift} ({selectedGiftsModal.scores?.[selectedGiftsModal.primaryGift.toLowerCase() as keyof typeof selectedGiftsModal.scores] || 0}/35)
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        {SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.primaryGift]?.shortDescription}
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Secondary Gift</span>
+                      <div className="text-lg font-black text-slate-900 dark:text-white">
+                        {selectedGiftsModal.secondaryGift || 'None'} {selectedGiftsModal.secondaryGift ? `(${selectedGiftsModal.scores?.[selectedGiftsModal.secondaryGift.toLowerCase() as keyof typeof selectedGiftsModal.scores] || 0}/35)` : ''}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {selectedGiftsModal.secondaryGift ? SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.secondaryGift]?.shortDescription : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 6 Gifts Scores */}
+                  <div className="space-y-2.5">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      Scores by Gift (out of 35)
+                    </h5>
+                    {selectedGiftsModal.rankedGifts?.map(rg => {
+                      const def = SPIRITUAL_GIFTS_DEFINITIONS[rg.gift];
+                      return (
+                        <div key={rg.gift} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-slate-800 dark:text-slate-200">{rg.gift}</span>
+                            <span className="text-slate-900 dark:text-white">{rg.score} / 35 ({rg.percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.max(5, rg.percentage)}%`,
+                                backgroundColor: def?.color || '#6366f1'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* All 42 Answer Ratings */}
+                  <div className="space-y-3 pt-2">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      Individual Ratings for all 42 Statements
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {SPIRITUAL_GIFTS_QUESTIONS.map(q => {
+                        const ans = selectedGiftsModal.answers?.[q.id] || 0;
+                        return (
+                          <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">
+                                #{q.id} • {q.category}
+                              </div>
+                              <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                                {q.text}
+                              </div>
+                            </div>
+                            <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                              {ans}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+          {/* ── Myers-Briggs (MBTI) Modal Breakdown ── */}
+          {selectedMbtiModal && createPortal(
+            <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md font-black text-sm"
+                      style={{ backgroundColor: MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.color || '#8b5cf6' }}
+                    >
+                      {selectedMbtiModal.mbtiType}
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900 dark:text-white">
+                        MBTI Profile: {person.name}
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.name} • Taken {new Date(selectedMbtiModal.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedMbtiModal(null)}
+                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Summary */}
+                  <div className="p-4 rounded-2xl bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-800/40 space-y-2">
+                    <span className="text-[10px] font-black uppercase text-violet-600 dark:text-violet-400 tracking-wider">
+                      Overview & Temperament ({selectedMbtiModal.temperament || MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.temperament})
+                    </span>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                      {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.tagline}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.fullDescription}
+                    </p>
+                  </div>
+
+                  {/* 4 Dimension Percentage Bars */}
+                  {selectedMbtiModal.traitPercentages && (
+                    <div className="space-y-3">
+                      <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                        Cognitive Dimensions
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        {/* E vs I */}
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                          <div className="flex justify-between font-bold">
+                            <span>Extraversion ({selectedMbtiModal.traitPercentages.energy.ePercent}%)</span>
+                            <span>Introversion ({selectedMbtiModal.traitPercentages.energy.iPercent}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-violet-600" style={{ width: `${selectedMbtiModal.traitPercentages.energy.ePercent}%` }} />
+                            <div className="h-full bg-indigo-400" style={{ width: `${selectedMbtiModal.traitPercentages.energy.iPercent}%` }} />
+                          </div>
+                        </div>
+
+                        {/* S vs N */}
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                          <div className="flex justify-between font-bold">
+                            <span>Sensing ({selectedMbtiModal.traitPercentages.information.sPercent}%)</span>
+                            <span>Intuition ({selectedMbtiModal.traitPercentages.information.nPercent}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-sky-600" style={{ width: `${selectedMbtiModal.traitPercentages.information.sPercent}%` }} />
+                            <div className="h-full bg-cyan-400" style={{ width: `${selectedMbtiModal.traitPercentages.information.nPercent}%` }} />
+                          </div>
+                        </div>
+
+                        {/* T vs F */}
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                          <div className="flex justify-between font-bold">
+                            <span>Thinking ({selectedMbtiModal.traitPercentages.decisions.tPercent}%)</span>
+                            <span>Feeling ({selectedMbtiModal.traitPercentages.decisions.fPercent}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-amber-500" style={{ width: `${selectedMbtiModal.traitPercentages.decisions.tPercent}%` }} />
+                            <div className="h-full bg-pink-400" style={{ width: `${selectedMbtiModal.traitPercentages.decisions.fPercent}%` }} />
+                          </div>
+                        </div>
+
+                        {/* J vs P */}
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                          <div className="flex justify-between font-bold">
+                            <span>Judging ({selectedMbtiModal.traitPercentages.structure.jPercent}%)</span>
+                            <span>Perceiving ({selectedMbtiModal.traitPercentages.structure.pPercent}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden flex">
+                            <div className="h-full bg-emerald-600" style={{ width: `${selectedMbtiModal.traitPercentages.structure.jPercent}%` }} />
+                            <div className="h-full bg-teal-400" style={{ width: `${selectedMbtiModal.traitPercentages.structure.pPercent}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ministry Strengths */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                      Ministry Strengths
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700 dark:text-slate-300">
+                      {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.ministryStrengths.map((s, idx) => (
+                        <div key={idx} className="p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                          • {s}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 28 Statements */}
+                  <div className="space-y-3 pt-2">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      Individual Ratings for all 28 Statements (1–5)
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {MBTI_QUESTIONS.map(q => {
+                        const ans = selectedMbtiModal.answers?.[q.id] || 0;
+                        return (
+                          <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">
+                                #{q.id} • {q.dimension} ({q.direction})
+                              </div>
+                              <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                                {q.text}
+                              </div>
+                            </div>
+                            <span className="w-6 h-6 rounded-lg bg-violet-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                              {ans}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
 
         </div>
       ) : (

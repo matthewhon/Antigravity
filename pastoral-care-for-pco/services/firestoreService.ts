@@ -28,7 +28,7 @@ import {
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot, DigitalBulletin,
-    GroupCareSession, GroupCareSlot
+    GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -2315,6 +2315,154 @@ class FirestoreService {
     } catch (e) {
       console.warn('[FirestoreService] getPersonPastoralNotes failed:', e);
       return [];
+    }
+  }
+
+  // ─── Spiritual Gifts Test Responses ─────────────────────────────────────────
+
+  async saveGiftsTestResponse(response: GiftsTestResponse): Promise<void> {
+    try {
+      await setDoc(doc(db, 'gifts_test_responses', response.id), response, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async getGiftsTestResponses(churchId: string, personId?: string): Promise<GiftsTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'gifts_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'gifts_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+    } catch (e) {
+      console.warn('[FirestoreService] getGiftsTestResponses query with orderBy failed, retrying without order:', e);
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'gifts_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'gifts_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('[FirestoreService] getGiftsTestResponses failed completely:', err);
+        return [];
+      }
+    }
+  }
+
+  async getGiftsTestResponseById(responseId: string): Promise<GiftsTestResponse | null> {
+    try {
+      const snap = await getDoc(doc(db, 'gifts_test_responses', responseId));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as GiftsTestResponse) : null;
+    } catch (e) {
+      console.warn('[FirestoreService] getGiftsTestResponseById failed:', e);
+      return null;
+    }
+  }
+
+  async deleteGiftsTestResponse(responseId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'gifts_test_responses', responseId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // ─── Myers-Briggs (MBTI) Test Responses ─────────────────────────────────────
+
+  async saveMbtiResponse(response: MbtiTestResponse): Promise<void> {
+    try {
+      await setDoc(doc(db, 'mbti_test_responses', response.id), response, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async getMbtiResponses(churchId: string, personId?: string): Promise<MbtiTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'mbti_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'mbti_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+    } catch (e) {
+      console.warn('[FirestoreService] getMbtiResponses query with orderBy failed, retrying without order:', e);
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'mbti_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'mbti_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('[FirestoreService] getMbtiResponses failed completely:', err);
+        return [];
+      }
+    }
+  }
+
+  async getMbtiResponseById(responseId: string): Promise<MbtiTestResponse | null> {
+    try {
+      const snap = await getDoc(doc(db, 'mbti_test_responses', responseId));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as MbtiTestResponse) : null;
+    } catch (e) {
+      console.warn('[FirestoreService] getMbtiResponseById failed:', e);
+      return null;
+    }
+  }
+
+  async deleteMbtiResponse(responseId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'mbti_test_responses', responseId));
+    } catch (e) {
+      this.handleFirestoreError(e);
     }
   }
 }

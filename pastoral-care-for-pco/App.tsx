@@ -73,6 +73,8 @@ import { PublicContactView } from './components/PublicContactView';
 import { PublicGroupCareView } from './components/PublicGroupCareView';
 import { PublicVolunteerHistoryView } from './components/PublicVolunteerHistoryView';
 import { PublicBulletinView } from './components/PublicBulletinView';
+import { PublicGiftsTestView } from './components/PublicGiftsTestView';
+import { PublicMbtiTestView } from './components/PublicMbtiTestView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -107,6 +109,8 @@ const App: React.FC = () => {
      if (path.startsWith('/ai-assistant')) return 'pastor-ai';
      if (path.startsWith('/people/households')) return 'people-households';
      if (path.startsWith('/people/risk')) return 'people-risk';
+     if (path.startsWith('/people/gifts-test')) return 'people-gifts-test';
+     if (path.startsWith('/people/mbti-test')) return 'people-mbti-test';
      if (path.startsWith('/people/reports')) return 'people-reports';
      if (path.startsWith('/people')) return 'people';
      if (path.startsWith('/groups')) return 'groups';
@@ -645,6 +649,8 @@ const App: React.FC = () => {
               'people': '/people',
               'people-households': '/people/households',
               'people-risk': '/people/risk',
+              'people-gifts-test': '/people/gifts-test',
+              'people-mbti-test': '/people/mbti-test',
               'people-reports': '/people/reports',
               'groups': '/groups',
               'groups-reports': '/groups/reports',
@@ -1029,6 +1035,20 @@ const App: React.FC = () => {
   const volunteerHistoryMatch = window.location.pathname.match(/^\/volunteer-history\/([^/]+)$/);
   if (volunteerHistoryMatch) {
     return <PublicVolunteerHistoryView churchId={volunteerHistoryMatch[1]} />;
+  }
+
+  // ─── Public Spiritual Gifts Test Route (no auth required) ───────────────────
+  const giftsTestMatch = window.location.pathname.match(/^\/gifts-test\/([^/]+)/);
+  if (giftsTestMatch) {
+    const isEmbedded = window.location.search.includes('embedded=true');
+    return <PublicGiftsTestView churchId={giftsTestMatch[1]} isEmbedded={isEmbedded} />;
+  }
+
+  // ─── Public Myers-Briggs (MBTI) Test Route (no auth required) ───────────────
+  const mbtiMatch = window.location.pathname.match(/^\/mbti-test\/([^/]+)/);
+  if (mbtiMatch) {
+    const isEmbedded = window.location.search.includes('embedded=true');
+    return <PublicMbtiTestView churchId={mbtiMatch[1]} isEmbedded={isEmbedded} />;
   }
 
   if (loading) {

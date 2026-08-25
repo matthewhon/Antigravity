@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats, PcoRegistrationEvent } from '../types';
+import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats, PcoRegistrationEvent, Church, User } from '../types';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
 import { 
@@ -12,10 +12,12 @@ import { WidgetWrapper, StatCard, PersonList } from './SharedUI';
 import { RiskDistributionWidget, AtRiskListWidget, StatusChangesWidget, RiskFactorsWidget, PeopleDirectoryWidget } from './RiskWidgets';
 import { CommunityComparison } from './CommunityComparison';
 import { PeopleReportsTab } from './PeopleReportsTab';
+import { GiftsTestManager } from './GiftsTestManager';
+import { MbtiTestManager } from './MbtiTestManager';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
-  activePage?: 'overview' | 'households' | 'risk' | 'reports';
+  activePage?: 'overview' | 'households' | 'risk' | 'reports' | 'gifts-test' | 'mbti-test';
   overviewWidgets: string[];
   householdWidgets: string[];
   riskWidgets: string[];
@@ -31,6 +33,8 @@ interface PeopleViewProps {
   isSyncing?: boolean;
   pcoConnected: boolean;
   churchId?: string;
+  church?: Church;
+  user?: User;
   apiBaseUrl?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
   currentTheme?: 'traditional' | 'dark';
@@ -87,6 +91,8 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   userSettings = {},
   onUpdateSettings = (_k: string, _v: any) => {},
   churchId,
+  church,
+  user,
   apiBaseUrl,
 }) => {
   const activeTab = activePage ?? 'overview';
@@ -1048,6 +1054,27 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
             return null;
     }
   };
+
+  if (activePage === 'gifts-test') {
+    return (
+      <GiftsTestManager 
+        churchId={churchId || church?.id || ''} 
+        church={church!} 
+        user={user!} 
+        people={data.allPeople} 
+      />
+    );
+  }
+
+  if (activePage === 'mbti-test') {
+    return (
+      <MbtiTestManager 
+        church={church!} 
+        user={user!} 
+        allPeople={data.allPeople} 
+      />
+    );
+  }
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">

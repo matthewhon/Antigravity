@@ -5,7 +5,7 @@ import {
   TrendingUp, Wrench, SlidersHorizontal, Home, AlertTriangle, FileText, Palette,
   MapPin, User as UserIcon, Calendar, Smartphone, BarChart3, Briefcase, Church as ChurchIcon,
   Building2, Phone, ClipboardList, Pencil, Settings, Mail, MessageSquare, Zap,
-  Newspaper, StickyNote, QrCode, Folder, Sparkles, UserMinus, ChevronDown, LogOut, Target,
+  Newspaper, StickyNote, QrCode, Folder, Sparkles, Brain, UserMinus, ChevronDown, LogOut, Target,
   type LucideIcon,
 } from 'lucide-react';
 import { Church, User } from '../types';
@@ -176,10 +176,12 @@ const Layout: React.FC<LayoutProps> = ({
       entries.push({
         kind: 'menu', key: 'people', icon: Users, label: 'People', prefix: 'people',
         items: [
-          { view: 'people',            icon: LayoutDashboard, label: 'Overview'      },
-          { view: 'people-households', icon: Home,            label: 'Households'    },
-          { view: 'people-risk',       icon: AlertTriangle,   label: 'Risk Profiles' },
-          { view: 'people-reports',    icon: FileText,        label: 'Reports'       },
+          { view: 'people',            icon: LayoutDashboard, label: 'Overview'         },
+          { view: 'people-households', icon: Home,            label: 'Households'       },
+          { view: 'people-risk',       icon: AlertTriangle,   label: 'Risk Profiles'    },
+          { view: 'people-gifts-test', icon: Sparkles,        label: 'Gifts Test'       },
+          { view: 'people-mbti-test',  icon: Brain,           label: 'MBTI Personality' },
+          { view: 'people-reports',    icon: FileText,        label: 'Reports'          },
         ],
       });
     }

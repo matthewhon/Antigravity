@@ -37,6 +37,8 @@ export const PeoplePage: React.FC<PeoplePageProps> = ({
         subpath === 'households' ? 'households' :
         subpath === 'risk'       ? 'risk'       :
         subpath === 'reports'    ? 'reports'    :
+        subpath === 'gifts-test' ? 'gifts-test' :
+        subpath === 'mbti-test'  ? 'mbti-test'  :
         'overview';
 
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
@@ -48,6 +50,8 @@ export const PeoplePage: React.FC<PeoplePageProps> = ({
         <PeopleView 
             data={peopleDashboardData}
             activePage={activePage as any}
+            church={church}
+            user={user}
             overviewWidgets={widgets}
             householdWidgets={user.widgetPreferences?.['people_households'] || []}
             riskWidgets={user.widgetPreferences?.['people_risk'] || []}
