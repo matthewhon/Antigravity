@@ -691,6 +691,8 @@ const InlineTextEditor: React.FC<{
 }> = ({ block, onUpdate, churchId }) => {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [showResourceModal, setShowResourceModal] = useState(false);
+  const [showHtmlCode, setShowHtmlCode] = useState(false);
+  const [htmlCode, setHtmlCode] = useState(block.content?.text || block.content?.html || '');
   const [linkUrl, setLinkUrl] = useState('');
   const [align, setAlign] = useState<'left' | 'center' | 'right'>(
     block.content?.align || 'left'
@@ -701,22 +703,44 @@ const InlineTextEditor: React.FC<{
     content: block.content?.text || block.content?.html || '',
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
+      setHtmlCode(html);
       onUpdate({ ...block.content, text: html, html, align });
     },
   });
 
   // Re-sync when block id changes
   useEffect(() => {
+    const content = block.content?.text || block.content?.html || '';
     if (editor) {
-      const content = block.content?.text || block.content?.html || '';
       if (editor.getHTML() !== content) editor.commands.setContent(content);
     }
+    setHtmlCode(content);
     setAlign(block.content?.align || 'left');
   }, [block.id]);
 
   const handleAlignChange = (a: 'left' | 'center' | 'right') => {
     setAlign(a);
-    onUpdate({ ...block.content, text: editor?.getHTML() || '', html: editor?.getHTML() || '', align: a });
+    const contentHtml = showHtmlCode ? htmlCode : (editor?.getHTML() || '');
+    onUpdate({ ...block.content, text: contentHtml, html: contentHtml, align: a });
+  };
+
+  const handleToggleHtml = () => {
+    if (!showHtmlCode) {
+      const current = editor ? editor.getHTML() : (block.content?.text || block.content?.html || '');
+      setHtmlCode(current);
+      setShowHtmlCode(true);
+    } else {
+      if (editor) {
+        editor.commands.setContent(htmlCode);
+      }
+      onUpdate({ ...block.content, text: htmlCode, html: htmlCode, align });
+      setShowHtmlCode(false);
+    }
+  };
+
+  const handleHtmlChange = (newHtml: string) => {
+    setHtmlCode(newHtml);
+    onUpdate({ ...block.content, text: newHtml, html: newHtml, align });
   };
 
   const handleInsertLink = () => {
@@ -741,6 +765,16 @@ const InlineTextEditor: React.FC<{
     onUpdate({ ...block.content, text: editor.getHTML(), html: editor.getHTML(), align });
   };
 
+  const handleInsertMergeTag = (tag: string) => {
+    if (showHtmlCode) {
+      const newHtml = (htmlCode || '') + tag;
+      setHtmlCode(newHtml);
+      onUpdate({ ...block.content, text: newHtml, html: newHtml, align });
+    } else {
+      editor?.chain().focus().insertContent(tag).run();
+    }
+  };
+
   const btn = (active: boolean) =>
     `p-1 rounded transition text-xs ${
       active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
@@ -752,14 +786,14 @@ const InlineTextEditor: React.FC<{
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
         {/* Format */}
-        <button onClick={() => editor?.chain().focus().toggleBold().run()} title="Bold" className={btn(!!editor?.isActive('bold'))}><Bold size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleItalic().run()} title="Italic" className={btn(!!editor?.isActive('italic'))}><Italic size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1" className={btn(!!editor?.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px]">H1</span></button>
-        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2" className={btn(!!editor?.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px]">H2</span></button>
+        <button onClick={() => editor?.chain().focus().toggleBold().run()} disabled={showHtmlCode} title="Bold" className={btn(!showHtmlCode && !!editor?.isActive('bold'))}><Bold size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleItalic().run()} disabled={showHtmlCode} title="Italic" className={btn(!showHtmlCode && !!editor?.isActive('italic'))}><Italic size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} disabled={showHtmlCode} title="Heading 1" className={btn(!showHtmlCode && !!editor?.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px]">H1</span></button>
+        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} disabled={showHtmlCode} title="Heading 2" className={btn(!showHtmlCode && !!editor?.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px]">H2</span></button>
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Lists */}
-        <button onClick={() => editor?.chain().focus().toggleBulletList().run()} title="Bullet List" className={btn(!!editor?.isActive('bulletList'))}><List size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleOrderedList().run()} title="Ordered List" className={btn(!!editor?.isActive('orderedList'))}><ListOrdered size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleBulletList().run()} disabled={showHtmlCode} title="Bullet List" className={btn(!showHtmlCode && !!editor?.isActive('bulletList'))}><List size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleOrderedList().run()} disabled={showHtmlCode} title="Ordered List" className={btn(!showHtmlCode && !!editor?.isActive('orderedList'))}><ListOrdered size={12} /></button>
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Alignment (stored in content.align, applied as wrapper style) */}
         <button onClick={() => handleAlignChange('left')} className={btn(align === 'left')} title="Align left"><AlignLeft size={12} /></button>
@@ -767,16 +801,32 @@ const InlineTextEditor: React.FC<{
         <button onClick={() => handleAlignChange('right')} className={btn(align === 'right')} title="Align right"><AlignRight size={12} /></button>
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Link */}
-        <button onClick={() => setShowLinkInput(v => !v)} className={btn(showLinkInput)} title="Insert link"><Link size={12} /></button>
+        <button onClick={() => setShowLinkInput(v => !v)} disabled={showHtmlCode} className={btn(!showHtmlCode && showLinkInput)} title="Insert link"><Link size={12} /></button>
         {churchId && (
           <button 
             onClick={() => setShowResourceModal(true)} 
-            className={btn(showResourceModal)} 
+            disabled={showHtmlCode}
+            className={btn(!showHtmlCode && showResourceModal)} 
             title="Insert Link to Form, Poll, or Note"
           >
             <ClipboardList size={12} />
           </button>
         )}
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+        {/* HTML Toggle Button */}
+        <button
+          type="button"
+          onClick={handleToggleHtml}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold transition ${
+            showHtmlCode
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
+          }`}
+          title={showHtmlCode ? 'Switch to Visual Editor' : 'Show HTML Code'}
+        >
+          <Code size={12} />
+          <span className="text-[10px]">HTML</span>
+        </button>
       </div>
       {/* Insert Resource Modal */}
       {churchId && (
@@ -805,12 +855,31 @@ const InlineTextEditor: React.FC<{
         </div>
       )}
       {/* Editor area */}
-      <div className={align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center'}>
-        <EditorContent
-          editor={editor}
-          className="prose prose-sm max-w-none p-3 min-h-[100px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus-within:outline-none"
-        />
-      </div>
+      {showHtmlCode ? (
+        <div className="p-3 bg-slate-900 dark:bg-slate-950">
+          <div className="flex items-center justify-between mb-1.5 text-[10px] text-slate-400 font-mono">
+            <span className="font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1">
+              <Code size={11} className="text-indigo-400" /> HTML Source
+            </span>
+            <span className="text-slate-500">Edit HTML directly</span>
+          </div>
+          <textarea
+            value={htmlCode}
+            onChange={e => handleHtmlChange(e.target.value)}
+            placeholder="<p>Enter HTML code here...</p>"
+            rows={6}
+            className="w-full font-mono text-xs text-indigo-200 bg-slate-800 dark:bg-slate-900 border border-slate-700 dark:border-slate-800 rounded-lg p-2.5 leading-relaxed focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+            spellCheck={false}
+          />
+        </div>
+      ) : (
+        <div className={align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center'}>
+          <EditorContent
+            editor={editor}
+            className="prose prose-sm max-w-none p-3 min-h-[100px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus-within:outline-none"
+          />
+        </div>
+      )}
       <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5 items-center">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Merge Tags:</span>
         {ALL_MERGE_TAGS.map(({ tag, label }) => (
@@ -818,7 +887,7 @@ const InlineTextEditor: React.FC<{
             key={tag}
             type="button"
             title={`Insert ${label}`}
-            onClick={() => editor?.chain().focus().insertContent(tag).run()}
+            onClick={() => handleInsertMergeTag(tag)}
             className="px-2 py-1 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"
           >
             {tag}
