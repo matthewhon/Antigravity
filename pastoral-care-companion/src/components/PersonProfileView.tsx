@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   PcoPerson, User, PastoralNote, PcoGroup, PrayerRequest, 
-  DetailedDonation, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee 
+  DetailedDonation, ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee,
+  GiftsTestResponse, MbtiTestResponse, DiscTestResponse, RiskChangeRecord, OutreachSlot
 } from '../types';
 import { firestore } from '../services/firestoreService';
 import { 
@@ -10,8 +11,14 @@ import {
   Plus, X, Mail, Loader2, Sparkles, CalendarCheck,
   ShieldAlert, Activity, HeartHandshake, Users,
   Church as ChurchIcon, DollarSign, Heart, Clock, Tag,
-  CheckSquare, Compass, Copy, ExternalLink, Check, Send
+  CheckSquare, Compass, Copy, ExternalLink, Check, Send,
+  Award, Brain, NotebookPen, TrendingUp, History, ShieldCheck,
+  AlertCircle, ChevronRight, User as UserIcon
 } from 'lucide-react';
+import { SPIRITUAL_GIFTS_DEFINITIONS, SPIRITUAL_GIFTS_QUESTIONS } from '../constants/spiritualGiftsTestData';
+import { MBTI_TYPE_PROFILES, MBTI_QUESTIONS } from '../constants/mbtiTestData';
+import { DISC_PROFILES, DISC_QUESTIONS, DISC_DIMENSIONS_INFO, DiscDimension } from '../constants/discTestData';
+import { PastoralEngagementModal } from './PastoralEngagementModal';
 
 function getEngagementStatus(person: PcoPerson): string {
   if (person.engagementStatus) return person.engagementStatus;
@@ -125,11 +132,29 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
   const [attendees, setAttendees] = useState<PcoRegistrationAttendee[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [donations, setDonations] = useState<DetailedDonation[]>([]);
+  const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
+  const [outreachSlots, setOutreachSlots] = useState<OutreachSlot[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteType, setNoteType] = useState<PastoralNote['type']>('Note');
   const [followUpDate, setFollowUpDate] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  // Assessments state
+  const [giftsResponses, setGiftsResponses] = useState<GiftsTestResponse[]>([]);
+  const [selectedGiftsModal, setSelectedGiftsModal] = useState<GiftsTestResponse | null>(null);
+  const [copiedGiftsLink, setCopiedGiftsLink] = useState(false);
+
+  const [mbtiResponses, setMbtiResponses] = useState<MbtiTestResponse[]>([]);
+  const [selectedMbtiModal, setSelectedMbtiModal] = useState<MbtiTestResponse | null>(null);
+  const [copiedMbtiLink, setCopiedMbtiLink] = useState(false);
+
+  const [discResponses, setDiscResponses] = useState<DiscTestResponse[]>([]);
+  const [selectedDiscModal, setSelectedDiscModal] = useState<DiscTestResponse | null>(null);
+  const [copiedDiscLink, setCopiedDiscLink] = useState(false);
+
+  // Pastoral Strategy & Engagement Playbook Modal
+  const [showEngagementModal, setShowEngagementModal] = useState<boolean>(false);
 
   // Suggestion state
   const [showNextStepsModal, setShowNextStepsModal] = useState<boolean>(false);
@@ -141,12 +166,25 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
 
   const canAccessGiving = canViewGiving(currentUser);
 
-  // Load notes, groups, teams, registrations, prayer requests, and donations on mount/change
+  // Load all profile, assessment, team, group, prayer, and donation data
   useEffect(() => {
     const fetchExtraData = async () => {
       setLoadingNotes(true);
       try {
-        const [list, fetchedGroups, fetchedPrayers, fetchedDonations, fetchedTeams, fetchedRegistrations, fetchedAttendees] = await Promise.all([
+        const [
+          list, 
+          fetchedGroups, 
+          fetchedPrayers, 
+          fetchedDonations, 
+          fetchedTeams, 
+          fetchedRegistrations, 
+          fetchedAttendees,
+          fetchedGifts,
+          fetchedMbti,
+          fetchedDisc,
+          fetchedTimeline,
+          fetchedSlots
+        ] = await Promise.all([
           firestore.getPastoralNotes(churchId, person.id),
           firestore.getGroups(churchId),
           firestore.getPrayerRequests(churchId),
@@ -154,7 +192,13 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           firestore.getServicesTeams(churchId),
           firestore.getRegistrations(churchId),
           firestore.getRegistrationAttendees(churchId),
+          firestore.getGiftsTestResponses(churchId),
+          firestore.getMbtiResponses(churchId),
+          firestore.getDiscResponses(churchId),
+          firestore.getPersonRiskTimeline(churchId, person.id),
+          firestore.getPersonOutreachSlots(churchId, person.id)
         ]);
+
         setNotes(list);
         setGroups(fetchedGroups);
         setPrayerRequests(fetchedPrayers);
@@ -162,6 +206,28 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
         setTeams(fetchedTeams || []);
         setRegistrations(fetchedRegistrations || []);
         setAttendees(fetchedAttendees || []);
+        setTimeline(fetchedTimeline || []);
+        setOutreachSlots(fetchedSlots || []);
+
+        const pEmail = getPersonEmail(person);
+        const matchedGifts = (fetchedGifts || []).filter(g => 
+          g.personId === person.id || 
+          (pEmail && g.email && g.email.toLowerCase() === pEmail.toLowerCase())
+        );
+        setGiftsResponses(matchedGifts);
+
+        const matchedMbti = (fetchedMbti || []).filter(m =>
+          m.personId === person.id ||
+          (pEmail && m.email && m.email.toLowerCase() === pEmail.toLowerCase())
+        );
+        setMbtiResponses(matchedMbti);
+
+        const matchedDisc = (fetchedDisc || []).filter(d =>
+          d.personId === person.id ||
+          (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase())
+        );
+        setDiscResponses(matchedDisc);
+
       } catch (e) {
         console.error("Failed to load profile data:", e);
       } finally {
@@ -199,7 +265,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
       setNoteContent('');
       setFollowUpDate('');
       setNoteType('Note');
-      alert("Note successfully added!");
+      setFeedbackToast("Note successfully recorded!");
     } catch (e) {
       console.error("Failed to save note:", e);
       alert("Error saving note.");
@@ -402,30 +468,53 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
     if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Helper for sending assessment SMS
+  const handleSendAssessmentSms = (assessmentName: string, testPath: string) => {
+    const testUrl = `${window.location.origin}/${testPath}/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+    const msg = `Hi ${firstName}! Please take our church ${assessmentName} to discover how God has wired and gifted you: ${testUrl}`;
+    if (resolvedPhone) {
+      const cleaned = resolvedPhone.replace(/[^\d+]/g, '');
+      const smsUri = `sms:${cleaned}?&body=${encodeURIComponent(msg)}`;
+      window.open(smsUri, '_system');
+      setFeedbackToast(`Opening SMS to send ${assessmentName}...`);
+    } else {
+      navigator.clipboard.writeText(msg);
+      setFeedbackToast(`${assessmentName} invite message copied to clipboard.`);
+    }
+  };
+
+  const handleCopyAssessmentLink = (testPath: string, setCopied: (val: boolean) => void) => {
+    const testUrl = `${window.location.origin}/${testPath}/${churchId}?personId=${person.id}&name=${encodeURIComponent(person.name)}`;
+    navigator.clipboard.writeText(testUrl);
+    setCopied(true);
+    setFeedbackToast('Test link copied to clipboard!');
+    setTimeout(() => setCopied(false), 2500);
+  };
+
   return (
     <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full h-[90vh] bg-slate-50 dark:bg-zinc-950 rounded-t-[2.5rem] p-6 shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250">
+      <div className="relative w-full h-[92vh] bg-slate-50 dark:bg-zinc-950 rounded-t-[2.5rem] p-4 sm:p-6 shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250">
         {/* Grab Bar */}
-        <div className="w-12 h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-full mx-auto mb-5 shrink-0" />
+        <div className="w-12 h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-full mx-auto mb-4 shrink-0" />
 
         {/* Profile Header */}
-        <div className="flex justify-between items-start mb-4 shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="flex justify-between items-start mb-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             {person.avatar ? (
               <img
                 src={person.avatar}
                 alt={person.name}
-                className="w-14 h-14 rounded-full object-cover bg-slate-100 border-2 border-white shadow-md"
+                className="w-13 h-13 sm:w-14 sm:h-14 rounded-full object-cover bg-slate-100 border-2 border-white shadow-md shrink-0"
               />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base shadow-sm border border-indigo-100 dark:border-indigo-900/30">
+              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base shadow-sm border border-indigo-100 dark:border-indigo-900/30 shrink-0">
                 {getInitials(person.name)}
               </div>
             )}
-            <div>
-              <h2 className="text-lg font-black tracking-tight">{person.name}</h2>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black tracking-tight truncate">{person.name}</h2>
               <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/20">
                   {person.membership || person.status || 'Contact'}
@@ -449,11 +538,19 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-zinc-700"
+            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-zinc-700 shrink-0 cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
+
+        {/* Toast Feedback */}
+        {feedbackToast && (
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/90 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in duration-150 shrink-0">
+            <Check size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="truncate">{feedbackToast}</span>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-6">
@@ -487,7 +584,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
             )}
           </div>
 
-          {/* ── Compact Suggested Next Steps Trigger Banner ── */}
+          {/* ── Suggested Next Steps Trigger Banner ── */}
           <div className="p-3.5 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-zinc-900 dark:to-purple-950/20 shadow-xs flex flex-col min-[380px]:flex-row items-stretch min-[380px]:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -531,276 +628,12 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
             <button
               type="button"
               onClick={() => setShowNextStepsModal(true)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition shadow-sm active:scale-95 shrink-0"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition shadow-sm active:scale-95 shrink-0 cursor-pointer"
             >
               <span>View Next Steps</span>
               <ExternalLink size={11} />
             </button>
           </div>
-
-          {/* ── Suggested Next Steps Popout Modal Window ── */}
-          {showNextStepsModal && typeof document !== 'undefined' && createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="absolute inset-0" onClick={() => setShowNextStepsModal(false)} />
-              <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh] z-10 animate-in zoom-in-95 duration-200">
-                {/* Popout Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                      <Compass size={16} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 dark:text-zinc-100">
-                        Suggested Next Steps
-                      </h3>
-                      <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
-                        Risk-based discipleship actions
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowNextStepsModal(false)}
-                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 flex items-center justify-center transition"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                {/* Toast Feedback */}
-                {feedbackToast && (
-                  <div className="my-2.5 flex items-center gap-2 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2.5 animate-in fade-in duration-150">
-                    <Check size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                    <span>{feedbackToast}</span>
-                  </div>
-                )}
-
-                {/* Popout Content */}
-                <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3 pr-0.5">
-                  {/* 1. Small Group Suggestion */}
-                  {isNotInGroup && (
-                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-                            <Users size={14} />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Small Group</h4>
-                            <p className="text-[10px] text-slate-400 leading-tight truncate">Not enrolled in any small group</p>
-                          </div>
-                        </div>
-                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasGroupRiskFactor ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 border-purple-100 dark:border-purple-900/30'}`}>
-                          {hasGroupRiskFactor ? 'Priority' : 'Pathway'}
-                        </span>
-                      </div>
-
-                      {availableGroups.length > 0 && (
-                        <select
-                          value={selectedGroupSuggestion || (activeTargetGroup?.id || '')}
-                          onChange={e => setSelectedGroupSuggestion(e.target.value)}
-                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                        >
-                          {availableGroups.map(g => (
-                            <option key={g.id} value={g.id}>
-                              {g.name} ({g.membersCount || 0} members)
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <div className="flex gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const groupName = activeTargetGroup?.name || 'a small group';
-                            const msg = `Hi ${firstName}, we'd love to invite you to join one of our small groups! Are you interested in checking out ${groupName}?`;
-                            handleApplySmsTemplate(msg);
-                          }}
-                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
-                        >
-                          <Send size={11} /> Text Invite
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const groupName = activeTargetGroup?.name || 'Small Group';
-                            handleApplyNoteTemplate(`Invited ${person.name} to join ${groupName}.`, 'Call');
-                          }}
-                          className="py-2 px-3.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
-                        >
-                          Log Note
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. Service Team Suggestion */}
-                  {isNotServing && (
-                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                            <HeartHandshake size={14} />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Connect to Service Team</h4>
-                            <p className="text-[10px] text-slate-400 leading-tight truncate">0 serving times in last 90 days</p>
-                          </div>
-                        </div>
-                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${hasServingRiskFactor ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
-                          {hasServingRiskFactor ? 'Need' : 'Serving'}
-                        </span>
-                      </div>
-
-                      {availableTeams.length > 0 && (
-                        <select
-                          value={selectedTeamSuggestion || (activeTargetTeam?.id || '')}
-                          onChange={e => setSelectedTeamSuggestion(e.target.value)}
-                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                        >
-                          {availableTeams.map(t => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <div className="flex gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const teamName = activeTargetTeam?.name || 'our service ministry';
-                            const msg = `Hi ${firstName}, we'd love to connect you with our ministry team! Would you be open to exploring serving with our ${teamName} team?`;
-                            handleApplySmsTemplate(msg);
-                          }}
-                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
-                        >
-                          <Send size={11} /> Text Opportunity
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const teamName = activeTargetTeam?.name || 'Service Team';
-                            handleApplyNoteTemplate(`Reached out to ${person.name} regarding serving on ${teamName}.`, 'Meeting');
-                          }}
-                          className="py-2 px-3.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
-                        >
-                          Log Note
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. Event Registration Suggestion */}
-                  {unregisteredUpcomingEvents.length > 0 && (
-                    <div className="bg-slate-50 dark:bg-zinc-800/90 rounded-2xl p-3.5 border border-slate-200/70 dark:border-zinc-700/60 space-y-2.5">
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                            <CalendarCheck size={14} />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">Invite to Registration Event</h4>
-                            <p className="text-[10px] text-slate-400 leading-tight truncate">Upcoming church event open for signups</p>
-                          </div>
-                        </div>
-                        <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 shrink-0">
-                          Event
-                        </span>
-                      </div>
-
-                      <select
-                        value={selectedEventSuggestion || (activeTargetEvent?.id || '')}
-                        onChange={e => setSelectedEventSuggestion(e.target.value)}
-                        className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-slate-800 dark:text-zinc-200 outline-none"
-                      >
-                        {unregisteredUpcomingEvents.map(ev => (
-                          <option key={ev.id} value={ev.id}>
-                            {ev.name} {ev.startsAt ? `(${formatDate(ev.startsAt)})` : ''}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const eventName = activeTargetEvent?.name || 'our church event';
-                            const link = activeTargetEvent?.publicUrl ? ` ${activeTargetEvent.publicUrl}` : '';
-                            const msg = `Hi ${firstName}, registration is open for ${eventName}! We'd love to see you there.${link ? ` Sign up: ${link}` : ''}`;
-                            handleApplySmsTemplate(msg);
-                          }}
-                          className="flex-1 py-2 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1 active:scale-95 transition"
-                        >
-                          <Send size={11} /> Text Invite
-                        </button>
-
-                        {activeTargetEvent?.publicUrl && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(activeTargetEvent.publicUrl!, `mob_event_${activeTargetEvent.id}`, 'Event link')}
-                            className="py-2 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl active:scale-95 transition"
-                            title="Copy event signup link"
-                          >
-                            {copiedItemId === `mob_event_${activeTargetEvent.id}` ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                          </button>
-                        )}
-
-                        {activeTargetEvent?.publicUrl && (
-                          <a
-                            href={activeTargetEvent.publicUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="py-2 px-2.5 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl active:scale-95 transition flex items-center justify-center"
-                            title="Open signup page"
-                          >
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const eventName = activeTargetEvent?.name || 'Event';
-                            handleApplyNoteTemplate(`Invited ${person.name} to attend ${eventName}.`, 'Note');
-                          }}
-                          className="py-2 px-3 bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-[10px] uppercase rounded-xl active:scale-95 transition"
-                        >
-                          Log Note
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Celebration state if all 3 are in place */}
-                  {!isNotInGroup && !isNotServing && unregisteredUpcomingEvents.length === 0 && (
-                    <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-3.5 flex items-center gap-2.5">
-                      <Check size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <div>
-                        <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-300">All Core Next Steps Active</h4>
-                        <p className="text-[10px] text-emerald-700 dark:text-emerald-400/80 leading-tight mt-0.5">
-                          Person is in a small group, serving on a team, and up to date on event registrations.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Popout Footer */}
-                <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex justify-end shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowNextStepsModal(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
 
           {/* ── Status & Engagement Overview Grid ── */}
           <div className="grid grid-cols-3 gap-2">
@@ -865,44 +698,577 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
           </div>
 
           {/* ── Companion Quick Actions Bar ── */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 min-[420px]:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEngagementModal(true)}
+              className="py-2.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm cursor-pointer col-span-2 min-[420px]:col-span-1"
+              title="Open Pastoral Care Recommendations & Strategy Playbook"
+            >
+              <Sparkles size={13} className="shrink-0 text-amber-300" />
+              <span className="truncate">Pastoral Strategy</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowNextStepsModal(true)}
-              className="py-2 px-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/40 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate shadow-2xs"
+              className="py-2.5 px-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/40 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate shadow-2xs cursor-pointer"
             >
               <Compass size={12} className="shrink-0" />
               <span className="truncate">Next Steps</span>
             </button>
+
             <button
               type="button"
               onClick={() => {
                 const el = document.getElementById('companion-note-box');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="py-2 px-2 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate"
+              className="py-2.5 px-2 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition truncate cursor-pointer"
             >
               <NotebookPen size={12} className="shrink-0" />
               <span className="truncate">Add Note</span>
             </button>
+
             <a
               href={`https://people.planningcenteronline.com/people/${person.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2 px-2 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition text-center truncate"
+              className="py-2.5 px-2 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 active:scale-95 transition text-center truncate"
             >
-              <span className="truncate">PCO</span>
+              <span className="truncate">PCO Profile</span>
               <ExternalLink size={10} className="shrink-0 text-slate-400" />
             </a>
           </div>
 
-          {/* Risk Factors & Serving Details (if available) */}
-          {(riskProfile?.factors?.length || servingStats?.recentServices?.length || servingStats?.nextServiceDate) && (
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-3.5 border border-slate-200/50 dark:border-zinc-800 space-y-2.5 shadow-sm text-xs">
+          {/* ═══════════════════════════════════════════════════════════════════
+              ASSESSMENT PROFILES (Spiritual Gifts, MBTI, DISC)
+          ═══════════════════════════════════════════════════════════════════ */}
+
+          {/* ── 1. Spiritual Gifts Assessment Card ── */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Award size={14} className="text-indigo-500" />
+                Spiritual Gifts Profile
+              </h3>
+              {giftsResponses.length > 0 ? (
+                <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
+                  Completed
+                </span>
+              ) : (
+                <span className="text-[9px] font-black bg-slate-100 dark:bg-zinc-800 text-slate-400 px-2 py-0.5 rounded-full">
+                  Pending
+                </span>
+              )}
+            </div>
+
+            {giftsResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestGifts = giftsResponses[0];
+                  const primDef = SPIRITUAL_GIFTS_DEFINITIONS[latestGifts.primaryGift];
+                  const secDef = latestGifts.secondaryGift ? SPIRITUAL_GIFTS_DEFINITIONS[latestGifts.secondaryGift] : null;
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
+                          <span className="text-[9px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">
+                            Primary Gift
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: primDef?.color || '#6366f1' }} />
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              {latestGifts.primaryGift}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              ({latestGifts.scores?.[latestGifts.primaryGift.toLowerCase() as keyof typeof latestGifts.scores] || 0}/35)
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                            {primDef?.shortDescription}
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
+                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                            Secondary Gift
+                          </span>
+                          {latestGifts.secondaryGift ? (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: secDef?.color || '#94a3b8' }} />
+                                <span className="text-sm font-black text-slate-900 dark:text-white">
+                                  {latestGifts.secondaryGift}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  ({latestGifts.scores?.[latestGifts.secondaryGift.toLowerCase() as keyof typeof latestGifts.scores] || 0}/35)
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                                {secDef?.shortDescription}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400 block pt-1">None specified</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 6 Gifts Breakdown Bars */}
+                      <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                          6 Spiritual Gifts Breakdown
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {(['Helps', 'Teaching', 'Encouragement', 'Administration', 'Mercy', 'Giving'] as const).map(g => {
+                            const score = latestGifts.scores?.[g.toLowerCase() as keyof typeof latestGifts.scores] || 0;
+                            const pct = Math.round((score / 35) * 100);
+                            const gDef = SPIRITUAL_GIFTS_DEFINITIONS[g];
+                            return (
+                              <div key={g} className="space-y-0.5">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-slate-700 dark:text-slate-300">{g}</span>
+                                  <span className="text-slate-900 dark:text-white">{score}</span>
+                                </div>
+                                <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full" 
+                                    style={{ width: `${Math.max(4, pct)}%`, backgroundColor: gDef.color }} 
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken {formatDate(new Date(latestGifts.submittedAt).toISOString())}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare size={13} />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGiftsModal(latestGifts)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass size={13} />
+                            <span>Full Test (42 Qs)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-3 space-y-2 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No Spiritual Gifts Test on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyAssessmentLink('gifts-test', setCopiedGiftsLink)}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedGiftsLink ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedGiftsLink ? 'Link Copied!' : 'Copy Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendAssessmentSms('Spiritual Gifts Test', 'gifts-test')}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send size={12} />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── 2. Myers-Briggs (MBTI) Profile Card ── */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Brain size={14} className="text-violet-500" />
+                Myers-Briggs (MBTI) Profile
+              </h3>
+              {mbtiResponses.length > 0 ? (
+                <span className="text-[9px] font-black bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                  Completed
+                </span>
+              ) : (
+                <span className="text-[9px] font-black bg-slate-100 dark:bg-zinc-800 text-slate-400 px-2 py-0.5 rounded-full">
+                  Pending
+                </span>
+              )}
+            </div>
+
+            {mbtiResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestMbti = mbtiResponses[0];
+                  const mbtiProf = MBTI_TYPE_PROFILES[latestMbti.mbtiType] || MBTI_TYPE_PROFILES['ENFJ'];
+
+                  return (
+                    <>
+                      <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="px-2.5 py-1 rounded-lg text-sm font-black text-white shadow-xs"
+                              style={{ backgroundColor: mbtiProf.color }}
+                            >
+                              {latestMbti.mbtiType}
+                            </span>
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                {mbtiProf.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Temperament: {latestMbti.temperament || mbtiProf.temperament}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                          {mbtiProf.tagline}
+                        </p>
+                      </div>
+
+                      {/* 4 Cognitive Trait Sliders */}
+                      {latestMbti.traitPercentages && (
+                        <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                            Cognitive Traits
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            {/* E vs I */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.energy.type === 'E' ? 'Extravert (E)' : 'Introvert (I)'}</span>
+                                <span>{latestMbti.traitPercentages.energy.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-violet-600" style={{ width: `${latestMbti.traitPercentages.energy.ePercent}%` }} />
+                                <div className="h-full bg-indigo-400" style={{ width: `${latestMbti.traitPercentages.energy.iPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* S vs N */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.information.type === 'S' ? 'Sensing (S)' : 'Intuitive (N)'}</span>
+                                <span>{latestMbti.traitPercentages.information.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-sky-600" style={{ width: `${latestMbti.traitPercentages.information.sPercent}%` }} />
+                                <div className="h-full bg-cyan-400" style={{ width: `${latestMbti.traitPercentages.information.nPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* T vs F */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.decisions.type === 'T' ? 'Thinking (T)' : 'Feeling (F)'}</span>
+                                <span>{latestMbti.traitPercentages.decisions.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-amber-500" style={{ width: `${latestMbti.traitPercentages.decisions.tPercent}%` }} />
+                                <div className="h-full bg-pink-400" style={{ width: `${latestMbti.traitPercentages.decisions.fPercent}%` }} />
+                              </div>
+                            </div>
+
+                            {/* J vs P */}
+                            <div className="space-y-0.5">
+                              <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                <span>{latestMbti.traitPercentages.structure.type === 'J' ? 'Judging (J)' : 'Perceiving (P)'}</span>
+                                <span>{latestMbti.traitPercentages.structure.percent}%</span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-emerald-600" style={{ width: `${latestMbti.traitPercentages.structure.jPercent}%` }} />
+                                <div className="h-full bg-teal-400" style={{ width: `${latestMbti.traitPercentages.structure.pPercent}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken {formatDate(new Date(latestMbti.submittedAt).toISOString())}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare size={13} />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMbtiModal(latestMbti)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass size={13} />
+                            <span>Full Test (28 Qs)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-3 space-y-2 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No MBTI Personality Test on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyAssessmentLink('mbti-test', setCopiedMbtiLink)}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedMbtiLink ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedMbtiLink ? 'Link Copied!' : 'Copy Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendAssessmentSms('MBTI Personality Assessment', 'mbti-test')}
+                    className="px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send size={12} />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── 3. Faith-Based DISC Profile Card ── */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Compass size={14} className="text-emerald-500" />
+                Faith-Based DISC Profile (KJV)
+              </h3>
+              {discResponses.length > 0 ? (
+                <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  Completed
+                </span>
+              ) : (
+                <span className="text-[9px] font-black bg-slate-100 dark:bg-zinc-800 text-slate-400 px-2 py-0.5 rounded-full">
+                  Pending
+                </span>
+              )}
+            </div>
+
+            {discResponses.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  const latestDisc = discResponses[0];
+                  const discProf = DISC_PROFILES[latestDisc.styleCode] || DISC_PROFILES[latestDisc.primaryDimension] || DISC_PROFILES['D'];
+
+                  return (
+                    <>
+                      <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="px-2.5 py-1 rounded-lg text-sm font-black text-white shadow-xs"
+                              style={{ backgroundColor: discProf.color }}
+                            >
+                              {latestDisc.styleCode}
+                            </span>
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                {discProf.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Primary: {DISC_DIMENSIONS_INFO[latestDisc.primaryDimension]?.name.split(' ')[0]}
+                                {latestDisc.secondaryDimension && ` • Secondary: ${DISC_DIMENSIONS_INFO[latestDisc.secondaryDimension]?.name.split(' ')[0]}`}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                          {discProf.summary}
+                        </p>
+
+                        {/* Theme KJV Verse */}
+                        {discProf.themeVerseKjv && (
+                          <div className="p-2.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 border-l-3 border-emerald-600 text-[10px] italic text-slate-700 dark:text-slate-300 font-serif">
+                            “{discProf.themeVerseKjv.text}” <span className="font-bold font-sans not-italic text-emerald-700 dark:text-emerald-400">— {discProf.themeVerseKjv.verse}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4 Dimension Percentage Sliders */}
+                      {latestDisc.percentages && (
+                        <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                            DISC Dimension Distribution
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(d => {
+                              const info = DISC_DIMENSIONS_INFO[d];
+                              const pct = latestDisc.percentages[d] || 0;
+                              const score = latestDisc.scores?.[d] || 0;
+                              return (
+                                <div key={d} className="space-y-0.5">
+                                  <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                                    <span>{info.name.split(' ')[0]} ({d})</span>
+                                    <span className="font-mono">{pct}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Taken {formatDate(new Date(latestDisc.submittedAt).toISOString())}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowEngagementModal(true)}
+                            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare size={13} />
+                            <span>Pastoral Strategy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDiscModal(latestDisc)}
+                            className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Compass size={13} />
+                            <span>Full Test (28 Statements)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-3 space-y-2 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 p-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  No Faith-Based DISC Assessment on file for {person.name}.
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyAssessmentLink('disc-test', setCopiedDiscLink)}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-zinc-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedDiscLink ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedDiscLink ? 'Link Copied!' : 'Copy Link'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendAssessmentSms('Faith-Based DISC Assessment (KJV)', 'disc-test')}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Send size={12} />
+                    <span>Send via SMS</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Serving Involvement & Schedule History ── */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <HeartHandshake size={14} className="text-emerald-500" />
+                Serving Involvement
+              </h3>
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">
+                {timesServed}x in 90 Days
+              </span>
+            </div>
+
+            {/* Serving Teams */}
+            {teams.filter(t => t.memberIds?.includes(person.id) || t.scheduledMemberIds?.includes(person.id)).length > 0 ? (
+              <div className="space-y-1.5">
+                <span className="text-[9px] font-black text-slate-400 uppercase block">Active Teams:</span>
+                {teams.filter(t => t.memberIds?.includes(person.id) || t.scheduledMemberIds?.includes(person.id)).map(t => (
+                  <div key={t.id} className="flex justify-between items-center bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 text-xs">
+                    <span className="font-bold text-slate-800 dark:text-zinc-200">{t.name}</span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {t.scheduledMemberIds?.includes(person.id) ? 'Scheduled' : 'Team Member'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Not actively enrolled in any Services ministry teams.</p>
+            )}
+
+            {/* Serving Stats */}
+            {servingStats && (
+              <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center text-[10px] font-bold text-slate-500 dark:text-zinc-400">
+                <span>Avg weekly: <span className="text-slate-800 dark:text-zinc-200">{servingStats.timesPerWeek ?? (timesServed / (90 / 7)).toFixed(2)}x</span></span>
+                {servingStats.nextServiceDate ? (
+                  <span className="text-indigo-600 dark:text-indigo-400">Next: {formatDate(servingStats.nextServiceDate)}</span>
+                ) : (
+                  <span>Next: None scheduled</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Risk Progression Timeline ── */}
+          {(timeline.length > 0 || (riskProfile?.factors && riskProfile.factors.length > 0)) && (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-rose-500" />
+                  Risk Progression & Factors
+                </h3>
+                {timeline.length > 0 && (
+                  <span className="text-[9px] font-black bg-slate-100 dark:bg-zinc-800 text-slate-500 px-2 py-0.5 rounded-full">
+                    {timeline.length} Change{timeline.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              {/* Active Risk Factors */}
               {riskProfile?.factors && riskProfile.factors.length > 0 && (
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
-                    Risk Factors Triggered:
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Triggered Risk Factors:
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {riskProfile.factors.map((f, i) => (
@@ -914,14 +1280,37 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
                 </div>
               )}
 
-              {servingStats && (
-                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center text-[10px] font-bold text-slate-500 dark:text-zinc-400">
-                  <span>Avg per week: <span className="text-slate-800 dark:text-zinc-200">{servingStats.timesPerWeek ?? (timesServed / (90 / 7)).toFixed(2)}x</span></span>
-                  {servingStats.nextServiceDate ? (
-                    <span className="text-indigo-600 dark:text-indigo-400">Next: {new Date(servingStats.nextServiceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  ) : (
-                    <span>Next: None scheduled</span>
-                  )}
+              {/* Timeline Items */}
+              {timeline.length > 0 && (
+                <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-zinc-800">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                    Historical Risk Timeline:
+                  </span>
+                  <div className="space-y-1.5">
+                    {timeline.slice(0, 5).map((t, idx) => (
+                      <div key={t.id || idx} className="p-2.5 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${getRiskBadgeColor(t.oldCategory)}`}>
+                              {t.oldCategory}
+                            </span>
+                            <span className="text-slate-400 text-[10px]">→</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${getRiskBadgeColor(t.newCategory)}`}>
+                              {t.newCategory}
+                            </span>
+                          </div>
+                          {t.reasons && t.reasons.length > 0 && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                              {t.reasons.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                          {formatDate(t.date)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1297,7 +1686,7 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
               <button
                 type="submit"
                 disabled={savingNote || !noteContent.trim()}
-                className="w-full flex items-center justify-center gap-1.5 p-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-100 dark:shadow-none transition active:scale-[0.98]"
+                className="w-full flex items-center justify-center gap-1.5 p-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-100 dark:shadow-none transition active:scale-[0.98] cursor-pointer"
               >
                 {savingNote ? 'Saving Entry...' : (
                   <>
@@ -1361,6 +1750,389 @@ export const PersonProfileView: React.FC<PersonProfileViewProps> = ({
 
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODALS & OVERLAYS (Spiritual Gifts, MBTI, DISC, Pastoral Strategy)
+      ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── 1. Spiritual Gifts Full Test (42 Qs) Modal ── */}
+      {selectedGiftsModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0"
+                  style={{ backgroundColor: SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.primaryGift]?.color || '#6366f1' }}
+                >
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    Spiritual Gifts: {person.name}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Taken on {new Date(selectedGiftsModal.submittedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedGiftsModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">Primary Gift</span>
+                  <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    {selectedGiftsModal.primaryGift} ({selectedGiftsModal.scores?.[selectedGiftsModal.primaryGift.toLowerCase() as keyof typeof selectedGiftsModal.scores] || 0}/35)
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                    {SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.primaryGift]?.shortDescription}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Secondary Gift</span>
+                  <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    {selectedGiftsModal.secondaryGift || 'None'} {selectedGiftsModal.secondaryGift ? `(${selectedGiftsModal.scores?.[selectedGiftsModal.secondaryGift.toLowerCase() as keyof typeof selectedGiftsModal.scores] || 0}/35)` : ''}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {selectedGiftsModal.secondaryGift ? SPIRITUAL_GIFTS_DEFINITIONS[selectedGiftsModal.secondaryGift]?.shortDescription : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* 6 Gifts Scores */}
+              <div className="space-y-2.5">
+                <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Scores by Gift (out of 35)
+                </h5>
+                {selectedGiftsModal.rankedGifts?.map(rg => {
+                  const def = SPIRITUAL_GIFTS_DEFINITIONS[rg.gift];
+                  return (
+                    <div key={rg.gift} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-800 dark:text-slate-200">{rg.gift}</span>
+                        <span className="text-slate-900 dark:text-white">{rg.score} / 35 ({rg.percentage}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.max(5, rg.percentage)}%`,
+                            backgroundColor: def?.color || '#6366f1'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* All 42 Answer Ratings */}
+              <div className="space-y-3 pt-2">
+                <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Individual Ratings for all 42 Statements
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {SPIRITUAL_GIFTS_QUESTIONS.map(q => {
+                    const ans = selectedGiftsModal.answers?.[q.id] || 0;
+                    return (
+                      <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase">
+                            #{q.id} • {q.category}
+                          </div>
+                          <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                            {q.text}
+                          </div>
+                        </div>
+                        <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          {ans}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── 2. Myers-Briggs (MBTI) Full Test (28 Qs) Modal ── */}
+      {selectedMbtiModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md font-black text-sm shrink-0"
+                  style={{ backgroundColor: MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.color || '#8b5cf6' }}
+                >
+                  {selectedMbtiModal.mbtiType}
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    MBTI Profile: {person.name}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.name} • Taken {new Date(selectedMbtiModal.submittedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMbtiModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+              {/* Summary */}
+              <div className="p-4 rounded-2xl bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-800/40 space-y-2">
+                <span className="text-[10px] font-black uppercase text-violet-600 dark:text-violet-400 tracking-wider">
+                  Overview & Temperament ({selectedMbtiModal.temperament || MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.temperament})
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                  {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.tagline}
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {MBTI_TYPE_PROFILES[selectedMbtiModal.mbtiType]?.fullDescription}
+                </p>
+              </div>
+
+              {/* 4 Dimension Percentage Bars */}
+              {selectedMbtiModal.traitPercentages && (
+                <div className="space-y-3">
+                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Cognitive Dimensions
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* E vs I */}
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-1">
+                      <div className="flex justify-between font-bold">
+                        <span>Extraversion ({selectedMbtiModal.traitPercentages.energy.ePercent}%)</span>
+                        <span>Introversion ({selectedMbtiModal.traitPercentages.energy.iPercent}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden flex">
+                        <div className="h-full bg-violet-600" style={{ width: `${selectedMbtiModal.traitPercentages.energy.ePercent}%` }} />
+                        <div className="h-full bg-indigo-400" style={{ width: `${selectedMbtiModal.traitPercentages.energy.iPercent}%` }} />
+                      </div>
+                    </div>
+
+                    {/* S vs N */}
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-1">
+                      <div className="flex justify-between font-bold">
+                        <span>Sensing ({selectedMbtiModal.traitPercentages.information.sPercent}%)</span>
+                        <span>Intuition ({selectedMbtiModal.traitPercentages.information.nPercent}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden flex">
+                        <div className="h-full bg-sky-600" style={{ width: `${selectedMbtiModal.traitPercentages.information.sPercent}%` }} />
+                        <div className="h-full bg-cyan-400" style={{ width: `${selectedMbtiModal.traitPercentages.information.nPercent}%` }} />
+                      </div>
+                    </div>
+
+                    {/* T vs F */}
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-1">
+                      <div className="flex justify-between font-bold">
+                        <span>Thinking ({selectedMbtiModal.traitPercentages.decisions.tPercent}%)</span>
+                        <span>Feeling ({selectedMbtiModal.traitPercentages.decisions.fPercent}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden flex">
+                        <div className="h-full bg-amber-500" style={{ width: `${selectedMbtiModal.traitPercentages.decisions.tPercent}%` }} />
+                        <div className="h-full bg-pink-400" style={{ width: `${selectedMbtiModal.traitPercentages.decisions.fPercent}%` }} />
+                      </div>
+                    </div>
+
+                    {/* J vs P */}
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-1">
+                      <div className="flex justify-between font-bold">
+                        <span>Judging ({selectedMbtiModal.traitPercentages.structure.jPercent}%)</span>
+                        <span>Perceiving ({selectedMbtiModal.traitPercentages.structure.pPercent}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden flex">
+                        <div className="h-full bg-emerald-600" style={{ width: `${selectedMbtiModal.traitPercentages.structure.jPercent}%` }} />
+                        <div className="h-full bg-teal-400" style={{ width: `${selectedMbtiModal.traitPercentages.structure.pPercent}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 28 Statements */}
+              <div className="space-y-3 pt-2">
+                <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Individual Ratings for all 28 Statements (1–5)
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {MBTI_QUESTIONS.map(q => {
+                    const ans = selectedMbtiModal.answers?.[q.id] || 0;
+                    return (
+                      <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase">
+                            #{q.id} • {q.dimension} ({q.direction})
+                          </div>
+                          <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                            {q.text}
+                          </div>
+                        </div>
+                        <span className="w-6 h-6 rounded-lg bg-violet-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          {ans}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── 3. Faith-Based DISC Full Test (28 Statements) Modal ── */}
+      {selectedDiscModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md font-black text-sm shrink-0"
+                  style={{ backgroundColor: DISC_PROFILES[selectedDiscModal.styleCode]?.color || '#10b981' }}
+                >
+                  {selectedDiscModal.styleCode}
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    DISC Profile: {person.name}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    {DISC_PROFILES[selectedDiscModal.styleCode]?.name} • Taken {new Date(selectedDiscModal.submittedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedDiscModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+              {/* Summary */}
+              <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
+                <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                  Summary & Ministry Overview
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                  {DISC_PROFILES[selectedDiscModal.styleCode]?.summary}
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {DISC_PROFILES[selectedDiscModal.styleCode]?.fullDescription}
+                </p>
+              </div>
+
+              {/* KJV Theme Verse */}
+              {DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border-l-4 border-emerald-600 space-y-1">
+                  <p className="text-xs italic text-slate-800 dark:text-slate-200 font-serif">
+                    “{DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv.text}”
+                  </p>
+                  <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 text-right">
+                    — {DISC_PROFILES[selectedDiscModal.styleCode]?.themeVerseKjv.verse}
+                  </p>
+                </div>
+              )}
+
+              {/* 4 Dimension Percentage Bars */}
+              {selectedDiscModal.percentages && (
+                <div className="space-y-3">
+                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    DISC Dimension Distribution
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(['D', 'I', 'S', 'C'] as DiscDimension[]).map(dim => {
+                      const info = DISC_DIMENSIONS_INFO[dim];
+                      const score = selectedDiscModal.scores?.[dim] || 0;
+                      const pct = selectedDiscModal.percentages?.[dim] || 0;
+
+                      return (
+                        <div key={dim} className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-1.5">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span>{info.name.split(' ')[0]}</span>
+                            <span className="font-mono">{pct}% ({score}/35)</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${Math.max(5, pct)}%`, backgroundColor: info.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 28 Statements */}
+              <div className="space-y-3 pt-2">
+                <h5 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Individual Ratings for all 28 Statements (1–5)
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {DISC_QUESTIONS.map(q => {
+                    const ans = selectedDiscModal.answers?.[q.id] || 0;
+                    return (
+                      <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase">
+                            #{q.id} • Dimension {q.dimension} ({q.trait})
+                          </div>
+                          <div className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug mt-0.5">
+                            {q.text}
+                          </div>
+                        </div>
+                        <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          {ans}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── 4. Pastoral Engagement & Shepherding Strategy Modal ── */}
+      {showEngagementModal && (
+        <PastoralEngagementModal
+          isOpen={showEngagementModal}
+          onClose={() => setShowEngagementModal(false)}
+          personName={person.name}
+          email={resolvedEmail}
+          phone={resolvedPhone}
+          personId={person.id}
+          churchId={churchId}
+          giftsResponse={giftsResponses[0] || null}
+          mbtiResponse={mbtiResponses[0] || null}
+          discResponse={discResponses[0] || null}
+        />
+      )}
+
     </div>
   );
 };

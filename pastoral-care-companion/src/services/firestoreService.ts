@@ -21,7 +21,8 @@ import {
   PcoPerson, PcoGroup, SystemSettings, 
   PastoralNote, PrayerRequest, PcoList,
   OutreachSession, OutreachSlot, DetailedDonation,
-  ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee
+  ServicesTeam, PcoRegistrationEvent, PcoRegistrationAttendee,
+  GiftsTestResponse, MbtiTestResponse, DiscTestResponse, RiskChangeRecord
 } from '../types';
 
 class FirestoreService {
@@ -446,6 +447,186 @@ class FirestoreService {
       return snapshot.docs.map(d => d.data() as OutreachSlot);
     } catch (e) {
       return [];
+    }
+  }
+
+  async getPersonOutreachSlots(churchId: string, personId: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('churchId', '==', churchId),
+        where('assignedPersonId', '==', personId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as OutreachSlot);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async getPersonRiskTimeline(churchId: string, personId: string): Promise<RiskChangeRecord[]> {
+    try {
+      const q = query(
+        collection(db, 'risk_changes'),
+        where('churchId', '==', churchId),
+        where('personId', '==', personId),
+        orderBy('timestamp', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as RiskChangeRecord);
+    } catch (e) {
+      try {
+        const qFallback = query(
+          collection(db, 'risk_changes'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId)
+        );
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => d.data() as RiskChangeRecord);
+        list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        return list;
+      } catch (err) {
+        console.warn('getPersonRiskTimeline error:', err);
+        return [];
+      }
+    }
+  }
+
+  // --- Spiritual Gifts Test Responses ---
+  async getGiftsTestResponses(churchId: string, personId?: string): Promise<GiftsTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'gifts_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'gifts_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+    } catch (e) {
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'gifts_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'gifts_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('getGiftsTestResponses failed:', err);
+        return [];
+      }
+    }
+  }
+
+  // --- Myers-Briggs (MBTI) Test Responses ---
+  async getMbtiResponses(churchId: string, personId?: string): Promise<MbtiTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'mbti_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'mbti_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+    } catch (e) {
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'mbti_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'mbti_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('getMbtiResponses failed:', err);
+        return [];
+      }
+    }
+  }
+
+  // --- Faith-Based DISC Personality Assessment Responses ---
+  async getDiscResponses(churchId: string, personId?: string): Promise<DiscTestResponse[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(
+          collection(db, 'disc_test_responses'),
+          where('churchId', '==', churchId),
+          where('personId', '==', personId),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'disc_test_responses'),
+          where('churchId', '==', churchId),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+    } catch (e) {
+      try {
+        let qFallback;
+        if (personId) {
+          qFallback = query(
+            collection(db, 'disc_test_responses'),
+            where('churchId', '==', churchId),
+            where('personId', '==', personId)
+          );
+        } else {
+          qFallback = query(
+            collection(db, 'disc_test_responses'),
+            where('churchId', '==', churchId)
+          );
+        }
+        const snapshot = await getDocs(qFallback);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+        list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        return list;
+      } catch (err) {
+        console.error('getDiscResponses failed:', err);
+        return [];
+      }
     }
   }
 }
