@@ -761,7 +761,18 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         let totalPriorYearDonorsCount = 0;
         let totalPriorYearGivingSum = 0;
 
-        donorYearMap.forEach(rec => {
+        donorYearMap.forEach((rec, donorId) => {
+            const person = peopleMap.get(donorId);
+            const resolvedName = (person?.name || rec.donorName || '').trim();
+            const isUnnamed = !resolvedName ||
+                resolvedName.toLowerCase() === 'donor' ||
+                resolvedName.toLowerCase() === 'unknown' ||
+                resolvedName.toLowerCase() === 'unknown contributor' ||
+                resolvedName.toLowerCase() === 'anonymous' ||
+                donorId === 'anonymous';
+
+            if (isUnnamed) return;
+
             const pTotal = rec.prior.reduce((s, d) => s + d.amount, 0);
             if (pTotal > 0) {
                 totalPriorYearDonorsCount++;
@@ -790,14 +801,25 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         }[] = [];
 
         donorYearMap.forEach((rec, donorId) => {
+            const person = peopleMap.get(donorId);
+            const resolvedName = (person?.name || rec.donorName || '').trim();
+            const isUnnamed = !resolvedName ||
+                resolvedName.toLowerCase() === 'donor' ||
+                resolvedName.toLowerCase() === 'unknown' ||
+                resolvedName.toLowerCase() === 'unknown contributor' ||
+                resolvedName.toLowerCase() === 'anonymous' ||
+                donorId === 'anonymous';
+
+            // Exclude donors without real names from the report
+            if (isUnnamed) return;
+
             const priorTotal = rec.prior.reduce((s, d) => s + d.amount, 0);
             const currentTotal = rec.current.reduce((s, d) => s + d.amount, 0);
             const currentTotalOverall = rec.currentOverall.reduce((s, d) => s + d.amount, 0);
 
             // Qualified Lapsed: Contributed in prior year (> 0) and $0 in current year
             if (priorTotal > 0 && currentTotal === 0) {
-                const person = peopleMap.get(donorId);
-                const name = person?.name || rec.donorName || 'Unknown Contributor';
+                const name = resolvedName;
                 const email = person?.email || '';
                 const phone = person?.phone || '';
                 const membership = person?.membership || person?.status || 'Contributor';
@@ -1393,7 +1415,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl w-fit border border-slate-200 dark:border-slate-700">
                 {([
                     { id: 'donors',          label: '👤 Donor Report' },
-                    { id: 'lapsed_donors',   label: '📉 Prior Year Not Given' },
+                    { id: 'lapsed_donors',   label: '📉 Lapsed Donors' },
                     { id: 'giving_by_fund',  label: '🏛️ Giving by Fund' },
                     { id: 'fund_label_pivot', label: '🔄 Fund & Label Pivot' },
                     { id: 'age_trends',      label: '🎂 Age Demographics' },
@@ -1592,14 +1614,14 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 <div className="flex items-center gap-2">
                                     <span className="text-xl">📉</span>
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                                        Prior Year Contributors Not Given in Current Year
+                                        Lapsed Donors
                                     </h3>
                                     <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                        LYBUNT Report
+                                        Prior vs Current Year
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                                    Contributors who gave in <strong className="text-slate-700 dark:text-slate-200">{priorYear}</strong> but have not yet contributed in <strong className="text-slate-700 dark:text-slate-200">{comparisonYear}</strong>. Use this data to identify lapsed supporters, coordinate pastoral check-ins, and deploy targeted renewal campaigns.
+                                    Donors who contributed in <strong className="text-slate-700 dark:text-slate-200">{priorYear}</strong> but have not yet contributed in <strong className="text-slate-700 dark:text-slate-200">{comparisonYear}</strong>. Donors without names are excluded.
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
@@ -1835,9 +1857,9 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                         {/* Table Header Controls */}
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
-                                <h4 className="text-base font-black text-slate-900 dark:text-white">Lapsed Contributors Directory</h4>
+                                <h4 className="text-base font-black text-slate-900 dark:text-white">Lapsed Donors Directory</h4>
                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
-                                    Click any contributor to view pastoral profile and care history
+                                    Click any donor to view pastoral profile and care history
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
