@@ -18,7 +18,8 @@ interface DonationReportProps {
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label' | 'fund_label_pivot';
+type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label' | 'fund_label_pivot' | 'lapsed_donors';
+type LapsedSortField = 'priorTotal' | 'name' | 'giftCount' | 'lastGiftDate' | 'lifetimeTotal';
 
 interface FilterState {
     startDate: string;
@@ -192,6 +193,45 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
 
     const currentYear = new Date().getFullYear();
+
+    // Available donation years for prior vs current year comparison
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        years.add(currentYear);
+        years.add(currentYear - 1);
+        donations.forEach(d => {
+            if (d.date) {
+                const yr = parseInt(d.date.slice(0, 4), 10);
+                if (!isNaN(yr) && yr > 1900 && yr < 2100) years.add(yr);
+            }
+        });
+        return Array.from(years).sort((a, b) => b - a);
+    }, [donations, currentYear]);
+
+    // State for Prior Year Donors Not Given (LYBUNT) report
+    const [priorYear, setPriorYear] = useState<number>(() => currentYear - 1);
+    const [comparisonYear, setComparisonYear] = useState<number>(() => currentYear);
+    const [lapsedFundFilter, setLapsedFundFilter] = useState<string>('');
+    const [lapsedMinAmount, setLapsedMinAmount] = useState<string>('');
+    const [lapsedSearchQuery, setLapsedSearchQuery] = useState<string>('');
+    const [lapsedTierFilter, setLapsedTierFilter] = useState<string>('all');
+    const [lapsedRecurringOnly, setLapsedRecurringOnly] = useState<boolean>(false);
+    const [lapsedSort, setLapsedSort] = useState<{ field: LapsedSortField; direction: SortDirection }>({
+        field: 'priorTotal',
+        direction: 'desc'
+    });
+    const [copiedEmails, setCopiedEmails] = useState<boolean>(false);
+
+    const handleCopyLapsedEmails = (emails: string[]) => {
+        if (!emails.length) return;
+        navigator.clipboard.writeText(emails.join(', '));
+        setCopiedEmails(true);
+        setTimeout(() => setCopiedEmails(false), 2500);
+    };
+
+    const handleOpenPersonProfile = (personId: string) => {
+        window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: personId }));
+    };
 
     // Build a stable people map
     const peopleMap = useMemo(() => new Map(people.map(p => [p.id, p])), [people]);
@@ -677,6 +717,259 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         };
     }, [filteredDonations]);
 
+    // ── Prior Year Donors Not Given (LYBUNT) Calculation ──────────────────────
+    const lapsedReportData = useMemo(() => {
+        const donorYearMap = new Map<string, {
+            prior: DetailedDonation[];
+            current: DetailedDonation[];
+            currentOverall: DetailedDonation[];
+            all: DetailedDonation[];
+            donorName: string;
+        }>();
+
+        donations.forEach(d => {
+            if (!d.donorId) return;
+            if (!donorYearMap.has(d.donorId)) {
+                donorYearMap.set(d.donorId, {
+                    prior: [],
+                    current: [],
+                    currentOverall: [],
+                    all: [],
+                    donorName: d.donorName || '',
+                });
+            }
+            const rec = donorYearMap.get(d.donorId)!;
+            rec.all.push(d);
+            if (d.donorName && !rec.donorName) {
+                rec.donorName = d.donorName;
+            }
+
+            const dYear = parseInt(d.date ? d.date.slice(0, 4) : '0', 10);
+            if (dYear === priorYear) {
+                if (!lapsedFundFilter || d.fundName === lapsedFundFilter) {
+                    rec.prior.push(d);
+                }
+            }
+            if (dYear === comparisonYear) {
+                rec.currentOverall.push(d);
+                if (!lapsedFundFilter || d.fundName === lapsedFundFilter) {
+                    rec.current.push(d);
+                }
+            }
+        });
+
+        let totalPriorYearDonorsCount = 0;
+        let totalPriorYearGivingSum = 0;
+
+        donorYearMap.forEach(rec => {
+            const pTotal = rec.prior.reduce((s, d) => s + d.amount, 0);
+            if (pTotal > 0) {
+                totalPriorYearDonorsCount++;
+                totalPriorYearGivingSum += pTotal;
+            }
+        });
+
+        const lapsedList: {
+            id: string;
+            name: string;
+            email: string;
+            phone: string;
+            membership: string;
+            avatar?: string | null;
+            status?: string | null;
+            priorTotal: number;
+            priorCount: number;
+            priorAvg: number;
+            priorLastDate: string;
+            priorFunds: { fundName: string; amount: number }[];
+            priorWasRecurring: boolean;
+            currentTotal: number;
+            currentTotalOverall: number;
+            lifetimeTotal: number;
+            tier: string;
+        }[] = [];
+
+        donorYearMap.forEach((rec, donorId) => {
+            const priorTotal = rec.prior.reduce((s, d) => s + d.amount, 0);
+            const currentTotal = rec.current.reduce((s, d) => s + d.amount, 0);
+            const currentTotalOverall = rec.currentOverall.reduce((s, d) => s + d.amount, 0);
+
+            // Qualified Lapsed: Contributed in prior year (> 0) and $0 in current year
+            if (priorTotal > 0 && currentTotal === 0) {
+                const person = peopleMap.get(donorId);
+                const name = person?.name || rec.donorName || 'Unknown Contributor';
+                const email = person?.email || '';
+                const phone = person?.phone || '';
+                const membership = person?.membership || person?.status || 'Contributor';
+                const avatar = person?.avatar || null;
+                const status = person?.status || null;
+
+                const priorCount = rec.prior.length;
+                const priorAvg = priorCount > 0 ? priorTotal / priorCount : 0;
+                const priorWasRecurring = rec.prior.some(d => d.isRecurring);
+
+                let priorLastDate = '';
+                rec.prior.forEach(d => {
+                    if (!priorLastDate || new Date(d.date) > new Date(priorLastDate)) {
+                        priorLastDate = d.date;
+                    }
+                });
+
+                const fundsMap = new Map<string, number>();
+                rec.prior.forEach(d => {
+                    fundsMap.set(d.fundName, (fundsMap.get(d.fundName) || 0) + d.amount);
+                });
+                const priorFunds = Array.from(fundsMap.entries())
+                    .map(([fundName, amount]) => ({ fundName, amount }))
+                    .sort((a, b) => b.amount - a.amount);
+
+                const lifetimeTotal = rec.all.reduce((s, d) => s + d.amount, 0);
+
+                let tier = '< $100';
+                if (priorTotal >= 10000) tier = '$10,000+';
+                else if (priorTotal >= 5000) tier = '$5,000 - $9,999';
+                else if (priorTotal >= 1000) tier = '$1,000 - $4,999';
+                else if (priorTotal >= 500) tier = '$500 - $999';
+                else if (priorTotal >= 100) tier = '$100 - $499';
+
+                lapsedList.push({
+                    id: donorId,
+                    name,
+                    email,
+                    phone,
+                    membership,
+                    avatar,
+                    status,
+                    priorTotal,
+                    priorCount,
+                    priorAvg,
+                    priorLastDate,
+                    priorFunds,
+                    priorWasRecurring,
+                    currentTotal,
+                    currentTotalOverall,
+                    lifetimeTotal,
+                    tier,
+                });
+            }
+        });
+
+        const totalLapsedDonors = lapsedList.length;
+        const totalLapsedGiving = lapsedList.reduce((s, d) => s + d.priorTotal, 0);
+        const avgLapsedGift = totalLapsedDonors > 0 ? totalLapsedGiving / totalLapsedDonors : 0;
+        const recurringLapsedCount = lapsedList.filter(d => d.priorWasRecurring).length;
+        const recurringLapsedGiving = lapsedList.filter(d => d.priorWasRecurring).reduce((s, d) => s + d.priorTotal, 0);
+        const lapseRateDonors = totalPriorYearDonorsCount > 0 ? (totalLapsedDonors / totalPriorYearDonorsCount) * 100 : 0;
+        const lapseRateGiving = totalPriorYearGivingSum > 0 ? (totalLapsedGiving / totalPriorYearGivingSum) * 100 : 0;
+
+        const sortedByPrior = [...lapsedList].sort((a, b) => b.priorTotal - a.priorTotal);
+        const topLapsedDonor = sortedByPrior.length > 0 ? sortedByPrior[0] : null;
+
+        const TIERS_CONFIG = [
+            { label: '$10,000+', min: 10000, max: Infinity, color: '#4338ca' },
+            { label: '$5,000 - $9,999', min: 5000, max: 9999.99, color: '#6366f1' },
+            { label: '$1,000 - $4,999', min: 1000, max: 4999.99, color: '#3b82f6' },
+            { label: '$500 - $999', min: 500, max: 999.99, color: '#06b6d4' },
+            { label: '$100 - $499', min: 100, max: 499.99, color: '#10b981' },
+            { label: '< $100', min: 0, max: 99.99, color: '#94a3b8' },
+        ];
+
+        const tierBreakdown = TIERS_CONFIG.map(t => {
+            const matches = lapsedList.filter(d => d.priorTotal >= t.min && d.priorTotal <= t.max);
+            const sum = matches.reduce((s, d) => s + d.priorTotal, 0);
+            return {
+                tier: t.label,
+                count: matches.length,
+                sum,
+                pct: totalLapsedGiving > 0 ? (sum / totalLapsedGiving) * 100 : 0,
+                color: t.color,
+            };
+        });
+
+        const fundsImpactMap = new Map<string, { sum: number; count: number }>();
+        lapsedList.forEach(d => {
+            d.priorFunds.forEach(f => {
+                const cur = fundsImpactMap.get(f.fundName) || { sum: 0, count: 0 };
+                cur.sum += f.amount;
+                cur.count += 1;
+                fundsImpactMap.set(f.fundName, cur);
+            });
+        });
+        const fundsImpactList = Array.from(fundsImpactMap.entries())
+            .map(([fundName, val]) => ({
+                fundName,
+                sum: val.sum,
+                count: val.count,
+                pct: totalLapsedGiving > 0 ? (val.sum / totalLapsedGiving) * 100 : 0,
+            }))
+            .sort((a, b) => b.sum - a.sum);
+
+        let filteredList = [...lapsedList];
+
+        if (lapsedMinAmount) {
+            const minVal = parseFloat(lapsedMinAmount);
+            if (!isNaN(minVal)) {
+                filteredList = filteredList.filter(d => d.priorTotal >= minVal);
+            }
+        }
+
+        if (lapsedTierFilter !== 'all') {
+            filteredList = filteredList.filter(d => d.tier === lapsedTierFilter);
+        }
+
+        if (lapsedRecurringOnly) {
+            filteredList = filteredList.filter(d => d.priorWasRecurring);
+        }
+
+        if (lapsedSearchQuery.trim()) {
+            const q = lapsedSearchQuery.toLowerCase().trim();
+            filteredList = filteredList.filter(d =>
+                d.name.toLowerCase().includes(q) ||
+                d.email.toLowerCase().includes(q) ||
+                d.membership.toLowerCase().includes(q) ||
+                d.phone.toLowerCase().includes(q)
+            );
+        }
+
+        filteredList.sort((a, b) => {
+            let va: any = a[lapsedSort.field];
+            let vb: any = b[lapsedSort.field];
+            if (lapsedSort.field === 'name') {
+                va = (va || '').toLowerCase();
+                vb = (vb || '').toLowerCase();
+            } else if (lapsedSort.field === 'giftCount') {
+                va = a.priorCount;
+                vb = b.priorCount;
+            } else if (lapsedSort.field === 'lastGiftDate') {
+                va = a.priorLastDate ? new Date(a.priorLastDate).getTime() : 0;
+                vb = b.priorLastDate ? new Date(b.priorLastDate).getTime() : 0;
+            }
+            if (va < vb) return lapsedSort.direction === 'asc' ? -1 : 1;
+            if (va > vb) return lapsedSort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return {
+            allLapsedDonors: lapsedList,
+            filteredList,
+            totalPriorYearDonorsCount,
+            totalPriorYearGivingSum,
+            totalLapsedDonors,
+            totalLapsedGiving,
+            avgLapsedGift,
+            recurringLapsedCount,
+            recurringLapsedGiving,
+            lapseRateDonors,
+            lapseRateGiving,
+            topLapsedDonor,
+            tierBreakdown,
+            fundsImpactList,
+        };
+    }, [
+        donations, peopleMap, priorYear, comparisonYear, lapsedFundFilter,
+        lapsedMinAmount, lapsedTierFilter, lapsedRecurringOnly, lapsedSearchQuery, lapsedSort
+    ]);
+
     // ── CSV Export ──────────────────────────────────────────────────────────────
     const handleExport = () => {
         const escapeCsv = (str: string) => {
@@ -800,6 +1093,39 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 csv = [header.join(','), ...rows].join('\n');
                 filename = `fund_label_pivot_by_label_${format(new Date(), 'yyyy-MM-dd')}.csv`;
             }
+        } else if (activeTab === 'lapsed_donors') {
+            const header = [
+                'Donor Name',
+                'Email',
+                'Phone',
+                'Membership / Status',
+                `Prior Year (${priorYear}) Total Given ($)`,
+                `Prior Year (${priorYear}) Gift Count`,
+                `Prior Year (${priorYear}) Avg Gift ($)`,
+                `Prior Year (${priorYear}) Last Gift Date`,
+                `Prior Year (${priorYear}) Funds Supported`,
+                `Prior Year (${priorYear}) Was Recurring`,
+                `Current Year (${comparisonYear}) Total Given ($)`,
+                'Lifetime Total Given ($)',
+                'Giving Bracket'
+            ];
+            const rows = lapsedReportData.filteredList.map(d => [
+                escapeCsv(d.name),
+                escapeCsv(d.email),
+                escapeCsv(d.phone),
+                escapeCsv(d.membership),
+                d.priorTotal.toFixed(2),
+                d.priorCount,
+                d.priorAvg.toFixed(2),
+                d.priorLastDate,
+                escapeCsv(d.priorFunds.map(f => `${f.fundName}: $${f.amount.toFixed(2)}`).join('; ')),
+                d.priorWasRecurring ? 'Yes' : 'No',
+                d.currentTotal.toFixed(2),
+                d.lifetimeTotal.toFixed(2),
+                escapeCsv(d.tier),
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `lapsed_donors_${priorYear}_to_${comparisonYear}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
         }
 
         if (!csv) return;
@@ -822,130 +1148,234 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
-                {/* Shared filters for all tabs */}
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
-                    <select
-                        aria-label="Time period"
-                        value={filters.timePeriod}
-                        onChange={(e) => handleTimePeriodChange(e.target.value)}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                        <option value="this_month">This Month</option>
-                        <option value="last_month">Last Month</option>
-                        <option value="this_quarter">This Quarter</option>
-                        <option value="ytd">Year To Date</option>
-                        <option value="last_year">Last Year</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
-                </div>
-
-                {filters.timePeriod === 'custom' && (
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="date"
-                                aria-label="Start date"
-                                value={filters.startDate}
-                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, timePeriod: 'custom' }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                            />
-                            <span className="text-slate-300">-</span>
-                            <input
-                                type="date"
-                                aria-label="End date"
-                                value={filters.endDate}
-                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, timePeriod: 'custom' }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                            />
+                {activeTab === 'lapsed_donors' ? (
+                    <>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Previous Year (Base)</label>
+                            <select
+                                aria-label="Previous Year"
+                                value={priorYear}
+                                onChange={(e) => setPriorYear(parseInt(e.target.value, 10))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {availableYears.map(yr => (
+                                    <option key={yr} value={yr}>{yr}</option>
+                                ))}
+                            </select>
                         </div>
-                    </div>
-                )}
 
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
-                    <select
-                        aria-label="Filter by Fund"
-                        value={filters.selectedFund}
-                        onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value }))}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
-                    >
-                        <option value="">All Funds</option>
-                        {availableFunds.map(fund => (
-                            <option key={fund} value={fund}>{fund}</option>
-                        ))}
-                    </select>
-                </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Current Year (Comparison)</label>
+                            <select
+                                aria-label="Current Year"
+                                value={comparisonYear}
+                                onChange={(e) => setComparisonYear(parseInt(e.target.value, 10))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {availableYears.map(yr => (
+                                    <option key={yr} value={yr}>{yr}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Payment Source</label>
-                    <select
-                        aria-label="Filter by Payment Source"
-                        value={filters.selectedPaymentSource}
-                        onChange={(e) => setFilters(prev => ({ ...prev, selectedPaymentSource: e.target.value }))}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
-                    >
-                        <option value="">All Sources</option>
-                        {availablePaymentSources.map(source => (
-                            <option key={source} value={source}>{source}</option>
-                        ))}
-                    </select>
-                </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
+                            <select
+                                aria-label="Filter by Fund"
+                                value={lapsedFundFilter}
+                                onChange={(e) => setLapsedFundFilter(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[130px]"
+                            >
+                                <option value="">All Funds</option>
+                                {availableFunds.map(fund => (
+                                    <option key={fund} value={fund}>{fund}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label</label>
-                    <select
-                        aria-label="Filter by Label"
-                        value={filters.selectedLabel}
-                        onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
-                    >
-                        <option value="">All Labels</option>
-                        {availableLabels.map(tag => (
-                            <option key={tag} value={tag}>{tag}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {activeTab !== 'giving_by_label' && (
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
-                        <select
-                            aria-label="Reporting interval"
-                            value={filters.interval}
-                            onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="YTD">Yearly (YTD)</option>
-                        </select>
-                    </div>
-                )}
-
-                {activeTab === 'donors' && (
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Total Given ($)</label>
-                        <div className="flex items-center gap-2">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Min Prior Given ($)</label>
                             <input
                                 type="number"
-                                placeholder="Min"
-                                value={filters.minAmount}
-                                onChange={(e) => setFilters(prev => ({ ...prev, minAmount: e.target.value }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none w-20"
-                            />
-                            <span className="text-slate-300">-</span>
-                            <input
-                                type="number"
-                                placeholder="Max"
-                                value={filters.maxAmount}
-                                onChange={(e) => setFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none w-20"
+                                placeholder="Min $"
+                                value={lapsedMinAmount}
+                                onChange={(e) => setLapsedMinAmount(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none w-28"
                             />
                         </div>
-                    </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Giving Tier</label>
+                            <select
+                                aria-label="Giving Tier"
+                                value={lapsedTierFilter}
+                                onChange={(e) => setLapsedTierFilter(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[130px]"
+                            >
+                                <option value="all">All Tiers</option>
+                                <option value="$10,000+">$10,000+</option>
+                                <option value="$5,000 - $9,999">$5,000 - $9,999</option>
+                                <option value="$1,000 - $4,999">$1,000 - $4,999</option>
+                                <option value="$500 - $999">$500 - $999</option>
+                                <option value="$100 - $499">$100 - $499</option>
+                                <option value="< $100">&lt; $100</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 pb-2">
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-600 dark:text-slate-300">
+                                <input
+                                    type="checkbox"
+                                    checked={lapsedRecurringOnly}
+                                    onChange={(e) => setLapsedRecurringOnly(e.target.checked)}
+                                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                />
+                                <span>Prior Recurring Only</span>
+                            </label>
+                        </div>
+
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Search Contributor</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, email, or membership..."
+                                    value={lapsedSearchQuery}
+                                    onChange={(e) => setLapsedSearchQuery(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-xl pl-9 pr-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* Shared filters for all tabs */}
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
+                            <select
+                                aria-label="Time period"
+                                value={filters.timePeriod}
+                                onChange={(e) => handleTimePeriodChange(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="this_month">This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_quarter">This Quarter</option>
+                                <option value="ytd">Year To Date</option>
+                                <option value="last_year">Last Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+
+                        {filters.timePeriod === 'custom' && (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="date"
+                                        aria-label="Start date"
+                                        value={filters.startDate}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, timePeriod: 'custom' }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    />
+                                    <span className="text-slate-300">-</span>
+                                    <input
+                                        type="date"
+                                        aria-label="End date"
+                                        value={filters.endDate}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, timePeriod: 'custom' }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
+                            <select
+                                aria-label="Filter by Fund"
+                                value={filters.selectedFund}
+                                onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                            >
+                                <option value="">All Funds</option>
+                                {availableFunds.map(fund => (
+                                    <option key={fund} value={fund}>{fund}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Payment Source</label>
+                            <select
+                                aria-label="Filter by Payment Source"
+                                value={filters.selectedPaymentSource}
+                                onChange={(e) => setFilters(prev => ({ ...prev, selectedPaymentSource: e.target.value }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                            >
+                                <option value="">All Sources</option>
+                                {availablePaymentSources.map(source => (
+                                    <option key={source} value={source}>{source}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label</label>
+                            <select
+                                aria-label="Filter by Label"
+                                value={filters.selectedLabel}
+                                onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                            >
+                                <option value="">All Labels</option>
+                                {availableLabels.map(tag => (
+                                    <option key={tag} value={tag}>{tag}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {activeTab !== 'giving_by_label' && (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
+                                <select
+                                    aria-label="Reporting interval"
+                                    value={filters.interval}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
+                                    className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Quarterly">Quarterly</option>
+                                    <option value="YTD">Yearly (YTD)</option>
+                                </select>
+                            </div>
+                        )}
+
+                        {activeTab === 'donors' && (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Total Given ($)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        placeholder="Min"
+                                        value={filters.minAmount}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, minAmount: e.target.value }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none w-20"
+                                    />
+                                    <span className="text-slate-300">-</span>
+                                    <input
+                                        type="number"
+                                        placeholder="Max"
+                                        value={filters.maxAmount}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none w-20"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 <div className="ml-auto">
@@ -963,6 +1393,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl w-fit border border-slate-200 dark:border-slate-700">
                 {([
                     { id: 'donors',          label: '👤 Donor Report' },
+                    { id: 'lapsed_donors',   label: '📉 Prior Year Not Given' },
                     { id: 'giving_by_fund',  label: '🏛️ Giving by Fund' },
                     { id: 'fund_label_pivot', label: '🔄 Fund & Label Pivot' },
                     { id: 'age_trends',      label: '🎂 Age Demographics' },
@@ -1147,6 +1578,486 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Prior Year Donors Not Given in Current Year (LYBUNT) ──────────── */}
+            {activeTab === 'lapsed_donors' && (
+                <div className="space-y-6">
+                    {/* Header & Pastoral Outreach Banner */}
+                    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl">📉</span>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                                        Prior Year Contributors Not Given in Current Year
+                                    </h3>
+                                    <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                        LYBUNT Report
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                                    Contributors who gave in <strong className="text-slate-700 dark:text-slate-200">{priorYear}</strong> but have not yet contributed in <strong className="text-slate-700 dark:text-slate-200">{comparisonYear}</strong>. Use this data to identify lapsed supporters, coordinate pastoral check-ins, and deploy targeted renewal campaigns.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+                                <button
+                                    onClick={() => handleCopyLapsedEmails(lapsedReportData.filteredList.map(d => d.email).filter(Boolean))}
+                                    disabled={lapsedReportData.filteredList.filter(d => Boolean(d.email)).length === 0}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    <span>{copiedEmails ? '✓ Copied Emails!' : '📋 Copy Filtered Emails'}</span>
+                                </button>
+                                <div className="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 px-3.5 py-1.5 rounded-xl text-xs font-bold">
+                                    Showing <span className="font-black text-indigo-600 dark:text-indigo-400">{lapsedReportData.filteredList.length}</span> of {lapsedReportData.totalLapsedDonors} Lapsed Donors
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top KPI Cards Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
+                            {/* Card 1: Lapsed Donors */}
+                            <div className="p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-2">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Lapsed Donors</span>
+                                    <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 font-mono">
+                                        {lapsedReportData.totalLapsedDonors}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                        <span>Lapse Rate</span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold">{lapsedReportData.lapseRateDonors.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, lapsedReportData.lapseRateDonors)}%` }} />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">Of {lapsedReportData.totalPriorYearDonorsCount} {priorYear} givers</p>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Unrenewed Giving at Risk */}
+                            <div className="p-5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 flex flex-col justify-between space-y-2">
+                                <div>
+                                    <span className="text-[10px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-wide">Prior Giving at Risk</span>
+                                    <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1 font-mono">
+                                        ${lapsedReportData.totalLapsedGiving.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                        <span>Prior Revenue Lost</span>
+                                        <span className="text-rose-600 dark:text-rose-400">{lapsedReportData.lapseRateGiving.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="h-1.5 bg-rose-200 dark:bg-rose-900/60 rounded-full overflow-hidden">
+                                        <div className="h-full bg-rose-500 rounded-full" style={{ width: `${Math.min(100, lapsedReportData.lapseRateGiving)}%` }} />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">${lapsedReportData.totalPriorYearGivingSum.toLocaleString(undefined, { maximumFractionDigits: 0 })} total in {priorYear}</p>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Average Prior Gift */}
+                            <div className="p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-2">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Avg Prior Giving</span>
+                                    <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 font-mono">
+                                        ${lapsedReportData.avgLapsedGift.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </p>
+                                </div>
+                                <p className="text-[11px] font-bold text-slate-400 mt-auto">
+                                    Average contribution in {priorYear} per lapsed giver
+                                </p>
+                            </div>
+
+                            {/* Card 4: Prior Recurring Givers */}
+                            <div className="p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-2">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Lapsed Recurring</span>
+                                    <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
+                                        {lapsedReportData.recurringLapsedCount}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                                        ${lapsedReportData.recurringLapsedGiving.toLocaleString(undefined, { maximumFractionDigits: 0 })} lost
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">Key target for card updates</p>
+                                </div>
+                            </div>
+
+                            {/* Card 5: Top Lapsed Contributor */}
+                            <div className="p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col justify-between space-y-2">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Top Lapsed Contributor</span>
+                                    <p className="text-base font-black text-slate-900 dark:text-white mt-1 truncate" title={lapsedReportData.topLapsedDonor?.name || 'None'}>
+                                        {lapsedReportData.topLapsedDonor?.name || 'None'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                                        ${lapsedReportData.topLapsedDonor ? lapsedReportData.topLapsedDonor.priorTotal.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">
+                                        {lapsedReportData.topLapsedDonor?.priorLastDate ? `Last: ${format(parseISO(lapsedReportData.topLapsedDonor.priorLastDate), 'MMM d, yyyy')}` : 'No previous date'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Visual Analytics Breakdown Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* 1. Giving Tier Distribution */}
+                        <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-base font-black text-slate-900 dark:text-white">Lapsed Donors by Giving Tier</h4>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
+                                        Breakdown by {priorYear} contribution volume (click to filter)
+                                    </p>
+                                </div>
+                                {lapsedTierFilter !== 'all' && (
+                                    <button
+                                        onClick={() => setLapsedTierFilter('all')}
+                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 uppercase tracking-wider underline"
+                                    >
+                                        Clear Tier Filter
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                {lapsedReportData.tierBreakdown.map(tier => {
+                                    const isSelected = lapsedTierFilter === tier.tier;
+                                    return (
+                                        <div
+                                            key={tier.tier}
+                                            onClick={() => setLapsedTierFilter(isSelected ? 'all' : tier.tier)}
+                                            className={`p-3.5 rounded-2xl cursor-pointer transition-all border ${
+                                                isSelected
+                                                    ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-500/20'
+                                                    : 'bg-slate-50/70 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-900/80 border-slate-100 dark:border-slate-800'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-2 text-xs mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tier.color }} />
+                                                    <span className="font-bold text-slate-900 dark:text-white">{tier.tier}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400">
+                                                        ({tier.count} {tier.count === 1 ? 'donor' : 'donors'})
+                                                    </span>
+                                                </div>
+                                                <div className="text-right font-mono">
+                                                    <span className="font-black text-slate-900 dark:text-white">${tier.sum.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-[11px] text-slate-400 ml-1.5">({tier.pct.toFixed(1)}%)</span>
+                                                </div>
+                                            </div>
+                                            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-300"
+                                                    style={{ width: `${tier.pct}%`, backgroundColor: tier.color }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 2. Impact by Fund */}
+                        <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-base font-black text-slate-900 dark:text-white">Funds Most Impacted</h4>
+                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
+                                        Where lapsed givers directed their gifts in {priorYear} (click to filter)
+                                    </p>
+                                </div>
+                                {lapsedFundFilter && (
+                                    <button
+                                        onClick={() => setLapsedFundFilter('')}
+                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 uppercase tracking-wider underline"
+                                    >
+                                        Show All Funds
+                                    </button>
+                                )}
+                            </div>
+
+                            {lapsedReportData.fundsImpactList.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center gap-2">
+                                    <span className="text-3xl opacity-20">🏛️</span>
+                                    <p className="text-xs font-bold text-slate-400">No fund history for lapsed contributors</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {lapsedReportData.fundsImpactList.map(fund => {
+                                        const isSelected = lapsedFundFilter === fund.fundName;
+                                        return (
+                                            <div
+                                                key={fund.fundName}
+                                                onClick={() => setLapsedFundFilter(isSelected ? '' : fund.fundName)}
+                                                className={`p-3.5 rounded-2xl cursor-pointer transition-all border ${
+                                                    isSelected
+                                                        ? 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-500/20'
+                                                        : 'bg-slate-50/70 hover:bg-slate-100 dark:bg-slate-900/40 dark:hover:bg-slate-900/80 border-slate-100 dark:border-slate-800'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2 text-xs mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{fund.fundName}</span>
+                                                        <span className="text-[10px] font-bold text-slate-400">
+                                                            ({fund.count} gifts)
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right font-mono">
+                                                        <span className="font-black text-rose-600 dark:text-rose-400">${fund.sum.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                        <span className="text-[11px] text-slate-400 ml-1.5">({fund.pct.toFixed(1)}%)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-rose-500 rounded-full transition-all duration-300"
+                                                        style={{ width: `${fund.pct}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Detailed Contributor Table */}
+                    <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        {/* Table Header Controls */}
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h4 className="text-base font-black text-slate-900 dark:text-white">Lapsed Contributors Directory</h4>
+                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
+                                    Click any contributor to view pastoral profile and care history
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {(lapsedMinAmount || lapsedTierFilter !== 'all' || lapsedRecurringOnly || lapsedSearchQuery || lapsedFundFilter) && (
+                                    <button
+                                        onClick={() => {
+                                            setLapsedMinAmount('');
+                                            setLapsedTierFilter('all');
+                                            setLapsedRecurringOnly(false);
+                                            setLapsedSearchQuery('');
+                                            setLapsedFundFilter('');
+                                        }}
+                                        className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 transition-colors"
+                                    >
+                                        Reset Filters ✕
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                                        <th
+                                            className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-indigo-500 whitespace-nowrap"
+                                            onClick={() => setLapsedSort({ field: 'name', direction: lapsedSort.field === 'name' && lapsedSort.direction === 'asc' ? 'desc' : 'asc' })}
+                                        >
+                                            Contributor {lapsedSort.field === 'name' && (lapsedSort.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
+                                            Contact Info
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
+                                            Membership
+                                        </th>
+                                        <th
+                                            className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500 whitespace-nowrap"
+                                            onClick={() => setLapsedSort({ field: 'priorTotal', direction: lapsedSort.field === 'priorTotal' && lapsedSort.direction === 'asc' ? 'desc' : 'asc' })}
+                                        >
+                                            {priorYear} Giving {lapsedSort.field === 'priorTotal' && (lapsedSort.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th
+                                            className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500 whitespace-nowrap"
+                                            onClick={() => setLapsedSort({ field: 'giftCount', direction: lapsedSort.field === 'giftCount' && lapsedSort.direction === 'asc' ? 'desc' : 'asc' })}
+                                        >
+                                            {priorYear} Gifts {lapsedSort.field === 'giftCount' && (lapsedSort.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">
+                                            Avg Gift
+                                        </th>
+                                        <th
+                                            className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500 whitespace-nowrap"
+                                            onClick={() => setLapsedSort({ field: 'lastGiftDate', direction: lapsedSort.field === 'lastGiftDate' && lapsedSort.direction === 'asc' ? 'desc' : 'asc' })}
+                                        >
+                                            Last Gift ({priorYear}) {lapsedSort.field === 'lastGiftDate' && (lapsedSort.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
+                                            Funds Supported
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-center whitespace-nowrap">
+                                            {comparisonYear} Giving
+                                        </th>
+                                        <th
+                                            className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500 whitespace-nowrap"
+                                            onClick={() => setLapsedSort({ field: 'lifetimeTotal', direction: lapsedSort.field === 'lifetimeTotal' && lapsedSort.direction === 'asc' ? 'desc' : 'asc' })}
+                                        >
+                                            Lifetime {lapsedSort.field === 'lifetimeTotal' && (lapsedSort.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-center whitespace-nowrap">
+                                            Action
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                    {lapsedReportData.filteredList.map(donor => (
+                                        <tr key={donor.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                                            {/* Contributor Name & Avatar */}
+                                            <td className="p-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[11px] font-black uppercase shadow-sm">
+                                                        {donor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                    </div>
+                                                    <div>
+                                                        <button
+                                                            onClick={() => handleOpenPersonProfile(donor.id)}
+                                                            className="text-xs font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left"
+                                                        >
+                                                            {donor.name}
+                                                        </button>
+                                                        <div className="text-[10px] text-slate-400">{donor.tier}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Contact Info */}
+                                            <td className="p-4 text-xs whitespace-nowrap">
+                                                {donor.email ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <a href={`mailto:${donor.email}`} className="text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">
+                                                            {donor.email}
+                                                        </a>
+                                                        <button
+                                                            onClick={() => handleCopyLapsedEmails([donor.email])}
+                                                            title="Copy email"
+                                                            className="text-slate-300 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                                                        >
+                                                            📋
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-[11px] italic">No email</span>
+                                                )}
+                                                {donor.phone && (
+                                                    <div className="text-[11px] text-slate-400 mt-0.5">
+                                                        <a href={`tel:${donor.phone}`} className="hover:text-slate-600 dark:hover:text-slate-200">
+                                                            {donor.phone}
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Membership */}
+                                            <td className="p-4 whitespace-nowrap">
+                                                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                    {donor.membership}
+                                                </span>
+                                            </td>
+
+                                            {/* Prior Year Giving */}
+                                            <td className="p-4 text-xs font-black text-rose-600 dark:text-rose-400 text-right font-mono whitespace-nowrap">
+                                                ${donor.priorTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+
+                                            {/* Prior Year Gifts Count */}
+                                            <td className="p-4 text-xs text-slate-700 dark:text-slate-300 text-right font-mono whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <span>{donor.priorCount}</span>
+                                                    {donor.priorWasRecurring && (
+                                                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300" title="Recurring donor in prior year">
+                                                            Rec
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            {/* Prior Year Avg Gift */}
+                                            <td className="p-4 text-xs text-slate-500 dark:text-slate-400 text-right font-mono whitespace-nowrap">
+                                                ${donor.priorAvg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+
+                                            {/* Last Gift Date */}
+                                            <td className="p-4 text-xs text-slate-500 dark:text-slate-400 text-right font-mono whitespace-nowrap">
+                                                {donor.priorLastDate ? format(parseISO(donor.priorLastDate), 'MMM d, yyyy') : '-'}
+                                            </td>
+
+                                            {/* Funds Supported */}
+                                            <td className="p-4 text-xs whitespace-nowrap">
+                                                <div className="flex flex-wrap gap-1 max-w-[220px]">
+                                                    {donor.priorFunds.slice(0, 2).map(f => (
+                                                        <span
+                                                            key={f.fundName}
+                                                            className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                                            title={`${f.fundName}: $${f.amount.toLocaleString()}`}
+                                                        >
+                                                            {f.fundName}
+                                                        </span>
+                                                    ))}
+                                                    {donor.priorFunds.length > 2 && (
+                                                        <span className="text-[10px] text-slate-400 font-bold self-center">
+                                                            +{donor.priorFunds.length - 2} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            {/* Comparison Year Giving */}
+                                            <td className="p-4 text-center whitespace-nowrap">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                                                    $0.00 Not Given
+                                                </span>
+                                            </td>
+
+                                            {/* Lifetime Total */}
+                                            <td className="p-4 text-xs text-slate-500 dark:text-slate-400 text-right font-mono whitespace-nowrap font-bold">
+                                                ${donor.lifetimeTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+
+                                            {/* Profile Action */}
+                                            <td className="p-4 text-center whitespace-nowrap">
+                                                <button
+                                                    onClick={() => handleOpenPersonProfile(donor.id)}
+                                                    className="px-3 py-1 rounded-xl text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                                                >
+                                                    Profile →
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {lapsedReportData.filteredList.length === 0 && (
+                                        <tr>
+                                            <td colSpan={11} className="p-12 text-center text-slate-400">
+                                                <div className="flex flex-col items-center justify-center gap-2">
+                                                    <span className="text-3xl">🎉</span>
+                                                    <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                                        {lapsedReportData.totalLapsedDonors === 0
+                                                            ? `All contributors from ${priorYear} have renewed their giving in ${comparisonYear}!`
+                                                            : 'No lapsed contributors match your selected filters.'}
+                                                    </p>
+                                                    <p className="text-xs text-slate-400">
+                                                        Try adjusting the fund filter, minimum amount, or search query.
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

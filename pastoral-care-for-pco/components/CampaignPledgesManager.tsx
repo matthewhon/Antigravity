@@ -129,6 +129,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
       setBannerUrl(camp.bannerUrl || '');
       setGraphicStyle(camp.graphicStyle || 'progress_bar');
       setColorTheme(camp.colorTheme || 'indigo');
+      setThemeMode(camp.themeMode || camp.theme || 'light');
       setProgressBasis(camp.progressBasis || 'both');
       setStartDate(camp.startDate || (camp.startsAt ? camp.startsAt.slice(0, 10) : ''));
       setEndDate(camp.endDate || (camp.endsAt ? camp.endsAt.slice(0, 10) : ''));
@@ -224,6 +225,7 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
         bannerUrl,
         graphicStyle,
         colorTheme,
+        themeMode,
         progressBasis,
         startDate: startDate || null,
         endDate: endDate || null,
@@ -278,8 +280,9 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
     + (autoHeight ? '&autoHeight=true' : '')
     + (scale !== 1 ? `&scale=${scale}` : '');
 
+  const iframeUrl = `${domain}/?widget=true&${embedParams}`;
   const scriptEmbedCode = `<script src="${domain}/widget.js?${embedParams}" async></script>`;
-  const iframeEmbedCode = `<iframe src="${domain}/?widget=true&${embedParams}" width="100%" height="700" style="border:none; border-radius:24px; overflow:hidden;" allow="clipboard-write"></iframe>`;
+  const iframeEmbedCode = `<iframe src="${iframeUrl}" width="100%" height="700" style="border:none; border-radius:24px; overflow:hidden;" allow="clipboard-write"></iframe>`;
 
   const copyToClipboard = (text: string, isScript: boolean) => {
     navigator.clipboard.writeText(text);
@@ -892,16 +895,14 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
 
             {/* Render Live Widget Preview */}
             <div className={`w-full transition-all duration-300 ${previewDevice === 'mobile' ? 'max-w-sm' : 'max-w-4xl'}`}>
-              <PledgeCampaignWidget
-                churchId={churchId}
-                campaignId={selectedCampaignId}
-                graphicStyle={graphicStyle}
-                color={colorTheme}
-                theme={themeMode}
-                givingEmbedMode={givingEmbedMode}
-                givingButtonText={givingButtonText}
-                pledgeButtonText={pledgeButtonText}
-                allowOnlinePledging={allowOnlinePledging}
+              <iframe
+                id="pledge-widget-preview"
+                key={`${selectedCampaignId}-${themeMode}-${colorTheme}-${graphicStyle}-${progressBasis}-${givingEmbedMode}-${allowOnlinePledging}-${givingButtonText}-${pledgeButtonText}-${scale}`}
+                src={iframeUrl}
+                title="Pledge Campaign Widget Preview"
+                className="w-full border-none rounded-3xl overflow-hidden shadow-2xl transition-all"
+                style={{ height: '700px', minHeight: '600px' }}
+                allow="clipboard-write"
               />
             </div>
 

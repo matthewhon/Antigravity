@@ -496,6 +496,8 @@ export async function getPublicPledgeCampaigns(req: any, res: any) {
         storyMarkdown: customConfig.storyMarkdown || '',
         graphicStyle: customConfig.graphicStyle || 'progress_bar',
         colorTheme: customConfig.colorTheme || 'indigo',
+        themeMode: customConfig.themeMode || customConfig.theme || 'light',
+        theme: customConfig.themeMode || customConfig.theme || 'light',
         showMetrics: customConfig.showMetrics || {
           goal: true,
           pledged: true,
@@ -691,6 +693,8 @@ export async function getPublicPledgeCampaign(req: any, res: any) {
       storyMarkdown: customConfig.storyMarkdown || '',
       graphicStyle: customConfig.graphicStyle || 'progress_bar',
       colorTheme: customConfig.colorTheme || 'indigo',
+      themeMode: customConfig.themeMode || customConfig.theme || 'light',
+      theme: customConfig.themeMode || customConfig.theme || 'light',
       showMetrics: customConfig.showMetrics || {
         goal: true,
         pledged: true,

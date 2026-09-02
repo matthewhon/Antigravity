@@ -154,8 +154,10 @@ export function PledgeCampaignWidget({
     };
   }, [churchId, activeCampaignId, apiBaseUrl]);
 
-  // Color themes
+  // Color & mode themes
   const color = propColor || params.get('color') || campaign?.colorTheme || 'indigo';
+  const theme = propTheme || params.get('theme') || campaign?.themeMode || campaign?.theme || 'light';
+  const isDark = theme === 'dark';
   const COLOR_THEMES: Record<string, { bg: string; text: string; ring: string; border: string; bar: string; glow: string }> = {
     indigo: { bg: 'bg-indigo-600', text: 'text-indigo-600 dark:text-indigo-400', ring: 'ring-indigo-500', border: 'border-indigo-500', bar: 'from-indigo-600 to-indigo-400', glow: 'shadow-indigo-500/20' },
     blue:   { bg: 'bg-blue-600',   text: 'text-blue-600 dark:text-blue-400',     ring: 'ring-blue-500',   border: 'border-blue-500',   bar: 'from-blue-600 to-blue-400',     glow: 'shadow-blue-500/20' },
@@ -361,7 +363,7 @@ export function PledgeCampaignWidget({
   const heroImage = campaign.bannerUrl || campaign.imageUrl || null;
 
   return (
-    <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all">
+    <div className={`w-full max-w-4xl mx-auto rounded-3xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all ${isDark ? 'dark text-white' : 'text-slate-900'}`}>
       {/* ─── Hero / Header Section ─────────────────────────────────── */}
       <div className="relative overflow-hidden bg-slate-950 text-white min-h-[220px] flex flex-col justify-end p-6 md:p-8">
         {heroImage ? (
@@ -423,9 +425,9 @@ export function PledgeCampaignWidget({
             <div className="relative w-32 h-72 shrink-0 flex items-center justify-center">
               <svg viewBox="0 0 100 240" className="w-full h-full filter drop-shadow-lg">
                 {/* Outer Glass Tube */}
-                <rect x="35" y="20" width="30" height="160" rx="15" fill="#e2e8f0" className="dark:fill-slate-700" stroke="#cbd5e1" strokeWidth="2" />
+                <rect x="35" y="20" width="30" height="160" rx="15" fill={isDark ? '#334155' : '#e2e8f0'} stroke={isDark ? '#475569' : '#cbd5e1'} strokeWidth="2" />
                 {/* Outer Glass Bulb */}
-                <circle cx="50" cy="195" r="30" fill="#e2e8f0" className="dark:fill-slate-700" stroke="#cbd5e1" strokeWidth="2" />
+                <circle cx="50" cy="195" r="30" fill={isDark ? '#334155' : '#e2e8f0'} stroke={isDark ? '#475569' : '#cbd5e1'} strokeWidth="2" />
                 
                 {/* Mercury Liquid Fill */}
                 <defs>
@@ -474,8 +476,8 @@ export function PledgeCampaignWidget({
                   const y = 170 - (t / 100) * 140;
                   return (
                     <g key={t}>
-                      <line x1="68" y1={y} x2="78" y2={y} stroke="#94a3b8" strokeWidth="2" />
-                      <text x="82" y={y + 3} fontSize="8" fontWeight="bold" fill="#64748b">{t}%</text>
+                      <line x1="68" y1={y} x2="78" y2={y} stroke={isDark ? '#64748b' : '#94a3b8'} strokeWidth="2" />
+                      <text x="82" y={y + 3} fontSize="8" fontWeight="bold" fill={isDark ? '#94a3b8' : '#64748b'}>{t}%</text>
                     </g>
                   );
                 })}
@@ -591,7 +593,7 @@ export function PledgeCampaignWidget({
             <div className="relative w-48 h-48 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
                 {/* Background Ring */}
-                <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="12" className="text-slate-200 dark:text-slate-700 fill-none" />
+                <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="12" className={`${isDark ? 'text-slate-700' : 'text-slate-200'} fill-none`} />
                 {/* Pledged Ring */}
                 <circle 
                   cx="60" 
@@ -710,7 +712,7 @@ export function PledgeCampaignWidget({
 
       {/* ─── Pledge Modal (Take Pledges & Send to PCO Giving) ─────────── */}
       {showPledgeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 ${isDark ? 'dark' : ''}`}>
           <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setShowPledgeModal(false)} 
