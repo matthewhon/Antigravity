@@ -259,7 +259,7 @@ export async function fetchAccounts(churchId: string): Promise<{
             active: a.Active !== false
         };
 
-        if (a.AccountType === 'Bank') {
+        if (a.AccountType === 'Bank' || (a.Classification === 'Asset' && (a.AccountSubType === 'UndepositedFunds' || a.AccountType === 'Other Current Asset'))) {
             bankAccounts.push(item);
         } else if (a.Classification === 'Revenue' || a.AccountType === 'Income' || a.AccountType === 'Other Income') {
             incomeAccounts.push(item);
@@ -305,28 +305,38 @@ export async function fetchAccounts(churchId: string): Promise<{
     return { bankAccounts, incomeAccounts, expenseAccounts, classes, vendors };
 }
 
+export interface CreateQuickbooksDepositOptions {
+    depositBankAccountId?: string;
+    depositBankAccountName?: string;
+    fundOverrides?: Record<string, import('../types').FundQuickbooksMapping>;
+}
+
 export async function createQuickbooksDeposit(
     churchId: string, 
     batch: GivingBatch, 
     mapping: QuickbooksMappingConfig,
-    userName?: string
+    userName?: string,
+    options?: CreateQuickbooksDepositOptions
 ): Promise<QuickbooksDepositResult> {
     const db = getDb();
     const log = createServerLogger(db);
     const tokens = await getValidTokens(churchId);
     if (!tokens) throw new Error('QuickBooks is not connected.');
 
-    if (!mapping.depositBankAccountId) {
-        throw new Error('Target deposit bank account is not configured in QuickBooks mapping.');
+    const targetBankAccountId = options?.depositBankAccountId || mapping.depositBankAccountId;
+    const targetBankAccountName = options?.depositBankAccountName || mapping.depositBankAccountName;
+
+    if (!targetBankAccountId) {
+        throw new Error('Target deposit bank account is not specified. Please configure or select an account.');
     }
 
     const lines: any[] = [];
 
-    // 1. Positive Lines: Fund breakdown (Income)
+    // 1. Positive Lines: 1-to-1 Fund breakdown (Income)
     for (const fund of batch.fundsBreakdown) {
         if (fund.grossAmount <= 0) continue;
 
-        const fundMap = mapping.fundMappings[fund.fundId];
+        const fundMap = options?.fundOverrides?.[fund.fundId] || mapping.fundMappings?.[fund.fundId];
         const accountId = fundMap?.qboAccountId || mapping.defaultIncomeAccountId;
 
         if (!accountId) {
@@ -392,8 +402,8 @@ export async function createQuickbooksDeposit(
 
     const depositPayload: any = {
         DepositToAccountRef: {
-            value: mapping.depositBankAccountId,
-            name: mapping.depositBankAccountName
+            value: targetBankAccountId,
+            name: targetBankAccountName
         },
         TxnDate: txnDate,
         PrivateNote: privateNote,
@@ -404,8 +414,10 @@ export async function createQuickbooksDeposit(
     const base = getBaseApiUrl(config.environment);
     const url = `${base}/v3/company/${tokens.realmId}/deposit?minorversion=65`;
 
-    log.info(`Creating QuickBooks Deposit for batch ${batch.id}`, 'quickbooks', { 
+    log.info(`Creating QuickBooks Deposit for batch ${batch.id} into account ${targetBankAccountId}`, 'quickbooks', { 
         batchId: batch.id, 
+        targetBankAccountId,
+        targetBankAccountName,
         gross: batch.totalGross, 
         fees: batch.totalFees, 
         net: batch.totalNet 
@@ -440,7 +452,8 @@ export async function createQuickbooksDeposit(
     log.info(`Successfully created QuickBooks Deposit #${depositId}`, 'quickbooks', { 
         depositId, 
         docNumber, 
-        totalAmount 
+        totalAmount,
+        targetBankAccountId
     }, churchId);
 
     return {
@@ -448,6 +461,8 @@ export async function createQuickbooksDeposit(
         docNumber,
         txnDate,
         totalAmount,
-        qboUrl
+        qboUrl,
+        depositBankAccountId: targetBankAccountId,
+        depositBankAccountName: targetBankAccountName
     };
 }

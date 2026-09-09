@@ -694,6 +694,8 @@ export interface GivingBatch {
     fundsBreakdown: GivingBatchFundBreakdown[];
     quickbooksDepositId?: string;
     quickbooksDepositDocNumber?: string;
+    quickbooksDepositBankAccountId?: string;
+    quickbooksDepositBankAccountName?: string;
     syncedAt?: string;
     syncedBy?: string;
     notes?: string;
@@ -759,6 +761,8 @@ export interface QuickbooksDepositResult {
     txnDate: string;
     totalAmount: number;
     qboUrl?: string;
+    depositBankAccountId?: string;
+    depositBankAccountName?: string;
 }
 
 export interface AttendanceEventSummary {

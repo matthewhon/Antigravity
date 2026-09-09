@@ -65,7 +65,17 @@ export const quickbooksClient = {
         return data.mapping;
     },
 
-    async sendDeposit(churchId: string, batchId: string, userName?: string): Promise<{
+    async sendDeposit(
+        churchId: string, 
+        batchId: string, 
+        userName?: string,
+        options?: {
+            depositBankAccountId?: string;
+            depositBankAccountName?: string;
+            fundOverrides?: Record<string, import('../types').FundQuickbooksMapping>;
+            saveAsDefault?: boolean;
+        }
+    ): Promise<{
         success: boolean;
         depositResult: QuickbooksDepositResult;
         batch: GivingBatch;
@@ -73,7 +83,15 @@ export const quickbooksClient = {
         const res = await fetch('/api/quickbooks/deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ churchId, batchId, userName })
+            body: JSON.stringify({ 
+                churchId, 
+                batchId, 
+                userName,
+                depositBankAccountId: options?.depositBankAccountId,
+                depositBankAccountName: options?.depositBankAccountName,
+                fundOverrides: options?.fundOverrides,
+                saveAsDefault: options?.saveAsDefault
+            })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({ error: res.statusText }));

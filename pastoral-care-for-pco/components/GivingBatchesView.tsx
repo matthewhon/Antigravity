@@ -483,10 +483,17 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                             {/* Status Badge */}
                                             <td className="px-4 py-3.5 text-center">
                                                 {isSynced ? (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                        <Check className="w-3 h-3" />
-                                                        Deposit #{batch.quickbooksDepositId}
-                                                    </span>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                            <Check className="w-3 h-3" />
+                                                            Deposit #{batch.quickbooksDepositId}
+                                                        </span>
+                                                        {batch.quickbooksDepositBankAccountName && (
+                                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[140px]" title={batch.quickbooksDepositBankAccountName}>
+                                                                {batch.quickbooksDepositBankAccountName}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                                                         Ready to Send
@@ -543,6 +550,9 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                     setIsMappingModalOpen(true);
                 }}
                 onDepositSuccess={handleDepositSuccess}
+                onMappingSaved={(newMapping) => {
+                    setMapping(newMapping);
+                }}
             />
         </div>
     );

@@ -1,17 +1,28 @@
-import { GivingBatch, QuickbooksMappingConfig } from '../types';
+import { GivingBatch, QuickbooksMappingConfig, FundQuickbooksMapping } from '../types';
 
-function buildMockDepositPayload(batch: GivingBatch, mapping: QuickbooksMappingConfig) {
-    if (!mapping.depositBankAccountId) {
-        throw new Error('Target deposit bank account is not configured in QuickBooks mapping.');
+function buildMockDepositPayload(
+    batch: GivingBatch, 
+    mapping: QuickbooksMappingConfig,
+    options?: {
+        depositBankAccountId?: string;
+        depositBankAccountName?: string;
+        fundOverrides?: Record<string, FundQuickbooksMapping>;
+    }
+) {
+    const targetBankAccountId = options?.depositBankAccountId || mapping.depositBankAccountId;
+    const targetBankAccountName = options?.depositBankAccountName || mapping.depositBankAccountName;
+
+    if (!targetBankAccountId) {
+        throw new Error('Target deposit bank account is not configured or specified.');
     }
 
     const lines: any[] = [];
 
-    // 1. Positive Lines: Fund breakdown (Income)
+    // 1. Positive Lines: 1-to-1 Fund breakdown (Income)
     for (const fund of batch.fundsBreakdown) {
         if (fund.grossAmount <= 0) continue;
 
-        const fundMap = mapping.fundMappings[fund.fundId];
+        const fundMap = options?.fundOverrides?.[fund.fundId] || mapping.fundMappings[fund.fundId];
         const accountId = fundMap?.qboAccountId || mapping.defaultIncomeAccountId;
 
         if (!accountId) {
@@ -76,8 +87,8 @@ function buildMockDepositPayload(batch: GivingBatch, mapping: QuickbooksMappingC
 
     return {
         DepositToAccountRef: {
-            value: mapping.depositBankAccountId,
-            name: mapping.depositBankAccountName
+            value: targetBankAccountId,
+            name: targetBankAccountName
         },
         TxnDate: txnDate,
         PrivateNote: privateNote,
@@ -157,17 +168,15 @@ function runTests() {
         }
     };
 
+    // Test 1: Standard deposit using configured default bank account and 1-to-1 fund mappings
+    console.log('\nTest 1: Default deposit account & 1-to-1 fund mappings:');
     const payload = buildMockDepositPayload(mockBatch, mockMapping);
 
-    // 1. Check Bank Account
     console.assert(payload.DepositToAccountRef.value === 'qbo_acc_checking_1001', 'DepositToAccountRef must match');
     console.log('✓ Target Deposit Bank Account verified: ', payload.DepositToAccountRef.name);
-
-    // 2. Check Date
     console.assert(payload.TxnDate === '2026-09-06', 'TxnDate must be YYYY-MM-DD');
     console.log('✓ Transaction Date verified: ', payload.TxnDate);
 
-    // 3. Check Fund Lines
     console.assert(payload.Line.length === 4, `Expected 4 lines (3 funds + 1 fee), got ${payload.Line.length}`);
     const fund1Line = payload.Line[0];
     console.assert(fund1Line.Amount === 2500.00, 'Fund 1 amount must be 2500.00');
@@ -175,18 +184,40 @@ function runTests() {
     console.assert(fund1Line.DepositLineDetail.ClassRef.value === 'class_sanctuary', 'Fund 1 ClassRef must match');
     console.log('✓ Fund Line 1 (General Tithes) verified: $', fund1Line.Amount, 'to Account:', fund1Line.DepositLineDetail.AccountRef.name);
 
-    // 4. Check Fee Line
     const feeLine = payload.Line[3];
     console.assert(feeLine.Amount === -72.35, `Fee line amount must be -72.35, got ${feeLine.Amount}`);
     console.assert(feeLine.DepositLineDetail.AccountRef.value === 'qbo_acc_fees_6050', 'Fee AccountRef must match');
     console.assert(feeLine.DepositLineDetail.Entity.EntityRef.value === 'vendor_stripe_99', 'Fee Vendor must match');
     console.log('✓ Fee Line (Stripe Processing) verified: $', feeLine.Amount, 'to Account:', feeLine.DepositLineDetail.AccountRef.name);
 
-    // 5. Check Sum Matches Net Deposit Exactly
     const calculatedNet = payload.Line.reduce((sum: number, line: any) => sum + line.Amount, 0);
     const roundedNet = Math.round(calculatedNet * 100) / 100;
     console.assert(roundedNet === mockBatch.totalNet, `Net deposit (${roundedNet}) must equal batch net (${mockBatch.totalNet})`);
     console.log('✓ Net Deposit matches batch net to the penny:', roundedNet, '==', mockBatch.totalNet);
+
+    // Test 2: Specifying a custom deposit bank account for this deposit
+    console.log('\nTest 2: Specifying a custom target deposit account:');
+    const customBankPayload = buildMockDepositPayload(mockBatch, mockMapping, {
+        depositBankAccountId: 'qbo_acc_building_checking_1002',
+        depositBankAccountName: 'Capital Projects Checking (1002)'
+    });
+    console.assert(customBankPayload.DepositToAccountRef.value === 'qbo_acc_building_checking_1002', 'Must use specified bank account');
+    console.assert(customBankPayload.DepositToAccountRef.name === 'Capital Projects Checking (1002)', 'Must use specified bank name');
+    console.log('✓ Custom Target Deposit Account verified:', customBankPayload.DepositToAccountRef.name);
+
+    // Test 3: Specifying 1-to-1 fund overrides on the fly
+    console.log('\nTest 3: Specifying 1-to-1 fund mapping overrides:');
+    const overridePayload = buildMockDepositPayload(mockBatch, mockMapping, {
+        fundOverrides: {
+            'fund_2': {
+                qboAccountId: 'qbo_acc_special_missions_4099',
+                qboAccountName: 'Special Mission Projects (4099)'
+            }
+        }
+    });
+    const overriddenFund2Line = overridePayload.Line.find(l => l.Description.startsWith('Building Campaign'));
+    console.assert(overriddenFund2Line?.DepositLineDetail.AccountRef.value === 'qbo_acc_special_missions_4099', 'Must use overridden fund account');
+    console.log('✓ 1-to-1 Fund Mapping Override verified: Fund 2 deposited to', overriddenFund2Line?.DepositLineDetail.AccountRef.name);
 
     console.log('\nAll QuickBooks Deposit Payload tests passed successfully!');
 }

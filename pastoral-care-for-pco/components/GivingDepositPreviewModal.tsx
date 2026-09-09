@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { GivingBatch, QuickbooksMappingConfig, QuickbooksDepositResult } from '../types';
+import React, { useState, useEffect } from 'react';
+import { GivingBatch, QuickbooksMappingConfig, QuickbooksDepositResult, QuickbooksAccount, QuickbooksClass, FundQuickbooksMapping } from '../types';
 import { quickbooksClient } from '../services/quickbooksService';
 import { X, Check, AlertCircle, RefreshCw, Landmark, CreditCard, ArrowRight, ExternalLink } from 'lucide-react';
 
@@ -12,6 +12,7 @@ interface GivingDepositPreviewModalProps {
     userName?: string;
     onConfigureMapping: () => void;
     onDepositSuccess: (batch: GivingBatch, result: QuickbooksDepositResult) => void;
+    onMappingSaved?: (mapping: QuickbooksMappingConfig) => void;
 }
 
 export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps> = ({
@@ -22,18 +23,81 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
     churchId,
     userName,
     onConfigureMapping,
-    onDepositSuccess
+    onDepositSuccess,
+    onMappingSaved
 }) => {
     const [sending, setSending] = useState(false);
+    const [loadingAccounts, setLoadingAccounts] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successResult, setSuccessResult] = useState<QuickbooksDepositResult | null>(null);
 
+    const [bankAccounts, setBankAccounts] = useState<QuickbooksAccount[]>([]);
+    const [incomeAccounts, setIncomeAccounts] = useState<QuickbooksAccount[]>([]);
+    const [classes, setClasses] = useState<QuickbooksClass[]>([]);
+
+    const [depositBankAccountId, setDepositBankAccountId] = useState(mapping?.depositBankAccountId || '');
+    const [fundMappings, setFundMappings] = useState<Record<string, FundQuickbooksMapping>>(mapping?.fundMappings || {});
+    const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && churchId) {
+            setDepositBankAccountId(batch?.quickbooksDepositBankAccountId || mapping?.depositBankAccountId || '');
+            setFundMappings(mapping?.fundMappings || {});
+            setSaveAsDefault(false);
+            setError(null);
+            setSuccessResult(null);
+
+            setLoadingAccounts(true);
+            quickbooksClient.getAccounts(churchId)
+                .then(data => {
+                    setBankAccounts(data.bankAccounts || []);
+                    setIncomeAccounts(data.incomeAccounts || []);
+                    setClasses(data.classes || []);
+
+                    // If no deposit account is currently selected, pick the first available
+                    if (!mapping?.depositBankAccountId && !batch?.quickbooksDepositBankAccountId && data.bankAccounts.length > 0) {
+                        setDepositBankAccountId(data.bankAccounts[0].id);
+                    }
+                })
+                .catch(e => {
+                    console.error('Failed to load accounts for deposit preview:', e);
+                })
+                .finally(() => {
+                    setLoadingAccounts(false);
+                });
+        }
+    }, [isOpen, churchId, batch, mapping]);
+
     if (!isOpen || !batch) return null;
 
+    const handleFundAccountChange = (fundId: string, accountId: string) => {
+        const acc = incomeAccounts.find(a => a.id === accountId);
+        setFundMappings(prev => ({
+            ...prev,
+            [fundId]: {
+                ...(prev[fundId] || {}),
+                qboAccountId: accountId,
+                qboAccountName: acc?.name || ''
+            }
+        }));
+    };
+
+    const handleFundClassChange = (fundId: string, classId: string) => {
+        const cls = classes.find(c => c.id === classId);
+        setFundMappings(prev => ({
+            ...prev,
+            [fundId]: {
+                ...(prev[fundId] || { qboAccountId: mapping?.defaultIncomeAccountId || '', qboAccountName: mapping?.defaultIncomeAccountName || '' }),
+                qboClassId: classId || undefined,
+                qboClassName: cls?.name || undefined
+            }
+        }));
+    };
+
     const unmappedFunds = batch.fundsBreakdown.filter(f => 
-        !mapping?.fundMappings[f.fundId]?.qboAccountId && !mapping?.defaultIncomeAccountId
+        f.grossAmount > 0 && !fundMappings[f.fundId]?.qboAccountId && !mapping?.defaultIncomeAccountId
     );
-    const missingBank = !mapping?.depositBankAccountId;
+    const missingBank = !depositBankAccountId;
     const missingFeeAcc = batch.totalFees > 0 && !mapping?.stripeFeeExpenseAccountId;
     const hasConfigError = unmappedFunds.length > 0 || missingBank || missingFeeAcc;
 
@@ -43,7 +107,26 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
         setError(null);
 
         try {
-            const res = await quickbooksClient.sendDeposit(churchId, batch.id, userName);
+            const selectedBank = bankAccounts.find(a => a.id === depositBankAccountId);
+            const res = await quickbooksClient.sendDeposit(churchId, batch.id, userName, {
+                depositBankAccountId,
+                depositBankAccountName: selectedBank?.name || mapping?.depositBankAccountName,
+                fundOverrides: fundMappings,
+                saveAsDefault
+            });
+
+            if (saveAsDefault && onMappingSaved && mapping) {
+                onMappingSaved({
+                    ...mapping,
+                    depositBankAccountId,
+                    depositBankAccountName: selectedBank?.name || mapping.depositBankAccountName,
+                    fundMappings: {
+                        ...(mapping.fundMappings || {}),
+                        ...fundMappings
+                    }
+                });
+            }
+
             setSuccessResult(res.depositResult);
             onDepositSuccess(res.batch, res.depositResult);
         } catch (err: any) {
@@ -127,21 +210,51 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                         </div>
                     ) : (
                         <>
-                            {/* Summary Card */}
-                            <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800">
-                                <div>
-                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Batch Name</span>
-                                    <p className="font-bold text-sm text-slate-900 dark:text-white truncate" title={batch.name}>{batch.name}</p>
+                            {/* Summary Card & Deposit Destination Account Selector */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Batch Name</span>
+                                        <p className="font-bold text-sm text-slate-900 dark:text-white truncate" title={batch.name}>{batch.name}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</span>
+                                        <p className="font-bold text-sm text-slate-900 dark:text-white">{batch.date.slice(0, 10)}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</span>
-                                    <p className="font-bold text-sm text-slate-900 dark:text-white">{batch.date.slice(0, 10)}</p>
-                                </div>
-                                <div>
-                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Target Bank Account</span>
-                                    <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400 truncate">
-                                        {mapping?.depositBankAccountName || 'Not configured'}
-                                    </p>
+
+                                <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                        <Landmark className="w-4 h-4 text-emerald-500" />
+                                        Deposit Destination Bank Account *
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <select
+                                            value={depositBankAccountId}
+                                            onChange={(e) => setDepositBankAccountId(e.target.value)}
+                                            disabled={loadingAccounts}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                                        >
+                                            <option value="">Select Checking, Bank, or Asset Account...</option>
+                                            {bankAccounts.map(a => (
+                                                <option key={a.id} value={a.id}>
+                                                    {a.name} {a.accountSubType ? `(${a.accountSubType})` : `(${a.accountType})`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="mt-2.5 flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="saveAsDefaultDeposit"
+                                            checked={saveAsDefault}
+                                            onChange={(e) => setSaveAsDefault(e.target.checked)}
+                                            className="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                        />
+                                        <label htmlFor="saveAsDefaultDeposit" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                                            Save this deposit account and fund mappings as default for future deposits
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 
@@ -153,23 +266,27 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                         <div>
                                             <p className="font-bold">Configuration Required Before Posting</p>
                                             <ul className="list-disc list-inside text-xs mt-1 space-y-0.5">
-                                                {missingBank && <li>Please select a QuickBooks Bank Account to receive deposits.</li>}
-                                                {missingFeeAcc && <li>Please select a QuickBooks Expense Account for Stripe credit card fees.</li>}
+                                                {missingBank && <li>Please select a QuickBooks Bank Account to receive deposits above.</li>}
+                                                {missingFeeAcc && <li>Please configure a QuickBooks Expense Account for Stripe processing fees.</li>}
                                                 {unmappedFunds.map(f => (
-                                                    <li key={f.fundId}>Fund "{f.fundName}" is not mapped to a QuickBooks Income Account.</li>
+                                                    <li key={f.fundId}>
+                                                        Fund "{f.fundName}" needs a QuickBooks Income Account (select from dropdown below).
+                                                    </li>
                                                 ))}
                                             </ul>
                                         </div>
                                     </div>
-                                    <div className="pt-1">
-                                        <button
-                                            type="button"
-                                            onClick={onConfigureMapping}
-                                            className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
-                                        >
-                                            Open Accounts & Fund Matching Settings →
-                                        </button>
-                                    </div>
+                                    {missingFeeAcc && (
+                                        <div className="pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={onConfigureMapping}
+                                                className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
+                                            >
+                                                Open Accounts & Fund Matching Settings →
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -182,39 +299,64 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
                             {/* Line Items Table */}
                             <div className="space-y-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Deposit Line Items Breakdown
-                                </h4>
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                        1-to-1 Deposit Line Items Breakdown
+                                    </h4>
+                                    <span className="text-[11px] text-slate-400">
+                                        Planning Center Fund ➔ QuickBooks Income Account
+                                    </span>
+                                </div>
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 font-semibold text-slate-500 dark:text-slate-400">
-                                                <th className="px-4 py-2.5">Line Description</th>
-                                                <th className="px-4 py-2.5">Target QBO Account</th>
+                                                <th className="px-4 py-2.5">Planning Center Fund</th>
+                                                <th className="px-4 py-2.5">QuickBooks Income Account (1-to-1)</th>
                                                 <th className="px-4 py-2.5 text-right">Amount</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                                             {/* Fund Lines */}
                                             {batch.fundsBreakdown.map((f) => {
-                                                const fundMap = mapping?.fundMappings[f.fundId];
-                                                const accName = fundMap?.qboAccountName || mapping?.defaultIncomeAccountName || 'Unmapped';
+                                                const fundMap = fundMappings[f.fundId];
+                                                const currentAccountId = fundMap?.qboAccountId || (mapping?.defaultIncomeAccountId || '');
 
                                                 return (
-                                                    <tr key={f.fundId} className="bg-white dark:bg-slate-900">
+                                                    <tr key={f.fundId} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                                         <td className="px-4 py-2.5">
-                                                            <div className="font-medium text-slate-900 dark:text-white">{f.fundName}</div>
+                                                            <div className="font-semibold text-slate-900 dark:text-white">{f.fundName}</div>
                                                             <div className="text-[10px] text-slate-400">{f.donationCount} gifts</div>
                                                         </td>
                                                         <td className="px-4 py-2.5">
-                                                            <span className={fundMap?.qboAccountId ? 'text-slate-700 dark:text-slate-300' : 'text-amber-500 font-semibold'}>
-                                                                {accName}
-                                                            </span>
-                                                            {fundMap?.qboClassName && (
-                                                                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
-                                                                    Class: {fundMap.qboClassName}
-                                                                </span>
-                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                <select
+                                                                    value={currentAccountId}
+                                                                    onChange={(e) => handleFundAccountChange(f.fundId, e.target.value)}
+                                                                    className={`w-full max-w-xs px-2.5 py-1 text-xs rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                                                        currentAccountId 
+                                                                            ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white' 
+                                                                            : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-semibold'
+                                                                    }`}
+                                                                >
+                                                                    <option value="">Select Income Account (1-to-1)...</option>
+                                                                    {incomeAccounts.map(a => (
+                                                                        <option key={a.id} value={a.id}>{a.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                                {classes.length > 0 && (
+                                                                    <select
+                                                                        value={fundMap?.qboClassId || ''}
+                                                                        onChange={(e) => handleFundClassChange(f.fundId, e.target.value)}
+                                                                        className="w-28 px-2 py-1 text-xs rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                                                                    >
+                                                                        <option value="">No Class</option>
+                                                                        {classes.map(c => (
+                                                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">
                                                             {money(f.grossAmount)}
@@ -231,14 +373,14 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                                             <CreditCard className="w-3.5 h-3.5 text-amber-600" />
                                                             Stripe Processing Fees
                                                         </div>
-                                                        <div className="text-[10px] text-slate-400">Card / ACH processing</div>
+                                                        <div className="text-[10px] text-slate-400">Card / ACH processing reduction</div>
                                                     </td>
                                                     <td className="px-4 py-2.5">
-                                                        <span className={mapping?.stripeFeeExpenseAccountId ? 'text-amber-800 dark:text-amber-300' : 'text-rose-500 font-semibold'}>
+                                                        <span className={mapping?.stripeFeeExpenseAccountId ? 'text-amber-800 dark:text-amber-300 font-medium' : 'text-rose-500 font-semibold'}>
                                                             {mapping?.stripeFeeExpenseAccountName || 'Unmapped Expense Account'}
                                                         </span>
                                                         {mapping?.stripeVendorName && (
-                                                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                                                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
                                                                 Vendor: {mapping.stripeVendorName}
                                                             </span>
                                                         )}

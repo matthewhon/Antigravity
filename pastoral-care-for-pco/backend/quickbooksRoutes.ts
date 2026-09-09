@@ -162,7 +162,16 @@ quickbooksRouter.post('/mapping', async (req: any, res: any) => {
 // Creates a Deposit in QuickBooks for a specific Giving Batch
 quickbooksRouter.post('/deposit', async (req: any, res: any) => {
     try {
-        const { churchId, batchId, userName } = req.body || {};
+        const { 
+            churchId, 
+            batchId, 
+            userName, 
+            depositBankAccountId, 
+            depositBankAccountName, 
+            fundOverrides, 
+            saveAsDefault 
+        } = req.body || {};
+
         if (!churchId || !batchId) {
             return res.status(400).json({ error: 'Missing churchId or batchId' });
         }
@@ -178,19 +187,57 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
 
         // 2. Fetch QuickBooks mapping
         const mappingDoc = await db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').get();
-        if (!mappingDoc.exists) {
-            return res.status(400).json({ error: 'QuickBooks mapping is not configured. Please configure your accounts and fund mappings first.' });
+        let mapping = (mappingDoc.exists ? mappingDoc.data() : null) as QuickbooksMappingConfig | null;
+
+        if (!mapping && !depositBankAccountId) {
+            return res.status(400).json({ error: 'QuickBooks mapping is not configured. Please configure your accounts or select a deposit bank account.' });
         }
-        const mapping = mappingDoc.data() as QuickbooksMappingConfig;
 
-        // 3. Create Deposit in QuickBooks
-        const depositResult = await createQuickbooksDeposit(churchId, batch, mapping, userName);
+        const effectiveMapping: QuickbooksMappingConfig = mapping || {
+            churchId,
+            depositBankAccountId: depositBankAccountId || '',
+            depositBankAccountName: depositBankAccountName || '',
+            stripeFeeExpenseAccountId: '',
+            fundMappings: {}
+        };
 
-        // 4. Update Batch status in Firestore
+        // 3. Create Deposit in QuickBooks with specified target account and fund overrides
+        const depositResult = await createQuickbooksDeposit(churchId, batch, effectiveMapping, userName, {
+            depositBankAccountId,
+            depositBankAccountName,
+            fundOverrides
+        });
+
+        // 4. Optionally update default mapping in Firestore if requested
+        if (saveAsDefault) {
+            const mappingUpdates: Partial<QuickbooksMappingConfig> = {
+                churchId,
+                updatedAt: Date.now(),
+                updatedBy: userName || 'System'
+            };
+
+            if (depositBankAccountId) {
+                mappingUpdates.depositBankAccountId = depositBankAccountId;
+                mappingUpdates.depositBankAccountName = depositBankAccountName;
+            }
+
+            if (fundOverrides && Object.keys(fundOverrides).length > 0) {
+                mappingUpdates.fundMappings = {
+                    ...(effectiveMapping.fundMappings || {}),
+                    ...fundOverrides
+                };
+            }
+
+            await db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').set(mappingUpdates, { merge: true });
+        }
+
+        // 5. Update Batch status in Firestore
         const batchUpdates: Partial<GivingBatch> = {
             status: 'synced_to_qbo',
             quickbooksDepositId: depositResult.depositId,
             quickbooksDepositDocNumber: depositResult.docNumber,
+            quickbooksDepositBankAccountId: depositResult.depositBankAccountId,
+            quickbooksDepositBankAccountName: depositResult.depositBankAccountName,
             syncedAt: new Date().toISOString(),
             syncedBy: userName || 'User'
         };

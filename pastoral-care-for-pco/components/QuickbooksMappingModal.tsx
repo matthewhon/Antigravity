@@ -4,7 +4,8 @@ import {
     QuickbooksVendor, QuickbooksMappingConfig, FundQuickbooksMapping 
 } from '../types';
 import { quickbooksClient } from '../services/quickbooksService';
-import { X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, ArrowRight } from 'lucide-react';
+import { firestore } from '../services/firestoreService';
+import { X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, ArrowRight, Search } from 'lucide-react';
 
 interface QuickbooksMappingModalProps {
     isOpen: boolean;
@@ -26,6 +27,9 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+    const [allFunds, setAllFunds] = useState<PcoFund[]>(funds || []);
+    const [fundSearch, setFundSearch] = useState('');
+
     const [bankAccounts, setBankAccounts] = useState<QuickbooksAccount[]>([]);
     const [incomeAccounts, setIncomeAccounts] = useState<QuickbooksAccount[]>([]);
     const [expenseAccounts, setExpenseAccounts] = useState<QuickbooksAccount[]>([]);
@@ -43,10 +47,25 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
         setLoading(true);
         setError(null);
         try {
-            const [accountsData, existingMapping] = await Promise.all([
+            const [accountsData, existingMapping, dbFunds] = await Promise.all([
                 quickbooksClient.getAccounts(churchId),
-                quickbooksClient.getMapping(churchId)
+                quickbooksClient.getMapping(churchId),
+                firestore.getFunds(churchId).catch(() => [])
             ]);
+
+            // Combine unique funds by ID
+            const fundMap = new Map<string, PcoFund>();
+            (funds || []).forEach(f => fundMap.set(f.id, f));
+            (dbFunds || []).forEach((f: PcoFund) => fundMap.set(f.id, f));
+            // Also include any funds already mapped in existingMapping
+            if (existingMapping?.fundMappings) {
+                Object.keys(existingMapping.fundMappings).forEach(fId => {
+                    if (!fundMap.has(fId)) {
+                        fundMap.set(fId, { id: fId, churchId, name: `Fund (${fId})` });
+                    }
+                });
+            }
+            setAllFunds(Array.from(fundMap.values()));
 
             setBankAccounts(accountsData.bankAccounts || []);
             setIncomeAccounts(accountsData.incomeAccounts || []);
@@ -92,11 +111,14 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
 
     const handleAutoMatch = () => {
         const newMappings = { ...fundMappings };
-        funds.forEach(fund => {
+        let matchedCount = 0;
+        allFunds.forEach(fund => {
             const cleanFundName = fund.name.toLowerCase().trim();
             const matchedAccount = incomeAccounts.find(acc => {
-                const cleanAccName = acc.name.toLowerCase();
-                return cleanAccName.includes(cleanFundName) || cleanFundName.includes(cleanAccName);
+                const cleanAccName = acc.name.toLowerCase().trim();
+                return cleanAccName === cleanFundName ||
+                    cleanAccName.includes(cleanFundName) || 
+                    cleanFundName.includes(cleanAccName);
             });
 
             if (matchedAccount) {
@@ -105,10 +127,11 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                     qboAccountId: matchedAccount.id,
                     qboAccountName: matchedAccount.name
                 };
+                matchedCount++;
             }
         });
         setFundMappings(newMappings);
-        setSuccessMessage('Auto-matched matching funds to QuickBooks income accounts.');
+        setSuccessMessage(`Auto-matched ${matchedCount} funds to QuickBooks income accounts.`);
         setTimeout(() => setSuccessMessage(null), 3000);
     };
 
@@ -180,7 +203,12 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
 
     if (!isOpen) return null;
 
-    const mappedCount = funds.filter(f => fundMappings[f.id]?.qboAccountId).length;
+    const mappedCount = allFunds.filter(f => fundMappings[f.id]?.qboAccountId).length;
+    const filteredFunds = allFunds.filter(fund => {
+        if (!fundSearch.trim()) return true;
+        const q = fundSearch.toLowerCase();
+        return fund.name.toLowerCase().includes(q) || fund.id.toLowerCase().includes(q);
+    });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -193,9 +221,9 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                             <Landmark className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">QuickBooks Accounts & Fund Matching</h2>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">QuickBooks Accounts & 1-to-1 Fund Mapping</h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Configure where batch deposits, fund revenues, and Stripe fees land in your Chart of Accounts.
+                                Specify your deposit destination account and map Planning Center funds 1-to-1 to QuickBooks Income accounts.
                             </p>
                         </div>
                     </div>
@@ -238,20 +266,22 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                         <Landmark className="w-4 h-4 text-emerald-500" />
-                                        QuickBooks Deposit Bank Account *
+                                        Default QuickBooks Deposit Account *
                                     </label>
                                     <select
                                         value={depositBankAccountId}
                                         onChange={(e) => setDepositBankAccountId(e.target.value)}
                                         className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     >
-                                        <option value="">Select Checking / Bank Account...</option>
+                                        <option value="">Select Checking, Bank, or Asset Account...</option>
                                         {bankAccounts.map(a => (
-                                            <option key={a.id} value={a.id}>{a.name}</option>
+                                            <option key={a.id} value={a.id}>
+                                                {a.name} {a.accountSubType ? `(${a.accountSubType})` : `(${a.accountType})`}
+                                            </option>
                                         ))}
                                     </select>
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                        The net batch amount is deposited here, enabling automated Bank Feed matching.
+                                        The full net batch deposit lands in this account. You can also specify or change the deposit account on any batch before sending.
                                     </p>
                                 </div>
 
@@ -271,7 +301,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                         ))}
                                     </select>
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                        Credit card processing fees will be coded as an expense reduction on the deposit.
+                                        Credit card & ACH fees will be deducted as a line item on the deposit to match net bank receipts.
                                     </p>
                                 </div>
 
@@ -293,7 +323,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
 
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Default Income Account (Fallback)
+                                        Fallback Income Account (If unmapped)
                                     </label>
                                     <select
                                         value={defaultIncomeAccountId}
@@ -334,97 +364,124 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* Fund Matching Table */}
+                            {/* 1-to-1 Fund Matching Table */}
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
                                         <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                            Fund Breakdown Matching
-                                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                                {mappedCount} of {funds.length} mapped
+                                            1-to-1 Fund Mapping: Planning Center to QuickBooks Income
+                                            <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                {mappedCount} of {allFunds.length} mapped
                                             </span>
                                         </h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Each fund line in the batch will be credited to its mapped QuickBooks Income Account.
+                                            Each Planning Center fund line in a batch is credited 1-to-1 to its mapped QuickBooks Income account.
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleAutoMatch}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors border border-emerald-200 dark:border-emerald-800"
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                                        Auto-Match by Name
-                                    </button>
+
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search funds..."
+                                                value={fundSearch}
+                                                onChange={(e) => setFundSearch(e.target.value)}
+                                                className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleAutoMatch}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors border border-emerald-200 dark:border-emerald-800 shrink-0"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                                            Auto-Match by Name
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                                     <table className="w-full text-left border-collapse text-sm">
                                         <thead>
                                             <tr className="bg-slate-50 dark:bg-slate-800/75 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                                <th className="px-4 py-3">Church Giving Fund</th>
-                                                <th className="px-4 py-3">QuickBooks Income Account *</th>
+                                                <th className="px-4 py-3">Planning Center Giving Fund</th>
+                                                <th className="px-4 py-3">QuickBooks Income Account (1-to-1) *</th>
                                                 {classes.length > 0 && (
                                                     <th className="px-4 py-3">QuickBooks Class (Optional)</th>
                                                 )}
-                                                <th className="px-3 py-3 w-16 text-center">Status</th>
+                                                <th className="px-3 py-3 w-20 text-center">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                            {funds.map((fund) => {
-                                                const mapping = fundMappings[fund.id] || { qboAccountId: '' };
-                                                const isMapped = !!mapping.qboAccountId;
+                                            {filteredFunds.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={classes.length > 0 ? 4 : 3} className="px-4 py-8 text-center text-xs text-slate-400">
+                                                        No Planning Center funds found matching your search.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredFunds.map((fund) => {
+                                                    const mapping = fundMappings[fund.id] || { qboAccountId: '' };
+                                                    const isMapped = !!mapping.qboAccountId;
 
-                                                return (
-                                                    <tr key={fund.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                                        <td className="px-4 py-3">
-                                                            <div className="font-semibold text-slate-900 dark:text-white">
-                                                                {fund.name}
-                                                            </div>
-                                                            <div className="text-[11px] text-slate-400 font-mono">
-                                                                ID: {fund.id}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <select
-                                                                value={mapping.qboAccountId || ''}
-                                                                onChange={(e) => handleFundAccountChange(fund, e.target.value)}
-                                                                className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                                            >
-                                                                <option value="">Select Income Account...</option>
-                                                                {incomeAccounts.map(a => (
-                                                                    <option key={a.id} value={a.id}>{a.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                        {classes.length > 0 && (
+                                                    return (
+                                                        <tr key={fund.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                                            <td className="px-4 py-3">
+                                                                <div className="font-semibold text-slate-900 dark:text-white">
+                                                                    {fund.name}
+                                                                </div>
+                                                                <div className="text-[11px] text-slate-400 font-mono">
+                                                                    ID: {fund.id}
+                                                                </div>
+                                                            </td>
                                                             <td className="px-4 py-3">
                                                                 <select
-                                                                    value={mapping.qboClassId || ''}
-                                                                    onChange={(e) => handleFundClassChange(fund, e.target.value)}
+                                                                    value={mapping.qboAccountId || ''}
+                                                                    onChange={(e) => handleFundAccountChange(fund, e.target.value)}
                                                                     className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                                                 >
-                                                                    <option value="">None</option>
-                                                                    {classes.map(c => (
-                                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                                    <option value="">Select QuickBooks Income Account...</option>
+                                                                    {incomeAccounts.map(a => (
+                                                                        <option key={a.id} value={a.id}>{a.name}</option>
                                                                     ))}
                                                                 </select>
                                                             </td>
-                                                        )}
-                                                        <td className="px-3 py-3 text-center">
-                                                            {isMapped ? (
-                                                                <span className="inline-flex items-center justify-center p-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" title="Mapped">
-                                                                    <Check className="w-3.5 h-3.5" />
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center justify-center p-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400" title="Unmapped">
-                                                                    <AlertCircle className="w-3.5 h-3.5" />
-                                                                </span>
+                                                            {classes.length > 0 && (
+                                                                <td className="px-4 py-3">
+                                                                    <select
+                                                                        value={mapping.qboClassId || ''}
+                                                                        onChange={(e) => handleFundClassChange(fund, e.target.value)}
+                                                                        className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                                                    >
+                                                                        <option value="">None</option>
+                                                                        {classes.map(c => (
+                                                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
                                                             )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                                            <td className="px-3 py-3 text-center">
+                                                                {isMapped ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" title="Mapped 1-to-1">
+                                                                        <Check className="w-3 h-3" />
+                                                                        Mapped
+                                                                    </span>
+                                                                ) : defaultIncomeAccountId ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400" title="Using Default Fallback">
+                                                                        Fallback
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400" title="Unmapped">
+                                                                        <AlertCircle className="w-3 h-3" />
+                                                                        Unmapped
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
