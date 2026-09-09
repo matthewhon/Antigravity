@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ChevronDown, X, Search, Filter } from 'lucide-react';
 import { DetailedDonation, PcoPerson } from '../types';
 import { 
     startOfWeek, startOfYear, endOfYear,
@@ -142,6 +143,28 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         timePeriod: 'ytd',
     });
 
+    // Dedicated Include/Exclude Fund Filter state for Giving by Label report
+    const [labelFundMode, setLabelFundMode] = useState<'include' | 'exclude'>('include');
+    const [labelSelectedFunds, setLabelSelectedFunds] = useState<string[]>([]);
+    const [isLabelFundDropdownOpen, setIsLabelFundDropdownOpen] = useState(false);
+    const [labelFundSearch, setLabelFundSearch] = useState('');
+    const labelFundDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Close fund dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (labelFundDropdownRef.current && !labelFundDropdownRef.current.contains(event.target as Node)) {
+                setIsLabelFundDropdownOpen(false);
+            }
+        };
+        if (isLabelFundDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isLabelFundDropdownOpen]);
+
     const handleTimePeriodChange = (period: string) => {
         const now = new Date();
         let start = now;
@@ -270,17 +293,24 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return Array.from(sources).sort();
     }, [dateFilteredDonations]);
 
-    // Available labels in the selected time period (optionally scoped to selected fund)
+    // Available labels in the selected time period (optionally scoped to selected fund or label fund filters)
     const availableLabels = useMemo(() => {
         const tags = new Set<string>();
-        const source = filters.selectedFund
-            ? dateFilteredDonations.filter(d => d.fundName === filters.selectedFund)
-            : dateFilteredDonations;
+        let source = dateFilteredDonations;
+        if (activeTab === 'giving_by_label') {
+            if (labelSelectedFunds.length > 0) {
+                source = labelFundMode === 'include'
+                    ? source.filter(d => labelSelectedFunds.includes(d.fundName))
+                    : source.filter(d => !labelSelectedFunds.includes(d.fundName));
+            }
+        } else if (filters.selectedFund) {
+            source = source.filter(d => d.fundName === filters.selectedFund);
+        }
         source.forEach(d => {
             if (d.labels) d.labels.forEach(l => tags.add(l));
         });
         return Array.from(tags).sort();
-    }, [dateFilteredDonations, filters.selectedFund]);
+    }, [dateFilteredDonations, filters.selectedFund, activeTab, labelSelectedFunds, labelFundMode]);
 
     // 1a. Filter Donations by Date, Fund, Payment Source, and Label
     const filteredDonations = useMemo(() => {
@@ -296,6 +326,25 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         }
         return filtered;
     }, [dateFilteredDonations, filters.selectedFund, filters.selectedPaymentSource, filters.selectedLabel]);
+
+    // Dedicated filtered donations for Giving by Label report (supporting Fund Include / Exclude multi-selection)
+    const givingByLabelDonations = useMemo(() => {
+        let filtered = dateFilteredDonations;
+        if (filters.selectedPaymentSource) {
+            filtered = filtered.filter(d => d.paymentSource === filters.selectedPaymentSource);
+        }
+        if (filters.selectedLabel) {
+            filtered = filtered.filter(d => d.labels?.includes(filters.selectedLabel));
+        }
+        if (labelSelectedFunds.length > 0) {
+            if (labelFundMode === 'include') {
+                filtered = filtered.filter(d => labelSelectedFunds.includes(d.fundName));
+            } else {
+                filtered = filtered.filter(d => !labelSelectedFunds.includes(d.fundName));
+            }
+        }
+        return filtered;
+    }, [dateFilteredDonations, filters.selectedPaymentSource, filters.selectedLabel, labelSelectedFunds, labelFundMode]);
 
     // 1b. Generate ordered bucket list
     const buckets = useMemo(() => {
@@ -439,7 +488,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         const COLORS = ['#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
 
         const allLabelsSet = new Set<string>();
-        filteredDonations.forEach(d => {
+        givingByLabelDonations.forEach(d => {
             if (d.labels) d.labels.forEach(l => allLabelsSet.add(l));
         });
         const allLabels = Array.from(allLabelsSet).sort();
@@ -447,7 +496,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         const labelData = allLabels.map((labelName, idx) => {
             const color = COLORS[idx % COLORS.length];
 
-            const labelDonations = filteredDonations.filter(d => d.labels?.includes(labelName));
+            const labelDonations = givingByLabelDonations.filter(d => d.labels?.includes(labelName));
             const totalGiven = labelDonations.reduce((s, d) => s + d.amount, 0);
 
             const fundsMap = new Map<string, number>();
@@ -464,7 +513,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         const overallTotal = labelData.reduce((s, t) => s + t.totalGiven, 0);
 
         return { labelData, overallTotal };
-    }, [filteredDonations]);
+    }, [givingByLabelDonations]);
 
     // 5b. Giving by Fund — total given, donor count, tx count, avg gift, % share, and bucket breakdown per fund
     const givingByFundData = useMemo(() => {
@@ -1313,20 +1362,185 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             </div>
                         )}
 
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
-                            <select
-                                aria-label="Filter by Fund"
-                                value={filters.selectedFund}
-                                onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
-                            >
-                                <option value="">All Funds</option>
-                                {availableFunds.map(fund => (
-                                    <option key={fund} value={fund}>{fund}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {activeTab === 'giving_by_label' ? (
+                            <div className="flex flex-col">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                    Funds ({labelFundMode === 'include' ? 'Include' : 'Exclude'})
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                    {/* Segmented Mode Button */}
+                                    <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setLabelFundMode('include')}
+                                            className={`px-2.5 py-1.5 text-[11px] font-black rounded-lg transition-all cursor-pointer ${
+                                                labelFundMode === 'include'
+                                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                                            }`}
+                                            title="Include only selected funds"
+                                        >
+                                            Include
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setLabelFundMode('exclude')}
+                                            className={`px-2.5 py-1.5 text-[11px] font-black rounded-lg transition-all cursor-pointer ${
+                                                labelFundMode === 'exclude'
+                                                    ? 'bg-rose-600 text-white shadow-xs'
+                                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                                            }`}
+                                            title="Exclude selected funds"
+                                        >
+                                            Exclude
+                                        </button>
+                                    </div>
+
+                                    {/* Multi-Select Dropdown Popover */}
+                                    <div className="relative" ref={labelFundDropdownRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLabelFundDropdownOpen(prev => !prev)}
+                                            className={`flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[150px] max-w-[220px] transition-all cursor-pointer border ${
+                                                labelSelectedFunds.length > 0
+                                                    ? labelFundMode === 'include'
+                                                        ? 'border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 bg-indigo-50/30'
+                                                        : 'border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 bg-rose-50/30'
+                                                    : 'border-transparent text-slate-700 dark:text-slate-200'
+                                            }`}
+                                        >
+                                            <span className="truncate">
+                                                {labelSelectedFunds.length === 0
+                                                    ? 'All Funds'
+                                                    : labelFundMode === 'include'
+                                                        ? `${labelSelectedFunds.length} Fund${labelSelectedFunds.length > 1 ? 's' : ''} Included`
+                                                        : `${labelSelectedFunds.length} Fund${labelSelectedFunds.length > 1 ? 's' : ''} Excluded`}
+                                            </span>
+                                            <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-slate-400 transition-transform ${isLabelFundDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {isLabelFundDropdownOpen && (
+                                            <div className="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 z-50 p-3 space-y-2 animate-in fade-in duration-150">
+                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                                                        {labelFundMode === 'include' ? 'Include Funds' : 'Exclude Funds'}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5 text-[11px]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLabelSelectedFunds([...availableFunds])}
+                                                            className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold cursor-pointer"
+                                                        >
+                                                            All
+                                                        </button>
+                                                        <span className="text-slate-300 dark:text-slate-600">|</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLabelSelectedFunds([])}
+                                                            className="text-slate-500 hover:underline font-bold cursor-pointer"
+                                                        >
+                                                            Clear
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {availableFunds.length > 5 && (
+                                                    <div className="relative">
+                                                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search funds..."
+                                                            value={labelFundSearch}
+                                                            onChange={(e) => setLabelFundSearch(e.target.value)}
+                                                            className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg pl-8 pr-3 py-1.5 text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="max-h-56 overflow-y-auto space-y-1 custom-scrollbar pr-1">
+                                                    {availableFunds
+                                                        .filter(fund => fund.toLowerCase().includes(labelFundSearch.toLowerCase()))
+                                                        .map(fund => {
+                                                            const isSelected = labelSelectedFunds.includes(fund);
+                                                            const fundDonationSum = dateFilteredDonations
+                                                                .filter(d => d.fundName === fund)
+                                                                .reduce((s, d) => s + d.amount, 0);
+
+                                                            return (
+                                                                <label
+                                                                    key={fund}
+                                                                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                                                        isSelected
+                                                                            ? labelFundMode === 'include'
+                                                                                ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200'
+                                                                                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200'
+                                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.checked) {
+                                                                                    setLabelSelectedFunds(prev => [...prev, fund]);
+                                                                                } else {
+                                                                                    setLabelSelectedFunds(prev => prev.filter(f => f !== fund));
+                                                                                }
+                                                                            }}
+                                                                            className={`w-3.5 h-3.5 rounded ${
+                                                                                labelFundMode === 'include'
+                                                                                    ? 'text-indigo-600 focus:ring-indigo-500'
+                                                                                    : 'text-rose-600 focus:ring-rose-500'
+                                                                            } border-slate-300 dark:border-slate-700`}
+                                                                        />
+                                                                        <span className="truncate font-bold">{fund}</span>
+                                                                    </div>
+                                                                    <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">
+                                                                        ${fundDonationSum.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                                    </span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                </div>
+
+                                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                                                    <span className="text-slate-400">
+                                                        {labelSelectedFunds.length === 0
+                                                            ? 'All funds active'
+                                                            : labelFundMode === 'include'
+                                                                ? `${labelSelectedFunds.length} included`
+                                                                : `${labelSelectedFunds.length} excluded`}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsLabelFundDropdownOpen(false)}
+                                                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                                                    >
+                                                        Done
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
+                                <select
+                                    aria-label="Filter by Fund"
+                                    value={filters.selectedFund}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value }))}
+                                    className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                                >
+                                    <option value="">All Funds</option>
+                                    {availableFunds.map(fund => (
+                                        <option key={fund} value={fund}>{fund}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Payment Source</label>
@@ -2411,6 +2625,82 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     </div>
                                 )}
                             </div>
+
+                            {/* Active Fund Filter Status & Chips */}
+                            {labelSelectedFunds.length > 0 ? (
+                                <div className={`mb-8 p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
+                                    labelFundMode === 'include'
+                                        ? 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-100 dark:border-indigo-900/50'
+                                        : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/50'
+                                }`}>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className={`text-xs font-bold flex items-center gap-1.5 ${
+                                            labelFundMode === 'include'
+                                                ? 'text-indigo-900 dark:text-indigo-200'
+                                                : 'text-rose-900 dark:text-rose-200'
+                                        }`}>
+                                            <span className={`w-2 h-2 rounded-full ${labelFundMode === 'include' ? 'bg-indigo-500' : 'bg-rose-500'}`}></span>
+                                            {labelFundMode === 'include'
+                                                ? `Including ${labelSelectedFunds.length} of ${availableFunds.length} fund${availableFunds.length === 1 ? '' : 's'}:`
+                                                : `Excluding ${labelSelectedFunds.length} fund${labelSelectedFunds.length === 1 ? '' : 's'}:`}
+                                        </span>
+                                        {labelSelectedFunds.map(fund => (
+                                            <span
+                                                key={fund}
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border shadow-xs ${
+                                                    labelFundMode === 'include'
+                                                        ? 'text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/80'
+                                                        : 'text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/80'
+                                                }`}
+                                            >
+                                                <span>{fund}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLabelSelectedFunds(prev => prev.filter(f => f !== fund))}
+                                                    className="hover:opacity-75 transition-opacity cursor-pointer p-0.5"
+                                                    title={`Remove ${fund}`}
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLabelFundDropdownOpen(true)}
+                                            className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
+                                        >
+                                            Edit Funds
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setLabelSelectedFunds([])}
+                                            className={`text-xs font-bold underline transition-colors cursor-pointer ${
+                                                labelFundMode === 'include'
+                                                    ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200'
+                                                    : 'text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-200'
+                                            }`}
+                                        >
+                                            Reset Filter
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mb-8 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                    <span>
+                                        Showing giving across all <strong>{availableFunds.length}</strong> funds in this date range.
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLabelFundDropdownOpen(true)}
+                                        className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Filter className="w-3.5 h-3.5" />
+                                        Filter Funds (Include / Exclude)
+                                    </button>
+                                </div>
+                            )}
 
                             {!hasLabels ? (
                                 <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
