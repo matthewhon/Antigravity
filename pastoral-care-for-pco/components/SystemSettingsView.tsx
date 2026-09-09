@@ -1464,90 +1464,228 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             </div>
 
             {/* QuickBooks Online Integration */}
-            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg">
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-8">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-black text-xl shadow-inner">
                             QB
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white">QuickBooks Online</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">Application-level OAuth 2.0 credentials for QuickBooks deposit sync.</p>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">QuickBooks Online</h3>
+                                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full">Giving Integration</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Application-level OAuth 2.0 configuration for syncing Planning Center Giving Batches as categorized bank deposits.</p>
                         </div>
                     </div>
-                    {settings.quickbooksClientId && settings.quickbooksClientSecret ? (
-                        <span className="text-[10px] font-black bg-emerald-500 text-white px-3 py-1 rounded-full">CONFIGURED ✓</span>
-                    ) : (
-                        <span className="text-[10px] font-black bg-amber-500 text-white px-3 py-1 rounded-full">NEEDS CREDENTIALS</span>
-                    )}
+                    <div>
+                        {settings.quickbooksClientId && settings.quickbooksClientSecret ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black bg-emerald-500 text-white px-3.5 py-1.5 rounded-full shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                CONFIGURED ✓
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black bg-amber-500 text-white px-3.5 py-1.5 rounded-full shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                NEEDS CREDENTIALS
+                            </span>
+                        )}
+                    </div>
                 </div>
 
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Create an App at <a href="https://developer.intuit.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-500 hover:text-indigo-400 font-semibold">developer.intuit.com</a> with the <strong>Accounting</strong> scope (<code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[11px]">com.intuit.quickbooks.accounting</code>) and add the Redirect URI below.
-                </p>
+                {/* Step-by-step Setup Guide */}
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-700/80">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+                        <span>📋</span> Intuit Developer App Setup Guide
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-[10px]">1</span>
+                                <span>Create Intuit App</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Sign in at <a href="https://developer.intuit.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline font-bold">developer.intuit.com</a>, go to <strong>Dashboard</strong> → <strong>Create an App</strong>, and select <strong>QuickBooks Online and Payments</strong>.
+                            </p>
+                        </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client ID</label>
-                        <input
-                            type="text"
-                            placeholder="AB..."
-                            value={settings.quickbooksClientId || ''}
-                            onChange={e => handleChange('quickbooksClientId', e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
+                        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-[10px]">2</span>
+                                <span>Required Scope</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Under Scopes, select <strong>Accounting</strong>:
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                                <code className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-700 dark:text-slate-300 truncate">
+                                    com.intuit.quickbooks.accounting
+                                </code>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText('com.intuit.quickbooks.accounting');
+                                        setMessage({ type: 'success', text: 'OAuth scope copied to clipboard!' });
+                                    }}
+                                    className="px-2 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-[10px] font-bold shrink-0"
+                                    title="Copy scope"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-[10px]">3</span>
+                                <span>Redirect URI</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Under <strong>Keys & OAuth</strong>, add the Redirect URI shown below to your Intuit App.
+                            </p>
+                            <span className="inline-block text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                                Must match exactly (including https://).
+                            </span>
+                        </div>
+
+                        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center gap-2 font-black text-slate-900 dark:text-white">
+                                <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-[10px]">4</span>
+                                <span>Copy Keys Below</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> from Intuit into the fields below and click <strong>Save</strong>.
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client Secret</label>
-                        <input
-                            type="password"
-                            placeholder="Secret..."
-                            value={settings.quickbooksClientSecret || ''}
-                            onChange={e => handleChange('quickbooksClientSecret', e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Environment</label>
-                        <select
-                            value={settings.quickbooksEnvironment || 'production'}
-                            onChange={e => handleChange('quickbooksEnvironment', e.target.value as any)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                        >
-                            <option value="production">Production (Live QuickBooks)</option>
-                            <option value="sandbox">Sandbox (Testing / Intuit Developer Sandbox)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">OAuth Redirect URI</label>
-                        <div className="flex gap-2">
+                </div>
+
+                {/* Configuration Fields */}
+                <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-4">
+                        OAuth 2.0 Credentials
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">
+                                Client ID <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="text"
-                                readOnly
-                                value={settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`}
-                                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-300 outline-none select-all"
+                                placeholder="AB123456789..."
+                                value={settings.quickbooksClientId || ''}
+                                onChange={e => handleChange('quickbooksClientId', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                             />
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`);
-                                    setMessage({ type: 'success', text: 'QuickBooks Redirect URI copied to clipboard!' });
-                                }}
-                                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-bold transition-colors shrink-0"
+                            <p className="text-[10px] text-slate-400 mt-1">Found in your Intuit Developer App under Development/Production Keys.</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">
+                                Client Secret <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="password"
+                                placeholder="Client secret..."
+                                value={settings.quickbooksClientSecret || ''}
+                                onChange={e => handleChange('quickbooksClientSecret', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Keep this secret. Never share or commit this value publicly.</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">
+                                Environment Mode
+                            </label>
+                            <select
+                                value={settings.quickbooksEnvironment || 'production'}
+                                onChange={e => handleChange('quickbooksEnvironment', e.target.value as any)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                             >
-                                Copy
-                            </button>
+                                <option value="production">Production (Live Church QuickBooks Online)</option>
+                                <option value="sandbox">Sandbox (Intuit Developer Sandbox Test Companies)</option>
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                                {settings.quickbooksEnvironment === 'sandbox' 
+                                    ? '⚠️ Using sandbox mode. Only Intuit sandbox companies can connect.'
+                                    : '✓ Production mode. Connects to real church QuickBooks Online accounts.'}
+                            </p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">
+                                OAuth Redirect URI (Add to Intuit App)
+                            </label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`}
+                                    className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-300 outline-none select-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`);
+                                        setMessage({ type: 'success', text: 'QuickBooks Redirect URI copied to clipboard!' });
+                                    }}
+                                    className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-bold transition-colors shrink-0"
+                                >
+                                    Copy URI
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">Paste this exact URL under <strong>Redirect URIs</strong> in your Intuit Developer App settings.</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-6 flex justify-end">
+                {/* Important Technical & Accounting Requirements */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
+                        <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs mb-1">
+                            <span>🏦</span> Bank Feed 1-Click Match
+                        </div>
+                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 leading-relaxed">
+                            When mapping accounts in Giving Batches, choose the exact bank account connected to QuickBooks Bank Feeds. Live Stripe payouts will then automatically match in 1 click.
+                        </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+                        <div className="flex items-center gap-2 text-indigo-800 dark:text-indigo-300 font-bold text-xs mb-1">
+                            <span>👤</span> QuickBooks Admin Access
+                        </div>
+                        <p className="text-[11px] text-indigo-700/80 dark:text-indigo-400/80 leading-relaxed">
+                            The staff member authorising the QuickBooks connection in Giving Batches must have <strong>Company Admin</strong> or <strong>Primary Admin</strong> role in QuickBooks Online.
+                        </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40">
+                        <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs mb-1">
+                            <span>🛡️</span> Intuit Production Keys
+                        </div>
+                        <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
+                            To obtain Production keys, Intuit requires completing an App Assessment questionnaire (Terms of Service, Privacy Policy URLs, and security check) in the Developer portal.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Save action */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <div className="text-[11px] text-slate-400">
+                        Changes will be saved to global system configuration and used for all QuickBooks sync workflows.
+                    </div>
                     <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all disabled:opacity-50 shadow-sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 shadow-md shadow-emerald-500/20 flex items-center gap-2"
                     >
-                        {isSaving ? 'Saving...' : 'Save QuickBooks Settings'}
+                        {isSaving ? (
+                            <>
+                                <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                                Saving...
+                            </>
+                        ) : (
+                            'Save QuickBooks Settings'
+                        )}
                     </button>
                 </div>
             </div>
