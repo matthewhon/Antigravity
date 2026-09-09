@@ -40,6 +40,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'synced' | 'stripe' | 'manual'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [showPriorToCutoff, setShowPriorToCutoff] = useState(false);
 
     // Check URL parameters for OAuth callbacks
     useEffect(() => {
@@ -111,14 +112,25 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
         });
     };
 
-    // Calculate aggregated metrics
+    const cutoffDate = mapping?.cutoffDate;
+    const priorCutoffCount = useMemo(() => {
+        if (!cutoffDate) return 0;
+        return batches.filter(b => (b.date || '').slice(0, 10) < cutoffDate).length;
+    }, [batches, cutoffDate]);
+
+    // Calculate aggregated metrics (respecting cutoff unless showing all)
     const metrics = useMemo(() => {
         let gross = 0;
         let fees = 0;
         let syncedCount = 0;
         let pendingCount = 0;
+        let count = 0;
 
         batches.forEach(b => {
+            const isPrior = cutoffDate && !showPriorToCutoff && (b.date || '').slice(0, 10) < cutoffDate;
+            if (isPrior) return;
+
+            count++;
             gross += b.totalGross || 0;
             fees += b.totalFees || 0;
             if (b.status === 'synced_to_qbo') syncedCount++;
@@ -126,18 +138,23 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
         });
 
         return {
-            totalBatches: batches.length,
+            totalBatches: count,
             gross,
             fees,
             net: gross - fees,
             syncedCount,
             pendingCount
         };
-    }, [batches]);
+    }, [batches, cutoffDate, showPriorToCutoff]);
 
     // Filtered batches
     const filteredBatches = useMemo(() => {
         return batches.filter(b => {
+            // Cutoff filtering
+            if (cutoffDate && !showPriorToCutoff && (b.date || '').slice(0, 10) < cutoffDate) {
+                return false;
+            }
+
             if (statusFilter === 'pending' && b.status === 'synced_to_qbo') return false;
             if (statusFilter === 'synced' && b.status !== 'synced_to_qbo') return false;
             if (statusFilter === 'stripe' && b.batchType !== 'stripe') return false;
@@ -152,7 +169,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
 
             return true;
         });
-    }, [batches, statusFilter, searchQuery]);
+    }, [batches, statusFilter, searchQuery, cutoffDate, showPriorToCutoff]);
 
     const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -317,6 +334,55 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                         )}
                     </div>
                 </div>
+
+                {/* Date Cutoff Info Strip */}
+                {cutoffDate ? (
+                    <div className="px-5 py-2.5 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                            <Calendar className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span>
+                                QuickBooks Cutoff Active: Only showing batches on or after <strong>{cutoffDate}</strong>
+                            </span>
+                            {priorCutoffCount > 0 && (
+                                <span className="text-slate-400 dark:text-slate-500">
+                                    ({priorCutoffCount} older manual {priorCutoffCount === 1 ? 'batch' : 'batches'} hidden)
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {priorCutoffCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPriorToCutoff(!showPriorToCutoff)}
+                                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                                >
+                                    {showPriorToCutoff ? 'Hide Older Batches' : `Show Older Batches (${priorCutoffCount})`}
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setIsMappingModalOpen(true)}
+                                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:underline"
+                            >
+                                Change Cutoff Date
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="px-5 py-2 bg-amber-50/50 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between text-[11px] text-amber-800 dark:text-amber-300">
+                        <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>No date cutoff configured. All historical batches are visible.</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsMappingModalOpen(true)}
+                            className="font-bold underline hover:no-underline cursor-pointer"
+                        >
+                            Set Date Cutoff to Hide Older Manual Batches →
+                        </button>
+                    </div>
+                )}
 
                 {/* Batches Table */}
                 <div className="overflow-x-auto">

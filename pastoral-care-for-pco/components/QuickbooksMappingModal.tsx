@@ -37,6 +37,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [stripeVendorId, setStripeVendorId] = useState('');
     const [defaultIncomeAccountId, setDefaultIncomeAccountId] = useState('');
     const [fundMappings, setFundMappings] = useState<Record<string, FundQuickbooksMapping>>({});
+    const [cutoffDate, setCutoffDate] = useState('');
 
     const loadData = async () => {
         setLoading(true);
@@ -59,6 +60,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 setStripeVendorId(existingMapping.stripeVendorId || '');
                 setDefaultIncomeAccountId(existingMapping.defaultIncomeAccountId || '');
                 setFundMappings(existingMapping.fundMappings || {});
+                setCutoffDate(existingMapping.cutoffDate || '');
             } else {
                 // Pre-select first bank and fee account if available
                 if (accountsData.bankAccounts.length > 0) {
@@ -162,7 +164,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 stripeVendorName: vendor?.displayName,
                 defaultIncomeAccountId: defaultIncomeAccountId || undefined,
                 defaultIncomeAccountName: defIncome?.name,
-                fundMappings
+                fundMappings,
+                cutoffDate: cutoffDate.trim() || undefined
             };
 
             const saved = await quickbooksClient.saveMapping(churchId, payload);
@@ -302,6 +305,32 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                             <option key={a.id} value={a.id}>{a.name}</option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div className="md:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                                            QuickBooks Batch Sync Date Cutoff (Optional)
+                                        </label>
+                                        {cutoffDate && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCutoffDate('')}
+                                                className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline font-medium"
+                                            >
+                                                Clear Cutoff (Show All)
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input
+                                        type="date"
+                                        value={cutoffDate}
+                                        onChange={(e) => setCutoffDate(e.target.value)}
+                                        className="w-full md:w-64 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                        Batches dated before this cutoff will be hidden so older manual batches don't clutter your QuickBooks deposit dashboard.
+                                    </p>
                                 </div>
                             </div>
 

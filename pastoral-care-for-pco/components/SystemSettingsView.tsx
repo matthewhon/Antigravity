@@ -1462,6 +1462,95 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     </button>
                 </div>
             </div>
+
+            {/* QuickBooks Online Integration */}
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg">
+                            QB
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">QuickBooks Online</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Application-level OAuth 2.0 credentials for QuickBooks deposit sync.</p>
+                        </div>
+                    </div>
+                    {settings.quickbooksClientId && settings.quickbooksClientSecret ? (
+                        <span className="text-[10px] font-black bg-emerald-500 text-white px-3 py-1 rounded-full">CONFIGURED ✓</span>
+                    ) : (
+                        <span className="text-[10px] font-black bg-amber-500 text-white px-3 py-1 rounded-full">NEEDS CREDENTIALS</span>
+                    )}
+                </div>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Create an App at <a href="https://developer.intuit.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-500 hover:text-indigo-400 font-semibold">developer.intuit.com</a> with the <strong>Accounting</strong> scope (<code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[11px]">com.intuit.quickbooks.accounting</code>) and add the Redirect URI below.
+                </p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client ID</label>
+                        <input
+                            type="text"
+                            placeholder="AB..."
+                            value={settings.quickbooksClientId || ''}
+                            onChange={e => handleChange('quickbooksClientId', e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client Secret</label>
+                        <input
+                            type="password"
+                            placeholder="Secret..."
+                            value={settings.quickbooksClientSecret || ''}
+                            onChange={e => handleChange('quickbooksClientSecret', e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Environment</label>
+                        <select
+                            value={settings.quickbooksEnvironment || 'production'}
+                            onChange={e => handleChange('quickbooksEnvironment', e.target.value as any)}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value="production">Production (Live QuickBooks)</option>
+                            <option value="sandbox">Sandbox (Testing / Intuit Developer Sandbox)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">OAuth Redirect URI</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                readOnly
+                                value={settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`}
+                                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-300 outline-none select-all"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`);
+                                    setMessage({ type: 'success', text: 'QuickBooks Redirect URI copied to clipboard!' });
+                                }}
+                                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-bold transition-colors shrink-0"
+                            >
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wide transition-all disabled:opacity-50 shadow-sm"
+                    >
+                        {isSaving ? 'Saving...' : 'Save QuickBooks Settings'}
+                    </button>
+                </div>
+            </div>
             </div>
         )}
         {activeTab === 'Logging' && (

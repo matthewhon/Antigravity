@@ -739,6 +739,8 @@ export interface QuickbooksMappingConfig {
     defaultIncomeAccountId?: string;
     defaultIncomeAccountName?: string;
     fundMappings: Record<string, FundQuickbooksMapping>;
+    /** Optional cutoff date (YYYY-MM-DD). Batches before this date are hidden from QuickBooks deposit views */
+    cutoffDate?: string;
     updatedAt?: number;
     updatedBy?: string;
 }
@@ -922,6 +924,15 @@ export interface SystemSettings {
     canvaClientId?: string;
     /** Canva Connect API Client Secret — from developers.canva.com */
     canvaClientSecret?: string;
+    // -- QuickBooks Online Integration ------------------------------------------
+    /** QuickBooks OAuth Client ID — from developer.intuit.com */
+    quickbooksClientId?: string;
+    /** QuickBooks OAuth Client Secret — from developer.intuit.com */
+    quickbooksClientSecret?: string;
+    /** QuickBooks Environment ('sandbox' | 'production') */
+    quickbooksEnvironment?: 'sandbox' | 'production';
+    /** Custom OAuth Redirect URI (defaults to /api/quickbooks/callback) */
+    quickbooksRedirectUri?: string;
 }
 
 export interface TemplateSettings {
