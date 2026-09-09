@@ -17,7 +17,7 @@ interface DonationReportProps {
 }
 
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
-type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
+type SortField = 'totalAmount' | 'name' | 'lastGiftDate' | 'firstGiftDate';
 type SortDirection = 'asc' | 'desc';
 type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label' | 'fund_label_pivot' | 'lapsed_donors';
 type LapsedSortField = 'priorTotal' | 'name' | 'giftCount' | 'lastGiftDate' | 'lifetimeTotal';
@@ -269,6 +269,21 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return map;
     }, [donations]);
 
+    // Build all-time earliest recorded giving date map per donor
+    const donorFirstGiftMap = useMemo(() => {
+        const map = new Map<string, string>();
+        donations.forEach(d => {
+            if (!d.donorId || !d.date) return;
+            const dTime = new Date(d.date).getTime();
+            if (isNaN(dTime)) return;
+            const existing = map.get(d.donorId);
+            if (!existing || dTime < new Date(existing).getTime()) {
+                map.set(d.donorId, d.date);
+            }
+        });
+        return map;
+    }, [donations]);
+
     // Donations filtered by date only (used to derive available funds/labels for the period)
     const dateFilteredDonations = useMemo(() => {
         const start = parseISO(filters.startDate);
@@ -376,7 +391,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
     const aggregatedData = useMemo(() => {
         const donorMap = new Map<string, {
             id: string; name: string; email: string;
-            totalAmount: number; lastGiftDate: string;
+            totalAmount: number; firstGiftDate: string; lastGiftDate: string;
             buckets: Record<string, number>;
         }>();
 
@@ -385,7 +400,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 donorMap.set(d.donorId, {
                     id: d.donorId, name: d.donorName,
                     email: peopleMap.get(d.donorId)?.email || '',
-                    totalAmount: 0, lastGiftDate: '', buckets: {},
+                    totalAmount: 0,
+                    firstGiftDate: donorFirstGiftMap.get(d.donorId) || d.date,
+                    lastGiftDate: '',
+                    buckets: {},
                 });
             }
             const rec = donorMap.get(d.donorId)!;
@@ -401,13 +419,18 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
         results.sort((a, b) => {
             let va: any = a[sort.field], vb: any = b[sort.field];
+            if (sort.field === 'firstGiftDate' || sort.field === 'lastGiftDate') {
+                const ta = va ? new Date(va).getTime() : 0;
+                const tb = vb ? new Date(vb).getTime() : 0;
+                return sort.direction === 'asc' ? ta - tb : tb - ta;
+            }
             if (sort.field !== 'totalAmount') { va = va.toString().toLowerCase(); vb = vb.toString().toLowerCase(); }
             if (va < vb) return sort.direction === 'asc' ? -1 : 1;
             if (va > vb) return sort.direction === 'asc' ? 1 : -1;
             return 0;
         });
         return results;
-    }, [filteredDonations, buckets, filters.interval, filters.minAmount, filters.maxAmount, sort, peopleMap]);
+    }, [filteredDonations, buckets, filters.interval, filters.minAmount, filters.maxAmount, sort, peopleMap, donorFirstGiftMap]);
 
     // 3. Age Trends — per bucket, sum giving by age group
     const ageTrendData = useMemo(() => {
@@ -1052,11 +1075,12 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         let filename = "";
 
         if (activeTab === 'donors') {
-            const header = ['Donor Name', 'Primary Email', 'Total Given', 'Last Gift Date', ...buckets];
+            const header = ['Donor Name', 'Primary Email', 'Total Given', 'First Recorded Giving Date', 'Last Gift Date', ...buckets];
             const rows = aggregatedData.map(d => [
                 escapeCsv(d.name), escapeCsv(d.email),
                 d.totalAmount.toFixed(2),
-                d.lastGiftDate,
+                d.firstGiftDate ? (d.firstGiftDate.includes('T') ? d.firstGiftDate.split('T')[0] : d.firstGiftDate) : '',
+                d.lastGiftDate ? (d.lastGiftDate.includes('T') ? d.lastGiftDate.split('T')[0] : d.lastGiftDate) : '',
                 ...buckets.map(b => (d.buckets[b] || 0).toFixed(2)),
             ].join(','));
             csv = [header.join(','), ...rows].join('\n');
@@ -1421,10 +1445,31 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
                                         {isLabelFundDropdownOpen && (
                                             <div className="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 z-50 p-3 space-y-2 animate-in fade-in duration-150">
-                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                                                        {labelFundMode === 'include' ? 'Include Funds' : 'Exclude Funds'}
-                                                    </span>
+                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 gap-2">
+                                                    <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLabelFundMode('include')}
+                                                            className={`px-2 py-1 text-[10px] font-black rounded transition-all cursor-pointer ${
+                                                                labelFundMode === 'include'
+                                                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                                                            }`}
+                                                        >
+                                                            Include
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLabelFundMode('exclude')}
+                                                            className={`px-2 py-1 text-[10px] font-black rounded transition-all cursor-pointer ${
+                                                                labelFundMode === 'exclude'
+                                                                    ? 'bg-rose-600 text-white shadow-xs'
+                                                                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                                                            }`}
+                                                        >
+                                                            Exclude
+                                                        </button>
+                                                    </div>
                                                     <div className="flex items-center gap-1.5 text-[11px]">
                                                         <button
                                                             type="button"
@@ -1776,6 +1821,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                         Total Given {sort.field === 'totalAmount' && (sort.direction === 'asc' ? '↑' : '↓')}
                                     </th>
                                     <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500"
+                                        onClick={() => setSort({ field: 'firstGiftDate', direction: sort.field === 'firstGiftDate' && sort.direction === 'asc' ? 'desc' : 'asc' })}>
+                                        First Recorded Gift {sort.field === 'firstGiftDate' && (sort.direction === 'asc' ? '↑' : '↓')}
+                                    </th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500"
                                         onClick={() => setSort({ field: 'lastGiftDate', direction: sort.field === 'lastGiftDate' && sort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         Last Gift {sort.field === 'lastGiftDate' && (sort.direction === 'asc' ? '↑' : '↓')}
                                     </th>
@@ -1793,6 +1842,12 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                             ${donor.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="p-4 text-xs text-slate-500 dark:text-slate-400 text-right font-mono">
+                                            {donor.firstGiftDate ? (() => {
+                                                try { return format(parseISO(donor.firstGiftDate), 'MMM d, yyyy'); }
+                                                catch { return donor.firstGiftDate; }
+                                            })() : '-'}
+                                        </td>
+                                        <td className="p-4 text-xs text-slate-500 dark:text-slate-400 text-right font-mono">
                                             {donor.lastGiftDate ? format(parseISO(donor.lastGiftDate), 'MMM d, yyyy') : '-'}
                                         </td>
                                         {buckets.map(b => (
@@ -1807,7 +1862,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 ))}
                                 {aggregatedData.length === 0 && (
                                     <tr>
-                                        <td colSpan={4 + buckets.length} className="p-8 text-center text-slate-400 text-xs italic">
+                                        <td colSpan={5 + buckets.length} className="p-8 text-center text-slate-400 text-xs italic">
                                             No donations found matching the selected criteria.
                                         </td>
                                     </tr>
@@ -2668,7 +2723,21 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <div className="flex items-center gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => setIsLabelFundDropdownOpen(true)}
+                                            onClick={() => setLabelFundMode(prev => prev === 'include' ? 'exclude' : 'include')}
+                                            className={`text-xs font-bold transition-colors cursor-pointer ${
+                                                labelFundMode === 'include'
+                                                    ? 'text-rose-600 dark:text-rose-400 hover:underline'
+                                                    : 'text-indigo-600 dark:text-indigo-400 hover:underline'
+                                            }`}
+                                        >
+                                            Switch to {labelFundMode === 'include' ? 'Exclude' : 'Include'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsLabelFundDropdownOpen(true);
+                                                labelFundDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                            }}
                                             className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
                                         >
                                             Edit Funds
@@ -2693,7 +2762,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     </span>
                                     <button
                                         type="button"
-                                        onClick={() => setIsLabelFundDropdownOpen(true)}
+                                        onClick={() => {
+                                            setIsLabelFundDropdownOpen(true);
+                                            labelFundDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                        }}
                                         className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
                                     >
                                         <Filter className="w-3.5 h-3.5" />

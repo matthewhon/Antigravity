@@ -14,7 +14,7 @@
  */
 
 import { firestore } from '../firestoreService';
-import { DetailedDonation, PcoFund, PcoPerson } from '../../types';
+import { DetailedDonation, PcoFund, PcoPerson, GivingBatch, GivingBatchFundBreakdown } from '../../types';
 import { logger, fetchAllPages, delay } from './pcoSyncCore.ts';
 
 /** Used when a donation has no resolvable fund. Never invent a real-sounding fund name. */
@@ -76,6 +76,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
+            const donationFee = (d.attributes?.fee_cents || 0) / 100;
+            const donationGross = (d.attributes?.amount_cents || 0) / 100;
 
             // Resolve Payment Source
             let paymentSource = 'Unknown';
@@ -119,7 +121,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 return [{
                     id: `${d.id}_0`,
                     churchId,
-                    amount: (d.attributes.amount_cents || 0) / 100,
+                    amount: donationGross,
                     date: donationDate,
                     fundName: UNKNOWN_FUND,
                     fundId: undefined,
@@ -129,7 +131,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     labels,
                     paymentSource,
                     batchId,
-                    batchName
+                    batchName,
+                    fee: donationFee
                 }] as DetailedDonation[];
             }
 
@@ -161,6 +164,10 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         }
                     }
 
+                    const fee = designationRefs.length === 1
+                        ? donationFee
+                        : Math.round((donationFee * (amount / (donationGross || 1))) * 100) / 100;
+
                     results.push({
                         id: `${d.id}_${index}`,
                         churchId,
@@ -174,7 +181,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         labels,
                         paymentSource,
                         batchId,
-                        batchName
+                        batchName,
+                        fee
                     });
                 }
             });
@@ -248,6 +256,127 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         if (peopleUpdates.length > 0) {
             await firestore.upsertPeople(peopleUpdates as any);
             console.log(`Updated giving stats for ${peopleUpdates.length} donors.`);
+        }
+
+        // 3. Sync Batches and Aggregate Funds Breakdown & Stripe Fees
+        console.log('Syncing and aggregating Giving Batches...');
+        let pcoBatches: any[] = [];
+        try {
+            pcoBatches = await fetchAllPages(
+                churchId,
+                'giving/v2/batches',
+                (b: any) => ({
+                    id: String(b.id),
+                    name: b.attributes?.description || b.attributes?.name || `Batch #${b.id}`,
+                    status: b.attributes?.status === 'committed' ? 'committed' : 'open',
+                    date: b.attributes?.committed_at || b.attributes?.created_at || new Date().toISOString(),
+                    totalGross: (b.attributes?.total_cents || 0) / 100,
+                }),
+                100
+            );
+        } catch (err: any) {
+            logger.warn('Error fetching batches from PCO Giving (non-fatal)', 'sync', { churchId, error: err.message }, churchId);
+        }
+
+        // Fetch existing batches from Firestore to preserve QBO sync state
+        const existingBatches = await firestore.getGivingBatches(churchId);
+        const existingBatchMap = new Map<string, GivingBatch>();
+        existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
+
+        // Group donations by batchId (or date for unbatched Stripe donations)
+        const batchDonationMap = new Map<string, DetailedDonation[]>();
+        const batchNameMap = new Map<string, string>();
+        const batchDateMap = new Map<string, string>();
+
+        pcoBatches.forEach(pb => {
+            batchNameMap.set(pb.id, pb.name);
+            batchDateMap.set(pb.id, pb.date);
+            if (!batchDonationMap.has(pb.id)) batchDonationMap.set(pb.id, []);
+        });
+
+        donations.forEach(d => {
+            let key = d.batchId;
+            if (!key) {
+                // If donation has fees or card/Stripe paymentSource and no batch, group by day
+                const isOnline = (d.fee && d.fee > 0) || (d.paymentSource && /stripe|card|ach/i.test(d.paymentSource));
+                const dateKey = (d.date || '').slice(0, 10);
+                key = isOnline ? `online_${dateKey}` : `manual_unbatched_${dateKey}`;
+                if (!batchNameMap.has(key)) {
+                    batchNameMap.set(key, isOnline ? `Online Giving Payout (${dateKey})` : `Unbatched Giving (${dateKey})`);
+                    batchDateMap.set(key, d.date);
+                }
+            } else if (d.batchName && !batchNameMap.has(key)) {
+                batchNameMap.set(key, d.batchName);
+            }
+            if (!batchDateMap.has(key)) batchDateMap.set(key, d.date);
+
+            const list = batchDonationMap.get(key) || [];
+            list.push(d);
+            batchDonationMap.set(key, list);
+        });
+
+        const batchesToSave: GivingBatch[] = [];
+
+        batchDonationMap.forEach((batchDonations, batchKey) => {
+            if (batchDonations.length === 0) return;
+
+            // Calculate fund breakdown
+            const fundGroups = new Map<string, { fundName: string; gross: number; fee: number; count: number }>();
+            let batchTotalGross = 0;
+            let batchTotalFee = 0;
+
+            batchDonations.forEach(d => {
+                const fId = d.fundId || 'unassigned';
+                const fName = d.fundName || 'Unassigned';
+                const cur = fundGroups.get(fId) || { fundName: fName, gross: 0, fee: 0, count: 0 };
+                cur.gross += d.amount || 0;
+                cur.fee += d.fee || 0;
+                cur.count += 1;
+                fundGroups.set(fId, cur);
+
+                batchTotalGross += d.amount || 0;
+                batchTotalFee += d.fee || 0;
+            });
+
+            const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundGroups.entries()).map(([fId, data]) => ({
+                fundId: fId,
+                fundName: data.fundName,
+                grossAmount: Math.round(data.gross * 100) / 100,
+                feeAmount: Math.round(data.fee * 100) / 100,
+                netAmount: Math.round((data.gross - data.fee) * 100) / 100,
+                donationCount: data.count
+            })).sort((a, b) => b.grossAmount - a.grossAmount);
+
+            const round2 = (n: number) => Math.round(n * 100) / 100;
+            const gross = round2(batchTotalGross);
+            const fees = round2(batchTotalFee);
+            const net = round2(gross - fees);
+
+            const existing = existingBatchMap.get(batchKey);
+            const isStripe = fees > 0 || batchKey.startsWith('online_') || batchDonations.some(d => /stripe|card|ach/i.test(d.paymentSource || ''));
+
+            batchesToSave.push({
+                id: batchKey,
+                churchId,
+                name: batchNameMap.get(batchKey) || `Batch ${batchKey}`,
+                date: batchDateMap.get(batchKey) || new Date().toISOString(),
+                batchType: isStripe ? 'stripe' : 'manual',
+                status: existing?.status === 'synced_to_qbo' ? 'synced_to_qbo' : 'committed',
+                totalGross: gross,
+                totalFees: fees,
+                totalNet: net,
+                donationCount: batchDonations.length,
+                fundsBreakdown,
+                quickbooksDepositId: existing?.quickbooksDepositId,
+                quickbooksDepositDocNumber: existing?.quickbooksDepositDocNumber,
+                syncedAt: existing?.syncedAt,
+                syncedBy: existing?.syncedBy
+            });
+        });
+
+        if (batchesToSave.length > 0) {
+            await firestore.upsertGivingBatches(batchesToSave);
+            console.log(`Saved ${batchesToSave.length} giving batches.`);
         }
     }
     logger.info(

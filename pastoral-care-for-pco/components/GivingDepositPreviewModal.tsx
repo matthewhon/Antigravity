@@ -1,0 +1,303 @@
+import React, { useState } from 'react';
+import { GivingBatch, QuickbooksMappingConfig, QuickbooksDepositResult } from '../types';
+import { quickbooksClient } from '../services/quickbooksService';
+import { X, Check, AlertCircle, RefreshCw, Landmark, CreditCard, ArrowRight, ExternalLink } from 'lucide-react';
+
+interface GivingDepositPreviewModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    batch: GivingBatch | null;
+    mapping: QuickbooksMappingConfig | null;
+    churchId: string;
+    userName?: string;
+    onConfigureMapping: () => void;
+    onDepositSuccess: (batch: GivingBatch, result: QuickbooksDepositResult) => void;
+}
+
+export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps> = ({
+    isOpen,
+    onClose,
+    batch,
+    mapping,
+    churchId,
+    userName,
+    onConfigureMapping,
+    onDepositSuccess
+}) => {
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successResult, setSuccessResult] = useState<QuickbooksDepositResult | null>(null);
+
+    if (!isOpen || !batch) return null;
+
+    const unmappedFunds = batch.fundsBreakdown.filter(f => 
+        !mapping?.fundMappings[f.fundId]?.qboAccountId && !mapping?.defaultIncomeAccountId
+    );
+    const missingBank = !mapping?.depositBankAccountId;
+    const missingFeeAcc = batch.totalFees > 0 && !mapping?.stripeFeeExpenseAccountId;
+    const hasConfigError = unmappedFunds.length > 0 || missingBank || missingFeeAcc;
+
+    const handleSend = async () => {
+        if (hasConfigError) return;
+        setSending(true);
+        setError(null);
+
+        try {
+            const res = await quickbooksClient.sendDeposit(churchId, batch.id, userName);
+            setSuccessResult(res.depositResult);
+            onDepositSuccess(res.batch, res.depositResult);
+        } catch (err: any) {
+            setError(err.message || 'Failed to send deposit to QuickBooks');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/60 rounded-xl text-emerald-600 dark:text-emerald-400">
+                            <Landmark className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">QuickBooks Deposit Preview</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Review how this batch will be posted to your QuickBooks Bank Register.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                    {successResult ? (
+                        <div className="text-center py-6 space-y-4">
+                            <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+                                <Check className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Deposit Created Successfully!</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    QuickBooks Deposit #{successResult.depositId} has been posted to your bank register for{' '}
+                                    <strong className="text-slate-900 dark:text-white">{money(successResult.totalAmount)}</strong>.
+                                </p>
+                            </div>
+
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-left text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+                                <p className="font-semibold flex items-center gap-1.5">
+                                    <Check className="w-4 h-4 text-emerald-500" />
+                                    Bank Feed Ready
+                                </p>
+                                <p>
+                                    When your bank feed downloads this deposit transaction, QuickBooks Online will automatically recognize the net amount and offer the green <strong>Match</strong> button.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-3 pt-2">
+                                {successResult.qboUrl && (
+                                    <a
+                                        href={successResult.qboUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/50 hover:bg-emerald-200 rounded-xl transition-colors"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                        View in QuickBooks
+                                    </a>
+                                )}
+                                <button
+                                    onClick={onClose}
+                                    className="px-5 py-2 text-sm font-semibold text-white bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 rounded-xl transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Summary Card */}
+                            <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800">
+                                <div>
+                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Batch Name</span>
+                                    <p className="font-bold text-sm text-slate-900 dark:text-white truncate" title={batch.name}>{batch.name}</p>
+                                </div>
+                                <div>
+                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</span>
+                                    <p className="font-bold text-sm text-slate-900 dark:text-white">{batch.date.slice(0, 10)}</p>
+                                </div>
+                                <div>
+                                    <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Target Bank Account</span>
+                                    <p className="font-bold text-sm text-emerald-600 dark:text-emerald-400 truncate">
+                                        {mapping?.depositBankAccountName || 'Not configured'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Warnings */}
+                            {hasConfigError && (
+                                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl space-y-2">
+                                    <div className="flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-sm">
+                                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold">Configuration Required Before Posting</p>
+                                            <ul className="list-disc list-inside text-xs mt-1 space-y-0.5">
+                                                {missingBank && <li>Please select a QuickBooks Bank Account to receive deposits.</li>}
+                                                {missingFeeAcc && <li>Please select a QuickBooks Expense Account for Stripe credit card fees.</li>}
+                                                {unmappedFunds.map(f => (
+                                                    <li key={f.fundId}>Fund "{f.fundName}" is not mapped to a QuickBooks Income Account.</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div className="pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={onConfigureMapping}
+                                            className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
+                                        >
+                                            Open Accounts & Fund Matching Settings →
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-xl text-sm text-rose-700 dark:text-rose-300">
+                                    <p className="font-bold">Error Posting Deposit</p>
+                                    <p className="text-xs mt-1">{error}</p>
+                                </div>
+                            )}
+
+                            {/* Line Items Table */}
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Deposit Line Items Breakdown
+                                </h4>
+                                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 font-semibold text-slate-500 dark:text-slate-400">
+                                                <th className="px-4 py-2.5">Line Description</th>
+                                                <th className="px-4 py-2.5">Target QBO Account</th>
+                                                <th className="px-4 py-2.5 text-right">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                            {/* Fund Lines */}
+                                            {batch.fundsBreakdown.map((f) => {
+                                                const fundMap = mapping?.fundMappings[f.fundId];
+                                                const accName = fundMap?.qboAccountName || mapping?.defaultIncomeAccountName || 'Unmapped';
+
+                                                return (
+                                                    <tr key={f.fundId} className="bg-white dark:bg-slate-900">
+                                                        <td className="px-4 py-2.5">
+                                                            <div className="font-medium text-slate-900 dark:text-white">{f.fundName}</div>
+                                                            <div className="text-[10px] text-slate-400">{f.donationCount} gifts</div>
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            <span className={fundMap?.qboAccountId ? 'text-slate-700 dark:text-slate-300' : 'text-amber-500 font-semibold'}>
+                                                                {accName}
+                                                            </span>
+                                                            {fundMap?.qboClassName && (
+                                                                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                                                    Class: {fundMap.qboClassName}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">
+                                                            {money(f.grossAmount)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+
+                                            {/* Stripe Fee Negative Line */}
+                                            {batch.totalFees > 0 && (
+                                                <tr className="bg-amber-50/40 dark:bg-amber-950/20">
+                                                    <td className="px-4 py-2.5">
+                                                        <div className="font-medium text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                                                            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                                                            Stripe Processing Fees
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400">Card / ACH processing</div>
+                                                    </td>
+                                                    <td className="px-4 py-2.5">
+                                                        <span className={mapping?.stripeFeeExpenseAccountId ? 'text-amber-800 dark:text-amber-300' : 'text-rose-500 font-semibold'}>
+                                                            {mapping?.stripeFeeExpenseAccountName || 'Unmapped Expense Account'}
+                                                        </span>
+                                                        {mapping?.stripeVendorName && (
+                                                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                                                                Vendor: {mapping.stripeVendorName}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right font-semibold text-rose-600 dark:text-rose-400">
+                                                        -{money(batch.totalFees)}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="bg-slate-100 dark:bg-slate-800 font-bold border-t border-slate-200 dark:border-slate-700">
+                                                <td colSpan={2} className="px-4 py-3 text-slate-900 dark:text-white">
+                                                    Net Bank Deposit Total (Hits Bank Feed)
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 text-sm">
+                                                    {money(batch.totalNet)}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                {!successResult && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSend}
+                            disabled={sending || hasConfigError}
+                            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-colors"
+                        >
+                            {sending ? (
+                                <>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    Sending to QuickBooks...
+                                </>
+                            ) : (
+                                <>
+                                    <Landmark className="w-4 h-4" />
+                                    Send Deposit to QuickBooks
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
+};

@@ -15,6 +15,7 @@ import { firestore } from '../services/firestoreService';
 
 import { DonationReport } from './DonationReport';
 import { CampaignPledgesManager } from './CampaignPledgesManager';
+import { GivingBatchesView } from './GivingBatchesView';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -23,7 +24,7 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString();
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
-  activePage?: 'overview' | 'donor' | 'budgets' | 'reports' | 'pledges';
+  activePage?: 'overview' | 'donor' | 'budgets' | 'reports' | 'pledges' | 'batches';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
@@ -139,10 +140,10 @@ export const GivingView: React.FC<GivingViewProps> = ({
           });
       } else if (activeTab === 'donor') {
           if (!analytics) return;
-          csvContent += "Name,Total Amount,Last Gift Date,Category\n";
+          csvContent += "Name,Total Amount,First Recorded Giving Date,Last Gift Date,Category\n";
           const appendList = (list: any[], category: string) => {
               list.forEach(d => {
-                  csvContent += `${escapeCsv(d.name)},${d.totalAmount},${d.lastGiftDate},${escapeCsv(category)}\n`;
+                  csvContent += `${escapeCsv(d.name)},${d.totalAmount},${d.firstGiftDate ? (d.firstGiftDate.includes('T') ? d.firstGiftDate.split('T')[0] : d.firstGiftDate) : ''},${d.lastGiftDate ? (d.lastGiftDate.includes('T') ? d.lastGiftDate.split('T')[0] : d.lastGiftDate) : ''},${escapeCsv(category)}\n`;
               });
           };
           if (analytics.lists) {
@@ -2132,6 +2133,21 @@ export const GivingView: React.FC<GivingViewProps> = ({
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <CampaignPledgesManager churchId={churchId} church={church} />
+      </div>
+    );
+  }
+
+  if (activeTab === 'batches') {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <GivingBatchesView
+          churchId={churchId}
+          funds={funds}
+          donations={donations}
+          userName={church?.name}
+          onSyncRecent={onSyncRecent}
+          isSyncing={isSyncing}
+        />
       </div>
     );
   }

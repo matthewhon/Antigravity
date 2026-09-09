@@ -55,6 +55,7 @@ import { listForms, saveForm, deleteForm, getPublicForm, submitForm, syncAllSubm
 import { emailServicePlan } from './backend/servicePlanEmail.js';
 import { startInfoUpdateScheduler } from './backend/infoUpdateScheduler';
 import { createServerLogger } from './services/logService';
+import { quickbooksRouter } from './backend/quickbooksRoutes';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -107,6 +108,9 @@ async function startServer() {
             res.status(500).json({ error: e.message || 'Failed to generate billing report' });
         }
     });
+
+    // ── QuickBooks Online Integration ──────────────────────────────────────
+    app.use('/api/quickbooks', express.json(), quickbooksRouter);
 
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body

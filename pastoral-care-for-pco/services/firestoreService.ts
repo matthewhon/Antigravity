@@ -29,7 +29,7 @@ import {
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot, DigitalBulletin,
     GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse,
-    DiscTestResponse
+    DiscTestResponse, GivingBatch, QuickbooksMappingConfig
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -760,6 +760,40 @@ class FirestoreService {
   async upsertCheckIns(records: CheckInRecord[]) { await this.batchUpsert('check_ins', records); }
   async upsertDetailedDonations(records: DetailedDonation[]) { await this.batchUpsert('detailed_donations', records); }
   async upsertFunds(records: PcoFund[]) { await this.batchUpsert('funds', records); }
+  async upsertGivingBatches(records: GivingBatch[]) { await this.batchUpsert('giving_batches', records); }
+
+  async getGivingBatches(churchId: string): Promise<GivingBatch[]> {
+    try {
+      const q = query(collection(db, 'giving_batches'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      const batches = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as GivingBatch));
+      return batches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (e) {
+      console.error('Error fetching giving batches:', e);
+      return [];
+    }
+  }
+
+  async updateGivingBatch(churchId: string, batchId: string, updates: Partial<GivingBatch>): Promise<void> {
+    const docRef = doc(db, 'giving_batches', batchId);
+    await updateDoc(docRef, this.deepSanitize(updates));
+  }
+
+  async getQuickbooksMapping(churchId: string): Promise<QuickbooksMappingConfig | null> {
+    try {
+      const docRef = doc(db, 'churches', churchId, 'quickbooks_mapping', 'config');
+      const snap = await getDoc(docRef);
+      return snap.exists() ? (snap.data() as QuickbooksMappingConfig) : null;
+    } catch (e) {
+      console.error('Error getting QuickBooks mapping:', e);
+      return null;
+    }
+  }
+
+  async saveQuickbooksMapping(churchId: string, mapping: QuickbooksMappingConfig): Promise<void> {
+    const docRef = doc(db, 'churches', churchId, 'quickbooks_mapping', 'config');
+    await setDoc(docRef, this.deepSanitize(mapping), { merge: true });
+  }
   async upsertServicesTeams(records: ServicesTeam[]) { await this.batchUpsert('teams', records); }
   async upsertServicePlans(records: ServicePlanSnapshot[]) { await this.batchUpsert('service_plans', records); }
   async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }

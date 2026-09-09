@@ -255,6 +255,7 @@ export const calculateGivingAnalytics = (
             name: resolvedName,
             totalAmount,
             avgMonthlyAmount,
+            firstGiftDate: firstGift.date,
             lastGiftDate: lastGift.date,
             avatar: person?.avatar || null,
             riskProfile: person?.riskProfile

@@ -445,6 +445,7 @@ export interface LifecycleDonor {
     name: string;
     totalAmount: number;
     avgMonthlyAmount: number;
+    firstGiftDate?: string;
     lastGiftDate: string;
     avatar?: string | null;
     riskProfile?: RiskProfile;
@@ -666,6 +667,96 @@ export interface DetailedDonation {
     batchId?: string;
     /** Human-readable PCO batch name, e.g. "Sunday Offering 6/8" */
     batchName?: string;
+    /** Processing fee in dollars (e.g. Stripe card/ACH fee) */
+    fee?: number;
+}
+
+export interface GivingBatchFundBreakdown {
+    fundId: string;
+    fundName: string;
+    grossAmount: number;
+    feeAmount: number;
+    netAmount: number;
+    donationCount: number;
+}
+
+export interface GivingBatch {
+    id: string;
+    churchId: string;
+    name: string;
+    date: string;
+    batchType: 'manual' | 'stripe' | 'mixed';
+    status: 'open' | 'committed' | 'synced_to_qbo';
+    totalGross: number;
+    totalFees: number;
+    totalNet: number;
+    donationCount: number;
+    fundsBreakdown: GivingBatchFundBreakdown[];
+    quickbooksDepositId?: string;
+    quickbooksDepositDocNumber?: string;
+    syncedAt?: string;
+    syncedBy?: string;
+    notes?: string;
+}
+
+export interface QuickbooksAccount {
+    id: string;
+    name: string;
+    accountType: string;
+    accountSubType?: string;
+    classification: 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense';
+    currentBalance?: number;
+    active: boolean;
+}
+
+export interface QuickbooksClass {
+    id: string;
+    name: string;
+    active: boolean;
+}
+
+export interface QuickbooksVendor {
+    id: string;
+    displayName: string;
+    active: boolean;
+}
+
+export interface FundQuickbooksMapping {
+    qboAccountId: string;
+    qboAccountName: string;
+    qboClassId?: string;
+    qboClassName?: string;
+}
+
+export interface QuickbooksMappingConfig {
+    churchId: string;
+    depositBankAccountId: string;
+    depositBankAccountName?: string;
+    stripeFeeExpenseAccountId: string;
+    stripeFeeExpenseAccountName?: string;
+    stripeVendorId?: string;
+    stripeVendorName?: string;
+    defaultIncomeAccountId?: string;
+    defaultIncomeAccountName?: string;
+    fundMappings: Record<string, FundQuickbooksMapping>;
+    updatedAt?: number;
+    updatedBy?: string;
+}
+
+export interface QuickbooksStatusResponse {
+    connected: boolean;
+    companyName?: string;
+    realmId?: string;
+    lastConnected?: string;
+    hasMapping: boolean;
+}
+
+export interface QuickbooksDepositResult {
+    depositId: string;
+    docNumber?: string;
+    txnDate: string;
+    totalAmount: number;
+    qboUrl?: string;
 }
 
 export interface AttendanceEventSummary {
