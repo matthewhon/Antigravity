@@ -779,6 +779,32 @@ class FirestoreService {
     await updateDoc(docRef, this.deepSanitize(updates));
   }
 
+  async deleteGivingBatch(batchId: string): Promise<void> {
+    try {
+      const docRef = doc(db, 'giving_batches', batchId);
+      await deleteDoc(docRef);
+    } catch (e) {
+      console.error(`Error deleting giving batch ${batchId}:`, e);
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteGivingBatches(batchIds: string[]): Promise<void> {
+    if (!batchIds.length) return;
+    try {
+      const CHUNK = 400;
+      for (let i = 0; i < batchIds.length; i += CHUNK) {
+        const chunk = batchIds.slice(i, i + CHUNK);
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db, 'giving_batches', id)));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.error('Error deleting giving batches batch:', e);
+      this.handleFirestoreError(e);
+    }
+  }
+
   async getQuickbooksMapping(churchId: string): Promise<QuickbooksMappingConfig | null> {
     try {
       const docRef = doc(db, 'churches', churchId, 'quickbooks_mapping', 'config');

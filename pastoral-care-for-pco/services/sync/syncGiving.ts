@@ -517,6 +517,17 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             });
         });
 
+        // Prune stale / duplicate un-synced batches that are no longer generated (e.g. from cadence changes or deleted PCO batches)
+        const activeBatchIds = new Set(batchesToSave.map(b => b.id));
+        const staleBatchIdsToDelete = existingBatches
+            .filter(eb => eb.status !== 'synced_to_qbo' && !activeBatchIds.has(eb.id))
+            .map(eb => eb.id);
+
+        if (staleBatchIdsToDelete.length > 0) {
+            console.log(`Pruning ${staleBatchIdsToDelete.length} obsolete / duplicate giving batch records:`, staleBatchIdsToDelete);
+            await firestore.deleteGivingBatches(staleBatchIdsToDelete);
+        }
+
         if (batchesToSave.length > 0) {
             await firestore.upsertGivingBatches(batchesToSave);
             console.log(`Saved ${batchesToSave.length} giving batches.`);

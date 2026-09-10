@@ -11,7 +11,7 @@ import { GivingDepositPreviewModal } from './GivingDepositPreviewModal';
 import { 
     Landmark, CreditCard, CheckCircle2, AlertCircle, RefreshCw, 
     Settings, Search, ArrowUpRight, Check, ExternalLink, Calendar,
-    DollarSign, Filter, Layers, ChevronRight
+    DollarSign, Filter, Layers, ChevronRight, Trash2
 } from 'lucide-react';
 
 interface GivingBatchesViewProps {
@@ -113,6 +113,30 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
             type: 'success',
             text: `Batch "${updatedBatch.name}" was successfully deposited into QuickBooks (Deposit #${result.depositId})!`
         });
+    };
+
+    const handleDeleteBatch = async (batch: GivingBatch) => {
+        if (batch.status === 'synced_to_qbo') {
+            alert('Cannot delete a batch that has already been synced and deposited to QuickBooks Online.');
+            return;
+        }
+        if (!window.confirm(`Are you sure you want to remove the un-synced batch "${batch.name}"?`)) {
+            return;
+        }
+        try {
+            await firestore.deleteGivingBatch(batch.id);
+            setBatches(prev => prev.filter(b => b.id !== batch.id));
+            setActionMessage({
+                type: 'success',
+                text: `Batch "${batch.name}" was removed successfully.`
+            });
+        } catch (err: any) {
+            console.error('Failed to delete giving batch:', err);
+            setActionMessage({
+                type: 'error',
+                text: `Failed to remove batch: ${err.message || 'Unknown error'}`
+            });
+        }
     };
 
     const cutoffDate = mapping?.cutoffDate;
@@ -559,18 +583,30 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
 
                                             {/* Action Button */}
                                             <td className="px-5 py-3.5 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPreviewBatch(batch)}
-                                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-colors ${
-                                                        isSynced 
-                                                            ? 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200' 
-                                                            : 'text-white bg-emerald-600 hover:bg-emerald-700'
-                                                    }`}
-                                                >
-                                                    {isSynced ? 'View Deposit' : 'Preview & Deposit'}
-                                                    <ChevronRight className="w-3.5 h-3.5" />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPreviewBatch(batch)}
+                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-colors ${
+                                                            isSynced 
+                                                                ? 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200' 
+                                                                : 'text-white bg-emerald-600 hover:bg-emerald-700'
+                                                        }`}
+                                                    >
+                                                        {isSynced ? 'View Deposit' : 'Preview & Deposit'}
+                                                        <ChevronRight className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {!isSynced && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteBatch(batch)}
+                                                            title="Delete / Remove un-synced batch"
+                                                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );
