@@ -12,7 +12,8 @@ import { SmartPayoutMatcherModal } from './SmartPayoutMatcherModal';
 import { 
     Landmark, CreditCard, CheckCircle2, AlertCircle, RefreshCw, 
     Settings, Search, ArrowUpRight, Check, ExternalLink, Calendar,
-    DollarSign, Filter, Layers, ChevronRight, Trash2, Sparkles
+    DollarSign, Filter, Layers, ChevronRight, Trash2, Sparkles,
+    Split
 } from 'lucide-react';
 
 interface GivingBatchesViewProps {
@@ -117,6 +118,42 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
         });
     };
 
+    const handleUnbundleBatch = async (batch: GivingBatch) => {
+        if (batch.status === 'synced_to_qbo') {
+            alert('Cannot unbundle a batch that has already been synced and deposited to QuickBooks Online.');
+            return;
+        }
+        if (!window.confirm(`Unbundle batch "${batch.name}"? This will release its ${batch.donationCount} gifts back into individual unbatched transactions so you can select and regroup them.`)) {
+            return;
+        }
+        try {
+            const count = await firestore.unbundleGivingBatch(churchId, batch.id);
+            setBatches(prev => prev.filter(b => b.id !== batch.id));
+            if (donations) {
+                donations.forEach(d => {
+                    if (d.batchId === batch.id) {
+                        d.batchId = undefined;
+                        d.batchName = undefined;
+                        d.stripePayoutId = undefined;
+                        d.stripe_payout_id = undefined;
+                        d.paidOutDate = undefined;
+                        d.paid_out_date = undefined;
+                    }
+                });
+            }
+            setActionMessage({
+                type: 'success',
+                text: `Batch "${batch.name}" unbundled! ${count} gifts are now available for individual grouping.`
+            });
+        } catch (err: any) {
+            console.error('Failed to unbundle giving batch:', err);
+            setActionMessage({
+                type: 'error',
+                text: `Failed to unbundle batch: ${err.message || 'Unknown error'}`
+            });
+        }
+    };
+
     const handleDeleteBatch = async (batch: GivingBatch) => {
         if (batch.status === 'synced_to_qbo') {
             alert('Cannot delete a batch that has already been synced and deposited to QuickBooks Online.');
@@ -126,7 +163,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
             return;
         }
         try {
-            await firestore.deleteGivingBatch(batch.id);
+            await firestore.unbundleGivingBatch(churchId, batch.id);
             setBatches(prev => prev.filter(b => b.id !== batch.id));
             setActionMessage({
                 type: 'success',
@@ -614,14 +651,25 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                                         <ChevronRight className="w-3.5 h-3.5" />
                                                     </button>
                                                     {!isSynced && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleDeleteBatch(batch)}
-                                                            title="Delete / Remove un-synced batch"
-                                                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleUnbundleBatch(batch)}
+                                                                title="Unbundle / Split batch into individual unbatched gifts"
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800 rounded-xl transition-colors"
+                                                            >
+                                                                <Split className="w-3.5 h-3.5" />
+                                                                <span>Split</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteBatch(batch)}
+                                                                title="Delete / Remove un-synced batch"
+                                                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </td>

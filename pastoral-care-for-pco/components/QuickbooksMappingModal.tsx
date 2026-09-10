@@ -54,7 +54,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [campusFundMappings, setCampusFundMappings] = useState<Record<string, Record<string, FundQuickbooksMapping>>>({});
     const [selectedCampusTab, setSelectedCampusTab] = useState<string>('default'); // 'default' or campus.pcoId
     const [cutoffDate, setCutoffDate] = useState('');
-    const [stripePayoutCadence, setStripePayoutCadence] = useState<'daily' | 'weekly' | 'transaction'>('weekly');
+    const [stripePayoutCadence, setStripePayoutCadence] = useState<'daily' | 'weekly' | 'transaction' | 'manual'>('manual');
     const [stripePayoutDayOfWeek, setStripePayoutDayOfWeek] = useState<number>(3); // 3 = Wednesday
 
     // Email Notification State
@@ -631,7 +631,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                 onChange={(e) => setStripePayoutCadence(e.target.value as any)}
                                                 className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                                             >
-                                                <option value="weekly">Weekly Payout (Recommended)</option>
+                                                <option value="manual">Manual / Smart Payout Matching (Recommended)</option>
+                                                <option value="weekly">Estimated Weekly Schedule</option>
                                                 <option value="daily">Daily Rolling Payout</option>
                                                 <option value="transaction">Individual per Transaction</option>
                                             </select>

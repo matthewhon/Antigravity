@@ -338,7 +338,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         const existingBatchMap = new Map<string, GivingBatch>();
         existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
 
-        const payoutCadence = qboMapping?.stripePayoutCadence || 'weekly';
+        const payoutCadence = qboMapping?.stripePayoutCadence || 'manual';
         const payoutDayOfWeek = typeof qboMapping?.stripePayoutDayOfWeek === 'number'
             ? qboMapping.stripePayoutDayOfWeek
             : 3; // Default: 3 (Wednesday)
@@ -426,6 +426,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                             batchDateMap.set(key, paidOutDate);
                             batchPaidOutDateMap.set(key, paidOutDate);
                         }
+                    } else if (payoutCadence === 'manual') {
+                        // In manual/smart match mode, do not generate synthetic weekly batches; leave online donations individual/unbatched
+                        key = undefined;
                     } else {
                         const info = getOnlinePayoutInfo(d.date, d.donorName, d.id);
                         key = info.key;
@@ -445,11 +448,13 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             } else if (d.batchName && !batchNameMap.has(key)) {
                 batchNameMap.set(key, d.batchName);
             }
-            if (!batchDateMap.has(key)) batchDateMap.set(key, d.date);
 
-            const list = batchDonationMap.get(key) || [];
-            list.push(d);
-            batchDonationMap.set(key, list);
+            if (key) {
+                if (!batchDateMap.has(key)) batchDateMap.set(key, d.date);
+                const list = batchDonationMap.get(key) || [];
+                list.push(d);
+                batchDonationMap.set(key, list);
+            }
         });
 
         const batchesToSave: GivingBatch[] = [];

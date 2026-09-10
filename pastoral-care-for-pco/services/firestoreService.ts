@@ -795,6 +795,48 @@ class FirestoreService {
     }
   }
 
+  async unbundleGivingBatch(churchId: string, batchId: string): Promise<number> {
+    try {
+      // 1. Find all donations tagged with this batchId
+      const q = query(
+        collection(db, 'detailed_donations'),
+        where('churchId', '==', churchId),
+        where('batchId', '==', batchId)
+      );
+      const snap = await getDocs(q);
+      const donationIds = snap.docs.map(d => d.id);
+
+      // 2. Unassign batch fields from donations
+      const CHUNK = 400;
+      for (let i = 0; i < donationIds.length; i += CHUNK) {
+        const chunk = donationIds.slice(i, i + CHUNK);
+        const wBatch = writeBatch(db);
+        chunk.forEach(id => {
+          const dRef = doc(db, 'detailed_donations', id);
+          wBatch.update(dRef, {
+            batchId: null,
+            batchName: null,
+            stripePayoutId: null,
+            stripe_payout_id: null,
+            paidOutDate: null,
+            paid_out_date: null
+          });
+        });
+        await wBatch.commit();
+      }
+
+      // 3. Delete the giving batch document
+      const batchRef = doc(db, 'giving_batches', batchId);
+      await deleteDoc(batchRef);
+
+      return donationIds.length;
+    } catch (e) {
+      console.error(`Error unbundling giving batch ${batchId}:`, e);
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
   async deleteGivingBatches(batchIds: string[]): Promise<void> {
     if (!batchIds.length) return;
     try {
