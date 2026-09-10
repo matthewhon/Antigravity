@@ -678,6 +678,12 @@ export interface DetailedDonation {
     campusId?: string | null;
     /** Campus name where the donation was made / attributed */
     campusName?: string | null;
+    /** Date the donation was paid out by Stripe / processor (YYYY-MM-DD or ISO string) */
+    paid_out_date?: string;
+    payoutDate?: string;
+    /** Stripe Payout / Transfer ID (e.g. po_xxx or dep_xxx) */
+    stripe_payout_id?: string;
+    stripePayoutId?: string;
 }
 
 export interface GivingBatchFundBreakdown {
@@ -703,6 +709,10 @@ export interface GivingBatch {
     totalNet: number;
     donationCount: number;
     fundsBreakdown: GivingBatchFundBreakdown[];
+    /** Stripe Payout ID if this batch corresponds to a Stripe payout */
+    stripePayoutId?: string;
+    /** Date this batch was paid out to the bank account */
+    paidOutDate?: string;
     quickbooksDepositId?: string;
     quickbooksDepositDocNumber?: string;
     quickbooksDepositBankAccountId?: string;

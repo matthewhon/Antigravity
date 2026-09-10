@@ -709,7 +709,8 @@ export async function createQuickbooksDeposit(
     }
 
     const txnDate = (batch.date || new Date().toISOString()).slice(0, 10);
-    const privateNote = `Giving Batch: ${batch.name} (ID: ${batch.id}) | Synced by ${userName || 'System'}`;
+    const payoutNote = batch.stripePayoutId ? ` | Stripe Payout: ${batch.stripePayoutId}` : '';
+    const privateNote = `Giving Batch: ${batch.name} (ID: ${batch.id})${payoutNote} | Synced by ${userName || 'System'}`;
 
     const depositPayload: any = {
         DepositToAccountRef: {
@@ -720,6 +721,13 @@ export async function createQuickbooksDeposit(
         PrivateNote: privateNote,
         Line: lines
     };
+
+    if (batch.stripePayoutId) {
+        // Truncate to QBO DocNumber max length 21 chars if needed
+        depositPayload.DocNumber = batch.stripePayoutId.length > 21 
+            ? batch.stripePayoutId.slice(0, 21) 
+            : batch.stripePayoutId;
+    }
 
     const config = await getQuickBooksConfig(db);
 

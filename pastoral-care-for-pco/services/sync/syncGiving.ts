@@ -383,10 +383,12 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             };
         };
 
-        // Group donations by batchId (or date/cadence for unbatched Stripe/ACH online donations)
+        // Group donations by batchId (or date/cadence/payoutId for unbatched Stripe/ACH online donations)
         const batchDonationMap = new Map<string, DetailedDonation[]>();
         const batchNameMap = new Map<string, string>();
         const batchDateMap = new Map<string, string>();
+        const batchPayoutIdMap = new Map<string, string>();
+        const batchPaidOutDateMap = new Map<string, string>();
 
         pcoBatches.forEach(pb => {
             batchNameMap.set(pb.id, pb.name);
@@ -397,17 +399,40 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         donations.forEach(d => {
             let key = d.batchId;
             if (!key) {
-                // If donation has fees, card/ACH/Stripe payment method/source and no batch, group according to cadence
+                // If donation has fees, card/ACH/Stripe payment method/source, or payout metadata
                 const isOnline = (d.fee != null && Math.abs(d.fee) > 0) ||
                     (d.paymentSource && /stripe|card|ach|online/i.test(d.paymentSource)) ||
-                    (d.paymentMethod && /card|ach|stripe/i.test(d.paymentMethod));
+                    (d.paymentMethod && /card|ach|stripe/i.test(d.paymentMethod)) ||
+                    !!(d.stripe_payout_id || (d as any).stripePayoutId);
 
                 if (isOnline) {
-                    const info = getOnlinePayoutInfo(d.date, d.donorName, d.id);
-                    key = info.key;
-                    if (!batchNameMap.has(key)) {
-                        batchNameMap.set(key, info.name);
-                        batchDateMap.set(key, info.date);
+                    const payoutId = d.stripe_payout_id || (d as any).stripePayoutId;
+                    const paidOutDate = d.paid_out_date || (d as any).payoutDate;
+
+                    if (payoutId) {
+                        const dateStr = (paidOutDate || d.date || '').slice(0, 10);
+                        key = `stripe_${payoutId}`;
+                        if (!batchNameMap.has(key)) {
+                            batchNameMap.set(key, `${dateStr} Stripe ${payoutId}`);
+                            batchDateMap.set(key, paidOutDate || d.date);
+                            batchPayoutIdMap.set(key, payoutId);
+                            if (paidOutDate) batchPaidOutDateMap.set(key, paidOutDate);
+                        }
+                    } else if (paidOutDate) {
+                        const dateStr = paidOutDate.slice(0, 10);
+                        key = `stripe_payout_${dateStr}`;
+                        if (!batchNameMap.has(key)) {
+                            batchNameMap.set(key, `${dateStr} Stripe Payout`);
+                            batchDateMap.set(key, paidOutDate);
+                            batchPaidOutDateMap.set(key, paidOutDate);
+                        }
+                    } else {
+                        const info = getOnlinePayoutInfo(d.date, d.donorName, d.id);
+                        key = info.key;
+                        if (!batchNameMap.has(key)) {
+                            batchNameMap.set(key, info.name);
+                            batchDateMap.set(key, info.date);
+                        }
                     }
                 } else {
                     const dateKey = (d.date || '').slice(0, 10);
@@ -489,23 +514,29 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const net = round2(gross - fees);
 
             const existing = existingBatchMap.get(batchKey);
-            const isOnlineBatch = fees > 0 || batchKey.startsWith('online_') || batchDonations.some(d =>
+            const isTithely = (batchNameMap.get(batchKey) || '').toLowerCase().includes('tithely') ||
+                (existing?.batchType === 'tithely');
+            const isOnlineBatch = isTithely || fees > 0 || batchKey.startsWith('online_') || batchKey.startsWith('stripe_') || batchDonations.some(d =>
                 /stripe|card|ach|online/i.test(d.paymentSource || '') ||
                 /card|ach|stripe/i.test((d as any).paymentMethod || '')
             );
+            const stripePayoutId = batchPayoutIdMap.get(batchKey) || existing?.stripePayoutId;
+            const paidOutDate = batchPaidOutDateMap.get(batchKey) || existing?.paidOutDate;
 
             batchesToSave.push({
                 id: batchKey,
                 churchId,
                 name: batchNameMap.get(batchKey) || `Batch ${batchKey}`,
                 date: batchDateMap.get(batchKey) || new Date().toISOString(),
-                batchType: isOnlineBatch ? 'stripe' : 'manual',
+                batchType: isTithely ? 'tithely' : (isOnlineBatch ? 'stripe' : 'manual'),
                 status: existing?.status === 'synced_to_qbo' ? 'synced_to_qbo' : 'committed',
                 totalGross: gross,
                 totalFees: fees,
                 totalNet: net,
                 donationCount: batchDonations.length,
                 fundsBreakdown,
+                stripePayoutId,
+                paidOutDate,
                 quickbooksDepositId: existing?.quickbooksDepositId,
                 quickbooksDepositDocNumber: existing?.quickbooksDepositDocNumber,
                 quickbooksDepositBankAccountId: existing?.quickbooksDepositBankAccountId,

@@ -493,6 +493,11 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                                 <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                                                     <Calendar className="w-3 h-3" />
                                                     {batch.date.slice(0, 10)} • {batch.donationCount} {batch.donationCount === 1 ? 'gift' : 'gifts'}
+                                                    {batch.stripePayoutId && (
+                                                        <span className="ml-1 text-purple-600 dark:text-purple-400 font-mono text-[10px]">
+                                                            • Payout: {batch.stripePayoutId}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
 
@@ -506,7 +511,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                                 ) : batch.batchType === 'stripe' ? (
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                                         <CreditCard className="w-3 h-3" />
-                                                        Stripe Online
+                                                        {batch.stripePayoutId ? 'Stripe Payout' : 'Stripe Online'}
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
