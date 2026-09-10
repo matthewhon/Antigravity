@@ -23,22 +23,28 @@ interface SmartPayoutMatcherModalProps {
     isOpen: boolean;
     onClose: () => void;
     onBatchCreated: (batch: GivingBatch) => void;
+    donations?: DetailedDonation[];
 }
 
 export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = ({
     churchId,
     isOpen,
     onClose,
-    onBatchCreated
+    onBatchCreated,
+    donations: inMemoryDonations
 }) => {
     // Input state
     const [payoutDate, setPayoutDate] = useState(() => new Date().toISOString().slice(0, 10));
-    const [startDate, setStartDate] = useState<string>('2026-08-23');
-    const [endDate, setEndDate] = useState<string>('2026-08-31');
+    const [startDate, setStartDate] = useState<string>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 14);
+        return d.toISOString().slice(0, 10);
+    });
+    const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [targetAmount, setTargetAmount] = useState<string>('');
     const [targetMode, setTargetMode] = useState<'gross' | 'net'>('net');
     const [targetFees, setTargetFees] = useState<string>('');
-    const [targetTitheGross, setTargetTitheGross] = useState<string>('7655.48');
+    const [targetTitheGross, setTargetTitheGross] = useState<string>('');
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
@@ -73,21 +79,30 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         setMatching(true);
         setMatchResult(null);
 
+        // Allow UI to update loading state before running calculations
+        await new Promise(r => setTimeout(r, 20));
+
         try {
-            // Fetch unbatched online donations
-            let sinceDate: string;
-            if (startDate) {
-                sinceDate = startDate.slice(0, 10);
+            let candidateDonations: DetailedDonation[] = [];
+
+            if (inMemoryDonations && inMemoryDonations.length > 0) {
+                // Use already loaded in-memory donations (instant, zero network latency)
+                candidateDonations = inMemoryDonations.filter(d => !d.batchId);
             } else {
-                const pDate = new Date(payoutDate);
-                const minDate = new Date(pDate);
-                minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
-                sinceDate = minDate.toISOString().slice(0, 10);
+                // Fetch unbatched online donations from Firestore as fallback
+                let sinceDate: string;
+                if (startDate) {
+                    sinceDate = startDate.slice(0, 10);
+                } else {
+                    const pDate = new Date(payoutDate);
+                    const minDate = new Date(pDate);
+                    minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
+                    sinceDate = minDate.toISOString().slice(0, 10);
+                }
+                candidateDonations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate);
             }
 
-            const donations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate);
-
-            if (donations.length === 0) {
+            if (candidateDonations.length === 0) {
                 setError('No unbatched online donations found within the search window. Please run a Giving sync first or widen the window.');
                 setMatching(false);
                 return;
@@ -95,7 +110,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
             const numFees = targetFees ? parseFloat(targetFees) : undefined;
             const numTithe = targetTitheGross ? parseFloat(targetTitheGross) : undefined;
-            const res = matchDonationsForPayout(donations, {
+            const res = matchDonationsForPayout(candidateDonations, {
                 payoutDate,
                 startDate: startDate.trim() || undefined,
                 endDate: endDate.trim() || undefined,

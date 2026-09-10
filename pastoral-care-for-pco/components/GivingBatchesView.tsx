@@ -670,6 +670,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 isOpen={isMatcherModalOpen}
                 onClose={() => setIsMatcherModalOpen(false)}
                 churchId={churchId}
+                donations={donations}
                 onBatchCreated={(newBatch) => {
                     setBatches(prev => [newBatch, ...prev.filter(b => b.id !== newBatch.id)]);
                     setActionMessage({

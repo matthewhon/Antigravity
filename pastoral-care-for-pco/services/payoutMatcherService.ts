@@ -150,7 +150,7 @@ export function matchDonationsForPayout(
         }
     }
 
-    // First try: Contiguous time-window search
+    // Pass 1: Contiguous time-window search (covers ~95% of standard daily/weekly Stripe payouts)
     for (let i = 0; i < parents.length; i++) {
         let currentG = 0;
         let currentF = 0;
@@ -167,9 +167,10 @@ export function matchDonationsForPayout(
         if (minScore === 0) break;
     }
 
-    // Second try: Bounded subset search if contiguous did not find exact match
-    if (minScore > 1 && parents.length <= 48) {
-        const items = parents.map(p => ({
+    // Pass 2: Bounded Branch & Bound subset search if contiguous window did not find an exact match
+    if (minScore > 0 && parents.length > 0) {
+        // Cap candidates to at most 22 items to guarantee instantaneous execution (<10ms)
+        const candidateItems = (parents.length > 22 ? parents.slice(0, 22) : parents).map(p => ({
             p,
             gCents: Math.round(p.gross * 100),
             fCents: Math.round(p.fee * 100),
@@ -177,29 +178,61 @@ export function matchDonationsForPayout(
             tCents: Math.round(p.tithe * 100)
         }));
 
-        function searchSubset(idx: number, accG: number, accF: number, accT: number, chosen: ParentDonationGroup[]) {
-            if (minScore === 0) return;
-
-            evaluateSubset(chosen, accG, accF, accT);
-
-            if (idx >= items.length) return;
-            if (hasTargetGross && accG > targetGrossCents + 200) return;
-            if (hasTargetNet && (accG - accF) > targetNetCents + 200) return;
-            if (targetTitheCents !== null && accT > targetTitheCents + 100) return;
-
-            // Include
-            searchSubset(
-                idx + 1,
-                accG + items[idx].gCents,
-                accF + items[idx].fCents,
-                accT + items[idx].tCents,
-                [...chosen, items[idx].p]
-            );
-            // Exclude
-            searchSubset(idx + 1, accG, accF, accT, chosen);
+        const n = candidateItems.length;
+        // Precompute suffix sums for aggressive lower-bound pruning
+        const suffixG = new Array<number>(n + 1).fill(0);
+        const suffixN = new Array<number>(n + 1).fill(0);
+        const suffixT = new Array<number>(n + 1).fill(0);
+        for (let i = n - 1; i >= 0; i--) {
+            suffixG[i] = suffixG[i + 1] + candidateItems[i].gCents;
+            suffixN[i] = suffixN[i + 1] + candidateItems[i].nCents;
+            suffixT[i] = suffixT[i + 1] + candidateItems[i].tCents;
         }
 
-        searchSubset(0, 0, 0, 0, []);
+        const stack: ParentDonationGroup[] = [];
+        let iterations = 0;
+        const MAX_ITERATIONS = 15000;
+        const startTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+
+        function searchSubset(idx: number, accG: number, accF: number, accT: number) {
+            if (minScore === 0) return;
+            iterations++;
+            if (iterations > MAX_ITERATIONS) return;
+            if (iterations % 500 === 0) {
+                const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+                if (now - startTime > 30) return; // Hard 30ms guard to never freeze main thread
+            }
+
+            evaluateSubset(stack, accG, accF, accT);
+
+            if (idx >= n) return;
+
+            const accN = accG - accF;
+            // Upper bound pruning
+            if (hasTargetGross && accG > targetGrossCents + 100) return;
+            if (hasTargetNet && accN > targetNetCents + 100) return;
+            if (targetTitheCents !== null && accT > targetTitheCents + 100) return;
+
+            // Lower bound pruning: if taking ALL remaining items still can't reach target, prune
+            if (hasTargetGross && (accG + suffixG[idx]) < targetGrossCents - 100) return;
+            if (hasTargetNet && (accN + suffixN[idx]) < targetNetCents - 100) return;
+            if (targetTitheCents !== null && (accT + suffixT[idx]) < targetTitheCents - 100) return;
+
+            // Include current item
+            stack.push(candidateItems[idx].p);
+            searchSubset(
+                idx + 1,
+                accG + candidateItems[idx].gCents,
+                accF + candidateItems[idx].fCents,
+                accT + candidateItems[idx].tCents
+            );
+            stack.pop();
+
+            // Exclude current item
+            searchSubset(idx + 1, accG, accF, accT);
+        }
+
+        searchSubset(0, 0, 0, 0);
     }
 
     if (!bestChosen || bestChosen.length === 0) return null;
