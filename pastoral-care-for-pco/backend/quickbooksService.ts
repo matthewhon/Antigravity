@@ -24,7 +24,7 @@ export interface QuickBooksTokens {
     updatedAt: number;
     needsReconnect?: boolean;
     connectionState?: 'connected' | 'expired' | 'disconnected';
-    lastError?: string;
+    lastError?: string | null;
 }
 
 export type QuickBooksAuthErrorCode = 
@@ -311,7 +311,7 @@ export async function exchangeCodeForTokens(code: string, realmId: string, churc
         updatedAt: now,
         needsReconnect: false,
         connectionState: 'connected',
-        lastError: undefined
+        lastError: null
     };
 
     await db.collection('churches').doc(churchId).collection('integrations').doc('quickbooks').set(tokens);
@@ -401,7 +401,7 @@ export async function getValidTokens(churchId: string, options?: { forceRefresh?
             refreshTokenExpiresAt: now + (freshData.x_refresh_token_expires_in ? freshData.x_refresh_token_expires_in * 1000 : tokens.refreshTokenExpiresAt),
             needsReconnect: false,
             connectionState: 'connected',
-            lastError: undefined,
+            lastError: null,
             updatedAt: now
         };
 

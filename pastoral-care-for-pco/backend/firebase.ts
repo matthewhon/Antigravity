@@ -31,6 +31,11 @@ export const getDb = () => {
     initAdmin();
     // Use the named database "pcforpco" — the (default) database does not exist
     dbInstance = getFirestore(admin.app(), 'pcforpco');
+    try {
+      dbInstance.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      // Ignore if settings already locked
+    }
   }
   return dbInstance;
 };
