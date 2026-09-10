@@ -756,6 +756,12 @@ export interface QuickbooksMappingConfig {
     stripeFeeExpenseAccountName?: string;
     stripeVendorId?: string;
     stripeVendorName?: string;
+    /** Tithely processing fee expense account (optional, falls back to stripeFeeExpenseAccountId) */
+    tithelyFeeExpenseAccountId?: string;
+    tithelyFeeExpenseAccountName?: string;
+    /** Tithely payee / vendor in QuickBooks (optional, e.g. Tithe.ly) */
+    tithelyVendorId?: string;
+    tithelyVendorName?: string;
     defaultIncomeAccountId?: string;
     defaultIncomeAccountName?: string;
     fundMappings: Record<string, FundQuickbooksMapping>;

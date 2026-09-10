@@ -46,6 +46,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [depositBankAccountId, setDepositBankAccountId] = useState('');
     const [stripeFeeExpenseAccountId, setStripeFeeExpenseAccountId] = useState('');
     const [stripeVendorId, setStripeVendorId] = useState('');
+    const [tithelyFeeExpenseAccountId, setTithelyFeeExpenseAccountId] = useState('');
+    const [tithelyVendorId, setTithelyVendorId] = useState('');
     const [defaultIncomeAccountId, setDefaultIncomeAccountId] = useState('');
     const [fundMappings, setFundMappings] = useState<Record<string, FundQuickbooksMapping>>({});
     const [enableCampusMapping, setEnableCampusMapping] = useState(false);
@@ -111,6 +113,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 setDepositBankAccountId(existingMapping.depositBankAccountId || '');
                 setStripeFeeExpenseAccountId(existingMapping.stripeFeeExpenseAccountId || '');
                 setStripeVendorId(existingMapping.stripeVendorId || '');
+                setTithelyFeeExpenseAccountId(existingMapping.tithelyFeeExpenseAccountId || '');
+                setTithelyVendorId(existingMapping.tithelyVendorId || '');
                 setDefaultIncomeAccountId(existingMapping.defaultIncomeAccountId || '');
                 setFundMappings(existingMapping.fundMappings || {});
                 setEnableCampusMapping(existingMapping.enableCampusMapping ?? false);
@@ -139,6 +143,10 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 const stripeVendor = accountsData.vendors.find(v => /stripe/i.test(v.displayName));
                 if (stripeVendor) {
                     setStripeVendorId(stripeVendor.id);
+                }
+                const tithelyVendor = accountsData.vendors.find(v => /tithe/i.test(v.displayName));
+                if (tithelyVendor) {
+                    setTithelyVendorId(tithelyVendor.id);
                 }
             }
         } catch (err: any) {
@@ -353,6 +361,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
             const bankAcc = bankAccounts.find(a => a.id === depositBankAccountId);
             const feeAcc = expenseAccounts.find(a => a.id === stripeFeeExpenseAccountId);
             const vendor = vendors.find(v => v.id === stripeVendorId);
+            const tithelyFeeAcc = expenseAccounts.find(a => a.id === tithelyFeeExpenseAccountId);
+            const tithelyVendor = vendors.find(v => v.id === tithelyVendorId);
             const defIncome = incomeAccounts.find(a => a.id === defaultIncomeAccountId);
 
             const payload: QuickbooksMappingConfig = {
@@ -363,6 +373,10 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 stripeFeeExpenseAccountName: feeAcc?.name,
                 stripeVendorId: stripeVendorId || undefined,
                 stripeVendorName: vendor?.displayName,
+                tithelyFeeExpenseAccountId: tithelyFeeExpenseAccountId || undefined,
+                tithelyFeeExpenseAccountName: tithelyFeeAcc?.name,
+                tithelyVendorId: tithelyVendorId || undefined,
+                tithelyVendorName: tithelyVendor?.displayName,
                 defaultIncomeAccountId: defaultIncomeAccountId || undefined,
                 defaultIncomeAccountName: defIncome?.name,
                 fundMappings,
@@ -508,6 +522,45 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                             <option key={v.id} value={v.id}>{v.displayName}</option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                        <CreditCard className="w-4 h-4 text-emerald-500" />
+                                        Tithely Fee Expense Account (Optional)
+                                    </label>
+                                    <select
+                                        value={tithelyFeeExpenseAccountId}
+                                        onChange={(e) => setTithelyFeeExpenseAccountId(e.target.value)}
+                                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        <option value="">Use Default Stripe/Merchant Fee Account</option>
+                                        {expenseAccounts.map(a => (
+                                            <option key={a.id} value={a.id}>{a.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                        Used for processing fees on Tithely batches. Defaults to the merchant fee account if left unselected.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Tithely Payee / Vendor (Optional)
+                                    </label>
+                                    <select
+                                        value={tithelyVendorId}
+                                        onChange={(e) => setTithelyVendorId(e.target.value)}
+                                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        <option value="">No vendor selected</option>
+                                        {vendors.map(v => (
+                                            <option key={v.id} value={v.id}>{v.displayName}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                        Vendor attached to Tithely fee lines in QuickBooks (e.g. Tithe.ly).
+                                    </p>
                                 </div>
 
                                 <div>

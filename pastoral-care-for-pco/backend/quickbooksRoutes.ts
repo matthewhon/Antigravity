@@ -231,8 +231,11 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
 
         const db = getDb();
 
-        // 1. Fetch the batch from Firestore
-        const batchDoc = await db.collection('churches').doc(churchId).collection('giving_batches').doc(batchId).get();
+        // 1. Fetch the batch from Firestore (check top-level 'giving_batches' first, then church subcollection)
+        let batchDoc = await db.collection('giving_batches').doc(batchId).get();
+        if (!batchDoc.exists) {
+            batchDoc = await db.collection('churches').doc(churchId).collection('giving_batches').doc(batchId).get();
+        }
         if (!batchDoc.exists) {
             return res.status(404).json({ error: 'Giving batch not found' });
         }
@@ -396,10 +399,11 @@ quickbooksRouter.post('/notify/batch-ready', async (req: any, res: any) => {
         if (!churchId || !batchId) return res.status(400).json({ error: 'Missing churchId or batchId' });
 
         const db = getDb();
-        const [batchDoc, mappingDoc] = await Promise.all([
-            db.collection('churches').doc(churchId).collection('giving_batches').doc(batchId).get(),
-            db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').get()
-        ]);
+        let batchDoc = await db.collection('giving_batches').doc(batchId).get();
+        if (!batchDoc.exists) {
+            batchDoc = await db.collection('churches').doc(churchId).collection('giving_batches').doc(batchId).get();
+        }
+        const mappingDoc = await db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').get();
 
         if (!batchDoc.exists) return res.status(404).json({ error: 'Batch not found' });
         const batch = batchDoc.data() as GivingBatch;

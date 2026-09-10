@@ -649,10 +649,26 @@ export async function createQuickbooksDeposit(
         ? Math.round(Math.abs(options.feeAmount) * 100) / 100 
         : Math.round((batch.totalFees || 0) * 100) / 100;
 
-    const feeAccountId = options?.feeExpenseAccountId || mapping.stripeFeeExpenseAccountId;
-    const feeAccountName = options?.feeExpenseAccountName || mapping.stripeFeeExpenseAccountName;
-    const vendorId = options?.feeVendorId !== undefined ? options.feeVendorId : mapping.stripeVendorId;
-    const vendorName = options?.feeVendorName !== undefined ? options.feeVendorName : mapping.stripeVendorName;
+    const batchNameLower = (batch.name || '').toLowerCase();
+    const isTithely = batchNameLower.includes('tithely') || batchNameLower.includes('tithe.ly');
+
+    const defaultFeeAccountId = (isTithely && mapping.tithelyFeeExpenseAccountId)
+        ? mapping.tithelyFeeExpenseAccountId
+        : mapping.stripeFeeExpenseAccountId;
+    const defaultFeeAccountName = (isTithely && mapping.tithelyFeeExpenseAccountName)
+        ? mapping.tithelyFeeExpenseAccountName
+        : mapping.stripeFeeExpenseAccountName;
+    const defaultVendorId = (isTithely && mapping.tithelyVendorId)
+        ? mapping.tithelyVendorId
+        : mapping.stripeVendorId;
+    const defaultVendorName = (isTithely && mapping.tithelyVendorName)
+        ? mapping.tithelyVendorName
+        : mapping.stripeVendorName;
+
+    const feeAccountId = options?.feeExpenseAccountId || defaultFeeAccountId;
+    const feeAccountName = options?.feeExpenseAccountName || defaultFeeAccountName;
+    const vendorId = options?.feeVendorId !== undefined ? options.feeVendorId : defaultVendorId;
+    const vendorName = options?.feeVendorName !== undefined ? options.feeVendorName : defaultVendorName;
 
     if (effectiveFees > 0) {
         if (!feeAccountId) {

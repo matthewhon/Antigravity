@@ -88,7 +88,8 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
                     // Auto-detect / Pre-select Fee Expense Account
                     const isTithely = (batch?.name || '').toLowerCase().includes('tithely') || (batch?.name || '').toLowerCase().includes('tithe.ly');
-                    let chosenFeeAcc = batch?.quickbooksFeeExpenseAccountId || mapping?.stripeFeeExpenseAccountId || '';
+                    let chosenFeeAcc = batch?.quickbooksFeeExpenseAccountId || 
+                        (isTithely ? (mapping?.tithelyFeeExpenseAccountId || mapping?.stripeFeeExpenseAccountId) : mapping?.stripeFeeExpenseAccountId) || '';
 
                     if (!chosenFeeAcc && expenses.length > 0) {
                         const feeMatch = isTithely
@@ -99,7 +100,8 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                     setFeeExpenseAccountId(chosenFeeAcc);
 
                     // Auto-detect / Pre-select Vendor for fees
-                    let chosenVendorId = batch?.quickbooksFeeVendorId || mapping?.stripeVendorId || '';
+                    let chosenVendorId = batch?.quickbooksFeeVendorId || 
+                        (isTithely ? (mapping?.tithelyVendorId || mapping?.stripeVendorId) : mapping?.stripeVendorId) || '';
                     if (!chosenVendorId) {
                         if (isTithely) {
                             const tithelyVendor = vends.find(v => /tithe/i.test(v.displayName));
