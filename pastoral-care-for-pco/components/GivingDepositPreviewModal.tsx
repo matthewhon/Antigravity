@@ -166,11 +166,25 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
     const handleSend = async () => {
         if (hasConfigError) return;
+
+        const selectedBank = bankAccounts.find(a => a.id === depositBankAccountId);
+        const bankName = selectedBank?.name || mapping?.depositBankAccountName || 'Selected Bank Account';
+
+        const confirmMsg = `Are you sure you want to send this deposit to QuickBooks Online?\n\n` +
+            `• Batch: ${batch.name}\n` +
+            `• Destination Bank: ${bankName}\n` +
+            `• Net Bank Deposit: ${money(netDeposit)}\n` +
+            `• Processing Fees Deducted: ${money(parsedFee)}\n\n` +
+            `Click OK to record this deposit in QuickBooks.`;
+
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+
         setSending(true);
         setError(null);
 
         try {
-            const selectedBank = bankAccounts.find(a => a.id === depositBankAccountId);
             const selectedFeeAcc = expenseAccounts.find(a => a.id === feeExpenseAccountId);
             const selectedVendor = vendors.find(v => v.id === feeVendorId);
 
@@ -213,6 +227,8 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
     const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+    const isAlreadySynced = batch.status === 'synced_to_qbo' || !!batch.quickbooksDepositId;
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -220,13 +236,21 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/60 rounded-xl text-emerald-600 dark:text-emerald-400">
+                        <div className={`p-2.5 rounded-xl ${
+                            isAlreadySynced || successResult
+                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' 
+                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                        }`}>
                             <Landmark className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">QuickBooks Deposit Preview</h2>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                                {isAlreadySynced ? 'QuickBooks Deposit Confirmation' : 'QuickBooks Deposit Preview'}
+                            </h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Review how this batch will be posted to your QuickBooks Bank Register.
+                                {isAlreadySynced 
+                                    ? `This batch was recorded as QuickBooks Deposit #${batch.quickbooksDepositId}.` 
+                                    : 'Review how this batch will be posted to your QuickBooks Bank Register.'}
                             </p>
                         </div>
                     </div>
@@ -240,6 +264,42 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
                 {/* Body */}
                 <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                    {isAlreadySynced && (
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200 font-bold text-sm">
+                                    <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Deposited to QuickBooks Online (Deposit #{batch.quickbooksDepositId})</span>
+                                </div>
+                                {batch.quickbooksDepositId && (
+                                    <a
+                                        href={`https://app.qbo.intuit.com/app/deposit?txnId=${batch.quickbooksDepositId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 hover:bg-emerald-200 rounded-lg transition-colors"
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                        Open in QBO
+                                    </a>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-xs text-emerald-800 dark:text-emerald-300">
+                                <div>
+                                    <span className="text-emerald-600 dark:text-emerald-400 block text-[10px] uppercase font-semibold">Destination Bank</span>
+                                    <span className="font-bold">{batch.quickbooksDepositBankAccountName || 'Checking Account'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-emerald-600 dark:text-emerald-400 block text-[10px] uppercase font-semibold">Net Deposit Amount</span>
+                                    <span className="font-bold">{money(batch.totalNet)}</span>
+                                </div>
+                                <div>
+                                    <span className="text-emerald-600 dark:text-emerald-400 block text-[10px] uppercase font-semibold">Synced Date</span>
+                                    <span>{batch.syncedAt ? new Date(batch.syncedAt).toLocaleDateString() : 'Recently'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {successResult ? (
                         <div className="text-center py-6 space-y-4">
                             <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
@@ -552,15 +612,28 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                 </div>
 
                 {/* Footer */}
-                {!successResult && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-                        >
-                            Cancel
-                        </button>
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                    >
+                        {isAlreadySynced || successResult ? 'Close' : 'Cancel'}
+                    </button>
+
+                    {isAlreadySynced ? (
+                        batch.quickbooksDepositId && (
+                            <a
+                                href={`https://app.qbo.intuit.com/app/deposit?txnId=${batch.quickbooksDepositId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-colors"
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                                View in QuickBooks Online
+                            </a>
+                        )
+                    ) : !successResult && (
                         <button
                             type="button"
                             onClick={handleSend}
@@ -579,8 +652,8 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                 </>
                             )}
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
 
             </div>
         </div>
