@@ -90,7 +90,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
-            const donationFee = (d.attributes?.fee_cents || 0) / 100;
+            const donationFee = Math.abs(d.attributes?.fee_cents || 0) / 100;
             const donationGross = (d.attributes?.amount_cents || 0) / 100;
 
             // Resolve Campus Attribution:
@@ -109,13 +109,27 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 campusName = dc.name;
             }
 
-            // Resolve Payment Source
+            // Resolve Payment Source & Method
             let paymentSource = 'Unknown';
             const paymentSourceRef = d.relationships?.payment_source?.data;
             if (paymentSourceRef) {
                 const ps = included.find(i => i.type === 'PaymentSource' && String(i.id) === String(paymentSourceRef.id));
                 if (ps) {
                     paymentSource = ps.attributes?.name || ps.attributes?.method || 'Unknown';
+                }
+            }
+            const paymentMethod = d.attributes?.payment_method || '';
+            const paymentBrand = d.attributes?.payment_brand || '';
+            const paymentLastFour = d.attributes?.payment_last_four || '';
+            const paymentStatus = d.attributes?.payment_status || '';
+
+            if (paymentSource === 'Unknown' && paymentMethod) {
+                if (paymentBrand) {
+                    paymentSource = `${paymentBrand.charAt(0).toUpperCase() + paymentBrand.slice(1)} ${paymentLastFour ? '(...' + paymentLastFour + ')' : ''}`.trim();
+                } else if (paymentMethod === 'ach') {
+                    paymentSource = paymentLastFour ? `ACH (...${paymentLastFour})` : 'ACH / Bank Transfer';
+                } else {
+                    paymentSource = paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1);
                 }
             }
 
@@ -160,6 +174,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     isRecurring,
                     labels,
                     paymentSource,
+                    paymentMethod,
+                    paymentStatus,
                     batchId,
                     batchName,
                     fee: donationFee,
@@ -212,6 +228,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         isRecurring,
                         labels,
                         paymentSource,
+                        paymentMethod,
+                        paymentStatus,
                         batchId,
                         batchName,
                         fee,
@@ -298,7 +316,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         try {
             pcoBatches = await fetchAllPages(
                 churchId,
-                'giving/v2/batches',
+                'giving/v2/batches?order=-updated_at',
                 (b: any) => ({
                     id: String(b.id),
                     name: b.attributes?.description || b.attributes?.name || `Batch #${b.id}`,
@@ -317,7 +335,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         const existingBatchMap = new Map<string, GivingBatch>();
         existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
 
-        // Group donations by batchId (or date for unbatched Stripe donations)
+        // Group donations by batchId (or date for unbatched Stripe/ACH online donations)
         const batchDonationMap = new Map<string, DetailedDonation[]>();
         const batchNameMap = new Map<string, string>();
         const batchDateMap = new Map<string, string>();
@@ -331,8 +349,10 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         donations.forEach(d => {
             let key = d.batchId;
             if (!key) {
-                // If donation has fees or card/Stripe paymentSource and no batch, group by day
-                const isOnline = (d.fee && d.fee > 0) || (d.paymentSource && /stripe|card|ach/i.test(d.paymentSource));
+                // If donation has fees, card/ACH/Stripe payment method/source and no batch, group by day as online giving
+                const isOnline = (d.fee != null && Math.abs(d.fee) > 0) ||
+                    (d.paymentSource && /stripe|card|ach|online/i.test(d.paymentSource)) ||
+                    (d.paymentMethod && /card|ach|stripe/i.test(d.paymentMethod));
                 const dateKey = (d.date || '').slice(0, 10);
                 key = isOnline ? `online_${dateKey}` : `manual_unbatched_${dateKey}`;
                 if (!batchNameMap.has(key)) {
@@ -384,13 +404,14 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     fee: 0, 
                     count: 0 
                 };
+                const donationFee = Math.abs(d.fee || 0);
                 cur.gross += d.amount || 0;
-                cur.fee += d.fee || 0;
+                cur.fee += donationFee;
                 cur.count += 1;
                 fundGroups.set(groupKey, cur);
 
                 batchTotalGross += d.amount || 0;
-                batchTotalFee += d.fee || 0;
+                batchTotalFee += donationFee;
             });
 
             const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundGroups.values()).map(data => ({
@@ -406,18 +427,21 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
 
             const round2 = (n: number) => Math.round(n * 100) / 100;
             const gross = round2(batchTotalGross);
-            const fees = round2(batchTotalFee);
+            const fees = round2(Math.abs(batchTotalFee));
             const net = round2(gross - fees);
 
             const existing = existingBatchMap.get(batchKey);
-            const isStripe = fees > 0 || batchKey.startsWith('online_') || batchDonations.some(d => /stripe|card|ach/i.test(d.paymentSource || ''));
+            const isOnlineBatch = fees > 0 || batchKey.startsWith('online_') || batchDonations.some(d =>
+                /stripe|card|ach|online/i.test(d.paymentSource || '') ||
+                /card|ach|stripe/i.test((d as any).paymentMethod || '')
+            );
 
             batchesToSave.push({
                 id: batchKey,
                 churchId,
                 name: batchNameMap.get(batchKey) || `Batch ${batchKey}`,
                 date: batchDateMap.get(batchKey) || new Date().toISOString(),
-                batchType: isStripe ? 'stripe' : 'manual',
+                batchType: isOnlineBatch ? 'stripe' : 'manual',
                 status: existing?.status === 'synced_to_qbo' ? 'synced_to_qbo' : 'committed',
                 totalGross: gross,
                 totalFees: fees,

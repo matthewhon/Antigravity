@@ -664,6 +664,10 @@ export interface DetailedDonation {
     isRecurring: boolean;
     labels?: string[];
     paymentSource?: string;
+    /** Payment method type, e.g. "card", "ach", "cash", "check" */
+    paymentMethod?: string;
+    /** Payment status, e.g. "succeeded", "pending", "failed" */
+    paymentStatus?: string;
     /** PCO Batch ID this donation belongs to (from giving/v2/batches) */
     batchId?: string;
     /** Human-readable PCO batch name, e.g. "Sunday Offering 6/8" */
