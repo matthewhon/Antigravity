@@ -703,6 +703,7 @@ export interface GivingBatch {
     quickbooksDepositDocNumber?: string;
     quickbooksDepositBankAccountId?: string;
     quickbooksDepositBankAccountName?: string;
+    quickbooksDepositIntuitTid?: string;
     syncedAt?: string;
     syncedBy?: string;
     notes?: string;
@@ -780,6 +781,8 @@ export interface QuickbooksStatusResponse {
     realmId?: string;
     lastConnected?: string;
     hasMapping: boolean;
+    needsReconnect?: boolean;
+    errorReason?: string;
 }
 
 export interface QuickbooksDepositResult {
@@ -790,6 +793,7 @@ export interface QuickbooksDepositResult {
     qboUrl?: string;
     depositBankAccountId?: string;
     depositBankAccountName?: string;
+    intuitTid?: string;
 }
 
 export interface AttendanceEventSummary {
@@ -1077,8 +1081,8 @@ export interface LogEntry {
     churchId: string;
     timestamp: number;
     level: 'info' | 'warn' | 'error';
-    /** Which subsystem generated this log: sync, webhook, proxy, auth, app, system, forms */
-    source?: 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system' | 'forms';
+    /** Which subsystem generated this log: sync, webhook, proxy, auth, app, system, forms, quickbooks */
+    source?: 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system' | 'forms' | 'quickbooks';
     message: string;
     /** JSON-serialized context object for quick display */
     details?: string;

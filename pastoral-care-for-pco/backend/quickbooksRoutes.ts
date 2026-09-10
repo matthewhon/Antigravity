@@ -3,7 +3,7 @@ import { getDb } from './firebase';
 import { 
     getAuthUrl, exchangeCodeForTokens, getValidTokens, 
     disconnectQuickBooks, fetchAccounts, createQuickbooksDeposit,
-    testQuickBooksCredentials 
+    testQuickBooksCredentials, verifyOAuthState, QuickBooksAuthError
 } from './quickbooksService';
 import { 
     sendBatchReadyNotification, sendBatchSyncedNotification, sendTestNotification 
@@ -21,7 +21,7 @@ quickbooksRouter.get('/auth', async (req: any, res: any) => {
             return res.status(400).send('Missing churchId query parameter');
         }
 
-        const url = await getAuthUrl(churchId);
+        const url = await getAuthUrl(churchId, undefined, req);
         res.redirect(url);
     } catch (error: any) {
         console.error('QuickBooks auth error:', error);
@@ -33,32 +33,44 @@ quickbooksRouter.get('/auth', async (req: any, res: any) => {
 // Receives authorization code and realmId from Intuit
 quickbooksRouter.get('/callback', async (req: any, res: any) => {
     try {
-        const { code, realmId, state } = req.query;
-        if (!code || !realmId) {
-            return res.status(400).send('Missing code or realmId from QuickBooks callback');
+        const { code, realmId, state, error, error_description } = req.query;
+
+        // 1. Check for Intuit OAuth cancellation or errors
+        if (error) {
+            if (error === 'access_denied') {
+                return res.redirect('/giving/batches?qbo_error=' + encodeURIComponent('QuickBooks authorization was cancelled.'));
+            }
+            const desc = error_description ? `: ${error_description}` : '';
+            return res.redirect('/giving/batches?qbo_error=' + encodeURIComponent(`QuickBooks authorization failed (${error})${desc}`));
         }
 
+        if (!code || !realmId || !state) {
+            return res.redirect('/giving/batches?qbo_error=' + encodeURIComponent('Missing required authorization code, realmId, or state from QuickBooks.'));
+        }
+
+        // 2. Cryptographic CSRF state verification
         let churchId = '';
-        if (state) {
-            try {
-                const parsed = JSON.parse(Buffer.from(String(state), 'base64').toString('utf8'));
-                churchId = parsed.churchId || '';
-            } catch (e) {
-                console.error('Failed to parse state:', e);
-            }
+        try {
+            const verified = await verifyOAuthState(String(state));
+            churchId = verified.churchId;
+        } catch (csrfErr: any) {
+            console.error('QuickBooks OAuth CSRF verification failed:', csrfErr);
+            const msg = csrfErr instanceof QuickBooksAuthError ? csrfErr.message : 'Security token mismatch (CSRF protection). Please try connecting again.';
+            return res.redirect(`/giving/batches?qbo_error=${encodeURIComponent(msg)}`);
         }
 
         if (!churchId) {
-            return res.status(400).send('Could not determine churchId from callback state');
+            return res.redirect('/giving/batches?qbo_error=' + encodeURIComponent('Could not determine churchId from authorization callback.'));
         }
 
-        await exchangeCodeForTokens(String(code), String(realmId), churchId);
+        await exchangeCodeForTokens(String(code), String(realmId), churchId, req);
 
         // Redirect back to Giving Batches in the frontend
         res.redirect('/giving/batches?qbo=connected');
     } catch (error: any) {
         console.error('QuickBooks callback error:', error);
-        res.redirect(`/giving/batches?qbo_error=${encodeURIComponent(error.message)}`);
+        const msg = error instanceof QuickBooksAuthError ? error.message : (error.message || 'Failed to connect to QuickBooks');
+        res.redirect(`/giving/batches?qbo_error=${encodeURIComponent(msg)}`);
     }
 });
 
@@ -68,9 +80,32 @@ quickbooksRouter.get('/status', async (req: any, res: any) => {
         const churchId = String(req.query.churchId || '').trim();
         if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
 
-        const tokens = await getValidTokens(churchId);
+        let tokens: any = null;
+        try {
+            tokens = await getValidTokens(churchId);
+        } catch (authErr: any) {
+            if (authErr instanceof QuickBooksAuthError || authErr.code === 'INVALID_GRANT' || authErr.code === 'EXPIRED_REFRESH_TOKEN') {
+                return res.json({
+                    connected: false,
+                    hasMapping: false,
+                    needsReconnect: true,
+                    errorReason: authErr.message
+                });
+            }
+            throw authErr;
+        }
+
         if (!tokens) {
             return res.json({ connected: false, hasMapping: false });
+        }
+
+        if (tokens.needsReconnect || tokens.connectionState === 'expired') {
+            return res.json({
+                connected: false,
+                hasMapping: false,
+                needsReconnect: true,
+                errorReason: tokens.lastError || 'QuickBooks authorization has expired. Please reconnect.'
+            });
         }
 
         const db = getDb();
@@ -84,7 +119,8 @@ quickbooksRouter.get('/status', async (req: any, res: any) => {
             companyName: tokens.companyName || 'QuickBooks Company',
             realmId: tokens.realmId,
             lastConnected: new Date(tokens.connectedAt).toISOString(),
-            hasMapping
+            hasMapping,
+            needsReconnect: false
         });
     } catch (error: any) {
         console.error('Error checking QuickBooks status:', error);
@@ -117,7 +153,15 @@ quickbooksRouter.get('/accounts', async (req: any, res: any) => {
         res.json(data);
     } catch (error: any) {
         console.error('Error fetching QuickBooks accounts:', error);
-        res.status(500).json({ error: error.message });
+        if (error instanceof QuickBooksAuthError || error.code === 'INVALID_GRANT' || error.code === 'EXPIRED_REFRESH_TOKEN' || error.code === 'EXPIRED_ACCESS_TOKEN') {
+            return res.status(401).json({
+                error: 'QUICKBOOKS_AUTH_EXPIRED',
+                needsReconnect: true,
+                message: error.message,
+                intuitTid: error.intuitTid
+            });
+        }
+        res.status(500).json({ error: error.message, intuitTid: error.intuitTid });
     }
 });
 
@@ -242,6 +286,7 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
             quickbooksDepositDocNumber: depositResult.docNumber,
             quickbooksDepositBankAccountId: depositResult.depositBankAccountId,
             quickbooksDepositBankAccountName: depositResult.depositBankAccountName,
+            quickbooksDepositIntuitTid: depositResult.intuitTid,
             syncedAt: new Date().toISOString(),
             syncedBy: userName || 'User'
         };
@@ -273,7 +318,15 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
         });
     } catch (error: any) {
         console.error('Error sending deposit to QuickBooks:', error);
-        res.status(500).json({ error: error.message });
+        if (error instanceof QuickBooksAuthError || error.code === 'INVALID_GRANT' || error.code === 'EXPIRED_REFRESH_TOKEN' || error.code === 'EXPIRED_ACCESS_TOKEN') {
+            return res.status(401).json({
+                error: 'QUICKBOOKS_AUTH_EXPIRED',
+                needsReconnect: true,
+                message: error.message,
+                intuitTid: error.intuitTid
+            });
+        }
+        res.status(500).json({ error: error.message, intuitTid: error.intuitTid });
     }
 });
 
@@ -353,14 +406,26 @@ quickbooksRouter.post('/test-credentials', async (req: any, res: any) => {
         let { clientId, clientSecret, environment, redirectUri } = req.body || {};
 
         // Fallback to system settings if not provided in payload
-        if (!clientId || !clientSecret) {
+        if (!clientId || !clientSecret || !redirectUri) {
             const db = getDb();
             const settingsDoc = await db.doc('system/settings').get();
             const settings = settingsDoc.data() || {};
             clientId = clientId || settings.quickbooksClientId;
             clientSecret = clientSecret || settings.quickbooksClientSecret;
             environment = environment || settings.quickbooksEnvironment;
-            redirectUri = redirectUri || settings.quickbooksRedirectUri;
+            if (!redirectUri) {
+                redirectUri = settings.quickbooksRedirectUri;
+                if (!redirectUri && req) {
+                    const proto = req.headers?.['x-forwarded-proto'] || req.protocol || 'https';
+                    const host = req.headers?.['x-forwarded-host'] || req.headers?.host;
+                    if (host) {
+                        redirectUri = `${proto}://${host}/api/quickbooks/callback`;
+                    }
+                }
+                if (!redirectUri) {
+                    redirectUri = 'https://pastoralcare.barnabassoftware.com/api/quickbooks/callback';
+                }
+            }
         }
 
         const result = await testQuickBooksCredentials({

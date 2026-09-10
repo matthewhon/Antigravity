@@ -206,7 +206,9 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                     <div className={`p-3 rounded-xl flex items-center justify-center ${
                         qboStatus?.connected 
                             ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            : qboStatus?.needsReconnect
+                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                     }`}>
                         <Landmark className="w-7 h-7" />
                     </div>
@@ -217,6 +219,11 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                     Connected
+                                </span>
+                            ) : qboStatus?.needsReconnect ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    Authorization Expired
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
@@ -229,6 +236,10 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                 <>
                                     Connected to company: <strong className="text-slate-700 dark:text-slate-300">{qboStatus.companyName}</strong> (ID: {qboStatus.realmId}). Deposits match bank feed entries automatically.
                                 </>
+                            ) : qboStatus?.needsReconnect ? (
+                                <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                    {qboStatus.errorReason || 'QuickBooks authorization has expired or was revoked. Please reconnect to resume syncing deposits.'}
+                                </span>
                             ) : (
                                 'Connect your QuickBooks Online company to sync batch deposits with fund breakdowns and Stripe fees.'
                             )}
@@ -255,6 +266,15 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                 Disconnect
                             </button>
                         </>
+                    ) : qboStatus?.needsReconnect ? (
+                        <button
+                            type="button"
+                            onClick={handleConnectQbo}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition-colors"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Reconnect to QuickBooks
+                        </button>
                     ) : (
                         <button
                             type="button"

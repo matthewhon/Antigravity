@@ -24,7 +24,7 @@ import { db } from './firebase';
 import { LogEntry } from '../types';
 
 export type LogLevel = 'info' | 'warn' | 'error';
-export type LogSource = 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system' | 'forms';
+export type LogSource = 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system' | 'forms' | 'quickbooks';
 
 // ─── In-memory ring buffer (for dev quick-access without Firestore round-trip) ─
 const _buffer: LogEntry[] = [];
