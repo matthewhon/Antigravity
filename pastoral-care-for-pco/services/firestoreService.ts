@@ -740,16 +740,22 @@ class FirestoreService {
   // --- Data Mutation (Batch Upserts) ---
 
   /**
-   * Recursively replaces all `undefined` values with `null` so Firestore doesn't
-   * reject the entire WriteBatch with "Unsupported field value: undefined".
+   * Recursively sanitizes objects for Firestore:
+   * 1. Strips out undefined values (so Firestore rejects nothing, and merge-writes preserve existing fields).
+   * 2. Preserves null, primitives, arrays, and nested objects.
    */
   private deepSanitize(obj: any): any {
-      if (obj === undefined) return null;
+      if (obj === undefined) return undefined;
       if (obj === null || typeof obj !== 'object') return obj;
-      if (Array.isArray(obj)) return obj.map(item => this.deepSanitize(item));
+      if (Array.isArray(obj)) return obj.map(item => this.deepSanitize(item)).filter(item => item !== undefined);
       const sanitized: Record<string, any> = {};
       for (const [key, value] of Object.entries(obj)) {
-          sanitized[key] = this.deepSanitize(value);
+          if (value !== undefined) {
+              const cleaned = this.deepSanitize(value);
+              if (cleaned !== undefined) {
+                  sanitized[key] = cleaned;
+              }
+          }
       }
       return sanitized;
   }
