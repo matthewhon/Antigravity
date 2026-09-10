@@ -12,7 +12,12 @@ import {
     SlidersHorizontal,
     Building,
     Search,
-    RotateCcw
+    RotateCcw,
+    Terminal,
+    ChevronDown,
+    ChevronUp,
+    Copy,
+    Info
 } from 'lucide-react';
 import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -47,20 +52,23 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     });
     const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [targetAmount, setTargetAmount] = useState<string>('');
-    const [targetMode, setTargetMode] = useState<'net' | 'gross'>('net');
+    const [targetMode, setTargetMode] = useState<'net' | 'gross'>('gross');
     const [targetFees, setTargetFees] = useState<string>('');
     const [targetTitheGross, setTargetTitheGross] = useState<string>('');
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
-    // Filter controls
-    const [paymentMethodFilter, setPaymentMethodFilter] = useState<'card' | 'ach' | 'all'>('card');
-    const [includeBatched, setIncludeBatched] = useState<boolean>(true);
+    // Filter controls: default to 'all' methods and exclude already-batched Planning Center gifts
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState<'card' | 'ach' | 'all'>('all');
+    const [includeBatched, setIncludeBatched] = useState<boolean>(false);
     const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
 
-    // Matching state
+    // Matching state & Diagnostics
     const [matching, setMatching] = useState(false);
     const [matchResult, setMatchResult] = useState<PayoutMatchResult | null>(null);
+    const [matchLogs, setMatchLogs] = useState<string[]>([]);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [copiedLogs, setCopiedLogs] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Selected parent donation IDs (keeps designations grouped)
@@ -224,8 +232,13 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 includeBatched
             });
 
+            if (res && res.matchLogs) {
+                setMatchLogs(res.matchLogs);
+            }
+
             if (!res || res.matchedDonations.length === 0) {
-                setError(`Could not find a combination of online gifts matching ${targetMode === 'gross' ? 'Gross' : 'Net'} $${numAmount.toFixed(2)} with the selected filters. Try switching the method filter (Card/ACH/All) or adjusting the date window.`);
+                setError(`Could not find a combination of online gifts matching ${targetMode === 'gross' ? 'Gross' : 'Net'} $${numAmount.toFixed(2)} with the selected filters. Check the Match Diagnostics below for candidate details.`);
+                setShowDiagnostics(true);
                 setMatching(false);
                 return;
             }
@@ -439,12 +452,20 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     <input
                                         type="number"
                                         step="0.01"
-                                        placeholder={targetMode === 'gross' ? '3751.20' : '3736.69'}
+                                        placeholder={targetMode === 'gross' ? '10264.99' : '10107.40'}
                                         value={targetAmount}
                                         onChange={(e) => setTargetAmount(e.target.value)}
                                         className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
                                     />
                                 </div>
+                                {numTargetAmount > 0 && numTargetFees > 0 && (
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+                                        <span>{targetMode === 'gross' ? 'Est. Net Bank Deposit:' : 'Est. Gross Deposit:'}</span>
+                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                            ${targetMode === 'gross' ? (Math.max(0, numTargetAmount - numTargetFees)).toFixed(2) : (numTargetAmount + numTargetFees).toFixed(2)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Payment Method Selector (Card vs ACH vs All) */}
@@ -454,9 +475,20 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                         <CreditCard className="w-3.5 h-3.5 text-blue-500" />
                                         Payment Method
                                     </span>
-                                    <span className="text-[10px] text-slate-400 font-normal">Stripe splits methods</span>
+                                    <span className="text-[10px] text-slate-400 font-normal">All online methods default</span>
                                 </label>
                                 <div className="grid grid-cols-3 gap-1 bg-slate-200/80 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethodFilter('all')}
+                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                            paymentMethodFilter === 'all'
+                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        All Online
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => setPaymentMethodFilter('card')}
@@ -478,17 +510,6 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                         }`}
                                     >
                                         ACH Only
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethodFilter('all')}
-                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
-                                            paymentMethodFilter === 'all'
-                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        All Online
                                     </button>
                                 </div>
                             </div>
@@ -532,7 +553,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     <input
                                         type="number"
                                         step="0.01"
-                                        placeholder="e.g. 2407.20"
+                                        placeholder="e.g. 7655.48"
                                         value={targetTitheGross}
                                         onChange={(e) => setTargetTitheGross(e.target.value)}
                                         className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
@@ -551,7 +572,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     <input
                                         type="number"
                                         step="0.01"
-                                        placeholder="e.g. 14.51"
+                                        placeholder="e.g. 157.59"
                                         value={targetFees}
                                         onChange={(e) => setTargetFees(e.target.value)}
                                         className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
@@ -585,10 +606,20 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500"
                                 />
                                 <span>Include already-batched gifts</span>
-                                <span className="text-[11px] text-slate-400 font-normal">(allows re-bundling gifts synced with PCO auto-batches)</span>
+                                <span className="text-[11px] text-slate-400 font-normal">(allows re-bundling gifts synced with PCO batches)</span>
                             </label>
 
                             <div className="flex items-center gap-2">
+                                {matchLogs.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDiagnostics(!showDiagnostics)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800/60 transition-colors"
+                                    >
+                                        <Terminal className="w-3.5 h-3.5 text-purple-500" />
+                                        {showDiagnostics ? 'Hide Diagnostics' : 'View Diagnostics'}
+                                    </button>
+                                )}
                                 {selectedParentIds.size > 0 && (
                                     <button
                                         type="button"
@@ -620,6 +651,64 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                             </div>
                         </div>
                     </div>
+
+                    {/* Diagnostics Drawer (Collapsible) */}
+                    {showDiagnostics && (
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 overflow-hidden text-xs font-mono shadow-sm">
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 select-none">
+                                <div className="flex items-center gap-2">
+                                    <Terminal className="w-4 h-4 text-purple-400" />
+                                    <span className="font-bold text-slate-200">AI Matcher Diagnostics & Trace Log</span>
+                                    {matchResult?.searchStrategy && (
+                                        <span className="px-2 py-0.5 rounded text-[10px] bg-purple-900/60 text-purple-300 border border-purple-800">
+                                            {matchResult.searchStrategy}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(matchLogs.join('\n'));
+                                            setCopiedLogs(true);
+                                            setTimeout(() => setCopiedLogs(false), 2000);
+                                        }}
+                                        className="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 transition-colors"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                        {copiedLogs ? 'Copied!' : 'Copy Logs'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDiagnostics(false)}
+                                        className="p-1 rounded text-slate-400 hover:text-slate-200"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-3.5 space-y-1 max-h-52 overflow-y-auto bg-slate-950 text-[11px] leading-relaxed select-text">
+                                {matchLogs.length === 0 ? (
+                                    <div className="text-slate-500 italic">Click "Find Matching Transactions" to run the matcher and generate diagnostic trace logs.</div>
+                                ) : (
+                                    matchLogs.map((logLine, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            className={
+                                                logLine.includes('EXACT MATCH') || logLine.includes('✨') ? 'text-emerald-400 font-semibold' :
+                                                logLine.includes('❌') || logLine.includes('⚠️') ? 'text-rose-400 font-semibold' :
+                                                logLine.includes('🚫') ? 'text-amber-400' :
+                                                logLine.includes('🎯') || logLine.includes('🚀') ? 'text-purple-300' :
+                                                'text-slate-300'
+                                            }
+                                        >
+                                            {logLine}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Running Scoreboard / Comparison Summary */}
                     {(candidateGroups.length > 0 || selectedParentIds.size > 0) && (
