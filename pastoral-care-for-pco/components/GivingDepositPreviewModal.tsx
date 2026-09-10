@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GivingBatch, QuickbooksMappingConfig, QuickbooksDepositResult, QuickbooksAccount, QuickbooksClass, FundQuickbooksMapping } from '../types';
+import { GivingBatch, QuickbooksMappingConfig, QuickbooksDepositResult, QuickbooksAccount, QuickbooksClass, QuickbooksVendor, FundQuickbooksMapping } from '../types';
 import { quickbooksClient } from '../services/quickbooksService';
 import { X, Check, AlertCircle, RefreshCw, Landmark, CreditCard, ArrowRight, ExternalLink } from 'lucide-react';
 
@@ -33,10 +33,16 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
     const [bankAccounts, setBankAccounts] = useState<QuickbooksAccount[]>([]);
     const [incomeAccounts, setIncomeAccounts] = useState<QuickbooksAccount[]>([]);
+    const [expenseAccounts, setExpenseAccounts] = useState<QuickbooksAccount[]>([]);
     const [classes, setClasses] = useState<QuickbooksClass[]>([]);
+    const [vendors, setVendors] = useState<QuickbooksVendor[]>([]);
 
     const [depositBankAccountId, setDepositBankAccountId] = useState(mapping?.depositBankAccountId || '');
     const [fundMappings, setFundMappings] = useState<Record<string, FundQuickbooksMapping>>(mapping?.fundMappings || {});
+    const [feeExpenseAccountId, setFeeExpenseAccountId] = useState('');
+    const [feeVendorId, setFeeVendorId] = useState('');
+    const [feeAmount, setFeeAmount] = useState<number>(0);
+    const [isEditingFeeAmount, setIsEditingFeeAmount] = useState(false);
     const [saveAsDefault, setSaveAsDefault] = useState(false);
 
     useEffect(() => {
@@ -54,6 +60,9 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
             }
             setFundMappings(initialMap);
 
+            const initialFees = batch?.totalFees !== undefined ? batch.totalFees : 0;
+            setFeeAmount(initialFees);
+            setIsEditingFeeAmount(false);
             setSaveAsDefault(false);
             setError(null);
             setSuccessResult(null);
@@ -61,14 +70,46 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
             setLoadingAccounts(true);
             quickbooksClient.getAccounts(churchId)
                 .then(data => {
-                    setBankAccounts(data.bankAccounts || []);
-                    setIncomeAccounts(data.incomeAccounts || []);
+                    const banks = data.bankAccounts || [];
+                    const incomes = data.incomeAccounts || [];
+                    const expenses = data.expenseAccounts || [];
+                    const vends = data.vendors || [];
+
+                    setBankAccounts(banks);
+                    setIncomeAccounts(incomes);
+                    setExpenseAccounts(expenses);
                     setClasses(data.classes || []);
+                    setVendors(vends);
 
                     // If no deposit account is currently selected, pick the first available
-                    if (!mapping?.depositBankAccountId && !batch?.quickbooksDepositBankAccountId && data.bankAccounts.length > 0) {
-                        setDepositBankAccountId(data.bankAccounts[0].id);
+                    if (!mapping?.depositBankAccountId && !batch?.quickbooksDepositBankAccountId && banks.length > 0) {
+                        setDepositBankAccountId(banks[0].id);
                     }
+
+                    // Auto-detect / Pre-select Fee Expense Account
+                    const isTithely = (batch?.name || '').toLowerCase().includes('tithely') || (batch?.name || '').toLowerCase().includes('tithe.ly');
+                    let chosenFeeAcc = batch?.quickbooksFeeExpenseAccountId || mapping?.stripeFeeExpenseAccountId || '';
+
+                    if (!chosenFeeAcc && expenses.length > 0) {
+                        const feeMatch = isTithely
+                            ? expenses.find(a => /tithe/i.test(a.name)) || expenses.find(a => /merchant|processing|bank fee|card/i.test(a.name))
+                            : expenses.find(a => /stripe|merchant|processing|bank fee|card/i.test(a.name));
+                        if (feeMatch) chosenFeeAcc = feeMatch.id;
+                    }
+                    setFeeExpenseAccountId(chosenFeeAcc);
+
+                    // Auto-detect / Pre-select Vendor for fees
+                    let chosenVendorId = batch?.quickbooksFeeVendorId || mapping?.stripeVendorId || '';
+                    if (!chosenVendorId) {
+                        if (isTithely) {
+                            const tithelyVendor = vends.find(v => /tithe/i.test(v.displayName));
+                            if (tithelyVendor) chosenVendorId = tithelyVendor.id;
+                        } else {
+                            const stripeVendor = vends.find(v => /stripe/i.test(v.displayName));
+                            if (stripeVendor) chosenVendorId = stripeVendor.id;
+                        }
+                    }
+                    setFeeVendorId(chosenVendorId);
                 })
                 .catch(e => {
                     console.error('Failed to load accounts for deposit preview:', e);
@@ -80,6 +121,13 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
     }, [isOpen, churchId, batch, mapping]);
 
     if (!isOpen || !batch) return null;
+
+    const parsedFee = Math.round(Math.abs(Number(feeAmount) || 0) * 100) / 100;
+    const grossTotal = batch.fundsBreakdown.reduce((sum, f) => sum + (f.grossAmount || 0), 0);
+    const netDeposit = Math.round((grossTotal - parsedFee) * 100) / 100;
+
+    const isTithely = (batch.name || '').toLowerCase().includes('tithely') || (batch.name || '').toLowerCase().includes('tithe.ly');
+    const processorName = isTithely ? 'Tithely' : ((batch.name || '').toLowerCase().includes('stripe') ? 'Stripe' : 'Processing');
 
     const handleFundAccountChange = (lineKey: string, accountId: string) => {
         const acc = incomeAccounts.find(a => a.id === accountId);
@@ -111,7 +159,7 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
         return f.grossAmount > 0 && !mapped?.qboAccountId && !mapping?.defaultIncomeAccountId;
     });
     const missingBank = !depositBankAccountId;
-    const missingFeeAcc = batch.totalFees > 0 && !mapping?.stripeFeeExpenseAccountId;
+    const missingFeeAcc = parsedFee > 0 && !feeExpenseAccountId;
     const hasConfigError = unmappedFunds.length > 0 || missingBank || missingFeeAcc;
 
     const handleSend = async () => {
@@ -121,10 +169,18 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
         try {
             const selectedBank = bankAccounts.find(a => a.id === depositBankAccountId);
+            const selectedFeeAcc = expenseAccounts.find(a => a.id === feeExpenseAccountId);
+            const selectedVendor = vendors.find(v => v.id === feeVendorId);
+
             const res = await quickbooksClient.sendDeposit(churchId, batch.id, userName, {
                 depositBankAccountId,
                 depositBankAccountName: selectedBank?.name || mapping?.depositBankAccountName,
                 fundOverrides: fundMappings,
+                feeExpenseAccountId: feeExpenseAccountId || undefined,
+                feeExpenseAccountName: selectedFeeAcc?.name,
+                feeVendorId: feeVendorId || undefined,
+                feeVendorName: selectedVendor?.displayName,
+                feeAmount: parsedFee,
                 saveAsDefault
             });
 
@@ -133,6 +189,10 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                     ...mapping,
                     depositBankAccountId,
                     depositBankAccountName: selectedBank?.name || mapping.depositBankAccountName,
+                    stripeFeeExpenseAccountId: feeExpenseAccountId || mapping.stripeFeeExpenseAccountId,
+                    stripeFeeExpenseAccountName: selectedFeeAcc?.name || mapping.stripeFeeExpenseAccountName,
+                    stripeVendorId: feeVendorId || mapping.stripeVendorId,
+                    stripeVendorName: selectedVendor?.displayName || mapping.stripeVendorName,
                     fundMappings: {
                         ...(mapping.fundMappings || {}),
                         ...fundMappings
@@ -280,7 +340,7 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                             <p className="font-bold">Configuration Required Before Posting</p>
                                             <ul className="list-disc list-inside text-xs mt-1 space-y-0.5">
                                                 {missingBank && <li>Please select a QuickBooks Bank Account to receive deposits above.</li>}
-                                                {missingFeeAcc && <li>Please configure a QuickBooks Expense Account for Stripe processing fees.</li>}
+                                                {missingFeeAcc && <li>Please select a QuickBooks Expense Account for {processorName} processing fees in the table below.</li>}
                                                 {unmappedFunds.map(f => (
                                                     <li key={f.fundId}>
                                                         Fund "{f.fundName}" needs a QuickBooks Income Account (select from dropdown below).
@@ -289,7 +349,7 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                             </ul>
                                         </div>
                                     </div>
-                                    {missingFeeAcc && (
+                                    {missingFeeAcc && !expenseAccounts.length && (
                                         <div className="pt-1">
                                             <button
                                                 type="button"
@@ -317,15 +377,15 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                         1-to-1 Deposit Line Items Breakdown
                                     </h4>
                                     <span className="text-[11px] text-slate-400">
-                                        Planning Center Fund ➔ QuickBooks Income Account
+                                        Income & Fee Breakdown ➔ QuickBooks Bank Register
                                     </span>
                                 </div>
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 font-semibold text-slate-500 dark:text-slate-400">
-                                                <th className="px-4 py-2.5">Planning Center Fund</th>
-                                                <th className="px-4 py-2.5">QuickBooks Income Account (1-to-1)</th>
+                                                <th className="px-4 py-2.5">Line Description / Fund</th>
+                                                <th className="px-4 py-2.5">QuickBooks Account & Classification</th>
                                                 <th className="px-4 py-2.5 text-right">Amount</th>
                                             </tr>
                                         </thead>
@@ -339,7 +399,7 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                                 return (
                                                     <tr key={lineKey} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                                         <td className="px-4 py-2.5">
-                                                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                                             <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                                                 <span>{f.fundName}</span>
                                                                 {f.campusName && (
                                                                     <span className="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
@@ -387,28 +447,82 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                                 );
                                             })}
 
-                                            {/* Stripe Fee Negative Line */}
-                                            {batch.totalFees > 0 && (
+                                            {/* Fee Negative Line: Assign to specified expense account & vendor */}
+                                            {(parsedFee > 0 || isEditingFeeAmount) && (
                                                 <tr className="bg-amber-50/40 dark:bg-amber-950/20">
                                                     <td className="px-4 py-2.5">
                                                         <div className="font-medium text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
                                                             <CreditCard className="w-3.5 h-3.5 text-amber-600" />
-                                                            Stripe Processing Fees
+                                                            <span>{processorName} Processing Fees</span>
                                                         </div>
-                                                        <div className="text-[10px] text-slate-400">Card / ACH processing reduction</div>
+                                                        <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                                            <span>Processing fee reduction</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsEditingFeeAmount(!isEditingFeeAmount)}
+                                                                className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-medium cursor-pointer"
+                                                            >
+                                                                {isEditingFeeAmount ? 'Done' : 'Edit Fee'}
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2.5">
-                                                        <span className={mapping?.stripeFeeExpenseAccountId ? 'text-amber-800 dark:text-amber-300 font-medium' : 'text-rose-500 font-semibold'}>
-                                                            {mapping?.stripeFeeExpenseAccountName || 'Unmapped Expense Account'}
-                                                        </span>
-                                                        {mapping?.stripeVendorName && (
-                                                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                                                                Vendor: {mapping.stripeVendorName}
-                                                            </span>
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                                            <select
+                                                                value={feeExpenseAccountId}
+                                                                onChange={(e) => setFeeExpenseAccountId(e.target.value)}
+                                                                className={`w-full max-w-xs px-2.5 py-1 text-xs rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                                                    feeExpenseAccountId
+                                                                        ? 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium'
+                                                                        : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 font-semibold'
+                                                                }`}
+                                                            >
+                                                                <option value="">Select Expense Account for Fees *</option>
+                                                                {expenseAccounts.map(a => (
+                                                                    <option key={a.id} value={a.id}>
+                                                                        {a.name} ({a.accountSubType || a.accountType})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+
+                                                            {vendors.length > 0 && (
+                                                                <select
+                                                                    value={feeVendorId}
+                                                                    onChange={(e) => setFeeVendorId(e.target.value)}
+                                                                    className="w-40 px-2 py-1 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                                                                    title="QuickBooks Vendor for Fees"
+                                                                >
+                                                                    <option value="">No Vendor</option>
+                                                                    {vendors.map(v => (
+                                                                        <option key={v.id} value={v.id}>
+                                                                            Vendor: {v.displayName}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            )}
+                                                        </div>
+                                                        {!feeExpenseAccountId && (
+                                                            <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-1 font-semibold">
+                                                                Select an expense account to deduct processing fees from this deposit.
+                                                            </p>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right font-semibold text-rose-600 dark:text-rose-400">
-                                                        -{money(batch.totalFees)}
+                                                        {isEditingFeeAmount ? (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <span className="text-xs text-slate-500">-$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={feeAmount}
+                                                                    onChange={(e) => setFeeAmount(parseFloat(e.target.value) || 0)}
+                                                                    className="w-20 px-1.5 py-0.5 text-xs text-right bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-rose-600 dark:text-rose-400 font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            `-${money(parsedFee)}`
+                                                        )}
                                                     </td>
                                                 </tr>
                                             )}
@@ -416,10 +530,15 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                         <tfoot>
                                             <tr className="bg-slate-100 dark:bg-slate-800 font-bold border-t border-slate-200 dark:border-slate-700">
                                                 <td colSpan={2} className="px-4 py-3 text-slate-900 dark:text-white">
-                                                    Net Bank Deposit Total (Hits Bank Feed)
+                                                    <div>
+                                                        <span>Net Bank Deposit Total (Hits Bank Feed)</span>
+                                                        <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                                            Total Gross ({money(grossTotal)}) − Processing Fees ({money(parsedFee)}) = Net Deposit ({money(netDeposit)})
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 text-sm">
-                                                    {money(batch.totalNet)}
+                                                <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 text-sm font-black">
+                                                    {money(netDeposit)}
                                                 </td>
                                             </tr>
                                         </tfoot>

@@ -217,6 +217,11 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
             depositBankAccountId, 
             depositBankAccountName, 
             fundOverrides, 
+            feeExpenseAccountId,
+            feeExpenseAccountName,
+            feeVendorId,
+            feeVendorName,
+            feeAmount,
             saveAsDefault 
         } = req.body || {};
 
@@ -245,15 +250,20 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
             churchId,
             depositBankAccountId: depositBankAccountId || '',
             depositBankAccountName: depositBankAccountName || '',
-            stripeFeeExpenseAccountId: '',
+            stripeFeeExpenseAccountId: feeExpenseAccountId || '',
             fundMappings: {}
         };
 
-        // 3. Create Deposit in QuickBooks with specified target account and fund overrides
+        // 3. Create Deposit in QuickBooks with specified target account, fund overrides, and fee options
         const depositResult = await createQuickbooksDeposit(churchId, batch, effectiveMapping, userName, {
             depositBankAccountId,
             depositBankAccountName,
-            fundOverrides
+            fundOverrides,
+            feeExpenseAccountId,
+            feeExpenseAccountName,
+            feeVendorId,
+            feeVendorName,
+            feeAmount
         });
 
         // 4. Optionally update default mapping in Firestore if requested
@@ -267,6 +277,16 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
             if (depositBankAccountId) {
                 mappingUpdates.depositBankAccountId = depositBankAccountId;
                 mappingUpdates.depositBankAccountName = depositBankAccountName;
+            }
+
+            if (feeExpenseAccountId) {
+                mappingUpdates.stripeFeeExpenseAccountId = feeExpenseAccountId;
+                mappingUpdates.stripeFeeExpenseAccountName = feeExpenseAccountName || '';
+            }
+
+            if (feeVendorId !== undefined) {
+                mappingUpdates.stripeVendorId = feeVendorId;
+                mappingUpdates.stripeVendorName = feeVendorName || '';
             }
 
             if (fundOverrides && Object.keys(fundOverrides).length > 0) {
@@ -287,9 +307,19 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
             quickbooksDepositBankAccountId: depositResult.depositBankAccountId,
             quickbooksDepositBankAccountName: depositResult.depositBankAccountName,
             quickbooksDepositIntuitTid: depositResult.intuitTid,
+            quickbooksFeeExpenseAccountId: depositResult.feeExpenseAccountId,
+            quickbooksFeeExpenseAccountName: depositResult.feeExpenseAccountName,
+            quickbooksFeeVendorId: depositResult.feeVendorId,
+            quickbooksFeeVendorName: depositResult.feeVendorName,
             syncedAt: new Date().toISOString(),
             syncedBy: userName || 'User'
         };
+
+        if (feeAmount !== undefined) {
+            const parsedFees = Math.round(Math.abs(feeAmount) * 100) / 100;
+            batchUpdates.totalFees = parsedFees;
+            batchUpdates.totalNet = Math.round((batch.totalGross - parsedFees) * 100) / 100;
+        }
 
         await batchDoc.ref.set(batchUpdates, { merge: true });
 

@@ -447,7 +447,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                     <th className="px-4 py-3">Type</th>
                                     <th className="px-4 py-3">Fund Breakdown</th>
                                     <th className="px-4 py-3 text-right">Gross Amount</th>
-                                    <th className="px-4 py-3 text-right">Stripe Fees</th>
+                                    <th className="px-4 py-3 text-right">Processing Fees</th>
                                     <th className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300">Net Bank Deposit</th>
                                     <th className="px-4 py-3 text-center">Status</th>
                                     <th className="px-5 py-3 text-right">Action</th>
@@ -457,6 +457,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                 {filteredBatches.map(batch => {
                                     const isSynced = batch.status === 'synced_to_qbo';
                                     const hasFees = (batch.totalFees || 0) > 0;
+                                    const isTithely = (batch.name || '').toLowerCase().includes('tithely') || (batch.name || '').toLowerCase().includes('tithe.ly') || batch.batchType === 'tithely';
 
                                     return (
                                         <tr key={batch.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -473,7 +474,12 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
 
                                             {/* Type Badge */}
                                             <td className="px-4 py-3.5">
-                                                {batch.batchType === 'stripe' ? (
+                                                {isTithely ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                                                        <CreditCard className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                                                        Tithely
+                                                    </span>
+                                                ) : batch.batchType === 'stripe' ? (
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                                         <CreditCard className="w-3 h-3" />
                                                         Stripe Online

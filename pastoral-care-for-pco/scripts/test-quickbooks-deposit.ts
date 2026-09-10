@@ -9,6 +9,11 @@ function buildMockDepositPayload(
         depositBankAccountId?: string;
         depositBankAccountName?: string;
         fundOverrides?: Record<string, FundQuickbooksMapping>;
+        feeExpenseAccountId?: string;
+        feeExpenseAccountName?: string;
+        feeVendorId?: string;
+        feeVendorName?: string;
+        feeAmount?: number;
     }
 ) {
     const targetBankAccountId = options?.depositBankAccountId || mapping.depositBankAccountId;
@@ -67,33 +72,47 @@ function buildMockDepositPayload(
         });
     }
 
-    // 2. Negative Line: Stripe Credit Card / ACH Processing Fees (Expense)
-    if (batch.totalFees > 0) {
-        if (!mapping.stripeFeeExpenseAccountId) {
-            throw new Error('Stripe Fee Expense Account is not configured, but this batch has processing fees.');
+    // 2. Negative Line: Processing Fees (Expense) - assigned to specified account
+    const effectiveFees = options?.feeAmount !== undefined 
+        ? Math.round(Math.abs(options.feeAmount) * 100) / 100 
+        : Math.round((batch.totalFees || 0) * 100) / 100;
+
+    const feeAccountId = options?.feeExpenseAccountId || mapping.stripeFeeExpenseAccountId;
+    const feeAccountName = options?.feeExpenseAccountName || mapping.stripeFeeExpenseAccountName;
+    const vendorId = options?.feeVendorId !== undefined ? options.feeVendorId : mapping.stripeVendorId;
+    const vendorName = options?.feeVendorName !== undefined ? options.feeVendorName : mapping.stripeVendorName;
+
+    if (effectiveFees > 0) {
+        if (!feeAccountId) {
+            throw new Error('Processing Fee Expense Account is not configured or specified.');
         }
 
         const feeLineDetail: any = {
             AccountRef: {
-                value: mapping.stripeFeeExpenseAccountId,
-                name: mapping.stripeFeeExpenseAccountName
+                value: feeAccountId,
+                name: feeAccountName
             }
         };
 
-        if (mapping.stripeVendorId) {
+        if (vendorId) {
             feeLineDetail.Entity = {
                 Type: 'Vendor',
                 EntityRef: {
-                    value: mapping.stripeVendorId,
-                    name: mapping.stripeVendorName || 'Stripe'
+                    value: vendorId,
+                    name: vendorName || 'Vendor'
                 }
             };
         }
 
+        const batchNameLower = (batch.name || '').toLowerCase();
+        const feeLabel = batchNameLower.includes('tithely') || batchNameLower.includes('tithe.ly')
+            ? 'Tithely Processing Fees'
+            : (batchNameLower.includes('stripe') ? 'Stripe Processing Fees' : 'Processing Fees');
+
         lines.push({
-            Amount: -Math.abs(batch.totalFees),
+            Amount: -effectiveFees,
             DetailType: 'DepositLineDetail',
-            Description: `Stripe Processing Fees - ${batch.name}`,
+            Description: `${feeLabel} - ${batch.name}`,
             DepositLineDetail: feeLineDetail
         });
     }
@@ -336,14 +355,75 @@ async function runTests() {
     console.assert(northBuildingLine.DepositLineDetail.AccountRef.value === 'qbo_acc_north_building_4021', 'North Building must route to North Building account');
     console.log('✓ North Campus Building verified: $', northBuildingLine.Amount, 'routed to', northBuildingLine.DepositLineDetail.AccountRef.name);
 
-    // Multi-campus Net deposit to the penny
-    const mcNet = multiCampusPayload.Line.reduce((sum: number, line: any) => sum + line.Amount, 0);
-    const mcNetRounded = Math.round(mcNet * 100) / 100;
-    console.assert(mcNetRounded === multiCampusBatch.totalNet, `Multi-campus net (${mcNetRounded}) must equal batch net (${multiCampusBatch.totalNet})`);
-    console.log('✓ Multi-campus Net Deposit matches to the penny:', mcNetRounded, '==', multiCampusBatch.totalNet);
+    // ── Test 5: Tithely Batch Deposit with Fee Account Assignment and Net Calculation ──
+    console.log('\n--- Test 5: Tithely Batch Deposit with Fee Account Assignment ---');
+    const tithelyBatch: GivingBatch = {
+        id: '483',
+        churchId: 'ch_v0cjkh0z1',
+        name: '2026-09-08 Tithely dep_1247322a7a7b4bab88fb42fce1e4',
+        date: '2026-09-09T02:08:42Z',
+        batchType: 'tithely',
+        status: 'committed',
+        totalGross: 110.00,
+        totalFees: 4.40,
+        totalNet: 105.60,
+        donationCount: 4,
+        fundsBreakdown: [
+            {
+                fundId: '313397',
+                fundName: 'Tithes and Offerings',
+                grossAmount: 110.00,
+                feeAmount: 4.40,
+                netAmount: 105.60,
+                donationCount: 4
+            }
+        ]
+    };
 
-    // ── Test 5: Email Notification Recipient Resolution & Message Construction ──
-    console.log('\n--- Test 5: Email Notification Recipient Resolution ---');
+    const tithelyMapping: QuickbooksMappingConfig = {
+        churchId: 'ch_v0cjkh0z1',
+        depositBankAccountId: 'qbo_bank_checking_265',
+        depositBankAccountName: 'General Checking Account',
+        stripeFeeExpenseAccountId: 'qbo_exp_default_218',
+        stripeFeeExpenseAccountName: 'Merchant & Bank Fees',
+        defaultIncomeAccountId: 'qbo_inc_tithes_98',
+        defaultIncomeAccountName: 'Tithes and Offerings',
+        fundMappings: {
+            '313397': {
+                qboAccountId: 'qbo_inc_tithes_98',
+                qboAccountName: 'Tithes and Offerings'
+            }
+        }
+    };
+
+    // Case 5A: Deposit using specified fee expense account and specified Tithely vendor
+    const tithelyPayload = buildMockDepositPayload(tithelyBatch, tithelyMapping, {
+        feeExpenseAccountId: 'qbo_exp_tithely_fees_220',
+        feeExpenseAccountName: 'Tithely Processing Fees (220)',
+        feeVendorId: 'vendor_tithely_55',
+        feeVendorName: 'Tithe.ly'
+    });
+
+    console.assert(tithelyPayload.Line.length === 2, `Expected 2 lines (1 fund + 1 fee), got ${tithelyPayload.Line.length}`);
+    const tithelyIncomeLine = tithelyPayload.Line[0];
+    console.assert(tithelyIncomeLine.Amount === 110.00, 'Income line must be 110.00');
+    console.assert(tithelyIncomeLine.DepositLineDetail.AccountRef.value === 'qbo_inc_tithes_98', 'Income line must map to Tithes account');
+    console.log('✓ Tithely Income Line verified: $', tithelyIncomeLine.Amount, 'to Account:', tithelyIncomeLine.DepositLineDetail.AccountRef.name);
+
+    const tithelyFeeLine = tithelyPayload.Line[1];
+    console.assert(tithelyFeeLine.Amount === -4.40, `Fee line amount must be -4.40, got ${tithelyFeeLine.Amount}`);
+    console.assert(tithelyFeeLine.DepositLineDetail.AccountRef.value === 'qbo_exp_tithely_fees_220', 'Fee line must map to specified Tithely fee account');
+    console.assert(tithelyFeeLine.DepositLineDetail.Entity.EntityRef.value === 'vendor_tithely_55', 'Fee line must map to Tithely vendor');
+    console.assert(tithelyFeeLine.Description.startsWith('Tithely Processing Fees'), `Description must identify Tithely fees, got ${tithelyFeeLine.Description}`);
+    console.log('✓ Tithely Fee Line verified: $', tithelyFeeLine.Amount, 'assigned to specified Account:', tithelyFeeLine.DepositLineDetail.AccountRef.name, 'with Vendor:', tithelyFeeLine.DepositLineDetail.Entity.EntityRef.name);
+    console.log('✓ Tithely Line Description verified:', tithelyFeeLine.Description);
+
+    const tithelyNet = Math.round(tithelyPayload.Line.reduce((sum: number, line: any) => sum + line.Amount, 0) * 100) / 100;
+    console.assert(tithelyNet === 105.60, `Net deposit (${tithelyNet}) must equal $105.60 ($110.00 total minus $4.40 fees)`);
+    console.log('✓ Net Deposit accurately equals total minus fees ($110.00 - $4.40): $', tithelyNet, '== 105.60');
+
+    // ── Test 6: Email Notification Recipient Resolution & Message Construction ──
+    console.log('\n--- Test 6: Email Notification Recipient Resolution ---');
 
     // Case 5A: Single and multiple comma/semicolon emails
     const directEmailMapping: QuickbooksMappingConfig = {

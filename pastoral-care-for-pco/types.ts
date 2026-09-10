@@ -696,7 +696,7 @@ export interface GivingBatch {
     churchId: string;
     name: string;
     date: string;
-    batchType: 'manual' | 'stripe' | 'mixed';
+    batchType: 'manual' | 'stripe' | 'tithely' | 'mixed';
     status: 'open' | 'committed' | 'synced_to_qbo';
     totalGross: number;
     totalFees: number;
@@ -708,6 +708,10 @@ export interface GivingBatch {
     quickbooksDepositBankAccountId?: string;
     quickbooksDepositBankAccountName?: string;
     quickbooksDepositIntuitTid?: string;
+    quickbooksFeeExpenseAccountId?: string;
+    quickbooksFeeExpenseAccountName?: string;
+    quickbooksFeeVendorId?: string;
+    quickbooksFeeVendorName?: string;
     syncedAt?: string;
     syncedBy?: string;
     notes?: string;
@@ -798,6 +802,11 @@ export interface QuickbooksDepositResult {
     depositBankAccountId?: string;
     depositBankAccountName?: string;
     intuitTid?: string;
+    feeExpenseAccountId?: string;
+    feeExpenseAccountName?: string;
+    feeVendorId?: string;
+    feeVendorName?: string;
+    netDepositAmount?: number;
 }
 
 export interface AttendanceEventSummary {

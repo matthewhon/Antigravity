@@ -570,6 +570,11 @@ export interface CreateQuickbooksDepositOptions {
     depositBankAccountId?: string;
     depositBankAccountName?: string;
     fundOverrides?: Record<string, import('../types').FundQuickbooksMapping>;
+    feeExpenseAccountId?: string;
+    feeExpenseAccountName?: string;
+    feeVendorId?: string;
+    feeVendorName?: string;
+    feeAmount?: number;
 }
 
 export async function createQuickbooksDeposit(
@@ -639,32 +644,46 @@ export async function createQuickbooksDeposit(
         });
     }
 
-    // 2. Negative Line: Stripe Credit Card / ACH Processing Fees (Expense)
-    if (batch.totalFees > 0) {
-        if (!mapping.stripeFeeExpenseAccountId) {
-            throw new Error('Stripe Fee Expense Account is not configured, but this batch has processing fees.');
+    // 2. Negative Line: Processing Fees (Expense) - assigned to specified account
+    const effectiveFees = options?.feeAmount !== undefined 
+        ? Math.round(Math.abs(options.feeAmount) * 100) / 100 
+        : Math.round((batch.totalFees || 0) * 100) / 100;
+
+    const feeAccountId = options?.feeExpenseAccountId || mapping.stripeFeeExpenseAccountId;
+    const feeAccountName = options?.feeExpenseAccountName || mapping.stripeFeeExpenseAccountName;
+    const vendorId = options?.feeVendorId !== undefined ? options.feeVendorId : mapping.stripeVendorId;
+    const vendorName = options?.feeVendorName !== undefined ? options.feeVendorName : mapping.stripeVendorName;
+
+    if (effectiveFees > 0) {
+        if (!feeAccountId) {
+            throw new Error('Processing Fee Expense Account is not specified. Please configure or select an expense account for fees.');
         }
 
         const feeLineDetail: any = {
             AccountRef: {
-                value: mapping.stripeFeeExpenseAccountId
+                value: feeAccountId
             }
         };
 
-        if (mapping.stripeVendorId) {
+        if (vendorId) {
             feeLineDetail.Entity = {
                 Type: 'Vendor',
                 EntityRef: {
-                    value: mapping.stripeVendorId,
-                    name: mapping.stripeVendorName || 'Stripe'
+                    value: vendorId,
+                    name: vendorName || 'Vendor'
                 }
             };
         }
 
+        const batchNameLower = (batch.name || '').toLowerCase();
+        const feeLabel = batchNameLower.includes('tithely') || batchNameLower.includes('tithe.ly')
+            ? 'Tithely Processing Fees'
+            : (batchNameLower.includes('stripe') ? 'Stripe Processing Fees' : 'Processing Fees');
+
         lines.push({
-            Amount: -Math.abs(batch.totalFees),
+            Amount: -effectiveFees,
             DetailType: 'DepositLineDetail',
-            Description: `Stripe Processing Fees - ${batch.name}`,
+            Description: `${feeLabel} - ${batch.name}`,
             DepositLineDetail: feeLineDetail
         });
     }
@@ -746,7 +765,12 @@ export async function createQuickbooksDeposit(
         qboUrl,
         depositBankAccountId: targetBankAccountId,
         depositBankAccountName: targetBankAccountName,
-        intuitTid
+        intuitTid,
+        feeExpenseAccountId: feeAccountId,
+        feeExpenseAccountName: feeAccountName,
+        feeVendorId: vendorId,
+        feeVendorName: vendorName,
+        netDepositAmount: totalAmount
     };
 }
 

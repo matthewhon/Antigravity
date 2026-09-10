@@ -73,6 +73,11 @@ export const quickbooksClient = {
             depositBankAccountId?: string;
             depositBankAccountName?: string;
             fundOverrides?: Record<string, import('../types').FundQuickbooksMapping>;
+            feeExpenseAccountId?: string;
+            feeExpenseAccountName?: string;
+            feeVendorId?: string;
+            feeVendorName?: string;
+            feeAmount?: number;
             saveAsDefault?: boolean;
         }
     ): Promise<{
@@ -90,6 +95,11 @@ export const quickbooksClient = {
                 depositBankAccountId: options?.depositBankAccountId,
                 depositBankAccountName: options?.depositBankAccountName,
                 fundOverrides: options?.fundOverrides,
+                feeExpenseAccountId: options?.feeExpenseAccountId,
+                feeExpenseAccountName: options?.feeExpenseAccountName,
+                feeVendorId: options?.feeVendorId,
+                feeVendorName: options?.feeVendorName,
+                feeAmount: options?.feeAmount,
                 saveAsDefault: options?.saveAsDefault
             })
         });
