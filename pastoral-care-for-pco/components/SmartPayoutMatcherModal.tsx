@@ -17,7 +17,8 @@ import {
     ChevronDown,
     ChevronUp,
     Copy,
-    Info
+    Info,
+    Landmark
 } from 'lucide-react';
 import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -32,7 +33,7 @@ interface SmartPayoutMatcherModalProps {
     churchId: string;
     isOpen: boolean;
     onClose: () => void;
-    onBatchCreated: (batch: GivingBatch) => void;
+    onBatchCreated: (batch: GivingBatch, andSendToQbo?: boolean) => void;
     donations?: DetailedDonation[];
 }
 
@@ -312,7 +313,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         (targetMode === 'gross' && numTargetAmount > 0 && Math.abs(grossDiff) < 0.005)
     ) && (numTargetTithe === 0 || Math.abs(titheDiff) < 0.005);
 
-    const handleCreateBatch = async () => {
+    const handleCreateBatch = async (andSendToQbo: boolean = false) => {
         if (activeDonations.length === 0) return;
 
         setCreatingBatch(true);
@@ -346,7 +347,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 activeDonations.map(d => d.id)
             );
 
-            onBatchCreated(newBatch);
+            onBatchCreated(newBatch, andSendToQbo);
             onClose();
         } catch (err: any) {
             console.error('Error creating payout batch:', err);
@@ -956,24 +957,35 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={handleCreateBatch}
-                                disabled={creatingBatch || activeDonations.length === 0}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all shrink-0"
-                            >
-                                {creatingBatch ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Creating Batch...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check className="w-4 h-4" />
-                                        Confirm & Create Batch ({activeDonations.length} Gifts)
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => handleCreateBatch(false)}
+                                    disabled={creatingBatch || activeDonations.length === 0}
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Check className="w-4 h-4 text-slate-500" />
+                                    Save Batch Only
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCreateBatch(true)}
+                                    disabled={creatingBatch || activeDonations.length === 0}
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all shrink-0"
+                                >
+                                    {creatingBatch ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Landmark className="w-4 h-4" />
+                                            Save & Send to QuickBooks
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

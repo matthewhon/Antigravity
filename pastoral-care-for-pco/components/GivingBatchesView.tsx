@@ -719,12 +719,16 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 onClose={() => setIsMatcherModalOpen(false)}
                 churchId={churchId}
                 donations={donations}
-                onBatchCreated={(newBatch) => {
+                onBatchCreated={(newBatch, andSendToQbo) => {
                     setBatches(prev => [newBatch, ...prev.filter(b => b.id !== newBatch.id)]);
-                    setActionMessage({
-                        type: 'success',
-                        text: `Payout batch "${newBatch.name}" created successfully with ${newBatch.donationCount} gifts!`
-                    });
+                    if (andSendToQbo) {
+                        setPreviewBatch(newBatch);
+                    } else {
+                        setActionMessage({
+                            type: 'success',
+                            text: `Payout batch "${newBatch.name}" created successfully with ${newBatch.donationCount} gifts!`
+                        });
+                    }
                 }}
             />
         </div>
