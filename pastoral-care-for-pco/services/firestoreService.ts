@@ -805,6 +805,68 @@ class FirestoreService {
     }
   }
 
+  async getUnbatchedOnlineDonations(churchId: string, sinceDate?: string): Promise<DetailedDonation[]> {
+    try {
+      let q = query(
+        collection(db, 'detailed_donations'),
+        where('churchId', '==', churchId)
+      );
+      const snap = await getDocs(q);
+      const donations: DetailedDonation[] = [];
+      snap.forEach(d => {
+        const data = d.data() as DetailedDonation;
+        if (!data.batchId) {
+          const isOnline = (data.fee != null && Math.abs(data.fee) > 0) ||
+            (data.paymentSource && /stripe|card|ach|online/i.test(data.paymentSource)) ||
+            (data.paymentMethod && /card|ach|stripe/i.test(data.paymentMethod)) ||
+            !!data.stripe_payout_id || !!data.stripePayoutId;
+          if (isOnline) {
+            if (!sinceDate || (data.date || '').slice(0, 10) >= sinceDate) {
+              donations.push({ id: d.id, ...data });
+            }
+          }
+        }
+      });
+      return donations.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (e) {
+      console.error('Error fetching unbatched online donations:', e);
+      return [];
+    }
+  }
+
+  async createCustomPayoutBatch(churchId: string, batch: GivingBatch, donationIds: string[]): Promise<GivingBatch> {
+    try {
+      // 1. Save Batch to giving_batches
+      const batchRef = doc(db, 'giving_batches', batch.id);
+      await setDoc(batchRef, this.deepSanitize(batch), { merge: true });
+
+      // 2. Update donations to assign batchId, batchName, stripePayoutId, paid_out_date
+      const CHUNK = 400;
+      for (let i = 0; i < donationIds.length; i += CHUNK) {
+        const chunk = donationIds.slice(i, i + CHUNK);
+        const wBatch = writeBatch(db);
+        chunk.forEach(id => {
+          const dRef = doc(db, 'detailed_donations', id);
+          wBatch.update(dRef, {
+            batchId: batch.id,
+            batchName: batch.name,
+            stripePayoutId: batch.stripePayoutId || null,
+            stripe_payout_id: batch.stripePayoutId || null,
+            paidOutDate: batch.paidOutDate || null,
+            paid_out_date: batch.paidOutDate || null
+          });
+        });
+        await wBatch.commit();
+      }
+
+      return batch;
+    } catch (e) {
+      console.error('Error creating custom payout batch:', e);
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
   async getQuickbooksMapping(churchId: string): Promise<QuickbooksMappingConfig | null> {
     try {
       const docRef = doc(db, 'churches', churchId, 'quickbooks_mapping', 'config');

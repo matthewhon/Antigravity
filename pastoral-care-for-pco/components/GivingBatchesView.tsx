@@ -8,10 +8,11 @@ import { quickbooksClient } from '../services/quickbooksService';
 import { useTenantData } from '../contexts/TenantDataContext';
 import { QuickbooksMappingModal } from './QuickbooksMappingModal';
 import { GivingDepositPreviewModal } from './GivingDepositPreviewModal';
+import { SmartPayoutMatcherModal } from './SmartPayoutMatcherModal';
 import { 
     Landmark, CreditCard, CheckCircle2, AlertCircle, RefreshCw, 
     Settings, Search, ArrowUpRight, Check, ExternalLink, Calendar,
-    DollarSign, Filter, Layers, ChevronRight, Trash2
+    DollarSign, Filter, Layers, ChevronRight, Trash2, Sparkles
 } from 'lucide-react';
 
 interface GivingBatchesViewProps {
@@ -38,6 +39,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     const [mapping, setMapping] = useState<QuickbooksMappingConfig | null>(null);
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     const [previewBatch, setPreviewBatch] = useState<GivingBatch | null>(null);
+    const [isMatcherModalOpen, setIsMatcherModalOpen] = useState(false);
 
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'synced' | 'stripe' | 'manual'>('all');
     const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>('all');
@@ -387,6 +389,16 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                             />
                         </div>
 
+                        <button
+                            type="button"
+                            onClick={() => setIsMatcherModalOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors shadow-sm"
+                            title="AI Match unbatched online transactions to a Stripe payout deposit"
+                        >
+                            <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                            Match Stripe Payout
+                        </button>
+
                         {onSyncRecent && (
                             <button
                                 type="button"
@@ -650,6 +662,20 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 onDepositSuccess={handleDepositSuccess}
                 onMappingSaved={(newMapping) => {
                     setMapping(newMapping);
+                }}
+            />
+
+            {/* Smart Payout Batch Matcher (AI Assist) */}
+            <SmartPayoutMatcherModal
+                isOpen={isMatcherModalOpen}
+                onClose={() => setIsMatcherModalOpen(false)}
+                churchId={churchId}
+                onBatchCreated={(newBatch) => {
+                    setBatches(prev => [newBatch, ...prev.filter(b => b.id !== newBatch.id)]);
+                    setActionMessage({
+                        type: 'success',
+                        text: `Payout batch "${newBatch.name}" created successfully with ${newBatch.donationCount} gifts!`
+                    });
                 }}
             />
         </div>
