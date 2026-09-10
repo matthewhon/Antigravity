@@ -822,13 +822,19 @@ class FirestoreService {
       snap.forEach(d => {
         const data = d.data() as DetailedDonation;
         if (includeBatched || !data.batchId) {
-          const isOnline = (data.fee != null && Math.abs(data.fee) > 0) ||
-            (data.paymentSource && /stripe|card|ach|online/i.test(data.paymentSource)) ||
-            (data.paymentMethod && /card|ach|stripe/i.test(data.paymentMethod)) ||
-            !!data.stripe_payout_id || !!data.stripePayoutId;
-          if (isOnline) {
-            if (!sinceDate || (data.date || '').slice(0, 10) >= sinceDate) {
-              donations.push({ id: d.id, ...data });
+          const isTithely = /tithely|tithe\.ly/i.test(data.paymentMethod || '') ||
+            /tithely|tithe\.ly/i.test(data.paymentSource || '') ||
+            /tithely|tithe\.ly/i.test(data.batchName || '') ||
+            (data.labels && data.labels.some(l => /tithely|tithe\.ly/i.test(l)));
+          if (!isTithely) {
+            const isOnline = (data.fee != null && Math.abs(data.fee) > 0) ||
+              (data.paymentSource && /stripe|card|ach|online/i.test(data.paymentSource)) ||
+              (data.paymentMethod && /card|ach|stripe/i.test(data.paymentMethod)) ||
+              !!data.stripe_payout_id || !!data.stripePayoutId;
+            if (isOnline) {
+              if (!sinceDate || (data.date || '').slice(0, 10) >= sinceDate) {
+                donations.push({ id: d.id, ...data });
+              }
             }
           }
         }

@@ -66,7 +66,17 @@ export function getCandidateGiftsForPayout(
     const candidates = allDonations.filter(d => {
         if (!includeBatched && d.batchId) return false;
 
-        const src = (d.paymentSource || '') + ' ' + (d.paymentMethod || '');
+        const src = (d.paymentSource || '') + ' ' + (d.paymentMethod || '') + ' ' + (d.batchName || '');
+
+        // Exclude Tithely transactions (Tithely has separate deposits and is not part of Stripe payouts)
+        const isTithely = /tithely|tithe\.ly/i.test(d.paymentMethod || '') ||
+            /tithely|tithe\.ly/i.test(d.paymentSource || '') ||
+            /tithely|tithe\.ly/i.test(d.batchName || '') ||
+            /tithely|tithe\.ly/i.test((d as any).batchType || '') ||
+            /tithely|tithe\.ly/i.test((d as any).paymentType || '') ||
+            (d.labels && d.labels.some(l => /tithely|tithe\.ly/i.test(l)));
+        if (isTithely) return false;
+
         const isCashOrCheck = /cash|check/i.test(d.paymentSource || '') || /cash|check/i.test(d.paymentMethod || '');
         if (isCashOrCheck) return false;
 
