@@ -33,9 +33,12 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 }) => {
     // Input state
     const [payoutDate, setPayoutDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [startDate, setStartDate] = useState<string>('2026-08-23');
+    const [endDate, setEndDate] = useState<string>('2026-08-31');
     const [targetAmount, setTargetAmount] = useState<string>('');
-    const [targetMode, setTargetMode] = useState<'gross' | 'net'>('gross');
+    const [targetMode, setTargetMode] = useState<'gross' | 'net'>('net');
     const [targetFees, setTargetFees] = useState<string>('');
+    const [targetTitheGross, setTargetTitheGross] = useState<string>('7655.48');
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
@@ -72,10 +75,15 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
         try {
             // Fetch unbatched online donations
-            const pDate = new Date(payoutDate);
-            const minDate = new Date(pDate);
-            minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
-            const sinceDate = minDate.toISOString().slice(0, 10);
+            let sinceDate: string;
+            if (startDate) {
+                sinceDate = startDate.slice(0, 10);
+            } else {
+                const pDate = new Date(payoutDate);
+                const minDate = new Date(pDate);
+                minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
+                sinceDate = minDate.toISOString().slice(0, 10);
+            }
 
             const donations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate);
 
@@ -86,11 +94,15 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
             }
 
             const numFees = targetFees ? parseFloat(targetFees) : undefined;
+            const numTithe = targetTitheGross ? parseFloat(targetTitheGross) : undefined;
             const res = matchDonationsForPayout(donations, {
                 payoutDate,
+                startDate: startDate.trim() || undefined,
+                endDate: endDate.trim() || undefined,
                 targetGross: targetMode === 'gross' ? numAmount : undefined,
                 targetNet: targetMode === 'net' ? numAmount : undefined,
                 targetFees: isNaN(numFees!) ? undefined : numFees,
+                targetTitheGross: isNaN(numTithe!) ? undefined : numTithe,
                 stripePayoutId: stripePayoutId.trim() || undefined,
                 searchWindowDays
             });
@@ -237,7 +249,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     )}
 
                     {/* Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800">
                         {/* Payout Date */}
                         <div>
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -257,21 +269,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                     <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                                    Target Amount *
+                                    Target Deposit *
                                 </label>
                                 <div className="flex items-center gap-1 text-[11px]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTargetMode('gross')}
-                                        className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
-                                            targetMode === 'gross' 
-                                                ? 'bg-purple-600 text-white' 
-                                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                        }`}
-                                    >
-                                        Gross
-                                    </button>
-                                    <span className="text-slate-300 dark:text-slate-700">|</span>
                                     <button
                                         type="button"
                                         onClick={() => setTargetMode('net')}
@@ -283,6 +283,18 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     >
                                         Net Bank
                                     </button>
+                                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTargetMode('gross')}
+                                        className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                            targetMode === 'gross' 
+                                                ? 'bg-purple-600 text-white' 
+                                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                        }`}
+                                    >
+                                        Gross
+                                    </button>
                                 </div>
                             </div>
                             <div className="relative">
@@ -290,7 +302,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 <input
                                     type="number"
                                     step="0.01"
-                                    placeholder={targetMode === 'gross' ? '3751.20' : '3736.69'}
+                                    placeholder={targetMode === 'gross' ? '10263.91' : '10107.40'}
                                     value={targetAmount}
                                     onChange={(e) => setTargetAmount(e.target.value)}
                                     className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
@@ -298,18 +310,50 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                             </div>
                         </div>
 
-                        {/* Optional Stripe Payout ID */}
+                        {/* Target Tithe Gross */}
                         <div>
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                                Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
+                                <Building className="w-3.5 h-3.5 text-indigo-500" />
+                                Target Tithe Gross <span className="text-slate-400 font-normal">(Optional)</span>
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="e.g. 7655.48"
+                                    value={targetTitheGross}
+                                    onChange={(e) => setTargetTitheGross(e.target.value)}
+                                    className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Window Start Date */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                Transaction Start Date
                             </label>
                             <input
-                                type="text"
-                                placeholder="e.g. po_1N8... or dep_..."
-                                value={stripePayoutId}
-                                onChange={(e) => setStripePayoutId(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
+                        </div>
+
+                        {/* Window End Date */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                Transaction End Date
+                            </label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
                             />
                         </div>
 
@@ -324,12 +368,27 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 <input
                                     type="number"
                                     step="0.01"
-                                    placeholder="e.g. 14.51"
+                                    placeholder="e.g. 156.51"
                                     value={targetFees}
                                     onChange={(e) => setTargetFees(e.target.value)}
                                     className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
                                 />
                             </div>
+                        </div>
+
+                        {/* Optional Stripe Payout ID */}
+                        <div className="sm:col-span-2 lg:col-span-3">
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                                Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="e.g. po_1N8... or dep_..."
+                                value={stripePayoutId}
+                                onChange={(e) => setStripePayoutId(e.target.value)}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
                         </div>
                     </div>
 
@@ -383,6 +442,14 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 </div>
 
                                 <div className="flex items-center gap-4 text-right">
+                                    {matchResult.totalTitheGross !== undefined && (
+                                        <div>
+                                            <span className="text-[10px] uppercase tracking-wider text-indigo-500 font-semibold block">Tithe</span>
+                                            <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                                ${matchResult.totalTitheGross.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div>
                                         <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block">Gross</span>
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">

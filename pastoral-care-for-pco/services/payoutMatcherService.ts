@@ -2,11 +2,14 @@ import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../type
 
 export interface PayoutMatchOptions {
     payoutDate: string;
+    startDate?: string;
+    endDate?: string;
     targetGross?: number;
     targetNet?: number;
     targetFees?: number;
+    targetTitheGross?: number;
     stripePayoutId?: string;
-    searchWindowDays?: number; // default 12 days before payout date
+    searchWindowDays?: number; // default 14 days before payout date
 }
 
 export interface PayoutMatchResult {
@@ -15,6 +18,7 @@ export interface PayoutMatchResult {
     totalGross: number;
     totalFees: number;
     totalNet: number;
+    totalTitheGross?: number;
     matchedDonations: DetailedDonation[];
     fundsBreakdown: GivingBatchFundBreakdown[];
     recommendedBatchName: string;
@@ -26,6 +30,7 @@ interface ParentDonationGroup {
     gross: number;
     fee: number;
     net: number;
+    tithe: number;
     date: string;
     donorName: string;
     paymentMethod: string;
@@ -41,14 +46,19 @@ export function matchDonationsForPayout(
     allDonations: DetailedDonation[],
     options: PayoutMatchOptions
 ): PayoutMatchResult | null {
-    const { payoutDate, targetGross, targetNet, targetFees, stripePayoutId } = options;
+    const { payoutDate, startDate, endDate, targetGross, targetNet, targetFees, targetTitheGross, stripePayoutId } = options;
     const windowDays = options.searchWindowDays || 14;
 
-    const pDate = new Date(payoutDate);
-    const pDateStr = payoutDate.slice(0, 10);
-    const minDate = new Date(pDate);
-    minDate.setDate(minDate.getDate() - windowDays);
-    const minDateStr = minDate.toISOString().slice(0, 10);
+    const pDateStr = (endDate || payoutDate).slice(0, 10);
+    let minDateStr: string;
+    if (startDate) {
+        minDateStr = startDate.slice(0, 10);
+    } else {
+        const pDate = new Date(payoutDate);
+        const minDate = new Date(pDate);
+        minDate.setDate(minDate.getDate() - windowDays);
+        minDateStr = minDate.toISOString().slice(0, 10);
+    }
 
     // 1. Filter online unbatched donations within window
     const candidates = allDonations.filter(d => {
@@ -76,6 +86,9 @@ export function matchDonationsForPayout(
     const parents: ParentDonationGroup[] = Array.from(parentMap.entries()).map(([rootId, desigs]) => {
         const gross = desigs.reduce((s, d) => s + (d.amount || 0), 0);
         const fee = desigs.reduce((s, d) => s + Math.abs(d.fee || 0), 0);
+        const tithe = desigs
+            .filter(d => /tithe/i.test(d.fundName || ''))
+            .reduce((s, d) => s + (d.amount || 0), 0);
         const net = gross - fee;
         const first = desigs[0];
         return {
@@ -83,6 +96,7 @@ export function matchDonationsForPayout(
             gross: Math.round(gross * 100) / 100,
             fee: Math.round(fee * 100) / 100,
             net: Math.round(net * 100) / 100,
+            tithe: Math.round(tithe * 100) / 100,
             date: first.date,
             donorName: first.donorName || 'Donor',
             paymentMethod: first.paymentMethod || 'card',
@@ -93,8 +107,11 @@ export function matchDonationsForPayout(
     // Determine target in cents
     const hasTargetGross = targetGross !== undefined && targetGross > 0;
     const hasTargetNet = targetNet !== undefined && targetNet > 0;
+    const targetTitheCents = targetTitheGross !== undefined && targetTitheGross > 0
+        ? Math.round(targetTitheGross * 100)
+        : null;
 
-    if (!hasTargetGross && !hasTargetNet) {
+    if (!hasTargetGross && !hasTargetNet && !targetTitheCents) {
         // If neither is specified, sum all candidates in window
         return buildResult(parents, pDateStr, stripePayoutId, 0, true);
     }
@@ -108,76 +125,87 @@ export function matchDonationsForPayout(
 
     // 3. Search for best subset
     let bestChosen: ParentDonationGroup[] | null = null;
-    let minDiffCents = Infinity;
+    let minScore = Infinity;
+    let bestDiffCents = Infinity;
+
+    function evaluateSubset(chosen: ParentDonationGroup[], accG: number, accF: number, accT: number) {
+        const accN = accG - accF;
+        let diff = 0;
+        if (hasTargetGross) diff = Math.abs(accG - targetGrossCents);
+        else if (hasTargetNet) diff = Math.abs(accN - targetNetCents);
+
+        let score = diff;
+        if (targetTitheCents !== null) {
+            const titheDiff = Math.abs(accT - targetTitheCents);
+            score += titheDiff * 20; // heavily weight tithe match
+        }
+        if (targetFeeCents !== null) {
+            score += Math.abs(accF - targetFeeCents) * 5;
+        }
+
+        if (score < minScore) {
+            minScore = score;
+            bestDiffCents = diff;
+            bestChosen = [...chosen];
+        }
+    }
 
     // First try: Contiguous time-window search
     for (let i = 0; i < parents.length; i++) {
         let currentG = 0;
         let currentF = 0;
+        let currentT = 0;
         const sub: ParentDonationGroup[] = [];
         for (let j = i; j < parents.length; j++) {
             sub.push(parents[j]);
             currentG += Math.round(parents[j].gross * 100);
             currentF += Math.round(parents[j].fee * 100);
-            const currentN = currentG - currentF;
-
-            const diff = hasTargetGross
-                ? Math.abs(currentG - targetGrossCents)
-                : Math.abs(currentN - targetNetCents);
-
-            if (diff < minDiffCents) {
-                minDiffCents = diff;
-                bestChosen = [...sub];
-                if (diff === 0 && (targetFeeCents === null || Math.abs(currentF - targetFeeCents) <= 2)) {
-                    break;
-                }
-            }
+            currentT += Math.round(parents[j].tithe * 100);
+            evaluateSubset(sub, currentG, currentF, currentT);
+            if (minScore === 0) break;
         }
-        if (minDiffCents === 0 && (targetFeeCents === null || bestChosen?.reduce((s, p) => s + Math.round(p.fee * 100), 0) === targetFeeCents)) {
-            break;
-        }
+        if (minScore === 0) break;
     }
 
     // Second try: Bounded subset search if contiguous did not find exact match
-    if (minDiffCents !== 0 && parents.length <= 45) {
+    if (minScore > 1 && parents.length <= 48) {
         const items = parents.map(p => ({
             p,
             gCents: Math.round(p.gross * 100),
             fCents: Math.round(p.fee * 100),
-            nCents: Math.round(p.net * 100)
+            nCents: Math.round(p.net * 100),
+            tCents: Math.round(p.tithe * 100)
         }));
 
-        function searchSubset(idx: number, accG: number, accF: number, chosen: ParentDonationGroup[]) {
-            if (minDiffCents === 0) return;
+        function searchSubset(idx: number, accG: number, accF: number, accT: number, chosen: ParentDonationGroup[]) {
+            if (minScore === 0) return;
 
-            const accN = accG - accF;
-            const diff = hasTargetGross ? Math.abs(accG - targetGrossCents) : Math.abs(accN - targetNetCents);
-
-            if (diff < minDiffCents) {
-                minDiffCents = diff;
-                bestChosen = [...chosen];
-                if (diff === 0 && (targetFeeCents === null || Math.abs(accF - targetFeeCents) <= 2)) {
-                    return;
-                }
-            }
+            evaluateSubset(chosen, accG, accF, accT);
 
             if (idx >= items.length) return;
-            if (hasTargetGross && accG > targetGrossCents + 100) return;
-            if (hasTargetNet && accN > targetNetCents + 100) return;
+            if (hasTargetGross && accG > targetGrossCents + 200) return;
+            if (hasTargetNet && (accG - accF) > targetNetCents + 200) return;
+            if (targetTitheCents !== null && accT > targetTitheCents + 100) return;
 
             // Include
-            searchSubset(idx + 1, accG + items[idx].gCents, accF + items[idx].fCents, [...chosen, items[idx].p]);
+            searchSubset(
+                idx + 1,
+                accG + items[idx].gCents,
+                accF + items[idx].fCents,
+                accT + items[idx].tCents,
+                [...chosen, items[idx].p]
+            );
             // Exclude
-            searchSubset(idx + 1, accG, accF, chosen);
+            searchSubset(idx + 1, accG, accF, accT, chosen);
         }
 
-        searchSubset(0, 0, 0, []);
+        searchSubset(0, 0, 0, 0, []);
     }
 
     if (!bestChosen || bestChosen.length === 0) return null;
 
-    const isExact = minDiffCents === 0;
-    return buildResult(bestChosen, pDateStr, stripePayoutId, minDiffCents / 100, isExact);
+    const isExact = bestDiffCents === 0;
+    return buildResult(bestChosen, pDateStr, stripePayoutId, bestDiffCents / 100, isExact);
 }
 
 function buildResult(
@@ -200,10 +228,12 @@ function buildResult(
 
     let totalGross = 0;
     let totalFees = 0;
+    let totalTithe = 0;
 
     parents.forEach(p => {
         totalGross += p.gross;
         totalFees += p.fee;
+        totalTithe += p.tithe;
         p.designations.forEach(d => {
             allDesignations.push(d);
             const fKey = `${d.fundId || d.fundName}_${d.campusId || 'main'}`;
@@ -229,6 +259,7 @@ function buildResult(
     const finalGross = round2(totalGross);
     const finalFees = round2(totalFees);
     const finalNet = round2(finalGross - finalFees);
+    const finalTithe = round2(totalTithe);
 
     const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundMap.values()).map(f => ({
         fundId: f.fundId,
@@ -250,6 +281,7 @@ function buildResult(
         totalGross: finalGross,
         totalFees: finalFees,
         totalNet: finalNet,
+        totalTitheGross: finalTithe,
         matchedDonations: allDesignations,
         fundsBreakdown,
         recommendedBatchName,
