@@ -56,9 +56,37 @@ export const FIELD_CATALOG: FieldSpec[] = [
     { key: 'gender',            label: 'Gender',            required: false, pcoPath: 'person',        fieldType: 'standard' },
     { key: 'graduation_year',   label: 'Graduation Year',   required: false, pcoPath: 'person',        fieldType: 'standard' },
     { key: 'school',            label: 'School',            required: false, pcoPath: 'person',        fieldType: 'standard' },
+    { key: 'grade',             label: 'Grade',             required: false, pcoPath: 'person',        fieldType: 'standard' },
+    { key: 'medical_notes',     label: 'Medical Notes',     required: false, pcoPath: 'person',        fieldType: 'standard' },
     { key: 'membership',        label: 'Membership Type',   required: false, pcoPath: 'person',        fieldType: 'standard' },
     { key: 'emergency_contact', label: 'Emergency Contact', required: false, pcoPath: 'field_data',    fieldType: 'custom'   },
 ];
+
+export const CHILD_FIELD_CATALOG: FieldSpec[] = [
+    { key: 'birthdate',         label: 'Birthday',                 required: false, pcoPath: 'person',     fieldType: 'standard' },
+    { key: 'grade',             label: 'School Grade',             required: false, pcoPath: 'person',     fieldType: 'standard' },
+    { key: 'school',            label: 'School Name',              required: false, pcoPath: 'person',     fieldType: 'standard' },
+    { key: 'medical_notes',     label: 'Medical / Allergy Notes',  required: false, pcoPath: 'person',     fieldType: 'standard' },
+    { key: 'gender',            label: 'Gender',                   required: false, pcoPath: 'person',     fieldType: 'standard' },
+    { key: 'emergency_contact', label: 'Emergency Contact',        required: false, pcoPath: 'field_data', fieldType: 'custom'   },
+];
+
+export function normalizeGrade(val: string): number | null {
+    const s = (val || '').toLowerCase().trim();
+    if (!s) return null;
+    if (s.includes('pre-k') || s.includes('preschool') || s.includes('pre k') || s === 'prek' || s === 'pk') return -1;
+    if (s.includes('kindergarten') || s === 'k') return 0;
+    if (s.includes('freshman')) return 9;
+    if (s.includes('sophomore')) return 10;
+    if (s.includes('junior')) return 11;
+    if (s.includes('senior')) return 12;
+    const match = s.match(/\d+/);
+    if (match) {
+        const num = parseInt(match[0], 10);
+        if (num >= -1 && num <= 12) return num;
+    }
+    return null;
+}
 
 async function writePhone(token: string, personId: string, value: string, location: 'Mobile' | 'Home'): Promise<string | null> {
     const existing = await pcoFetch(token, `/people/${personId}/phone_numbers?per_page=50`);
@@ -77,15 +105,20 @@ async function writePhone(token: string, personId: string, value: string, locati
 }
 
 async function writeEmail(token: string, personId: string, value: string): Promise<string | null> {
+    const trimmed = (value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        // Not a valid RFC-like email (e.g. "I don't have one") - ignore without error
+        return null;
+    }
     const existing = await pcoFetch(token, `/people/${personId}/emails?per_page=50`);
     if (existing.ok) {
         const data = await existing.json();
-        const duplicate = (data.data || []).find((e: any) => (e.attributes?.address || '').toLowerCase() === value.toLowerCase());
+        const duplicate = (data.data || []).find((e: any) => (e.attributes?.address || '').toLowerCase() === trimmed.toLowerCase());
         if (duplicate) return null;
     }
     const res = await pcoFetch(token, `/people/${personId}/emails`, {
         method: 'POST',
-        body: JSON.stringify({ data: { type: 'Email', attributes: { address: value, location: 'Home', primary: true } } }),
+        body: JSON.stringify({ data: { type: 'Email', attributes: { address: trimmed, location: 'Home', primary: true } } }),
     });
     if (!res.ok) { const err = await res.text().catch(() => ''); return `PCO email write failed (${res.status}): ${err.slice(0, 200)}`; }
     return null;
@@ -149,12 +182,17 @@ export async function writePersonDataToPco(params: {
 
         // 1. Batch standard person attrs into a single PATCH
         const personAttrs: Record<string, any> = {};
-        const PERSON_ATTR_KEYS = ['birthdate', 'anniversary', 'marital_status', 'gender', 'graduation_year', 'school', 'membership'];
+        const PERSON_ATTR_KEYS = ['birthdate', 'anniversary', 'marital_status', 'gender', 'graduation_year', 'school', 'grade', 'medical_notes', 'membership'];
         for (const key of PERSON_ATTR_KEYS) {
             if (collectedData[key]) {
-                personAttrs[key] = key === 'graduation_year'
-                    ? (parseInt(collectedData[key], 10) || collectedData[key])
-                    : collectedData[key];
+                if (key === 'graduation_year') {
+                    personAttrs[key] = parseInt(collectedData[key], 10) || collectedData[key];
+                } else if (key === 'grade') {
+                    const norm = normalizeGrade(collectedData[key]);
+                    if (norm !== null) personAttrs[key] = norm;
+                } else {
+                    personAttrs[key] = collectedData[key];
+                }
             }
         }
         if (Object.keys(personAttrs).length > 0) {

@@ -18,19 +18,55 @@ const POLL_INTERVAL_MS = 60_000;
 
 // ─── Outreach message builder ─────────────────────────────────────────────────
 
-function buildIntroMessage(campaign: any, personName: string, churchName: string, pcoValues: Record<string, string> = {}, sessionId: string = ''): string {
+export function buildIntroMessage(
+    campaign: any,
+    personName: string,
+    churchName: string,
+    pcoValues: Record<string, string> = {},
+    sessionId: string = '',
+    children: any[] = []
+): string {
     const isFormLinkMode = campaign.mode === 'form_link';
+    const targetScope = campaign.targetScope || 'adults_only';
     const baseUrl = process.env.API_BASE_URL || 'https://pastoralcare.barnabassoftware.com';
     const formLink = sessionId ? `${baseUrl}/form/${campaign.churchId}/${sessionId}` : `${baseUrl}/form/${campaign.churchId}/update`;
 
-    const rawTemplate = campaign.messaging?.introMessage || (
-        isFormLinkMode
-            ? `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your info for our church directory using this link: {{form_link}}`
-            : `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`
-    );
-
     const fieldLabels = (campaign.fieldsToCollect || []).map((f: any) => f.label).join(', ');
+    const childFieldLabels = (campaign.childFieldsToCollect || [
+        { key: 'birthdate', label: 'Birthday' },
+        { key: 'grade', label: 'School Grade' },
+        { key: 'school', label: 'School Name' },
+    ]).map((f: any) => f.label).join(', ');
     const firstName = personName.split(' ')[0] || personName;
+
+    // Build children names string (e.g., "Timmy" or "Timmy & Sarah")
+    const childNamesList = (children || []).map(c => c.firstName || c.personName?.split(' ')[0] || 'your child');
+    const childrenNames = childNamesList.length === 0
+        ? 'your children'
+        : childNamesList.length === 1
+            ? childNamesList[0]
+            : childNamesList.slice(0, -1).join(', ') + ' & ' + childNamesList.slice(-1);
+
+    let defaultIntro = '';
+    if (isFormLinkMode) {
+        if (targetScope === 'children_only') {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update details for {{children_names}} using this secure link: {{form_link}} - Thank you!`;
+        } else if (targetScope === 'household_all' && children.length > 0) {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your family's info (including {{children_names}}) using this link: {{form_link}}`;
+        } else {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your info for our church directory using this link: {{form_link}}`;
+        }
+    } else {
+        if (targetScope === 'children_only') {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. We're updating our records for {{children_names}} and would love to confirm a few details: {{children_fields}}. Reply to help us update their profile! Reply STOP to opt out.`;
+        } else if (targetScope === 'household_all' && children.length > 0) {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory for your family (including {{children_names}}). Reply to get started! Reply STOP to opt out.`;
+        } else {
+            defaultIntro = `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`;
+        }
+    }
+
+    const rawTemplate = campaign.messaging?.introMessage || defaultIntro;
 
     // Direct mapping dictionary for standard & special merge tags
     const tagMap: Record<string, string> = {
@@ -39,6 +75,10 @@ function buildIntroMessage(campaign: any, personName: string, churchName: string
         full_name: personName,
         church_name: churchName,
         fields_list: fieldLabels,
+        child_fields: childFieldLabels,
+        children_fields: childFieldLabels,
+        children_names: childrenNames,
+        child_names: childrenNames,
         form_link: formLink,
         address: pcoValues['address_home'] || '(not on file)',
         address_home: pcoValues['address_home'] || '(not on file)',
@@ -167,6 +207,68 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
     }
 }
 
+async function resolveHouseholdChildren(db: any, churchId: string, pcoPerson: any): Promise<any[]> {
+    const included = pcoPerson._included || [];
+    let householdId = pcoPerson.relationships?.households?.data?.[0]?.id || null;
+    if (!householdId) {
+        const hhInc = included.find((i: any) => i.type === 'Household');
+        if (hhInc?.id) householdId = hhInc.id;
+    }
+
+    // Try Firestore people lookup if householdId is missing in includes
+    if (!householdId) {
+        try {
+            const pDoc = await db.collection('people').doc(`${churchId}_${pcoPerson.id}`).get();
+            if (pDoc.exists) householdId = pDoc.data()?.householdId || null;
+        } catch { /* ignore */ }
+    }
+
+    if (!householdId) return [];
+
+    const children: any[] = [];
+    try {
+        const snap = await db.collection('people')
+            .where('churchId', '==', churchId)
+            .where('householdId', '==', householdId)
+            .get();
+
+        if (!snap.empty) {
+            snap.forEach((d: any) => {
+                const data = d.data();
+                if (String(data.id) !== String(pcoPerson.id) && (data.child === true || (data.age !== undefined && data.age < 18))) {
+                    children.push(data);
+                }
+            });
+        }
+    } catch { /* ignore */ }
+
+    // Fallback: fetch from PCO API if not in Firestore
+    if (children.length === 0) {
+        try {
+            const pcoRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/households/${householdId}/people?include=field_data`);
+            const pcoPeople = pcoRes?.data || [];
+            for (const p of pcoPeople) {
+                if (String(p.id) !== String(pcoPerson.id) && p.attributes?.child === true) {
+                    children.push({
+                        id: p.id,
+                        firstName: p.attributes?.first_name || '',
+                        lastName: p.attributes?.last_name || '',
+                        name: `${p.attributes?.first_name || ''} ${p.attributes?.last_name || ''}`.trim(),
+                        birthdate: p.attributes?.birthdate || null,
+                        grade: p.attributes?.grade ?? null,
+                        school: p.attributes?.school || null,
+                        medical_notes: p.attributes?.medical_notes || null,
+                        gender: p.attributes?.gender || null,
+                        emergency_contact: p.attributes?.emergency_contact || null,
+                    });
+                }
+            }
+        } catch { /* ignore */ }
+    }
+
+    return children;
+}
+
 async function processPersonForCampaign(
     db: any,
     log: any,
@@ -175,10 +277,16 @@ async function processPersonForCampaign(
     churchName: string,
     _timeZone: string,
 ): Promise<void> {
-    const { id: campaignId, churchId, schedule, channels, fieldsToCollect } = campaign;
+    const { id: campaignId, churchId, schedule, channels, fieldsToCollect, targetScope = 'adults_only' } = campaign;
     const pcoPersonId = pcoPerson.id;
     const personName  = `${pcoPerson.attributes?.first_name || ''} ${pcoPerson.attributes?.last_name || ''}`.trim() || 'Friend';
     const included    = pcoPerson._included || [];
+    const isChild     = pcoPerson.attributes?.child === true;
+
+    // If campaign is children_only and target person is already marked as child, skip outreach to them directly (we reach parents)
+    if (targetScope === 'children_only' && isChild) {
+        return;
+    }
 
     // Resolve phone and email from PCO includes
     const phones = included.filter((i: any) => i.type === 'PhoneNumber');
@@ -204,6 +312,8 @@ async function processPersonForCampaign(
     if (attrs.gender) pcoValues['gender'] = attrs.gender;
     if (attrs.graduation_year) pcoValues['graduation_year'] = String(attrs.graduation_year);
     if (attrs.school) pcoValues['school'] = attrs.school;
+    if (attrs.grade !== undefined && attrs.grade !== null) pcoValues['grade'] = String(attrs.grade);
+    if (attrs.medical_notes) pcoValues['medical_notes'] = attrs.medical_notes;
     if (attrs.membership) pcoValues['membership'] = attrs.membership;
     if (attrs.first_name) pcoValues['first_name'] = attrs.first_name;
     if (attrs.last_name) pcoValues['last_name'] = attrs.last_name;
@@ -220,12 +330,65 @@ async function processPersonForCampaign(
         if (addr.zip) pcoValues['zip'] = addr.zip;
     }
 
+    // Resolve children if campaign scope includes them
+    let childrenSessionData: any[] = [];
+    if (targetScope !== 'adults_only') {
+        const rawChildren = await resolveHouseholdChildren(db, churchId, pcoPerson);
+        const childFieldsToCollect = campaign.childFieldsToCollect || [
+            { key: 'birthdate', label: 'Birthday' },
+            { key: 'grade', label: 'School Grade' },
+            { key: 'school', label: 'School Name' },
+            { key: 'medical_notes', label: 'Medical / Allergy Notes' },
+        ];
+        const childFieldKeys = childFieldsToCollect.map((f: any) => f.key);
+        const behavior = campaign.fieldBehavior || 'confirm_all';
+
+        childrenSessionData = rawChildren.map((child: any) => {
+            const childPcoValues: Record<string, string> = {};
+            if (child.birthdate) childPcoValues['birthdate'] = String(child.birthdate);
+            if (child.grade !== undefined && child.grade !== null) childPcoValues['grade'] = String(child.grade);
+            if (child.school) childPcoValues['school'] = String(child.school);
+            if (child.medical_notes) childPcoValues['medical_notes'] = String(child.medical_notes);
+            if (child.gender) childPcoValues['gender'] = String(child.gender);
+            if (child.emergency_contact) childPcoValues['emergency_contact'] = String(child.emergency_contact);
+            if (child.firstName || child.first_name) childPcoValues['first_name'] = child.firstName || child.first_name;
+            if (child.lastName || child.last_name) childPcoValues['last_name'] = child.lastName || child.last_name;
+
+            const childRemaining = behavior === 'only_blank'
+                ? childFieldKeys.filter((k: string) => !childPcoValues[k] || !childPcoValues[k].trim())
+                : childFieldKeys;
+
+            return {
+                pcoPersonId: String(child.id || child.pcoId),
+                personName: child.name || `${child.firstName || child.first_name || ''} ${child.lastName || child.last_name || ''}`.trim(),
+                firstName: child.firstName || child.first_name || child.name || 'Child',
+                remainingFields: childRemaining,
+                existingPcoData: childPcoValues,
+                collectedData: {},
+                pcoWriteResult: null,
+            };
+        });
+
+        if (targetScope === 'children_only' && childrenSessionData.length === 0) {
+            // Person has no children in household; skip outreach for children_only campaign
+            log.info(`[InfoUpdateScheduler] Skipping ${personName} — no children in household for children_only campaign`, 'system', { churchId, campaignId, pcoPersonId }, churchId);
+            return;
+        }
+    }
+
     // Determine initial remaining fields based on campaign fieldBehavior ('confirm_all' vs 'only_blank')
     const behavior = campaign.fieldBehavior || 'confirm_all';
     const allFieldKeys = (fieldsToCollect || []).map((f: any) => f.key);
-    const initialRemainingFields = behavior === 'only_blank'
+    let initialRemainingFields = behavior === 'only_blank'
         ? allFieldKeys.filter((key: string) => !pcoValues[key] || !pcoValues[key].trim())
         : allFieldKeys;
+
+    if (targetScope === 'children_only') {
+        initialRemainingFields = [];
+    }
+
+    const totalChildRemaining = childrenSessionData.reduce((acc, c) => acc + (c.remainingFields?.length || 0), 0);
+    const isAllComplete = (initialRemainingFields.length === 0) && (targetScope === 'adults_only' || totalChildRemaining === 0);
 
     // Check for existing session
     const existingSnap = await db.collection('people_info_sessions')
@@ -242,7 +405,7 @@ async function processPersonForCampaign(
 
         // If session was created as 'pending' but attemptCount is 0, send initial outreach now!
         if (session.status === 'pending' || session.attemptCount === 0) {
-            await sendOutreach(db, log, campaign, sessionId, session, churchName, phoneE164, emailAddr);
+            await sendOutreach(db, log, campaign, sessionId, session, churchName, phoneE164, emailAddr, childrenSessionData);
             return;
         }
 
@@ -258,19 +421,21 @@ async function processPersonForCampaign(
         if (Date.now() < nextScheduledAt) return; // Not yet time to retry
 
         // Send retry outreach
-        await sendOutreach(db, log, campaign, sessionId, session, churchName, phoneE164, emailAddr);
+        await sendOutreach(db, log, campaign, sessionId, session, churchName, phoneE164, emailAddr, childrenSessionData);
         return;
     }
 
-    // Guard: if in 'only_blank' mode and person already has all requested fields filled, mark complete immediately without outreach
-    if (behavior === 'only_blank' && initialRemainingFields.length === 0) {
-        log.info(`[InfoUpdateScheduler] ${personName} already has all requested fields filled — skipping outreach`, 'system', { churchId, campaignId, pcoPersonId }, churchId);
+    // Guard: if in 'only_blank' mode and person (and children) already have all requested fields filled, mark complete immediately without outreach
+    if (behavior === 'only_blank' && isAllComplete) {
+        log.info(`[InfoUpdateScheduler] ${personName} (and children) already have all requested fields filled — skipping outreach`, 'system', { churchId, campaignId, pcoPersonId }, churchId);
         const sessionId = `ius_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         await db.collection('people_info_sessions').doc(sessionId).set({
             id: sessionId, campaignId, churchId, pcoPersonId, personName,
             phoneE164: phoneE164 || null, emailAddress: emailAddr || null,
             conversationHistory: [], collectedData: {}, existingPcoData: pcoValues,
-            remainingFields: [], status: 'complete', attemptCount: 0,
+            remainingFields: [],
+            children: childrenSessionData,
+            status: 'complete', attemptCount: 0,
             completedAt: Date.now()
         });
         await db.collection('people_info_campaigns').doc(campaignId).update({
@@ -294,6 +459,7 @@ async function processPersonForCampaign(
         collectedData: {},
         existingPcoData: pcoValues,
         remainingFields: initialRemainingFields,
+        children: childrenSessionData,
         status: 'pending',
         attemptCount: 0,
         lastContactedAt: null,
@@ -305,7 +471,7 @@ async function processPersonForCampaign(
     await db.collection('people_info_campaigns').doc(campaignId).update({ 'stats.total': FieldValue.increment(1), 'stats.pending': FieldValue.increment(1) });
 
     // Send initial outreach
-    await sendOutreach(db, log, campaign, sessionId, newSession, churchName, phoneE164, emailAddr);
+    await sendOutreach(db, log, campaign, sessionId, newSession, churchName, phoneE164, emailAddr, childrenSessionData);
 }
 
 async function sendOutreach(
@@ -317,12 +483,14 @@ async function sendOutreach(
     churchName: string,
     phoneE164: string | null,
     emailAddr: string | null,
+    children: any[] = []
 ): Promise<void> {
     const { churchId, channels, schedule } = campaign;
     const intervalDays = schedule?.intervalDays || 3;
     const nextScheduledAt = Date.now() + intervalDays * 24 * 60 * 60 * 1000;
 
-    const message = buildIntroMessage(campaign, session.personName, churchName, session.existingPcoData || {}, sessionId);
+    const sessionChildren = children.length > 0 ? children : (session.children || []);
+    const message = buildIntroMessage(campaign, session.personName, churchName, session.existingPcoData || {}, sessionId, sessionChildren);
     let sent = false;
 
     // Prefer SMS; fall back to email

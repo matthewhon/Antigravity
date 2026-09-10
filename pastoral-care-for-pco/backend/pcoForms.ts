@@ -86,49 +86,98 @@ export async function getPublicForm(req: any, res: any) {
       // Synthesize custom fields from campaign.fieldsToCollect
       const customFields: any[] = [];
       const requestedKeys = (campaign.fieldsToCollect || []).map((f: any) => f.key);
+      const targetScope = campaign.targetScope || 'adults_only';
       
-      if (!requestedKeys.includes('first_name')) {
-          customFields.push({ id: 'first_name', type: 'text', label: 'First Name', required: true, mapToPco: 'firstName', defaultValue: session.existingPcoData?.first_name || '' });
-      }
-      if (!requestedKeys.includes('last_name')) {
-          customFields.push({ id: 'last_name', type: 'text', label: 'Last Name', required: true, mapToPco: 'lastName', defaultValue: session.existingPcoData?.last_name || '' });
+      if (targetScope !== 'children_only') {
+        if (!requestedKeys.includes('first_name')) {
+            customFields.push({ id: 'first_name', type: 'text', label: 'First Name', required: true, mapToPco: 'firstName', defaultValue: session.existingPcoData?.first_name || '' });
+        }
+        if (!requestedKeys.includes('last_name')) {
+            customFields.push({ id: 'last_name', type: 'text', label: 'Last Name', required: true, mapToPco: 'lastName', defaultValue: session.existingPcoData?.last_name || '' });
+        }
+
+        (campaign.fieldsToCollect || []).forEach((f: any) => {
+          if (f.key === 'address_home') {
+            customFields.push({ id: 'heading_address', type: 'section_heading', label: 'Home Address', required: false, mapToPco: 'none' });
+            customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street', defaultValue: session.existingPcoData?.street || '' });
+            customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city', defaultValue: session.existingPcoData?.city || '' });
+            customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state', defaultValue: session.existingPcoData?.state || '' });
+            customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip', defaultValue: session.existingPcoData?.zip || '' });
+          } else {
+            let type = 'text';
+            let options: string[] | undefined;
+            let mapToPco = f.key;
+            
+            if (f.key === 'phone_mobile') mapToPco = 'phone';
+            else if (f.key === 'phone_home') mapToPco = 'phone';
+            else if (f.key === 'email_primary') mapToPco = 'email';
+            else if (f.key === 'birthdate') { type = 'date'; mapToPco = 'birthday'; }
+            else if (f.key === 'anniversary') { type = 'date'; mapToPco = 'anniversary'; }
+            else if (f.key === 'gender') { type = 'select'; options = ['Male', 'Female']; mapToPco = 'gender'; }
+            else if (f.key === 'marital_status') { type = 'select'; options = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated']; mapToPco = 'maritalStatus'; }
+            else if (f.key === 'emergency_contact' || f.key === 'school' || f.key === 'membership' || f.key === 'graduation_year') {
+               type = f.key === 'emergency_contact' ? 'paragraph' : 'text';
+               mapToPco = 'notes';
+            }
+            
+            customFields.push({
+              id: f.key,
+              type,
+              label: f.label,
+              required: false,
+              options,
+              mapToPco,
+              defaultValue: session.existingPcoData?.[f.key] || ''
+            });
+          }
+        });
       }
 
-      (campaign.fieldsToCollect || []).forEach((f: any) => {
-        if (f.key === 'address_home') {
-          customFields.push({ id: 'heading_address', type: 'section_heading', label: 'Home Address', required: false, mapToPco: 'none' });
-          customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street', defaultValue: session.existingPcoData?.street || '' });
-          customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city', defaultValue: session.existingPcoData?.city || '' });
-          customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state', defaultValue: session.existingPcoData?.state || '' });
-          customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip', defaultValue: session.existingPcoData?.zip || '' });
-        } else {
-          let type = 'text';
-          let options: string[] | undefined;
-          let mapToPco = f.key;
-          
-          if (f.key === 'phone_mobile') mapToPco = 'phone';
-          else if (f.key === 'phone_home') mapToPco = 'phone';
-          else if (f.key === 'email_primary') mapToPco = 'email';
-          else if (f.key === 'birthdate') { type = 'date'; mapToPco = 'birthday'; }
-          else if (f.key === 'anniversary') { type = 'date'; mapToPco = 'anniversary'; }
-          else if (f.key === 'gender') { type = 'select'; options = ['Male', 'Female']; mapToPco = 'gender'; }
-          else if (f.key === 'marital_status') { type = 'select'; options = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated']; mapToPco = 'maritalStatus'; }
-          else if (f.key === 'emergency_contact' || f.key === 'school' || f.key === 'membership' || f.key === 'graduation_year') {
-             type = f.key === 'emergency_contact' ? 'paragraph' : 'text';
-             mapToPco = 'notes';
-          }
-          
+      // If session has children, synthesize fields for each child
+      if (session.children && session.children.length > 0) {
+        const childFields = campaign.childFieldsToCollect || [
+          { key: 'birthdate', label: 'Birthday' },
+          { key: 'grade', label: 'School Grade' },
+          { key: 'school', label: 'School Name' },
+          { key: 'medical_notes', label: 'Medical / Allergy Notes' },
+        ];
+
+        session.children.forEach((child: any) => {
           customFields.push({
-            id: f.key,
-            type,
-            label: f.label,
+            id: `heading_child_${child.pcoPersonId}`,
+            type: 'section_heading',
+            label: `Child: ${child.personName}`,
             required: false,
-            options,
-            mapToPco,
-            defaultValue: session.existingPcoData?.[f.key] || ''
+            mapToPco: 'none'
           });
-        }
-      });
+
+          childFields.forEach((cf: any) => {
+            let type = 'text';
+            let options: string[] | undefined;
+            let mapToPco = cf.key;
+
+            if (cf.key === 'birthdate') { type = 'date'; mapToPco = 'birthday'; }
+            else if (cf.key === 'grade') {
+              type = 'select';
+              options = ['Pre-K / Preschool', 'Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+              mapToPco = 'grade';
+            }
+            else if (cf.key === 'medical_notes') { type = 'paragraph'; mapToPco = 'medical_notes'; }
+            else if (cf.key === 'gender') { type = 'select'; options = ['Male', 'Female']; mapToPco = 'gender'; }
+            else if (cf.key === 'emergency_contact') { type = 'paragraph'; mapToPco = 'notes'; }
+
+            customFields.push({
+              id: `child_${child.pcoPersonId}_${cf.key}`,
+              type,
+              label: `${child.firstName}'s ${cf.label}`,
+              required: false,
+              options,
+              mapToPco,
+              defaultValue: child.existingPcoData?.[cf.key] || ''
+            });
+          });
+        });
+      }
 
       let churchLogoUrl = null;
       try {
@@ -558,18 +607,73 @@ export async function submitForm(req: any, res: any) {
       const sessionRef = db.collection('people_info_sessions').doc(formId);
       const sessionDoc = await sessionRef.get();
       if (sessionDoc.exists) {
-        const history = sessionDoc.data()?.conversationHistory || [];
+        const sessionData = sessionDoc.data()!;
+        const history = sessionData.conversationHistory || [];
         history.push({
           role: 'system',
-          content: 'Form submitted successfully via web link.',
-          timestamp: Date.now()
+          text: 'Form submitted successfully via web link.',
+          channel: 'form',
+          ts: Date.now()
         });
+
+        // Collect child fields from submissionsData
+        const children = [...(sessionData.children || [])];
+        const { writePersonDataToPco } = await import('./pcoPersonUpdate.js');
+
+        for (let i = 0; i < children.length; i++) {
+          const childId = children[i].pcoPersonId;
+          const childCollected = { ...(children[i].collectedData || {}) };
+          
+          Object.keys(submissionsData).forEach(k => {
+            if (k.startsWith(`child_${childId}_`)) {
+              const fieldKey = k.replace(`child_${childId}_`, '');
+              const val = submissionsData[k];
+              if (val) childCollected[fieldKey] = val;
+            }
+          });
+
+          children[i].collectedData = childCollected;
+          children[i].remainingFields = [];
+
+          if (Object.keys(childCollected).length > 0) {
+            try {
+              const childRes = await writePersonDataToPco({
+                db,
+                log,
+                churchId,
+                pcoPersonId: childId,
+                collectedData: childCollected,
+                fieldsToCollect: [
+                  { key: 'birthdate', label: 'Birthday', required: false, pcoPath: 'person', fieldType: 'standard' },
+                  { key: 'grade', label: 'Grade', required: false, pcoPath: 'person', fieldType: 'standard' },
+                  { key: 'school', label: 'School', required: false, pcoPath: 'person', fieldType: 'standard' },
+                  { key: 'medical_notes', label: 'Medical Notes', required: false, pcoPath: 'person', fieldType: 'standard' },
+                  { key: 'gender', label: 'Gender', required: false, pcoPath: 'person', fieldType: 'standard' },
+                  { key: 'emergency_contact', label: 'Emergency Contact', required: false, pcoPath: 'field_data', fieldType: 'custom' },
+                ],
+              });
+              children[i].pcoWriteResult = childRes;
+            } catch (childErr: any) {
+              log.warn(`Child PCO write error for ${childId}: ${childErr.message}`, 'forms', { childId }, churchId);
+            }
+          }
+        }
+
         await sessionRef.update({
           status: 'complete',
-          lastActionAt: Date.now(),
+          completedAt: Date.now(),
           conversationHistory: history,
-          pcoPersonId: personId || sessionDoc.data()?.pcoPersonId
+          children,
+          remainingFields: [],
+          pcoPersonId: personId || sessionData.pcoPersonId
         });
+
+        // Update campaign stats
+        await db.collection('people_info_campaigns').doc(sessionData.campaignId).update({
+          'stats.complete': FieldValue.increment(1),
+          'stats.inProgress': FieldValue.increment(-1),
+        }).catch(() => {});
+
         log.info(`Marked session ${formId} as complete after web form submission`, 'forms', { formId }, churchId);
       }
     }

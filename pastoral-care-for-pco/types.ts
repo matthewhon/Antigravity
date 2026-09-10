@@ -2677,5 +2677,64 @@ export interface DiscTestResponse {
     syncedToPco?: boolean;
 }
 
+// ─── Church Helper (People Info Update Agent) Types ─────────────────────────
+export interface InfoFieldSpec {
+    key: string;
+    label: string;
+    required?: boolean;
+    pcoPath?: string;
+    fieldType?: 'standard' | 'custom';
+    pcoFieldDefId?: string;
+}
 
+export interface ChildSessionData {
+    pcoPersonId: string;
+    personName: string;
+    firstName: string;
+    remainingFields: string[];
+    existingPcoData: Record<string, string>;
+    collectedData: Record<string, string>;
+    pcoWriteResult?: { success: boolean; errors: string[] } | null;
+}
 
+export interface InfoCampaign {
+    id: string;
+    name: string;
+    churchId: string;
+    pcoListId: string;
+    pcoListName?: string;
+    status: 'active' | 'paused' | 'complete' | 'draft';
+    targetScope?: 'adults_only' | 'children_only' | 'household_all';
+    fieldsToCollect: InfoFieldSpec[];
+    childFieldsToCollect?: InfoFieldSpec[];
+    fieldBehavior?: 'confirm_all' | 'only_blank';
+    mode?: 'conversational' | 'form_link';
+    existingFieldValues?: Record<string, Record<string, string>>;
+    channels: { sms: boolean; email: boolean; smsNumberId?: string };
+    schedule: { startDate?: string; intervalDays: number; maxAttempts: number; sendWindowStart: string; sendWindowEnd: string };
+    messaging?: { introMessage?: string };
+    stats: { total: number; pending: number; inProgress: number; complete: number; maxAttempts: number };
+    createdAt: number;
+    completedAt?: number;
+}
+
+export interface InfoSession {
+    id: string;
+    campaignId: string;
+    churchId: string;
+    pcoPersonId: string;
+    personName: string;
+    phoneE164?: string | null;
+    emailAddress?: string | null;
+    status: 'pending' | 'in_progress' | 'complete' | 'max_attempts' | 'failed';
+    attemptCount: number;
+    lastContactedAt?: number | null;
+    nextScheduledAt?: number | null;
+    completedAt?: number | null;
+    remainingFields: string[];
+    existingPcoData?: Record<string, string>;
+    collectedData: Record<string, string>;
+    children?: ChildSessionData[];
+    conversationHistory: { role: string; text: string; channel: string; ts: number }[];
+    pcoWriteResult?: { success: boolean; errors: string[] } | null;
+}

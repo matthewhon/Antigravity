@@ -37,6 +37,15 @@ const FIELD_CATALOG: FieldSpec[] = [
     { key: 'emergency_contact', label: 'Emergency Contact' },
 ];
 
+const CHILD_FIELD_CATALOG: FieldSpec[] = [
+    { key: 'birthdate',         label: 'Birthday'                 },
+    { key: 'grade',             label: 'School Grade'             },
+    { key: 'school',            label: 'School Name'              },
+    { key: 'medical_notes',     label: 'Medical / Allergy Notes'  },
+    { key: 'gender',            label: 'Gender'                   },
+    { key: 'emergency_contact', label: 'Emergency Contact'        },
+];
+
 interface InfoCampaign {
     id: string;
     name: string;
@@ -44,7 +53,9 @@ interface InfoCampaign {
     pcoListId: string;
     pcoListName?: string;
     status: 'active' | 'paused' | 'complete' | 'draft';
+    targetScope?: 'adults_only' | 'children_only' | 'household_all';
     fieldsToCollect: FieldSpec[];
+    childFieldsToCollect?: FieldSpec[];
     fieldBehavior?: 'confirm_all' | 'only_blank';
     mode?: 'conversational' | 'form_link';
     existingFieldValues?: Record<string, Record<string, string>>;
@@ -53,6 +64,16 @@ interface InfoCampaign {
     messaging?: { introMessage?: string };
     stats: { total: number; pending: number; inProgress: number; complete: number; maxAttempts: number };
     createdAt: number;
+}
+
+interface ChildSessionData {
+    pcoPersonId: string;
+    personName: string;
+    firstName: string;
+    remainingFields: string[];
+    existingPcoData: Record<string, string>;
+    collectedData: Record<string, string>;
+    pcoWriteResult?: { success: boolean; errors: string[] };
 }
 
 interface InfoSession {
@@ -68,6 +89,7 @@ interface InfoSession {
     lastContactedAt?: number;
     remainingFields: string[];
     collectedData: Record<string, string>;
+    children?: ChildSessionData[];
     conversationHistory: { role: string; text: string; channel: string; ts: number }[];
     pcoWriteResult?: { success: boolean; errors: string[] };
 }
@@ -172,7 +194,7 @@ function SessionDetailModal({ session, onClose, onRetry }: {
                 <div className="p-5 border-t border-slate-200 dark:border-slate-700 space-y-4">
                     {Object.keys(session.collectedData).length > 0 && (
                         <div>
-                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Collected Data</p>
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Parent Collected Data</p>
                             <div className="grid grid-cols-2 gap-1.5">
                                 {Object.entries(session.collectedData).map(([key, val]) => (
                                     <div key={key} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-xs">
@@ -183,9 +205,58 @@ function SessionDetailModal({ session, onClose, onRetry }: {
                             </div>
                         </div>
                     )}
+
+                    {session.children && session.children.length > 0 && (
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                                Children in Household ({session.children.length})
+                            </p>
+                            <div className="space-y-2">
+                                {session.children.map(child => (
+                                    <div key={child.pcoPersonId} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <p className="font-semibold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                <span>👶</span> {child.personName}
+                                            </p>
+                                            {child.remainingFields.length === 0 ? (
+                                                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                                                    ✓ All Updated
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                                                    {child.remainingFields.length} field(s) needed
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {Object.keys(child.collectedData || {}).length > 0 ? (
+                                            <div className="grid grid-cols-2 gap-1 text-[11px] mt-1.5">
+                                                {Object.entries(child.collectedData).map(([k, v]) => (
+                                                    <div key={k} className="bg-white dark:bg-slate-900/60 p-1.5 rounded border border-slate-100 dark:border-slate-700/50">
+                                                        <span className="text-slate-400 capitalize">{k.replace(/_/g, ' ')}: </span>
+                                                        <span className="font-medium text-slate-800 dark:text-slate-200">{v}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-[11px] text-slate-400 italic">No new details collected yet</p>
+                                        )}
+
+                                        {child.pcoWriteResult && (
+                                            <div className={`mt-2 text-[10px] px-2 py-1 rounded ${child.pcoWriteResult.success ? 'bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-red-100/60 dark:bg-red-900/40 text-red-700 dark:text-red-300'}`}>
+                                                <span className="font-semibold">PCO Sync: </span>
+                                                {child.pcoWriteResult.success ? 'Success' : child.pcoWriteResult.errors.join(', ')}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {session.pcoWriteResult && (
                         <div className={`text-xs px-3 py-2 rounded-lg ${session.pcoWriteResult.success ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
-                            <span className="font-semibold">PCO Write:</span> {session.pcoWriteResult.success ? 'Success' : session.pcoWriteResult.errors.join(', ')}
+                            <span className="font-semibold">Parent PCO Write:</span> {session.pcoWriteResult.success ? 'Success' : session.pcoWriteResult.errors.join(', ')}
                         </div>
                     )}
                     {(session.status === 'max_attempts' || session.status === 'failed') && (
@@ -218,7 +289,9 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [pcoListId, setPcoListId] = useState(existing?.pcoListId || '');
     const [pcoListName, setPcoListName] = useState(existing?.pcoListName || '');
+    const [targetScope, setTargetScope] = useState<'adults_only' | 'children_only' | 'household_all'>(existing?.targetScope || 'adults_only');
     const [selectedFields, setSelectedFields] = useState<string[]>(existing?.fieldsToCollect.map(f => f.key) || ['phone_mobile', 'email_primary', 'address_home']);
+    const [selectedChildFields, setSelectedChildFields] = useState<string[]>(existing?.childFieldsToCollect?.map(f => f.key) || ['birthdate', 'grade', 'school', 'medical_notes']);
     const [fieldBehavior, setFieldBehavior] = useState<'confirm_all' | 'only_blank'>(existing?.fieldBehavior || 'confirm_all');
     const [mode, setMode] = useState<'conversational' | 'form_link'>(existing?.mode || 'conversational');
     const [smsEnabled, setSmsEnabled] = useState(existing?.channels?.sms ?? true);
@@ -248,12 +321,22 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
         setSelectedFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
     };
 
+    const toggleChildField = (key: string) => {
+        setSelectedChildFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    };
+
     const handleSuggestMessage = () => {
         const selectedSpecs = FIELD_CATALOG.filter(f => selectedFields.includes(f.key));
         const fieldNames = selectedSpecs.map(f => f.label);
+        const childSpecs = CHILD_FIELD_CATALOG.filter(f => selectedChildFields.includes(f.key));
+        const childFieldNames = childSpecs.map(f => f.label);
         
-        if (fieldNames.length === 0) {
-            alert('Please select at least one field to collect first.');
+        if (targetScope === 'adults_only' && fieldNames.length === 0) {
+            alert('Please select at least one parent field to collect first.');
+            return;
+        }
+        if (targetScope === 'children_only' && childFieldNames.length === 0) {
+            alert('Please select at least one child field to collect first.');
             return;
         }
 
@@ -261,9 +344,26 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
         const firstNameTag = '{{first_name}}';
 
         if (mode === 'form_link') {
-            setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. Please take a quick moment to update your info for our church directory using this secure link: {{form_link}} - Thank you!`);
+            if (targetScope === 'children_only') {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. Please take a moment to update records for {{children_names}} using this secure link: {{form_link}} - Thank you!`);
+            } else if (targetScope === 'household_all') {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. Please take a moment to update your family info (including {{children_names}}) using this link: {{form_link}}`);
+            } else {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. Please take a quick moment to update your info for our church directory using this secure link: {{form_link}} - Thank you!`);
+            }
             return;
         }
+
+        if (targetScope === 'children_only') {
+            setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We're updating our church directory records for {{children_names}} (${childFieldNames.join(', ')}). Reply to help us complete their profile! Reply STOP to opt out.`);
+            return;
+        }
+
+        if (targetScope === 'household_all') {
+            setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We're updating our church directory for your family (including {{children_names}}). Reply to get started! Reply STOP to opt out.`);
+            return;
+        }
+
         const isConfirm = fieldBehavior === 'confirm_all';
 
         if (isConfirm) {
@@ -301,8 +401,12 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             setErrorMsg('Please select a PCO List.');
             return;
         }
-        if (status === 'active' && selectedFields.length === 0) {
-            setErrorMsg('Please select at least one field to collect.');
+        if (status === 'active' && targetScope !== 'children_only' && selectedFields.length === 0) {
+            setErrorMsg('Please select at least one field to collect for adults.');
+            return;
+        }
+        if (status === 'active' && targetScope !== 'adults_only' && selectedChildFields.length === 0) {
+            setErrorMsg('Please select at least one field to collect for children.');
             return;
         }
 
@@ -314,8 +418,11 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 pcoListId,
                 pcoListName: list?.attributes?.name || pcoListName,
                 status,
+                targetScope,
                 fieldsToCollect: FIELD_CATALOG.filter(f => selectedFields.includes(f.key)),
+                childFieldsToCollect: CHILD_FIELD_CATALOG.filter(f => selectedChildFields.includes(f.key)),
                 fieldBehavior,
+                mode,
                 channels: { sms: smsEnabled, email: emailEnabled },
                 schedule: { startDate, intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
                 messaging: introMessage ? { introMessage } : undefined,
@@ -351,7 +458,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 <input
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Spring 2025 Directory Update"
+                    placeholder="e.g. Spring 2025 Directory & Children Update"
                     className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
             </div>
@@ -376,36 +483,110 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 <p className="text-xs text-slate-400">All people in this list will be contacted. One list per campaign.</p>
             </div>
 
-            {/* Field Picker */}
-            <div className="space-y-3">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fields to Collect</label>
-                <div className="space-y-4">
-                    {FIELD_GROUPS.map(group => (
-                        <div key={group.title}>
-                            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{group.title}</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {FIELD_CATALOG.filter(f => group.keys.includes(f.key)).map(field => (
-                                    <label key={field.key} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
-                                        selectedFields.includes(field.key)
-                                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                                    }`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedFields.includes(field.key)}
-                                            onChange={() => toggleField(field.key)}
-                                            className="rounded text-emerald-600 focus:ring-emerald-500"
-                                        />
-                                        <span className={`text-sm ${selectedFields.includes(field.key) ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {field.label}
-                                        </span>
-                                    </label>
-                                ))}
+            {/* Target Audience Scope */}
+            <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Target Audience Scope</label>
+                <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                        { id: 'adults_only', label: '👤 Adults Only', desc: 'Update info for the adult member directly' },
+                        { id: 'children_only', label: '👶 Children via Parents', desc: 'Reach parents to update child details' },
+                        { id: 'household_all', label: '👨‍👩‍👧‍👦 Parents & Children', desc: 'Update both parent and child info' },
+                    ].map(t => (
+                        <label
+                            key={t.id}
+                            className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${
+                                targetScope === t.id
+                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="radio"
+                                    name="targetScope"
+                                    value={t.id}
+                                    checked={targetScope === t.id}
+                                    onChange={() => setTargetScope(t.id as any)}
+                                    className="text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <span className={`text-xs font-semibold ${targetScope === t.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                    {t.label}
+                                </span>
                             </div>
-                        </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-5">
+                                {t.desc}
+                            </p>
+                        </label>
                     ))}
                 </div>
             </div>
+
+            {/* Parent Field Picker (if not children_only) */}
+            {targetScope !== 'children_only' && (
+                <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        {targetScope === 'household_all' ? 'Adult / Parent Fields to Collect' : 'Fields to Collect'}
+                    </label>
+                    <div className="space-y-4">
+                        {FIELD_GROUPS.map(group => (
+                            <div key={group.title}>
+                                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{group.title}</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {FIELD_CATALOG.filter(f => group.keys.includes(f.key)).map(field => (
+                                        <label key={field.key} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                            selectedFields.includes(field.key)
+                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                                        }`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedFields.includes(field.key)}
+                                                onChange={() => toggleField(field.key)}
+                                                className="rounded text-emerald-600 focus:ring-emerald-500"
+                                            />
+                                            <span className={`text-sm ${selectedFields.includes(field.key) ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {field.label}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Child Field Picker (if not adults_only) */}
+            {targetScope !== 'adults_only' && (
+                <div className="space-y-3 p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl border border-purple-200/60 dark:border-purple-800/40">
+                    <div className="flex items-center gap-2">
+                        <span className="text-base">👶</span>
+                        <div>
+                            <label className="text-sm font-semibold text-purple-900 dark:text-purple-300">Child Fields to Collect from Parents</label>
+                            <p className="text-xs text-purple-700/80 dark:text-purple-400">These fields will be requested for each child found in the parent's household.</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                        {CHILD_FIELD_CATALOG.map(field => (
+                            <label key={field.key} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                selectedChildFields.includes(field.key)
+                                    ? 'border-purple-500 bg-purple-100/50 dark:bg-purple-900/30'
+                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedChildFields.includes(field.key)}
+                                    onChange={() => toggleChildField(field.key)}
+                                    className="rounded text-purple-600 focus:ring-purple-500"
+                                />
+                                <span className={`text-sm ${selectedChildFields.includes(field.key) ? 'text-purple-800 dark:text-purple-300 font-medium' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    {field.label}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Outreach Interaction Mode */}
             <div className="space-y-2">
@@ -450,11 +631,11 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 </div>
             </div>
 
-            {/* Field Value Behavior */}
+            {/* Field Behavior */}
             <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Field Questioning Mode</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Field Behavior</label>
                 <div className="grid grid-cols-2 gap-3">
-                    <label className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${fieldBehavior === 'confirm_all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'confirm_all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -465,14 +646,14 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 className="text-emerald-600 focus:ring-emerald-500"
                             />
                             <span className={`text-sm font-semibold ${fieldBehavior === 'confirm_all' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                Confirm Existing Info
+                                🔄 Confirm & Update All
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
-                            Ask members to confirm their current info on file, or collect it if missing.
+                            Contacts everyone on the list to verify existing details and collect any blanks.
                         </p>
                     </label>
-                    <label className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${fieldBehavior === 'only_blank' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'only_blank' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -483,90 +664,110 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 className="text-emerald-600 focus:ring-emerald-500"
                             />
                             <span className={`text-sm font-semibold ${fieldBehavior === 'only_blank' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                Ask Only If Blank
+                                🎯 Only Missing Fields
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
-                            Only prompt members for selected fields that are currently empty in Planning Center.
+                            Only asks for fields currently empty in PCO. Skips members if all fields exist.
                         </p>
                     </label>
                 </div>
             </div>
 
-            {/* Channel toggles */}
+            {/* Channels */}
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outreach Channels</label>
-                <div className="flex gap-3">
-                    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition ${smsEnabled ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
-                        <input type="checkbox" checked={smsEnabled} onChange={e => setSmsEnabled(e.target.checked)} className="rounded text-emerald-600" />
-                        <span className="text-sm font-medium">📱 SMS</span>
+                <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={smsEnabled}
+                            onChange={e => setSmsEnabled(e.target.checked)}
+                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        SMS (Primary)
                     </label>
-                    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition ${emailEnabled ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
-                        <input type="checkbox" checked={emailEnabled} onChange={e => setEmailEnabled(e.target.checked)} className="rounded text-emerald-600" />
-                        <span className="text-sm font-medium">✉️ Email</span>
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={emailEnabled}
+                            onChange={e => setEmailEnabled(e.target.checked)}
+                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        Email (Fallback)
                     </label>
                 </div>
             </div>
 
-            {/* Schedule & Kickoff */}
-            <div className="space-y-3">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Schedule & Kickoff</label>
-                <div className="grid grid-cols-4 gap-3">
+            {/* Schedule */}
+            <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Schedule & Delivery Rules</p>
+                <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Kickoff Date</p>
-                            <button
-                                type="button"
-                                onClick={() => setStartDate(new Date().toISOString().split('T')[0])}
-                                className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                            >
-                                ⚡ Immediately
-                            </button>
-                        </div>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Kickoff Date</label>
                         <input
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
-                            className="w-full px-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
                     <div className="space-y-1">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Retry after</p>
-                        <div className="flex items-center gap-1.5">
-                            <input
-                                type="number" min={1} max={30}
-                                value={intervalDays}
-                                onChange={e => setIntervalDays(Number(e.target.value))}
-                                className="w-16 px-2 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                            <span className="text-sm text-slate-500">days</span>
-                        </div>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Retry Interval</label>
+                        <select
+                            value={intervalDays}
+                            onChange={e => setIntervalDays(Number(e.target.value))}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value={1}>Every 1 day</option>
+                            <option value={2}>Every 2 days</option>
+                            <option value={3}>Every 3 days</option>
+                            <option value={5}>Every 5 days</option>
+                            <option value={7}>Every 7 days</option>
+                        </select>
                     </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Max attempts</p>
-                        <input
-                            type="number" min={1} max={10}
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Max Attempts</label>
+                        <select
                             value={maxAttempts}
                             onChange={e => setMaxAttempts(Number(e.target.value))}
-                            className="w-16 px-2 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value={1}>1 attempt</option>
+                            <option value={2}>2 attempts</option>
+                            <option value={3}>3 attempts</option>
+                            <option value={4}>4 attempts</option>
+                            <option value={5}>5 attempts</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Send Window Start</label>
+                        <input
+                            type="time"
+                            value={sendWindowStart}
+                            onChange={e => setSendWindowStart(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
                     <div className="space-y-1">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Send window</p>
-                        <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                            <input type="time" value={sendWindowStart} onChange={e => setSendWindowStart(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded-lg px-1.5 py-1.5 bg-white dark:bg-slate-800 text-xs" />
-                            <span>–</span>
-                            <input type="time" value={sendWindowEnd} onChange={e => setSendWindowEnd(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded-lg px-1.5 py-1.5 bg-white dark:bg-slate-800 text-xs" />
-                        </div>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Send Window End</label>
+                        <input
+                            type="time"
+                            value={sendWindowEnd}
+                            onChange={e => setSendWindowEnd(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
                     </div>
                 </div>
             </div>
 
-                        {/* Intro message override */}
+            {/* Custom Messaging */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Custom Intro Message <span className="font-normal text-slate-400">(optional)</span>
+                        Custom Intro Message <span className="text-xs text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <button
                         type="button"
@@ -580,7 +781,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     value={introMessage}
                     onChange={e => setIntroMessage(e.target.value)}
                     rows={4}
-                    placeholder="Hi {{first_name}}! This is {{church_name}}. Is your current home address still {{address}}? Reply YES to confirm or send your new address."
+                    placeholder="Hi {{first_name}}! This is {{church_name}}. We're updating our records for {{children_names}} (Birthday, School Grade). Reply to help us keep their profiles up to date!"
                     className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
                 <div>
@@ -589,6 +790,8 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                         {[
                             { tag: '{{first_name}}', label: 'First Name' },
                             { tag: '{{church_name}}', label: 'Church Name' },
+                            { tag: '{{children_names}}', label: 'Children Names' },
+                            { tag: '{{children_fields}}', label: 'Children Fields' },
                             { tag: '{{address}}', label: 'Home Address' },
                             { tag: '{{email}}', label: 'Primary Email' },
                             { tag: '{{mobile_phone}}', label: 'Mobile Phone' },
@@ -767,7 +970,14 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                             {sessions.map(session => (
                                 <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                                     <td className="px-6 py-4">
-                                        <p className="font-semibold text-slate-900 dark:text-white">{session.personName}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-semibold text-slate-900 dark:text-white">{session.personName}</p>
+                                            {session.children && session.children.length > 0 && (
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50" title={session.children.map(c => c.personName).join(', ')}>
+                                                    👶 {session.children.length} {session.children.length === 1 ? 'child' : 'children'}
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-slate-400 mt-0.5">{session.phoneE164 || session.emailAddress || '—'}</p>
                                     </td>
                                     <td className="px-4 py-4"><StatusBadge status={session.status} /></td>
