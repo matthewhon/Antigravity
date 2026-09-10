@@ -330,12 +330,60 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             logger.warn('Error fetching batches from PCO Giving (non-fatal)', 'sync', { churchId, error: err.message }, churchId);
         }
 
-        // Fetch existing batches from Firestore to preserve QBO sync state
-        const existingBatches = await firestore.getGivingBatches(churchId);
+        // Fetch existing batches and mapping from Firestore to preserve QBO sync state & apply cadence
+        const [existingBatches, qboMapping] = await Promise.all([
+            firestore.getGivingBatches(churchId),
+            firestore.getQuickbooksMapping(churchId).catch(() => null)
+        ]);
         const existingBatchMap = new Map<string, GivingBatch>();
         existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
 
-        // Group donations by batchId (or date for unbatched Stripe/ACH online donations)
+        const payoutCadence = qboMapping?.stripePayoutCadence || 'weekly';
+        const payoutDayOfWeek = typeof qboMapping?.stripePayoutDayOfWeek === 'number'
+            ? qboMapping.stripePayoutDayOfWeek
+            : 3; // Default: 3 (Wednesday)
+
+        // Helper to compute payout key, name, and date for online gifts
+        const getOnlinePayoutInfo = (donationDateStr: string, donorName?: string, donationId?: string) => {
+            const rawDate = new Date(donationDateStr);
+            const validDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
+            const pad2 = (n: number) => String(n).padStart(2, '0');
+            const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+            if (payoutCadence === 'daily') {
+                const dateKey = toDateStr(validDate);
+                return {
+                    key: `online_${dateKey}`,
+                    name: `Online Giving Payout (${dateKey})`,
+                    date: validDate.toISOString()
+                };
+            }
+
+            if (payoutCadence === 'transaction') {
+                const dateKey = toDateStr(validDate);
+                const shortId = (donationId || '').split('_')[0] || dateKey;
+                return {
+                    key: `online_tx_${shortId}`,
+                    name: `Online Giving (${dateKey}${donorName && donorName !== 'Donor' ? ' - ' + donorName : ''})`,
+                    date: validDate.toISOString()
+                };
+            }
+
+            // Weekly Cadence (default anchor payoutDayOfWeek = 3 for Wednesday)
+            const currentDay = validDate.getDay(); // 0..6 (0=Sun, 1=Mon, ..., 3=Wed, ..., 6=Sat)
+            const diff = (payoutDayOfWeek - currentDay + 7) % 7;
+            const payoutDate = new Date(validDate);
+            payoutDate.setDate(validDate.getDate() + diff);
+            const payoutDateStr = toDateStr(payoutDate);
+
+            return {
+                key: `online_weekly_${payoutDateStr}`,
+                name: `Stripe Online Payout (${payoutDateStr})`,
+                date: payoutDate.toISOString()
+            };
+        };
+
+        // Group donations by batchId (or date/cadence for unbatched Stripe/ACH online donations)
         const batchDonationMap = new Map<string, DetailedDonation[]>();
         const batchNameMap = new Map<string, string>();
         const batchDateMap = new Map<string, string>();
@@ -349,15 +397,25 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         donations.forEach(d => {
             let key = d.batchId;
             if (!key) {
-                // If donation has fees, card/ACH/Stripe payment method/source and no batch, group by day as online giving
+                // If donation has fees, card/ACH/Stripe payment method/source and no batch, group according to cadence
                 const isOnline = (d.fee != null && Math.abs(d.fee) > 0) ||
                     (d.paymentSource && /stripe|card|ach|online/i.test(d.paymentSource)) ||
                     (d.paymentMethod && /card|ach|stripe/i.test(d.paymentMethod));
-                const dateKey = (d.date || '').slice(0, 10);
-                key = isOnline ? `online_${dateKey}` : `manual_unbatched_${dateKey}`;
-                if (!batchNameMap.has(key)) {
-                    batchNameMap.set(key, isOnline ? `Online Giving Payout (${dateKey})` : `Unbatched Giving (${dateKey})`);
-                    batchDateMap.set(key, d.date);
+
+                if (isOnline) {
+                    const info = getOnlinePayoutInfo(d.date, d.donorName, d.id);
+                    key = info.key;
+                    if (!batchNameMap.has(key)) {
+                        batchNameMap.set(key, info.name);
+                        batchDateMap.set(key, info.date);
+                    }
+                } else {
+                    const dateKey = (d.date || '').slice(0, 10);
+                    key = `manual_unbatched_${dateKey}`;
+                    if (!batchNameMap.has(key)) {
+                        batchNameMap.set(key, `Unbatched Giving (${dateKey})`);
+                        batchDateMap.set(key, d.date);
+                    }
                 }
             } else if (d.batchName && !batchNameMap.has(key)) {
                 batchNameMap.set(key, d.batchName);

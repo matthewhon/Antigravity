@@ -765,6 +765,10 @@ export interface QuickbooksMappingConfig {
     campusFundMappings?: Record<string, Record<string, FundQuickbooksMapping>>;
     /** Optional cutoff date (YYYY-MM-DD). Batches before this date are hidden from QuickBooks deposit views */
     cutoffDate?: string;
+    /** Stripe online payout deposit cadence (default: 'weekly') */
+    stripePayoutCadence?: 'daily' | 'weekly' | 'transaction';
+    /** Day of the week for weekly Stripe payout grouping (0=Sunday, 1=Monday, ..., 3=Wednesday, ..., 6=Saturday). Default: 3 (Wednesday) */
+    stripePayoutDayOfWeek?: number;
     /** Enable email notifications for giving batches */
     emailNotificationsEnabled?: boolean;
     /** Send email when a batch is ready to be synced to QuickBooks (default true if notifications enabled) */

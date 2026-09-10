@@ -52,6 +52,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [campusFundMappings, setCampusFundMappings] = useState<Record<string, Record<string, FundQuickbooksMapping>>>({});
     const [selectedCampusTab, setSelectedCampusTab] = useState<string>('default'); // 'default' or campus.pcoId
     const [cutoffDate, setCutoffDate] = useState('');
+    const [stripePayoutCadence, setStripePayoutCadence] = useState<'daily' | 'weekly' | 'transaction'>('weekly');
+    const [stripePayoutDayOfWeek, setStripePayoutDayOfWeek] = useState<number>(3); // 3 = Wednesday
 
     // Email Notification State
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
@@ -114,6 +116,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 setEnableCampusMapping(existingMapping.enableCampusMapping ?? false);
                 setCampusFundMappings(existingMapping.campusFundMappings || {});
                 setCutoffDate(existingMapping.cutoffDate || '');
+                setStripePayoutCadence(existingMapping.stripePayoutCadence || 'weekly');
+                setStripePayoutDayOfWeek(typeof existingMapping.stripePayoutDayOfWeek === 'number' ? existingMapping.stripePayoutDayOfWeek : 3);
                 setEmailNotificationsEnabled(existingMapping.emailNotificationsEnabled ?? false);
                 setNotifyOnBatchReady(existingMapping.notifyOnBatchReady ?? true);
                 setNotifyOnBatchSynced(existingMapping.notifyOnBatchSynced ?? true);
@@ -365,6 +369,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 enableCampusMapping,
                 campusFundMappings: enableCampusMapping ? campusFundMappings : undefined,
                 cutoffDate: cutoffDate.trim() || undefined,
+                stripePayoutCadence,
+                stripePayoutDayOfWeek: stripePayoutCadence === 'weekly' ? stripePayoutDayOfWeek : undefined,
                 emailNotificationsEnabled,
                 notifyOnBatchReady,
                 notifyOnBatchSynced,
@@ -544,6 +550,61 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                                         Batches dated before this cutoff will be hidden so older manual batches don't clutter your QuickBooks deposit dashboard.
                                     </p>
+                                </div>
+
+                                {/* Stripe Online Payout Cadence Section */}
+                                <div className="md:col-span-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-purple-100 dark:bg-purple-950/60 rounded-lg text-purple-600 dark:text-purple-400">
+                                            <CreditCard className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                                                Stripe Online Giving Payout Schedule
+                                            </h4>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Group online card & ACH donations into QuickBooks deposits matching your Stripe bank payout schedule.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                                Deposit Cadence
+                                            </label>
+                                            <select
+                                                value={stripePayoutCadence}
+                                                onChange={(e) => setStripePayoutCadence(e.target.value as any)}
+                                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            >
+                                                <option value="weekly">Weekly Payout (Recommended)</option>
+                                                <option value="daily">Daily Rolling Payout</option>
+                                                <option value="transaction">Individual per Transaction</option>
+                                            </select>
+                                        </div>
+
+                                        {stripePayoutCadence === 'weekly' && (
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                                    Weekly Payout Day
+                                                </label>
+                                                <select
+                                                    value={stripePayoutDayOfWeek}
+                                                    onChange={(e) => setStripePayoutDayOfWeek(Number(e.target.value))}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                >
+                                                    <option value={3}>Wednesday (Default / Planning Center)</option>
+                                                    <option value={1}>Monday</option>
+                                                    <option value={2}>Tuesday</option>
+                                                    <option value={4}>Thursday</option>
+                                                    <option value={5}>Friday</option>
+                                                    <option value={6}>Saturday</option>
+                                                    <option value={0}>Sunday</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
