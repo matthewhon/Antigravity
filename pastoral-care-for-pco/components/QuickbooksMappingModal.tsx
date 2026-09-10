@@ -5,7 +5,11 @@ import {
 } from '../types';
 import { quickbooksClient } from '../services/quickbooksService';
 import { firestore } from '../services/firestoreService';
-import { X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, ArrowRight, Search, Building2, Copy } from 'lucide-react';
+import { pcoService } from '../services/pcoService';
+import { 
+    X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, 
+    ArrowRight, Search, Building2, Copy, Mail, Users, Send, Bell
+} from 'lucide-react';
 
 interface QuickbooksMappingModalProps {
     isOpen: boolean;
@@ -49,16 +53,31 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [selectedCampusTab, setSelectedCampusTab] = useState<string>('default'); // 'default' or campus.pcoId
     const [cutoffDate, setCutoffDate] = useState('');
 
+    // Email Notification State
+    const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+    const [notifyOnBatchReady, setNotifyOnBatchReady] = useState(true);
+    const [notifyOnBatchSynced, setNotifyOnBatchSynced] = useState(true);
+    const [notificationRecipientType, setNotificationRecipientType] = useState<'email' | 'pco_list'>('email');
+    const [notificationEmail, setNotificationEmail] = useState('');
+    const [notificationPcoListId, setNotificationPcoListId] = useState('');
+    const [notificationPcoListName, setNotificationPcoListName] = useState('');
+    const [pcoLists, setPcoLists] = useState<any[]>([]);
+    const [testSending, setTestSending] = useState(false);
+    const [testFeedback, setTestFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
     const loadData = async () => {
         setLoading(true);
         setError(null);
         try {
-            const [accountsData, existingMapping, dbFunds, dbCampuses] = await Promise.all([
+            const [accountsData, existingMapping, dbFunds, dbCampuses, lists] = await Promise.all([
                 quickbooksClient.getAccounts(churchId),
                 quickbooksClient.getMapping(churchId),
                 firestore.getFunds(churchId).catch(() => []),
-                firestore.getCampuses(churchId).catch(() => [])
+                firestore.getCampuses(churchId).catch(() => []),
+                pcoService.getPeopleLists(churchId).catch(() => [])
             ]);
+
+            setPcoLists(lists || []);
 
             // Combine unique funds by ID
             const fundMap = new Map<string, PcoFund>();
@@ -95,6 +114,13 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 setEnableCampusMapping(existingMapping.enableCampusMapping ?? false);
                 setCampusFundMappings(existingMapping.campusFundMappings || {});
                 setCutoffDate(existingMapping.cutoffDate || '');
+                setEmailNotificationsEnabled(existingMapping.emailNotificationsEnabled ?? false);
+                setNotifyOnBatchReady(existingMapping.notifyOnBatchReady ?? true);
+                setNotifyOnBatchSynced(existingMapping.notifyOnBatchSynced ?? true);
+                setNotificationRecipientType(existingMapping.notificationRecipientType || 'email');
+                setNotificationEmail(existingMapping.notificationEmail || '');
+                setNotificationPcoListId(existingMapping.notificationPcoListId || '');
+                setNotificationPcoListName(existingMapping.notificationPcoListName || '');
             } else {
                 // Pre-select first bank and fee account if available
                 if (accountsData.bankAccounts.length > 0) {
@@ -274,6 +300,39 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
         }
     };
 
+    const handleSendTestEmail = async () => {
+        setTestSending(true);
+        setTestFeedback(null);
+        try {
+            const currentMapping: QuickbooksMappingConfig = {
+                churchId,
+                depositBankAccountId: depositBankAccountId || 'test',
+                stripeFeeExpenseAccountId: stripeFeeExpenseAccountId || 'test',
+                fundMappings,
+                emailNotificationsEnabled: true,
+                notifyOnBatchReady,
+                notifyOnBatchSynced,
+                notificationRecipientType,
+                notificationEmail: notificationEmail.trim(),
+                notificationPcoListId: notificationRecipientType === 'pco_list' ? notificationPcoListId : undefined,
+                notificationPcoListName: notificationRecipientType === 'pco_list' ? notificationPcoListName : undefined
+            };
+
+            const res = await quickbooksClient.sendTestNotification(churchId, currentMapping);
+            setTestFeedback({
+                type: 'success',
+                text: res.message || `Test email sent to ${res.recipients.join(', ')}!`
+            });
+        } catch (err: any) {
+            setTestFeedback({
+                type: 'error',
+                text: err.message || 'Failed to send test email.'
+            });
+        } finally {
+            setTestSending(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!depositBankAccountId) {
             setError('Please select a QuickBooks Bank Account to receive deposits.');
@@ -305,7 +364,14 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 fundMappings,
                 enableCampusMapping,
                 campusFundMappings: enableCampusMapping ? campusFundMappings : undefined,
-                cutoffDate: cutoffDate.trim() || undefined
+                cutoffDate: cutoffDate.trim() || undefined,
+                emailNotificationsEnabled,
+                notifyOnBatchReady,
+                notifyOnBatchSynced,
+                notificationRecipientType,
+                notificationEmail: notificationEmail.trim() || undefined,
+                notificationPcoListId: notificationRecipientType === 'pco_list' ? notificationPcoListId : undefined,
+                notificationPcoListName: notificationRecipientType === 'pco_list' ? notificationPcoListName : undefined
             };
 
             const saved = await quickbooksClient.saveMapping(churchId, payload);
@@ -574,6 +640,168 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                     )}
                                 </div>
                             )}
+
+                            {/* Batch Email Notifications */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 bg-blue-100 dark:bg-blue-950/60 rounded-xl text-blue-600 dark:text-blue-400">
+                                            <Mail className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                <span>Batch Email Notifications</span>
+                                                {emailNotificationsEnabled ? (
+                                                    <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                        Active
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                        Off
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Send email alerts when Giving batches are ready to sync or successfully deposited into QuickBooks.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEmailNotificationsEnabled(!emailNotificationsEnabled)}
+                                        className={`w-12 h-6 rounded-full p-1 transition-colors shrink-0 ${emailNotificationsEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                        title="Toggle batch email notifications"
+                                    >
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${emailNotificationsEnabled ? 'translate-x-6' : ''}`}></div>
+                                    </button>
+                                </div>
+
+                                {emailNotificationsEnabled && (
+                                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-4 animate-in fade-in duration-150">
+                                        {/* Notification Triggers */}
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={notifyOnBatchReady}
+                                                    onChange={(e) => setNotifyOnBatchReady(e.target.checked)}
+                                                    className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                />
+                                                <span>🔔 Notify when a batch is <strong>Ready to Sync</strong></span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={notifyOnBatchSynced}
+                                                    onChange={(e) => setNotifyOnBatchSynced(e.target.checked)}
+                                                    className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                />
+                                                <span>✅ Notify when a batch has been <strong>Deposited to QuickBooks</strong></span>
+                                            </label>
+                                        </div>
+
+                                        {/* Recipient Mode Tabs */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                                <span>Send Notification To:</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNotificationRecipientType('email')}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                        notificationRecipientType === 'email'
+                                                            ? 'bg-blue-600 text-white shadow-sm'
+                                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                                    }`}
+                                                >
+                                                    <Mail className="w-3.5 h-3.5" />
+                                                    Direct Email Address(es)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNotificationRecipientType('pco_list')}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                        notificationRecipientType === 'pco_list'
+                                                            ? 'bg-blue-600 text-white shadow-sm'
+                                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                                    }`}
+                                                >
+                                                    <Users className="w-3.5 h-3.5" />
+                                                    Planning Center People List
+                                                </button>
+                                            </div>
+
+                                            {notificationRecipientType === 'email' ? (
+                                                <div className="pt-1">
+                                                    <input
+                                                        type="text"
+                                                        value={notificationEmail}
+                                                        onChange={(e) => setNotificationEmail(e.target.value)}
+                                                        placeholder="e.g. finance@yourchurch.org, bookkeeper@yourchurch.org"
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                        Enter one or more email addresses separated by commas or semicolons.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="pt-1">
+                                                    <select
+                                                        value={notificationPcoListId}
+                                                        onChange={(e) => {
+                                                            const selectedId = e.target.value;
+                                                            setNotificationPcoListId(selectedId);
+                                                            const found = pcoLists.find(l => String(l.id) === String(selectedId));
+                                                            setNotificationPcoListName(found ? (found.attributes?.name || found.name) : '');
+                                                        }}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        <option value="">Select a Planning Center List...</option>
+                                                        {pcoLists.map(l => (
+                                                            <option key={l.id} value={l.id}>
+                                                                {l.attributes?.name || l.name} {l.attributes?.total_people ? `(${l.attributes.total_people} members)` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                        Emails will automatically be sent to the primary address of each member in this Planning Center list (e.g. Finance Team or Board of Elders).
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Test Email Button & Status */}
+                                        <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-700/60">
+                                            <button
+                                                type="button"
+                                                onClick={handleSendTestEmail}
+                                                disabled={testSending || (!notificationEmail.trim() && !notificationPcoListId)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-xs hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                                            >
+                                                {testSending ? (
+                                                    <>
+                                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                        <span>Sending Test Email...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Send className="w-3.5 h-3.5" />
+                                                        <span>Send Test Email</span>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            {testFeedback && (
+                                                <div className={`text-xs flex items-center gap-1.5 ${testFeedback.type === 'success' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                    {testFeedback.type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                                    <span>{testFeedback.text}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* 1-to-1 Fund Matching Table */}
                             <div className="space-y-3">

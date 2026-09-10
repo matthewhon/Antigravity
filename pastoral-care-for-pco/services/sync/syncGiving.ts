@@ -426,14 +426,51 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 fundsBreakdown,
                 quickbooksDepositId: existing?.quickbooksDepositId,
                 quickbooksDepositDocNumber: existing?.quickbooksDepositDocNumber,
+                quickbooksDepositBankAccountId: existing?.quickbooksDepositBankAccountId,
+                quickbooksDepositBankAccountName: existing?.quickbooksDepositBankAccountName,
                 syncedAt: existing?.syncedAt,
-                syncedBy: existing?.syncedBy
+                syncedBy: existing?.syncedBy,
+                readyNotifiedAt: existing?.readyNotifiedAt,
+                syncedNotifiedAt: existing?.syncedNotifiedAt
             });
         });
 
         if (batchesToSave.length > 0) {
             await firestore.upsertGivingBatches(batchesToSave);
             console.log(`Saved ${batchesToSave.length} giving batches.`);
+
+            // Trigger batch-ready email notifications if configured
+            try {
+                const qboMapping = await firestore.getQuickbooksMapping(churchId);
+                if (qboMapping?.emailNotificationsEnabled && qboMapping?.notifyOnBatchReady !== false) {
+                    const cutoffDate = qboMapping.cutoffDate;
+                    const batchesToNotify = batchesToSave.filter(b => {
+                        if (b.status === 'synced_to_qbo') return false;
+                        if (b.readyNotifiedAt) return false;
+                        if (cutoffDate && b.date && b.date.slice(0, 10) < cutoffDate) return false;
+                        return true;
+                    });
+
+                    for (const b of batchesToNotify) {
+                        try {
+                            const port = typeof process !== 'undefined' ? process.env?.PORT || 8080 : 8080;
+                            const baseUrl = typeof window === 'undefined' ? `http://127.0.0.1:${port}` : '';
+                            const res = await fetch(`${baseUrl}/api/quickbooks/notify/batch-ready`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ churchId, batchId: b.id })
+                            });
+                            if (res.ok) {
+                                b.readyNotifiedAt = new Date().toISOString();
+                            }
+                        } catch (e: any) {
+                            logger.warn(`Failed to send batch ready notification for ${b.id}: ${e.message}`, 'sync', { churchId, batchId: b.id }, churchId);
+                        }
+                    }
+                }
+            } catch (notifErr: any) {
+                logger.warn(`Non-fatal error checking QuickBooks batch notifications: ${notifErr.message}`, 'sync', { churchId }, churchId);
+            }
         }
     }
     logger.info(

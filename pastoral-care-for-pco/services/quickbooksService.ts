@@ -98,5 +98,38 @@ export const quickbooksClient = {
             throw new Error(err.error || 'Failed to send deposit to QuickBooks');
         }
         return res.json();
+    },
+
+    async sendTestNotification(
+        churchId: string,
+        mapping: QuickbooksMappingConfig,
+        testRecipientOverride?: string
+    ): Promise<{ success: boolean; message: string; recipients: string[] }> {
+        const res = await fetch('/api/quickbooks/notify/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId, mapping, testRecipientOverride })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(err.error || 'Failed to send test notification');
+        }
+        return res.json();
+    },
+
+    async sendBatchReadyNotification(
+        churchId: string,
+        batchId: string
+    ): Promise<{ success: boolean; message: string; recipients: string[]; readyNotifiedAt: string }> {
+        const res = await fetch('/api/quickbooks/notify/batch-ready', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId, batchId })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(err.error || 'Failed to send batch-ready notification');
+        }
+        return res.json();
     }
 };

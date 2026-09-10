@@ -706,6 +706,8 @@ export interface GivingBatch {
     syncedAt?: string;
     syncedBy?: string;
     notes?: string;
+    readyNotifiedAt?: string;
+    syncedNotifiedAt?: string;
 }
 
 export interface QuickbooksAccount {
@@ -754,6 +756,20 @@ export interface QuickbooksMappingConfig {
     campusFundMappings?: Record<string, Record<string, FundQuickbooksMapping>>;
     /** Optional cutoff date (YYYY-MM-DD). Batches before this date are hidden from QuickBooks deposit views */
     cutoffDate?: string;
+    /** Enable email notifications for giving batches */
+    emailNotificationsEnabled?: boolean;
+    /** Send email when a batch is ready to be synced to QuickBooks (default true if notifications enabled) */
+    notifyOnBatchReady?: boolean;
+    /** Send email when a batch has been synced to QuickBooks (default true if notifications enabled) */
+    notifyOnBatchSynced?: boolean;
+    /** Notification recipient type: single/multiple email addresses or a Planning Center People list */
+    notificationRecipientType?: 'email' | 'pco_list';
+    /** Direct recipient email address(es), comma or semicolon separated */
+    notificationEmail?: string;
+    /** Planning Center People List ID to notify */
+    notificationPcoListId?: string;
+    /** Name of the Planning Center People List for display */
+    notificationPcoListName?: string;
     updatedAt?: number;
     updatedBy?: string;
 }

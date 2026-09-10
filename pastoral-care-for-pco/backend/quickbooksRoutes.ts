@@ -4,6 +4,9 @@ import {
     getAuthUrl, exchangeCodeForTokens, getValidTokens, 
     disconnectQuickBooks, fetchAccounts, createQuickbooksDeposit 
 } from './quickbooksService';
+import { 
+    sendBatchReadyNotification, sendBatchSyncedNotification, sendTestNotification 
+} from './quickbooksNotificationService';
 import { QuickbooksMappingConfig, GivingBatch } from '../types';
 
 export const quickbooksRouter = express.Router();
@@ -244,6 +247,24 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
 
         await batchDoc.ref.set(batchUpdates, { merge: true });
 
+        // 6. Send email notification if enabled
+        if (effectiveMapping.emailNotificationsEnabled && effectiveMapping.notifyOnBatchSynced !== false) {
+            try {
+                const notifyRes = await sendBatchSyncedNotification(
+                    churchId, 
+                    { ...batch, ...batchUpdates }, 
+                    depositResult, 
+                    effectiveMapping, 
+                    userName
+                );
+                if (notifyRes.success) {
+                    await batchDoc.ref.set({ syncedNotifiedAt: new Date().toISOString() }, { merge: true });
+                }
+            } catch (notifErr: any) {
+                console.warn('[QuickbooksRoutes] Non-fatal notification error on deposit sync:', notifErr.message);
+            }
+        }
+
         res.json({
             success: true,
             depositResult,
@@ -254,3 +275,73 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ─── POST /api/quickbooks/notify/test ───────────────────────────────────────
+// Sends a sample test email to verify recipient resolution and provider setup
+quickbooksRouter.post('/notify/test', async (req: any, res: any) => {
+    try {
+        const { churchId, mapping, testRecipientOverride } = req.body || {};
+        if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+        const effectiveMapping: QuickbooksMappingConfig = mapping || {};
+        const result = await sendTestNotification(churchId, effectiveMapping, testRecipientOverride);
+
+        if (!result.success) {
+            return res.status(400).json({
+                error: result.error || 'Failed to send test email',
+                details: result
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Test email successfully dispatched to ${result.recipientCount} recipient(s).`,
+            recipients: result.recipients
+        });
+    } catch (error: any) {
+        console.error('Error sending test notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── POST /api/quickbooks/notify/batch-ready ────────────────────────────────
+// Manually triggers a batch-ready notification email for a specific batch
+quickbooksRouter.post('/notify/batch-ready', async (req: any, res: any) => {
+    try {
+        const { churchId, batchId } = req.body || {};
+        if (!churchId || !batchId) return res.status(400).json({ error: 'Missing churchId or batchId' });
+
+        const db = getDb();
+        const [batchDoc, mappingDoc] = await Promise.all([
+            db.collection('churches').doc(churchId).collection('giving_batches').doc(batchId).get(),
+            db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').get()
+        ]);
+
+        if (!batchDoc.exists) return res.status(404).json({ error: 'Batch not found' });
+        const batch = batchDoc.data() as GivingBatch;
+        const mapping = (mappingDoc.exists ? mappingDoc.data() : null) as QuickbooksMappingConfig | null;
+
+        if (!mapping || !mapping.emailNotificationsEnabled) {
+            return res.status(400).json({ error: 'Email notifications are not configured or enabled in QuickBooks settings.' });
+        }
+
+        const result = await sendBatchReadyNotification(churchId, batch, mapping);
+        if (!result.success) {
+            return res.status(400).json({ error: result.error || 'Failed to send ready notification', details: result });
+        }
+
+        const now = new Date().toISOString();
+        await batchDoc.ref.set({ readyNotifiedAt: now }, { merge: true });
+
+        res.json({
+            success: true,
+            message: `Batch ready notification sent to ${result.recipients.length} recipient(s).`,
+            recipients: result.recipients,
+            readyNotifiedAt: now
+        });
+    } catch (error: any) {
+        console.error('Error sending batch-ready notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+

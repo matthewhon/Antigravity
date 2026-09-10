@@ -1,4 +1,5 @@
 import { GivingBatch, QuickbooksMappingConfig, FundQuickbooksMapping } from '../types';
+import { resolveNotificationRecipients } from '../backend/quickbooksNotificationService';
 
 function buildMockDepositPayload(
     batch: GivingBatch, 
@@ -110,7 +111,7 @@ function buildMockDepositPayload(
     };
 }
 
-function runTests() {
+async function runTests() {
     console.log('--- Testing QuickBooks Deposit Payload Generator ---');
 
     const mockBatch: GivingBatch = {
@@ -340,7 +341,47 @@ function runTests() {
     console.assert(mcNetRounded === multiCampusBatch.totalNet, `Multi-campus net (${mcNetRounded}) must equal batch net (${multiCampusBatch.totalNet})`);
     console.log('✓ Multi-campus Net Deposit matches to the penny:', mcNetRounded, '==', multiCampusBatch.totalNet);
 
-    console.log('\nAll QuickBooks Deposit Payload tests passed successfully!');
+    // ── Test 5: Email Notification Recipient Resolution & Message Construction ──
+    console.log('\n--- Test 5: Email Notification Recipient Resolution ---');
+
+    // Case 5A: Single and multiple comma/semicolon emails
+    const directEmailMapping: QuickbooksMappingConfig = {
+        churchId: 'church_abc',
+        depositBankAccountId: 'qbo_acc_checking_1001',
+        stripeFeeExpenseAccountId: 'qbo_acc_fees_6050',
+        fundMappings: {},
+        emailNotificationsEnabled: true,
+        notificationRecipientType: 'email',
+        notificationEmail: 'finance@grace.org,  bookkeeper@grace.org; auditor@grace.org\nnot-an-email'
+    };
+
+    const emailsDirect = await resolveNotificationRecipients('church_abc', directEmailMapping);
+    console.assert(emailsDirect.length === 3, `Expected 3 valid emails, got ${emailsDirect.length}`);
+    console.assert(emailsDirect.includes('finance@grace.org'), 'Must include finance@grace.org');
+    console.assert(emailsDirect.includes('bookkeeper@grace.org'), 'Must include bookkeeper@grace.org');
+    console.assert(emailsDirect.includes('auditor@grace.org'), 'Must include auditor@grace.org');
+    console.assert(!emailsDirect.includes('not-an-email'), 'Must exclude invalid email strings');
+    console.log('✓ Direct email addresses parsed and validated correctly:', emailsDirect.join(', '));
+
+    // Case 5B: Planning Center People List recipient resolution (simulated)
+    const pcoListMapping: QuickbooksMappingConfig = {
+        churchId: 'sim_church_456',
+        depositBankAccountId: 'qbo_acc_checking_1001',
+        stripeFeeExpenseAccountId: 'qbo_acc_fees_6050',
+        fundMappings: {},
+        emailNotificationsEnabled: true,
+        notificationRecipientType: 'pco_list',
+        notificationPcoListId: 'pco_list_finance_team',
+        notificationPcoListName: 'Finance & Stewardship Committee'
+    };
+
+    const emailsPcoList = await resolveNotificationRecipients('sim_church_456', pcoListMapping);
+    console.assert(emailsPcoList.length >= 2, `Expected at least 2 emails from PCO list, got ${emailsPcoList.length}`);
+    console.assert(emailsPcoList.includes('finance@example.com'), 'Must include finance@example.com');
+    console.assert(emailsPcoList.includes('treasurer@example.com'), 'Must include treasurer@example.com');
+    console.log('✓ Planning Center List members resolved to emails:', emailsPcoList.join(', '));
+
+    console.log('\nAll QuickBooks Deposit & Notification tests passed successfully!');
 }
 
 runTests();
