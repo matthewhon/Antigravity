@@ -241,6 +241,15 @@ quickbooksRouter.post('/deposit', async (req: any, res: any) => {
         }
         const batch = batchDoc.data() as GivingBatch;
 
+        // Prevent duplicate deposits for batches that have already been synced
+        if (batch.status === 'synced_to_qbo' || batch.quickbooksDepositId) {
+            return res.status(409).json({
+                error: `Batch "${batch.name || batchId}" has already been deposited to QuickBooks (Deposit #${batch.quickbooksDepositId}).`,
+                alreadySynced: true,
+                quickbooksDepositId: batch.quickbooksDepositId
+            });
+        }
+
         // 2. Fetch QuickBooks mapping
         const mappingDoc = await db.collection('churches').doc(churchId).collection('quickbooks_mapping').doc('config').get();
         let mapping = (mappingDoc.exists ? mappingDoc.data() : null) as QuickbooksMappingConfig | null;
