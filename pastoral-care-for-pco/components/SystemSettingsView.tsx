@@ -4,6 +4,7 @@ import { SystemSettings, Church, User, LogEntry } from '../types';
 import { firestore } from '../services/firestoreService';
 import { loadStripe } from '@stripe/stripe-js';
 import { initializeWebhooks } from '../services/pcoWebhookService';
+import { quickbooksClient } from '../services/quickbooksService';
 
 import { BillingReportsView } from './BillingReportsView';
 
@@ -47,6 +48,39 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
   // Grow Access Request management
   const [growRequestMsg, setGrowRequestMsg] = useState<{ type: 'success' | 'error'; text: string; churchId?: string } | null>(null);
   const [growRequestProcessing, setGrowRequestProcessing] = useState<string>('');
+
+  // QuickBooks Online OAuth Credential Testing State
+  const [testingQbo, setTestingQbo] = useState(false);
+  const [qboTestResult, setQboTestResult] = useState<{ success: boolean; message: string; authUrl?: string } | null>(null);
+
+  const handleTestQuickBooks = async () => {
+    if (!settings.quickbooksClientId || !settings.quickbooksClientSecret) {
+      setQboTestResult({
+        success: false,
+        message: 'Please enter both Client ID and Client Secret before testing.'
+      });
+      return;
+    }
+    setTestingQbo(true);
+    setQboTestResult(null);
+    try {
+      const redirectUri = settings.quickbooksRedirectUri || `${window.location.origin}/api/quickbooks/callback`;
+      const result = await quickbooksClient.testCredentials({
+        clientId: settings.quickbooksClientId,
+        clientSecret: settings.quickbooksClientSecret,
+        environment: settings.quickbooksEnvironment || 'production',
+        redirectUri
+      });
+      setQboTestResult(result);
+    } catch (err: any) {
+      setQboTestResult({
+        success: false,
+        message: err.message || 'QuickBooks credential verification failed'
+      });
+    } finally {
+      setTestingQbo(false);
+    }
+  };
 
   const handleGrowRequest = async (churchId: string, action: 'approve' | 'reject') => {
     setGrowRequestProcessing(churchId);
@@ -1636,6 +1670,65 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <p className="text-[10px] text-slate-400 mt-1">Paste this exact URL under <strong>Redirect URIs</strong> in your Intuit Developer App settings.</p>
                         </div>
                     </div>
+
+                    {/* Test Credentials Action Bar */}
+                    <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={handleTestQuickBooks}
+                                disabled={testingQbo || !settings.quickbooksClientId || !settings.quickbooksClientSecret}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                            >
+                                {testingQbo ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Testing with Intuit OAuth...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>🧪</span>
+                                        <span>Test OAuth 2.0 Credentials</span>
+                                    </>
+                                )}
+                            </button>
+                            {qboTestResult && (
+                                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${
+                                    qboTestResult.success 
+                                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                        : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                }`}>
+                                    {qboTestResult.success ? '✓ Verified with Intuit' : '✕ Authentication Failed'}
+                                </span>
+                            )}
+                        </div>
+
+                        {qboTestResult?.authUrl && qboTestResult.success && (
+                            <a
+                                href={qboTestResult.authUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                            >
+                                <span>Test Intuit Consent Screen in New Tab</span>
+                                <span>→</span>
+                            </a>
+                        )}
+                    </div>
+
+                    {/* Test Result Message Banner */}
+                    {qboTestResult && (
+                        <div className={`mt-3 p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                            qboTestResult.success
+                                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                                : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                        }`}>
+                            <span className="text-sm shrink-0">{qboTestResult.success ? '✅' : '⚠️'}</span>
+                            <div className="flex-1">
+                                <p className="font-semibold">{qboTestResult.message}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Important Technical & Accounting Requirements */}

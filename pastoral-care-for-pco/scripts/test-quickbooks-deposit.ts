@@ -1,5 +1,6 @@
 import { GivingBatch, QuickbooksMappingConfig, FundQuickbooksMapping } from '../types';
 import { resolveNotificationRecipients } from '../backend/quickbooksNotificationService';
+import { testQuickBooksCredentials } from '../backend/quickbooksService';
 
 function buildMockDepositPayload(
     batch: GivingBatch, 
@@ -381,7 +382,39 @@ async function runTests() {
     console.assert(emailsPcoList.includes('treasurer@example.com'), 'Must include treasurer@example.com');
     console.log('✓ Planning Center List members resolved to emails:', emailsPcoList.join(', '));
 
-    console.log('\nAll QuickBooks Deposit & Notification tests passed successfully!');
+    // ── Test 6: QuickBooks OAuth 2.0 Credentials Live Validation ──
+    console.log('\n--- Test 6: QuickBooks OAuth 2.0 Credentials Validation ---');
+
+    // Case 6A: Missing Client ID
+    const missingIdResult = await testQuickBooksCredentials({
+        clientId: '',
+        clientSecret: 'secret_123'
+    });
+    console.assert(!missingIdResult.success, 'Missing Client ID must fail');
+    console.assert(missingIdResult.message.includes('Client ID is missing'), 'Error message must specify missing Client ID');
+    console.log('✓ Missing Client ID correctly caught and rejected');
+
+    // Case 6B: Missing Client Secret
+    const missingSecretResult = await testQuickBooksCredentials({
+        clientId: 'id_123',
+        clientSecret: ''
+    });
+    console.assert(!missingSecretResult.success, 'Missing Client Secret must fail');
+    console.assert(missingSecretResult.message.includes('Client Secret is missing'), 'Error message must specify missing Client Secret');
+    console.log('✓ Missing Client Secret correctly caught and rejected');
+
+    // Case 6C: Invalid credentials rejected by Intuit server
+    const invalidCredentialsResult = await testQuickBooksCredentials({
+        clientId: 'dummy_nonexistent_client_id',
+        clientSecret: 'dummy_nonexistent_secret',
+        environment: 'production'
+    });
+    console.assert(!invalidCredentialsResult.success, 'Invalid credentials must fail against Intuit');
+    console.assert(invalidCredentialsResult.message.includes('Client Authentication Failed') || invalidCredentialsResult.message.includes('invalid_client'), 'Error message must report Intuit client authentication failure');
+    console.assert(invalidCredentialsResult.authUrl?.includes('client_id=dummy_nonexistent_client_id'), 'Auth URL must contain client_id');
+    console.log('✓ Intuit server correctly rejected invalid credentials with detailed diagnostic feedback');
+
+    console.log('\nAll QuickBooks Deposit, Notification & Credential tests passed successfully!');
 }
 
 runTests();

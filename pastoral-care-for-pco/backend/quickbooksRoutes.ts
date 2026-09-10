@@ -2,7 +2,8 @@ import express from 'express';
 import { getDb } from './firebase';
 import { 
     getAuthUrl, exchangeCodeForTokens, getValidTokens, 
-    disconnectQuickBooks, fetchAccounts, createQuickbooksDeposit 
+    disconnectQuickBooks, fetchAccounts, createQuickbooksDeposit,
+    testQuickBooksCredentials 
 } from './quickbooksService';
 import { 
     sendBatchReadyNotification, sendBatchSyncedNotification, sendTestNotification 
@@ -344,4 +345,40 @@ quickbooksRouter.post('/notify/batch-ready', async (req: any, res: any) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ─── POST /api/quickbooks/test-credentials ──────────────────────────────────
+// Validates QuickBooks OAuth 2.0 Client ID and Client Secret against Intuit OAuth servers
+quickbooksRouter.post('/test-credentials', async (req: any, res: any) => {
+    try {
+        let { clientId, clientSecret, environment, redirectUri } = req.body || {};
+
+        // Fallback to system settings if not provided in payload
+        if (!clientId || !clientSecret) {
+            const db = getDb();
+            const settingsDoc = await db.doc('system/settings').get();
+            const settings = settingsDoc.data() || {};
+            clientId = clientId || settings.quickbooksClientId;
+            clientSecret = clientSecret || settings.quickbooksClientSecret;
+            environment = environment || settings.quickbooksEnvironment;
+            redirectUri = redirectUri || settings.quickbooksRedirectUri;
+        }
+
+        const result = await testQuickBooksCredentials({
+            clientId,
+            clientSecret,
+            environment,
+            redirectUri
+        });
+
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+
+        res.json(result);
+    } catch (error: any) {
+        console.error('Error testing QuickBooks credentials:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 

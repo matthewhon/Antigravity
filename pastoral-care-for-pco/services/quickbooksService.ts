@@ -131,5 +131,23 @@ export const quickbooksClient = {
             throw new Error(err.error || 'Failed to send batch-ready notification');
         }
         return res.json();
+    },
+
+    async testCredentials(params: {
+        clientId: string;
+        clientSecret: string;
+        environment?: 'sandbox' | 'production';
+        redirectUri?: string;
+    }): Promise<{ success: boolean; message: string; authUrl?: string; details?: any }> {
+        const res = await fetch('/api/quickbooks/test-credentials', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.message || data.error || 'QuickBooks credential verification failed');
+        }
+        return data;
     }
 };

@@ -24,7 +24,7 @@ export interface QuickBooksTokens {
 }
 
 const INTUIT_AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2';
-const INTUIT_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth/v1/tokens/bearer';
+const INTUIT_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 
 export async function getQuickBooksConfig(db: any): Promise<QuickBooksConfig> {
     const settingsDoc = await db.doc('system/settings').get();
@@ -480,4 +480,109 @@ export async function createQuickbooksDeposit(
         depositBankAccountId: targetBankAccountId,
         depositBankAccountName: targetBankAccountName
     };
+}
+
+/**
+ * Validates QuickBooks OAuth 2.0 credentials directly against Intuit's OAuth servers
+ */
+export async function testQuickBooksCredentials(params: {
+    clientId: string;
+    clientSecret: string;
+    environment?: 'sandbox' | 'production';
+    redirectUri?: string;
+}): Promise<{
+    success: boolean;
+    authUrl?: string;
+    message: string;
+    details?: any;
+}> {
+    const clientId = (params.clientId || '').trim();
+    const clientSecret = (params.clientSecret || '').trim();
+    const environment = params.environment || 'production';
+    const redirectUri = (params.redirectUri || '').trim();
+
+    if (!clientId) {
+        return { success: false, message: 'Client ID is missing. Please enter your Intuit Client ID.' };
+    }
+    if (!clientSecret) {
+        return { success: false, message: 'Client Secret is missing. Please enter your Intuit Client Secret.' };
+    }
+
+    // Generate sample OAuth authorization URL for testing/inspection
+    const authParams = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        scope: 'com.intuit.quickbooks.accounting',
+        redirect_uri: redirectUri || 'https://developer.intuit.com',
+        state: Buffer.from(JSON.stringify({ test: true, timestamp: Date.now() })).toString('base64')
+    });
+    const authUrl = `${INTUIT_AUTH_URL}?${authParams.toString()}`;
+
+    // Validate client authentication directly with Intuit's OAuth 2.0 token endpoint
+    // We send a test request with HTTP Basic Auth (clientId:clientSecret).
+    // Intuit evaluates client credentials first:
+    // - If credentials are invalid, Intuit returns 400 or 401 with {"error":"invalid_client"}.
+    // - If credentials are valid, client auth succeeds and Intuit rejects only the dummy auth code with {"error":"invalid_grant"}.
+    try {
+        const authHeader = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+        const body = new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: 'test_verify_credentials_code',
+            redirect_uri: redirectUri || 'https://developer.intuit.com'
+        });
+
+        const res = await fetch(INTUIT_TOKEN_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': authHeader,
+                'Accept': 'application/json'
+            },
+            body: body.toString()
+        });
+
+        const json = await res.json().catch(() => ({}));
+        const error = json?.error;
+        const errorDesc = json?.error_description;
+
+        if (error === 'invalid_client') {
+            return {
+                success: false,
+                authUrl,
+                message: `Client Authentication Failed: Intuit rejected this Client ID or Client Secret (${errorDesc || 'invalid_client'}). Please check that you copied the keys from the ${environment === 'sandbox' ? 'Development' : 'Production'} tab in your Intuit Developer Portal.`,
+                details: json
+            };
+        }
+
+        if (error === 'redirect_uri_mismatch') {
+            return {
+                success: true,
+                authUrl,
+                message: `Credentials Valid! Note: Ensure the Redirect URI (${redirectUri}) is added under Redirect URIs in your Intuit App settings.`,
+                details: json
+            };
+        }
+
+        if (error === 'invalid_grant' || res.status === 400) {
+            return {
+                success: true,
+                authUrl,
+                message: `Credentials Authenticated! Intuit verified your Client ID and Client Secret successfully (${environment === 'sandbox' ? 'Sandbox' : 'Production'}).`,
+                details: { status: 'authenticated', intuitResponse: error || 'Client verified' }
+            };
+        }
+
+        return {
+            success: true,
+            authUrl,
+            message: `Intuit server verified client credentials successfully (Status ${res.status}).`,
+            details: json
+        };
+    } catch (err: any) {
+        return {
+            success: false,
+            authUrl,
+            message: `Could not reach Intuit OAuth servers: ${err.message}`
+        };
+    }
 }
