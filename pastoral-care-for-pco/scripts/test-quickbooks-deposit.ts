@@ -22,11 +22,21 @@ function buildMockDepositPayload(
     for (const fund of batch.fundsBreakdown) {
         if (fund.grossAmount <= 0) continue;
 
-        const fundMap = options?.fundOverrides?.[fund.fundId] || mapping.fundMappings[fund.fundId];
+        const overrideKey = fund.campusId ? `${fund.campusId}_${fund.fundId}` : fund.fundId;
+        const campusSpecificMap = (mapping.enableCampusMapping && fund.campusId)
+            ? mapping.campusFundMappings?.[fund.campusId]?.[fund.fundId]
+            : undefined;
+
+        const fundMap = options?.fundOverrides?.[overrideKey] 
+            || options?.fundOverrides?.[fund.fundId] 
+            || campusSpecificMap 
+            || mapping.fundMappings[fund.fundId];
+
         const accountId = fundMap?.qboAccountId || mapping.defaultIncomeAccountId;
 
         if (!accountId) {
-            throw new Error(`Fund "${fund.fundName}" is not mapped to a QuickBooks Income Account, and no default income account is set.`);
+            const campusLabel = fund.campusName ? ` (${fund.campusName})` : '';
+            throw new Error(`Fund "${fund.fundName}"${campusLabel} is not mapped to a QuickBooks Income Account, and no default income account is set.`);
         }
 
         const depositLineDetail: any = {
@@ -43,10 +53,14 @@ function buildMockDepositPayload(
             };
         }
 
+        const lineDesc = fund.campusName 
+            ? `${fund.fundName} (${fund.campusName}) - ${batch.name}`
+            : `${fund.fundName} - ${batch.name}`;
+
         lines.push({
             Amount: fund.grossAmount,
             DetailType: 'DepositLineDetail',
-            Description: `${fund.fundName} - ${batch.name}`,
+            Description: lineDesc,
             DepositLineDetail: depositLineDetail
         });
     }
@@ -218,6 +232,113 @@ function runTests() {
     const overriddenFund2Line = overridePayload.Line.find(l => l.Description.startsWith('Building Campaign'));
     console.assert(overriddenFund2Line?.DepositLineDetail.AccountRef.value === 'qbo_acc_special_missions_4099', 'Must use overridden fund account');
     console.log('✓ 1-to-1 Fund Mapping Override verified: Fund 2 deposited to', overriddenFund2Line?.DepositLineDetail.AccountRef.name);
+
+    // Test 4: Multi-Campus Fund Mapping & Location Routing
+    console.log('\nTest 4: Multi-Campus Fund Mapping (Per-Campus Accounts & Classes):');
+    const multiCampusBatch: GivingBatch = {
+        id: 'pco_batch_multi_campus_999',
+        churchId: 'church_abc',
+        name: 'Combined Sunday Offering',
+        date: '2026-09-06T12:00:00Z',
+        batchType: 'stripe',
+        status: 'committed',
+        totalGross: 1250.00,
+        totalFees: 28.50,
+        totalNet: 1221.50,
+        donationCount: 15,
+        fundsBreakdown: [
+            {
+                fundId: 'fund_1',
+                fundName: 'General Tithes',
+                campusId: 'campus_north',
+                campusName: 'North Campus',
+                grossAmount: 600.00,
+                feeAmount: 13.50,
+                netAmount: 586.50,
+                donationCount: 8
+            },
+            {
+                fundId: 'fund_1',
+                fundName: 'General Tithes',
+                campusId: 'campus_south',
+                campusName: 'South Campus',
+                grossAmount: 400.00,
+                feeAmount: 10.00,
+                netAmount: 390.00,
+                donationCount: 5
+            },
+            {
+                fundId: 'fund_2',
+                fundName: 'Building Campaign',
+                campusId: 'campus_north',
+                campusName: 'North Campus',
+                grossAmount: 250.00,
+                feeAmount: 5.00,
+                netAmount: 245.00,
+                donationCount: 2
+            }
+        ]
+    };
+
+    const multiCampusMapping: QuickbooksMappingConfig = {
+        ...mockMapping,
+        enableCampusMapping: true,
+        campusFundMappings: {
+            'campus_north': {
+                'fund_1': {
+                    qboAccountId: 'qbo_acc_north_tithes_4011',
+                    qboAccountName: 'North Campus Tithes (4011)',
+                    qboClassId: 'class_north_campus',
+                    qboClassName: 'North Campus'
+                },
+                'fund_2': {
+                    qboAccountId: 'qbo_acc_north_building_4021',
+                    qboAccountName: 'North Building Fund (4021)',
+                    qboClassId: 'class_north_campus',
+                    qboClassName: 'North Campus'
+                }
+            },
+            'campus_south': {
+                'fund_1': {
+                    qboAccountId: 'qbo_acc_south_tithes_4012',
+                    qboAccountName: 'South Campus Tithes (4012)',
+                    qboClassId: 'class_south_campus',
+                    qboClassName: 'South Campus'
+                }
+            }
+        }
+    };
+
+    const multiCampusPayload = buildMockDepositPayload(multiCampusBatch, multiCampusMapping);
+    console.assert(multiCampusPayload.Line.length === 4, `Expected 4 lines (3 fund + 1 fee), got ${multiCampusPayload.Line.length}`);
+
+    // North Campus Tithes line
+    const northTithesLine = multiCampusPayload.Line[0];
+    console.assert(northTithesLine.Amount === 600.00, 'North Tithes must be 600.00');
+    console.assert(northTithesLine.DepositLineDetail.AccountRef.value === 'qbo_acc_north_tithes_4011', 'North Tithes must route to North Tithes account');
+    console.assert(northTithesLine.DepositLineDetail.ClassRef.value === 'class_north_campus', 'North Tithes must have North Campus class');
+    console.assert(northTithesLine.Description.includes('(North Campus)'), 'Line description must include campus name');
+    console.log('✓ North Campus Tithes verified: $', northTithesLine.Amount, 'routed to', northTithesLine.DepositLineDetail.AccountRef.name, 'with Class:', northTithesLine.DepositLineDetail.ClassRef.name);
+
+    // South Campus Tithes line
+    const southTithesLine = multiCampusPayload.Line[1];
+    console.assert(southTithesLine.Amount === 400.00, 'South Tithes must be 400.00');
+    console.assert(southTithesLine.DepositLineDetail.AccountRef.value === 'qbo_acc_south_tithes_4012', 'South Tithes must route to South Tithes account');
+    console.assert(southTithesLine.DepositLineDetail.ClassRef.value === 'class_south_campus', 'South Tithes must have South Campus class');
+    console.assert(southTithesLine.Description.includes('(South Campus)'), 'Line description must include campus name');
+    console.log('✓ South Campus Tithes verified: $', southTithesLine.Amount, 'routed to', southTithesLine.DepositLineDetail.AccountRef.name, 'with Class:', southTithesLine.DepositLineDetail.ClassRef.name);
+
+    // North Campus Building line
+    const northBuildingLine = multiCampusPayload.Line[2];
+    console.assert(northBuildingLine.Amount === 250.00, 'North Building must be 250.00');
+    console.assert(northBuildingLine.DepositLineDetail.AccountRef.value === 'qbo_acc_north_building_4021', 'North Building must route to North Building account');
+    console.log('✓ North Campus Building verified: $', northBuildingLine.Amount, 'routed to', northBuildingLine.DepositLineDetail.AccountRef.name);
+
+    // Multi-campus Net deposit to the penny
+    const mcNet = multiCampusPayload.Line.reduce((sum: number, line: any) => sum + line.Amount, 0);
+    const mcNetRounded = Math.round(mcNet * 100) / 100;
+    console.assert(mcNetRounded === multiCampusBatch.totalNet, `Multi-campus net (${mcNetRounded}) must equal batch net (${multiCampusBatch.totalNet})`);
+    console.log('✓ Multi-campus Net Deposit matches to the penny:', mcNetRounded, '==', multiCampusBatch.totalNet);
 
     console.log('\nAll QuickBooks Deposit Payload tests passed successfully!');
 }

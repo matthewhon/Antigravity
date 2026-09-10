@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    PcoFund, QuickbooksAccount, QuickbooksClass, 
+    PcoFund, PcoCampus, QuickbooksAccount, QuickbooksClass, 
     QuickbooksVendor, QuickbooksMappingConfig, FundQuickbooksMapping 
 } from '../types';
 import { quickbooksClient } from '../services/quickbooksService';
 import { firestore } from '../services/firestoreService';
-import { X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, ArrowRight, Search } from 'lucide-react';
+import { X, Check, AlertCircle, Sparkles, RefreshCw, Landmark, CreditCard, ArrowRight, Search, Building2, Copy } from 'lucide-react';
 
 interface QuickbooksMappingModalProps {
     isOpen: boolean;
     onClose: () => void;
     churchId: string;
     funds: PcoFund[];
+    campuses?: PcoCampus[];
     onMappingSaved: (mapping: QuickbooksMappingConfig) => void;
 }
 
@@ -20,6 +21,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     onClose,
     churchId,
     funds,
+    campuses,
     onMappingSaved
 }) => {
     const [loading, setLoading] = useState(true);
@@ -28,6 +30,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const [allFunds, setAllFunds] = useState<PcoFund[]>(funds || []);
+    const [campusesList, setCampusesList] = useState<PcoCampus[]>(campuses || []);
     const [fundSearch, setFundSearch] = useState('');
 
     const [bankAccounts, setBankAccounts] = useState<QuickbooksAccount[]>([]);
@@ -41,16 +44,20 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     const [stripeVendorId, setStripeVendorId] = useState('');
     const [defaultIncomeAccountId, setDefaultIncomeAccountId] = useState('');
     const [fundMappings, setFundMappings] = useState<Record<string, FundQuickbooksMapping>>({});
+    const [enableCampusMapping, setEnableCampusMapping] = useState(false);
+    const [campusFundMappings, setCampusFundMappings] = useState<Record<string, Record<string, FundQuickbooksMapping>>>({});
+    const [selectedCampusTab, setSelectedCampusTab] = useState<string>('default'); // 'default' or campus.pcoId
     const [cutoffDate, setCutoffDate] = useState('');
 
     const loadData = async () => {
         setLoading(true);
         setError(null);
         try {
-            const [accountsData, existingMapping, dbFunds] = await Promise.all([
+            const [accountsData, existingMapping, dbFunds, dbCampuses] = await Promise.all([
                 quickbooksClient.getAccounts(churchId),
                 quickbooksClient.getMapping(churchId),
-                firestore.getFunds(churchId).catch(() => [])
+                firestore.getFunds(churchId).catch(() => []),
+                firestore.getCampuses(churchId).catch(() => [])
             ]);
 
             // Combine unique funds by ID
@@ -67,6 +74,12 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
             }
             setAllFunds(Array.from(fundMap.values()));
 
+            if (campuses && campuses.length > 0) {
+                setCampusesList(campuses);
+            } else {
+                setCampusesList(dbCampuses || []);
+            }
+
             setBankAccounts(accountsData.bankAccounts || []);
             setIncomeAccounts(accountsData.incomeAccounts || []);
             setExpenseAccounts(accountsData.expenseAccounts || []);
@@ -79,6 +92,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 setStripeVendorId(existingMapping.stripeVendorId || '');
                 setDefaultIncomeAccountId(existingMapping.defaultIncomeAccountId || '');
                 setFundMappings(existingMapping.fundMappings || {});
+                setEnableCampusMapping(existingMapping.enableCampusMapping ?? false);
+                setCampusFundMappings(existingMapping.campusFundMappings || {});
                 setCutoffDate(existingMapping.cutoffDate || '');
             } else {
                 // Pre-select first bank and fee account if available
@@ -110,53 +125,153 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
     }, [isOpen, churchId]);
 
     const handleAutoMatch = () => {
-        const newMappings = { ...fundMappings };
-        let matchedCount = 0;
-        allFunds.forEach(fund => {
-            const cleanFundName = fund.name.toLowerCase().trim();
-            const matchedAccount = incomeAccounts.find(acc => {
-                const cleanAccName = acc.name.toLowerCase().trim();
-                return cleanAccName === cleanFundName ||
-                    cleanAccName.includes(cleanFundName) || 
-                    cleanFundName.includes(cleanAccName);
+        if (selectedCampusTab === 'default') {
+            const newMappings = { ...fundMappings };
+            let matchedCount = 0;
+            allFunds.forEach(fund => {
+                const cleanFundName = fund.name.toLowerCase().trim();
+                const matchedAccount = incomeAccounts.find(acc => {
+                    const cleanAccName = acc.name.toLowerCase().trim();
+                    return cleanAccName === cleanFundName ||
+                        cleanAccName.includes(cleanFundName) || 
+                        cleanFundName.includes(cleanAccName);
+                });
+
+                if (matchedAccount) {
+                    newMappings[fund.id] = {
+                        ...(newMappings[fund.id] || {}),
+                        qboAccountId: matchedAccount.id,
+                        qboAccountName: matchedAccount.name
+                    };
+                    matchedCount++;
+                }
+            });
+            setFundMappings(newMappings);
+            setSuccessMessage(`Auto-matched ${matchedCount} funds to QuickBooks income accounts.`);
+            setTimeout(() => setSuccessMessage(null), 3000);
+        } else {
+            const currentCampus = campusesList.find(c => c.pcoId === selectedCampusTab);
+            const campusNameClean = (currentCampus?.name || '').toLowerCase();
+            const campusClass = classes.find(c => 
+                c.name.toLowerCase() === campusNameClean || c.name.toLowerCase().includes(campusNameClean)
+            );
+
+            const newCampusMappings = { ...(campusFundMappings[selectedCampusTab] || {}) };
+            let matchedCount = 0;
+
+            allFunds.forEach(fund => {
+                const cleanFundName = fund.name.toLowerCase().trim();
+                // Look for campus-specific account first (e.g. "Tithes - North Campus" or "North Tithes")
+                let matchedAccount = incomeAccounts.find(acc => {
+                    const cleanAccName = acc.name.toLowerCase().trim();
+                    return cleanAccName.includes(cleanFundName) && cleanAccName.includes(campusNameClean);
+                });
+
+                // Fallback to general fund name match
+                if (!matchedAccount) {
+                    matchedAccount = incomeAccounts.find(acc => {
+                        const cleanAccName = acc.name.toLowerCase().trim();
+                        return cleanAccName === cleanFundName || cleanAccName.includes(cleanFundName);
+                    });
+                }
+
+                if (matchedAccount || campusClass) {
+                    newCampusMappings[fund.id] = {
+                        qboAccountId: matchedAccount?.id || fundMappings[fund.id]?.qboAccountId || '',
+                        qboAccountName: matchedAccount?.name || fundMappings[fund.id]?.qboAccountName || '',
+                        qboClassId: campusClass?.id || fundMappings[fund.id]?.qboClassId,
+                        qboClassName: campusClass?.name || fundMappings[fund.id]?.qboClassName
+                    };
+                    matchedCount++;
+                }
             });
 
-            if (matchedAccount) {
-                newMappings[fund.id] = {
-                    ...(newMappings[fund.id] || {}),
-                    qboAccountId: matchedAccount.id,
-                    qboAccountName: matchedAccount.name
+            setCampusFundMappings(prev => ({
+                ...prev,
+                [selectedCampusTab]: newCampusMappings
+            }));
+            setSuccessMessage(`Auto-matched ${matchedCount} funds for ${currentCampus?.name || 'this campus'}.`);
+            setTimeout(() => setSuccessMessage(null), 3000);
+        }
+    };
+
+    const handleCopyDefaultToCurrentCampus = () => {
+        if (selectedCampusTab === 'default') return;
+        const currentCampus = campusesList.find(c => c.pcoId === selectedCampusTab);
+        const campusClass = classes.find(c => 
+            currentCampus && c.name.toLowerCase().includes(currentCampus.name.toLowerCase())
+        );
+
+        const newCampusMap: Record<string, FundQuickbooksMapping> = {};
+        allFunds.forEach(fund => {
+            const def = fundMappings[fund.id];
+            if (def && def.qboAccountId) {
+                newCampusMap[fund.id] = {
+                    ...def,
+                    qboClassId: campusClass?.id || def.qboClassId,
+                    qboClassName: campusClass?.name || def.qboClassName
                 };
-                matchedCount++;
             }
         });
-        setFundMappings(newMappings);
-        setSuccessMessage(`Auto-matched ${matchedCount} funds to QuickBooks income accounts.`);
+
+        setCampusFundMappings(prev => ({
+            ...prev,
+            [selectedCampusTab]: newCampusMap
+        }));
+        setSuccessMessage(`Copied default fund mappings to ${currentCampus?.name || 'this campus'}${campusClass ? ` and assigned Class "${campusClass.name}"` : ''}.`);
         setTimeout(() => setSuccessMessage(null), 3000);
     };
 
     const handleFundAccountChange = (fund: PcoFund, accountId: string) => {
         const account = incomeAccounts.find(a => a.id === accountId);
-        setFundMappings(prev => ({
-            ...prev,
-            [fund.id]: {
-                ...(prev[fund.id] || {}),
-                qboAccountId: accountId,
-                qboAccountName: account?.name || ''
-            }
-        }));
+        if (selectedCampusTab === 'default') {
+            setFundMappings(prev => ({
+                ...prev,
+                [fund.id]: {
+                    ...(prev[fund.id] || {}),
+                    qboAccountId: accountId,
+                    qboAccountName: account?.name || ''
+                }
+            }));
+        } else {
+            setCampusFundMappings(prev => ({
+                ...prev,
+                [selectedCampusTab]: {
+                    ...(prev[selectedCampusTab] || {}),
+                    [fund.id]: {
+                        ...(prev[selectedCampusTab]?.[fund.id] || {}),
+                        qboAccountId: accountId,
+                        qboAccountName: account?.name || ''
+                    }
+                }
+            }));
+        }
     };
 
     const handleFundClassChange = (fund: PcoFund, classId: string) => {
         const qboClass = classes.find(c => c.id === classId);
-        setFundMappings(prev => ({
-            ...prev,
-            [fund.id]: {
-                ...(prev[fund.id] || { qboAccountId: defaultIncomeAccountId, qboAccountName: '' }),
-                qboClassId: classId || undefined,
-                qboClassName: qboClass?.name || undefined
-            }
-        }));
+        if (selectedCampusTab === 'default') {
+            setFundMappings(prev => ({
+                ...prev,
+                [fund.id]: {
+                    ...(prev[fund.id] || { qboAccountId: defaultIncomeAccountId, qboAccountName: '' }),
+                    qboClassId: classId || undefined,
+                    qboClassName: qboClass?.name || undefined
+                }
+            }));
+        } else {
+            setCampusFundMappings(prev => ({
+                ...prev,
+                [selectedCampusTab]: {
+                    ...(prev[selectedCampusTab] || {}),
+                    [fund.id]: {
+                        ...(prev[selectedCampusTab]?.[fund.id] || { qboAccountId: '', qboAccountName: '' }),
+                        qboClassId: classId || undefined,
+                        qboClassName: qboClass?.name || undefined
+                    }
+                }
+            }));
+        }
     };
 
     const handleSave = async () => {
@@ -188,6 +303,8 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                 defaultIncomeAccountId: defaultIncomeAccountId || undefined,
                 defaultIncomeAccountName: defIncome?.name,
                 fundMappings,
+                enableCampusMapping,
+                campusFundMappings: enableCampusMapping ? campusFundMappings : undefined,
                 cutoffDate: cutoffDate.trim() || undefined
             };
 
@@ -364,18 +481,118 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                 </div>
                             </div>
 
+                            {/* Multi-Campus Support Toggle */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-indigo-100 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400">
+                                        <Building2 className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                            <span>Campus & Location Specific Funds</span>
+                                            {enableCampusMapping ? (
+                                                <span className="text-[10px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                    Enabled
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                    Single / Consolidated
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Associate each campus with a different set of QuickBooks income accounts or classes.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setEnableCampusMapping(!enableCampusMapping)}
+                                    className={`w-12 h-6 rounded-full p-1 transition-colors shrink-0 ${enableCampusMapping ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                    title="Toggle campus mapping"
+                                >
+                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${enableCampusMapping ? 'translate-x-6' : ''}`}></div>
+                                </button>
+                            </div>
+
+                            {/* Campus Tabs (when enabled) */}
+                            {enableCampusMapping && campusesList.length > 0 && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedCampusTab('default')}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                selectedCampusTab === 'default'
+                                                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                            }`}
+                                        >
+                                            <span>⭐</span>
+                                            <span>Default / All Campuses</span>
+                                        </button>
+                                        {campusesList.map(campus => {
+                                            const hasCustom = campusFundMappings[campus.pcoId] && Object.keys(campusFundMappings[campus.pcoId]).length > 0;
+                                            return (
+                                                <button
+                                                    key={campus.pcoId}
+                                                    type="button"
+                                                    onClick={() => setSelectedCampusTab(campus.pcoId)}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                        selectedCampusTab === campus.pcoId
+                                                            ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <span>🏛️</span>
+                                                    <span>{campus.name}</span>
+                                                    {hasCustom && (
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Has campus-specific mappings"></span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {selectedCampusTab !== 'default' && (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40 text-xs">
+                                            <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200">
+                                                <span>ℹ️</span>
+                                                <span>
+                                                    Configuring funds for <strong>{campusesList.find(c => c.pcoId === selectedCampusTab)?.name}</strong>. Funds left unmapped will inherit the <strong>Default / Church-Wide</strong> mapping.
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleCopyDefaultToCurrentCampus}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 rounded-lg font-bold text-xs hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors shrink-0 shadow-sm"
+                                            >
+                                                <Copy className="w-3.5 h-3.5" />
+                                                Copy All From Default
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* 1-to-1 Fund Matching Table */}
                             <div className="space-y-3">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
                                         <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                            1-to-1 Fund Mapping: Planning Center to QuickBooks Income
+                                            {selectedCampusTab === 'default'
+                                                ? 'Default Fund Mapping: Planning Center to QuickBooks Income'
+                                                : `${campusesList.find(c => c.pcoId === selectedCampusTab)?.name} Fund Mapping`}
                                             <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                                {mappedCount} of {allFunds.length} mapped
+                                                {selectedCampusTab === 'default' 
+                                                    ? `${mappedCount} of ${allFunds.length} mapped`
+                                                    : `${Object.keys(campusFundMappings[selectedCampusTab] || {}).length} customized`}
                                             </span>
                                         </h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Each Planning Center fund line in a batch is credited 1-to-1 to its mapped QuickBooks Income account.
+                                            {selectedCampusTab === 'default'
+                                                ? 'Each Planning Center fund line in a batch is credited 1-to-1 to its mapped QuickBooks Income account.'
+                                                : `Customize accounts and classes for donations attributed to ${campusesList.find(c => c.pcoId === selectedCampusTab)?.name}.`}
                                         </p>
                                     </div>
 
@@ -410,7 +627,7 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                 {classes.length > 0 && (
                                                     <th className="px-4 py-3">QuickBooks Class (Optional)</th>
                                                 )}
-                                                <th className="px-3 py-3 w-20 text-center">Status</th>
+                                                <th className="px-3 py-3 w-24 text-center">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
@@ -422,8 +639,12 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                 </tr>
                                             ) : (
                                                 filteredFunds.map((fund) => {
-                                                    const mapping = fundMappings[fund.id] || { qboAccountId: '' };
-                                                    const isMapped = !!mapping.qboAccountId;
+                                                    const defaultMap = fundMappings[fund.id] || { qboAccountId: '' };
+                                                    const campusMap = selectedCampusTab !== 'default' ? campusFundMappings[selectedCampusTab]?.[fund.id] : undefined;
+                                                    const activeMap = selectedCampusTab === 'default' ? defaultMap : (campusMap || { qboAccountId: '' });
+
+                                                    const isCampusExplicitlyMapped = selectedCampusTab !== 'default' && !!campusMap?.qboAccountId;
+                                                    const isDefaultMapped = !!defaultMap.qboAccountId;
 
                                                     return (
                                                         <tr key={fund.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -437,11 +658,15 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <select
-                                                                    value={mapping.qboAccountId || ''}
+                                                                    value={activeMap.qboAccountId || ''}
                                                                     onChange={(e) => handleFundAccountChange(fund, e.target.value)}
                                                                     className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                                                 >
-                                                                    <option value="">Select QuickBooks Income Account...</option>
+                                                                    <option value="">
+                                                                        {selectedCampusTab !== 'default' && defaultMap.qboAccountId 
+                                                                            ? `(Inherits default: ${defaultMap.qboAccountName || 'Mapped'})` 
+                                                                            : 'Select QuickBooks Income Account...'}
+                                                                    </option>
                                                                     {incomeAccounts.map(a => (
                                                                         <option key={a.id} value={a.id}>{a.name}</option>
                                                                     ))}
@@ -450,11 +675,15 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                             {classes.length > 0 && (
                                                                 <td className="px-4 py-3">
                                                                     <select
-                                                                        value={mapping.qboClassId || ''}
+                                                                        value={activeMap.qboClassId || ''}
                                                                         onChange={(e) => handleFundClassChange(fund, e.target.value)}
                                                                         className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                                                     >
-                                                                        <option value="">None</option>
+                                                                        <option value="">
+                                                                            {selectedCampusTab !== 'default' && defaultMap.qboClassId 
+                                                                                ? `(Inherits default: ${defaultMap.qboClassName || 'Class'})` 
+                                                                                : 'None'}
+                                                                        </option>
                                                                         {classes.map(c => (
                                                                             <option key={c.id} value={c.id}>{c.name}</option>
                                                                         ))}
@@ -462,7 +691,27 @@ export const QuickbooksMappingModal: React.FC<QuickbooksMappingModalProps> = ({
                                                                 </td>
                                                             )}
                                                             <td className="px-3 py-3 text-center">
-                                                                {isMapped ? (
+                                                                {selectedCampusTab !== 'default' ? (
+                                                                    isCampusExplicitlyMapped ? (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" title="Customized for this campus">
+                                                                            <Check className="w-3 h-3" />
+                                                                            Campus
+                                                                        </span>
+                                                                    ) : isDefaultMapped ? (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400" title="Inherits default church-wide mapping">
+                                                                            Inherited
+                                                                        </span>
+                                                                    ) : defaultIncomeAccountId ? (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400" title="Using Default Fallback">
+                                                                            Fallback
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400" title="Unmapped">
+                                                                            <AlertCircle className="w-3 h-3" />
+                                                                            Unmapped
+                                                                        </span>
+                                                                    )
+                                                                ) : isDefaultMapped ? (
                                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" title="Mapped 1-to-1">
                                                                         <Check className="w-3 h-3" />
                                                                         Mapped

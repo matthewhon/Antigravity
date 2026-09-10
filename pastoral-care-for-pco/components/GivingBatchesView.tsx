@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { firestore } from '../services/firestoreService';
 import { quickbooksClient } from '../services/quickbooksService';
+import { useTenantData } from '../contexts/TenantDataContext';
 import { QuickbooksMappingModal } from './QuickbooksMappingModal';
 import { GivingDepositPreviewModal } from './GivingDepositPreviewModal';
 import { 
@@ -30,6 +31,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     onSyncRecent,
     isSyncing = false
 }) => {
+    const { campuses } = useTenantData();
     const [batches, setBatches] = useState<GivingBatch[]>([]);
     const [loadingBatches, setLoadingBatches] = useState(true);
     const [qboStatus, setQboStatus] = useState<QuickbooksStatusResponse | null>(null);
@@ -38,6 +40,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     const [previewBatch, setPreviewBatch] = useState<GivingBatch | null>(null);
 
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'synced' | 'stripe' | 'manual'>('all');
+    const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [showPriorToCutoff, setShowPriorToCutoff] = useState(false);
@@ -160,16 +163,21 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
             if (statusFilter === 'stripe' && b.batchType !== 'stripe') return false;
             if (statusFilter === 'manual' && b.batchType !== 'manual') return false;
 
+            if (selectedCampusFilter !== 'all') {
+                const hasCampus = b.fundsBreakdown.some(f => f.campusId === selectedCampusFilter);
+                if (!hasCampus) return false;
+            }
+
             if (searchQuery.trim()) {
                 const query = searchQuery.toLowerCase();
                 const nameMatches = b.name.toLowerCase().includes(query);
-                const fundMatches = b.fundsBreakdown.some(f => f.fundName.toLowerCase().includes(query));
+                const fundMatches = b.fundsBreakdown.some(f => f.fundName.toLowerCase().includes(query) || (f.campusName && f.campusName.toLowerCase().includes(query)));
                 if (!nameMatches && !fundMatches) return false;
             }
 
             return true;
         });
-    }, [batches, statusFilter, searchQuery, cutoffDate, showPriorToCutoff]);
+    }, [batches, statusFilter, selectedCampusFilter, searchQuery, cutoffDate, showPriorToCutoff]);
 
     const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -310,6 +318,20 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {campuses && campuses.length > 0 && (
+                            <select
+                                aria-label="Filter batches by campus"
+                                value={selectedCampusFilter}
+                                onChange={(e) => setSelectedCampusFilter(e.target.value)}
+                                className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                            >
+                                <option value="all">All Campuses</option>
+                                {campuses.map(c => (
+                                    <option key={c.pcoId} value={c.pcoId}>🏛️ {c.name}</option>
+                                ))}
+                            </select>
+                        )}
+
                         <div className="relative">
                             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                             <input
@@ -317,7 +339,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                 placeholder="Search by batch name or fund..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-60"
+                                className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-52"
                             />
                         </div>
 
@@ -447,15 +469,23 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                                             {/* Fund Breakdown Chips */}
                                             <td className="px-4 py-3.5 max-w-xs">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {batch.fundsBreakdown.map(f => (
-                                                        <span 
-                                                            key={f.fundId}
-                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                                                        >
-                                                            <span>{f.fundName}:</span>
-                                                            <span className="text-slate-900 dark:text-white">{money(f.grossAmount)}</span>
-                                                        </span>
-                                                    ))}
+                                                    {batch.fundsBreakdown.map(f => {
+                                                        const chipKey = f.campusId ? `${f.campusId}_${f.fundId}` : f.fundId;
+                                                        return (
+                                                            <span 
+                                                                key={chipKey}
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex-wrap"
+                                                            >
+                                                                <span>{f.fundName}</span>
+                                                                {f.campusName && (
+                                                                    <span className="text-[9px] text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-100 dark:bg-indigo-950/80 px-1 rounded">
+                                                                        {f.campusName}
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-slate-900 dark:text-white ml-0.5">{money(f.grossAmount)}</span>
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                             </td>
 
@@ -531,6 +561,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 onClose={() => setIsMappingModalOpen(false)}
                 churchId={churchId}
                 funds={funds}
+                campuses={campuses}
                 onMappingSaved={(newMapping) => {
                     setMapping(newMapping);
                     setActionMessage({ type: 'success', text: 'QuickBooks accounts & fund mappings saved successfully!' });

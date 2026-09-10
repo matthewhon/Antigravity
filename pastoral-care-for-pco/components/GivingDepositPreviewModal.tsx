@@ -42,7 +42,18 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
     useEffect(() => {
         if (isOpen && churchId) {
             setDepositBankAccountId(batch?.quickbooksDepositBankAccountId || mapping?.depositBankAccountId || '');
-            setFundMappings(mapping?.fundMappings || {});
+            
+            const initialMap: Record<string, FundQuickbooksMapping> = { ...(mapping?.fundMappings || {}) };
+            if (batch?.fundsBreakdown) {
+                batch.fundsBreakdown.forEach(f => {
+                    const lineKey = f.campusId ? `${f.campusId}_${f.fundId}` : f.fundId;
+                    if (mapping?.enableCampusMapping && f.campusId && mapping.campusFundMappings?.[f.campusId]?.[f.fundId]) {
+                        initialMap[lineKey] = mapping.campusFundMappings[f.campusId][f.fundId];
+                    }
+                });
+            }
+            setFundMappings(initialMap);
+
             setSaveAsDefault(false);
             setError(null);
             setSuccessResult(null);
@@ -70,33 +81,35 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
 
     if (!isOpen || !batch) return null;
 
-    const handleFundAccountChange = (fundId: string, accountId: string) => {
+    const handleFundAccountChange = (lineKey: string, accountId: string) => {
         const acc = incomeAccounts.find(a => a.id === accountId);
         setFundMappings(prev => ({
             ...prev,
-            [fundId]: {
-                ...(prev[fundId] || {}),
+            [lineKey]: {
+                ...(prev[lineKey] || {}),
                 qboAccountId: accountId,
                 qboAccountName: acc?.name || ''
             }
         }));
     };
 
-    const handleFundClassChange = (fundId: string, classId: string) => {
+    const handleFundClassChange = (lineKey: string, classId: string) => {
         const cls = classes.find(c => c.id === classId);
         setFundMappings(prev => ({
             ...prev,
-            [fundId]: {
-                ...(prev[fundId] || { qboAccountId: mapping?.defaultIncomeAccountId || '', qboAccountName: mapping?.defaultIncomeAccountName || '' }),
+            [lineKey]: {
+                ...(prev[lineKey] || { qboAccountId: mapping?.defaultIncomeAccountId || '', qboAccountName: mapping?.defaultIncomeAccountName || '' }),
                 qboClassId: classId || undefined,
                 qboClassName: cls?.name || undefined
             }
         }));
     };
 
-    const unmappedFunds = batch.fundsBreakdown.filter(f => 
-        f.grossAmount > 0 && !fundMappings[f.fundId]?.qboAccountId && !mapping?.defaultIncomeAccountId
-    );
+    const unmappedFunds = batch.fundsBreakdown.filter(f => {
+        const lineKey = f.campusId ? `${f.campusId}_${f.fundId}` : f.fundId;
+        const mapped = fundMappings[lineKey] || fundMappings[f.fundId];
+        return f.grossAmount > 0 && !mapped?.qboAccountId && !mapping?.defaultIncomeAccountId;
+    });
     const missingBank = !depositBankAccountId;
     const missingFeeAcc = batch.totalFees > 0 && !mapping?.stripeFeeExpenseAccountId;
     const hasConfigError = unmappedFunds.length > 0 || missingBank || missingFeeAcc;
@@ -319,20 +332,29 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                                             {/* Fund Lines */}
                                             {batch.fundsBreakdown.map((f) => {
-                                                const fundMap = fundMappings[f.fundId];
+                                                const lineKey = f.campusId ? `${f.campusId}_${f.fundId}` : f.fundId;
+                                                const fundMap = fundMappings[lineKey] || fundMappings[f.fundId];
                                                 const currentAccountId = fundMap?.qboAccountId || (mapping?.defaultIncomeAccountId || '');
 
                                                 return (
-                                                    <tr key={f.fundId} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <tr key={lineKey} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                                         <td className="px-4 py-2.5">
-                                                            <div className="font-semibold text-slate-900 dark:text-white">{f.fundName}</div>
+                                                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                                                <span>{f.fundName}</span>
+                                                                {f.campusName && (
+                                                                    <span className="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                                                        <span>🏛️</span>
+                                                                        <span>{f.campusName}</span>
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <div className="text-[10px] text-slate-400">{f.donationCount} gifts</div>
                                                         </td>
                                                         <td className="px-4 py-2.5">
                                                             <div className="flex items-center gap-2">
                                                                 <select
                                                                     value={currentAccountId}
-                                                                    onChange={(e) => handleFundAccountChange(f.fundId, e.target.value)}
+                                                                    onChange={(e) => handleFundAccountChange(lineKey, e.target.value)}
                                                                     className={`w-full max-w-xs px-2.5 py-1 text-xs rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
                                                                         currentAccountId 
                                                                             ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white' 
@@ -347,7 +369,7 @@ export const GivingDepositPreviewModal: React.FC<GivingDepositPreviewModalProps>
                                                                 {classes.length > 0 && (
                                                                     <select
                                                                         value={fundMap?.qboClassId || ''}
-                                                                        onChange={(e) => handleFundClassChange(f.fundId, e.target.value)}
+                                                                        onChange={(e) => handleFundClassChange(lineKey, e.target.value)}
                                                                         className="w-28 px-2 py-1 text-xs rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                                                                     >
                                                                         <option value="">No Class</option>

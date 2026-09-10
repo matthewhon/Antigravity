@@ -66,18 +66,48 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         console.error('Labels sync error', e);
     }
 
+    // 1b. Fetch Campuses and People to build donor-campus lookup maps
+    const campuses = await firestore.getCampuses(churchId).catch(() => []);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
+    const people = await firestore.getPeople(churchId).catch(() => []);
+    const donorCampusMap = new Map<string, { id: string; name: string }>();
+    people.forEach(p => {
+        if (p.primaryCampusId) {
+            const name = p.primaryCampusName || campusMap.get(p.primaryCampusId) || 'Campus';
+            donorCampusMap.set(p.id, { id: p.primaryCampusId, name });
+        }
+    });
+
     // 2. Fetch Donations
     // NOTE: PCO accepts and then ignores `payment_source` and `batch` here — they
     // never appear in `included`. Do not add `fund` for the same reason (see header).
     const donations: DetailedDonation[] = await fetchAllPages(
         churchId,
-        `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels,payment_source,batch`,
+        `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels,payment_source,batch,campus`,
         (d: any, included: any[] = []) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
             const donationFee = (d.attributes?.fee_cents || 0) / 100;
             const donationGross = (d.attributes?.amount_cents || 0) / 100;
+
+            // Resolve Campus Attribution:
+            // 1. Direct campus relationship on donation (from PCO campus selector/stamp)
+            // 2. Fallback to donor's primary campus from People profile
+            let campusId: string | null = null;
+            let campusName: string | null = null;
+            const campusRef = d.relationships?.campus?.data;
+            if (campusRef) {
+                campusId = String(campusRef.id);
+                const campusObj = included.find(i => (i.type === 'Campus' || i.type === 'campus') && String(i.id) === campusId);
+                campusName = campusObj?.attributes?.name || campusMap.get(campusId) || null;
+            } else if (donorCampusMap.has(donorId)) {
+                const dc = donorCampusMap.get(donorId)!;
+                campusId = dc.id;
+                campusName = dc.name;
+            }
 
             // Resolve Payment Source
             let paymentSource = 'Unknown';
@@ -132,7 +162,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     paymentSource,
                     batchId,
                     batchName,
-                    fee: donationFee
+                    fee: donationFee,
+                    campusId,
+                    campusName
                 }] as DetailedDonation[];
             }
 
@@ -182,7 +214,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         paymentSource,
                         batchId,
                         batchName,
-                        fee
+                        fee,
+                        campusId,
+                        campusName
                     });
                 }
             });
@@ -320,27 +354,50 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         batchDonationMap.forEach((batchDonations, batchKey) => {
             if (batchDonations.length === 0) return;
 
-            // Calculate fund breakdown
-            const fundGroups = new Map<string, { fundName: string; gross: number; fee: number; count: number }>();
+            // Calculate fund breakdown (by Fund and optionally Campus)
+            const fundGroups = new Map<string, { 
+                fundId: string;
+                fundName: string;
+                campusId?: string | null;
+                campusName?: string | null;
+                gross: number; 
+                fee: number; 
+                count: number;
+            }>();
             let batchTotalGross = 0;
             let batchTotalFee = 0;
 
             batchDonations.forEach(d => {
                 const fId = d.fundId || 'unassigned';
                 const fName = d.fundName || 'Unassigned';
-                const cur = fundGroups.get(fId) || { fundName: fName, gross: 0, fee: 0, count: 0 };
+                const cId = d.campusId || null;
+                const cName = d.campusName || null;
+                // Group by campus + fund if campus is assigned, else by fundId
+                const groupKey = cId ? `${cId}_${fId}` : fId;
+
+                const cur = fundGroups.get(groupKey) || { 
+                    fundId: fId,
+                    fundName: fName, 
+                    campusId: cId,
+                    campusName: cName,
+                    gross: 0, 
+                    fee: 0, 
+                    count: 0 
+                };
                 cur.gross += d.amount || 0;
                 cur.fee += d.fee || 0;
                 cur.count += 1;
-                fundGroups.set(fId, cur);
+                fundGroups.set(groupKey, cur);
 
                 batchTotalGross += d.amount || 0;
                 batchTotalFee += d.fee || 0;
             });
 
-            const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundGroups.entries()).map(([fId, data]) => ({
-                fundId: fId,
+            const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundGroups.values()).map(data => ({
+                fundId: data.fundId,
                 fundName: data.fundName,
+                campusId: data.campusId,
+                campusName: data.campusName,
                 grossAmount: Math.round(data.gross * 100) / 100,
                 feeAmount: Math.round(data.fee * 100) / 100,
                 netAmount: Math.round((data.gross - data.fee) * 100) / 100,

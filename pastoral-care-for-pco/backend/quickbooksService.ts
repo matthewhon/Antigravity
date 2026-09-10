@@ -336,11 +336,22 @@ export async function createQuickbooksDeposit(
     for (const fund of batch.fundsBreakdown) {
         if (fund.grossAmount <= 0) continue;
 
-        const fundMap = options?.fundOverrides?.[fund.fundId] || mapping.fundMappings?.[fund.fundId];
+        // Resolve mapping: check override by composite key, override by fundId, campus-specific mapping, then default mapping
+        const overrideKey = fund.campusId ? `${fund.campusId}_${fund.fundId}` : fund.fundId;
+        const campusSpecificMap = (mapping.enableCampusMapping && fund.campusId)
+            ? mapping.campusFundMappings?.[fund.campusId]?.[fund.fundId]
+            : undefined;
+
+        const fundMap = options?.fundOverrides?.[overrideKey]
+            || options?.fundOverrides?.[fund.fundId]
+            || campusSpecificMap
+            || mapping.fundMappings?.[fund.fundId];
+
         const accountId = fundMap?.qboAccountId || mapping.defaultIncomeAccountId;
 
         if (!accountId) {
-            throw new Error(`Fund "${fund.fundName}" is not mapped to a QuickBooks Income Account, and no default income account is set.`);
+            const campusLabel = fund.campusName ? ` (${fund.campusName})` : '';
+            throw new Error(`Fund "${fund.fundName}"${campusLabel} is not mapped to a QuickBooks Income Account, and no default income account is set.`);
         }
 
         const depositLineDetail: any = {
@@ -355,10 +366,14 @@ export async function createQuickbooksDeposit(
             };
         }
 
+        const lineDesc = fund.campusName 
+            ? `${fund.fundName} (${fund.campusName}) - ${batch.name}`
+            : `${fund.fundName} - ${batch.name}`;
+
         lines.push({
             Amount: fund.grossAmount,
             DetailType: 'DepositLineDetail',
-            Description: `${fund.fundName} - ${batch.name}`,
+            Description: lineDesc,
             DepositLineDetail: depositLineDetail
         });
     }

@@ -150,6 +150,7 @@ export interface Church {
     subdomain: string;
     pcoConnected: boolean;
     multiCampusEnabled?: boolean;
+    givingCampusTrackingEnabled?: boolean;
     lastSyncTimestamp?: number | null;
     pcoClientId?: string;
     pcoClientSecret?: string;
@@ -669,11 +670,17 @@ export interface DetailedDonation {
     batchName?: string;
     /** Processing fee in dollars (e.g. Stripe card/ACH fee) */
     fee?: number;
+    /** Campus ID where the donation was made / attributed */
+    campusId?: string | null;
+    /** Campus name where the donation was made / attributed */
+    campusName?: string | null;
 }
 
 export interface GivingBatchFundBreakdown {
     fundId: string;
     fundName: string;
+    campusId?: string | null;
+    campusName?: string | null;
     grossAmount: number;
     feeAmount: number;
     netAmount: number;
@@ -741,6 +748,10 @@ export interface QuickbooksMappingConfig {
     defaultIncomeAccountId?: string;
     defaultIncomeAccountName?: string;
     fundMappings: Record<string, FundQuickbooksMapping>;
+    /** Enable multi-campus fund & location mapping */
+    enableCampusMapping?: boolean;
+    /** Per-campus fund mappings: [campusId]: { [pcoFundId]: FundQuickbooksMapping } */
+    campusFundMappings?: Record<string, Record<string, FundQuickbooksMapping>>;
     /** Optional cutoff date (YYYY-MM-DD). Batches before this date are hidden from QuickBooks deposit views */
     cutoffDate?: string;
     updatedAt?: number;

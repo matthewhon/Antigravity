@@ -2176,6 +2176,21 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </button>
                             </div>
 
+                            {/* Giving Campus & Location Tracking */}
+                            <div className="mt-3 flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">Giving Campus & Location Tracking</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Track which campus donations came from and allow campus-specific QuickBooks fund mappings</p>
+                                </div>
+                                <button 
+                                    title="Toggle Giving Campus Tracking"
+                                    onClick={() => handleChange('givingCampusTrackingEnabled', !formData.givingCampusTrackingEnabled)}
+                                    className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.givingCampusTrackingEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                >
+                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.givingCampusTrackingEnabled ? 'translate-x-6' : ''}`}></div>
+                                </button>
+                            </div>
+
                             {/* YouTube Integration */}
                             <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
                                 <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wide mb-1">YouTube Integration</p>
