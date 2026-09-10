@@ -1,7 +1,5 @@
 {
   "projects": {
     "default": "pastoral-care-for-pco"
-  },
-  "targets": {},
-  "etags": {}
+  }
 }
