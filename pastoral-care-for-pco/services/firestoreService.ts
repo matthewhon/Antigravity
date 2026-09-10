@@ -811,7 +811,7 @@ class FirestoreService {
     }
   }
 
-  async getUnbatchedOnlineDonations(churchId: string, sinceDate?: string): Promise<DetailedDonation[]> {
+  async getUnbatchedOnlineDonations(churchId: string, sinceDate?: string, includeBatched: boolean = false): Promise<DetailedDonation[]> {
     try {
       let q = query(
         collection(db, 'detailed_donations'),
@@ -821,7 +821,7 @@ class FirestoreService {
       const donations: DetailedDonation[] = [];
       snap.forEach(d => {
         const data = d.data() as DetailedDonation;
-        if (!data.batchId) {
+        if (includeBatched || !data.batchId) {
           const isOnline = (data.fee != null && Math.abs(data.fee) > 0) ||
             (data.paymentSource && /stripe|card|ach|online/i.test(data.paymentSource)) ||
             (data.paymentMethod && /card|ach|stripe/i.test(data.paymentMethod)) ||

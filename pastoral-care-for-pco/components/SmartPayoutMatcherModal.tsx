@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     X, 
     Sparkles, 
@@ -9,14 +9,19 @@ import {
     CreditCard, 
     Loader2, 
     Check, 
-    ArrowRight,
-    RefreshCw,
     SlidersHorizontal,
-    Building
+    Building,
+    Search,
+    RotateCcw
 } from 'lucide-react';
 import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../types';
 import { firestore } from '../services/firestoreService';
-import { matchDonationsForPayout, PayoutMatchResult } from '../services/payoutMatcherService';
+import { 
+    matchDonationsForPayout, 
+    getCandidateGiftsForPayout,
+    PayoutMatchResult, 
+    ParentDonationGroup 
+} from '../services/payoutMatcherService';
 
 interface SmartPayoutMatcherModalProps {
     churchId: string;
@@ -42,32 +47,134 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     });
     const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [targetAmount, setTargetAmount] = useState<string>('');
-    const [targetMode, setTargetMode] = useState<'gross' | 'net'>('net');
+    const [targetMode, setTargetMode] = useState<'net' | 'gross'>('net');
     const [targetFees, setTargetFees] = useState<string>('');
     const [targetTitheGross, setTargetTitheGross] = useState<string>('');
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
+    // Filter controls
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState<'card' | 'ach' | 'all'>('card');
+    const [includeBatched, setIncludeBatched] = useState<boolean>(true);
+    const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
+
     // Matching state
-    const [loadingDonations, setLoadingDonations] = useState(false);
     const [matching, setMatching] = useState(false);
     const [matchResult, setMatchResult] = useState<PayoutMatchResult | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Selected donations within result
-    const [selectedDonationIds, setSelectedDonationIds] = useState<Set<string>>(new Set());
+    // Selected parent donation IDs (keeps designations grouped)
+    const [selectedParentIds, setSelectedParentIds] = useState<Set<string>>(new Set());
     const [creatingBatch, setCreatingBatch] = useState(false);
 
-    // Reset when opened
+    // When modal opens or dates change, reset error and match
     useEffect(() => {
         if (isOpen) {
             setError(null);
             setMatchResult(null);
+            setSelectedParentIds(new Set());
         }
     }, [isOpen]);
 
+    // When payoutDate changes, optionally adjust default window end date
+    const handlePayoutDateChange = (newPayoutDate: string) => {
+        setPayoutDate(newPayoutDate);
+        setEndDate(newPayoutDate);
+        const d = new Date(newPayoutDate);
+        if (!isNaN(d.getTime())) {
+            d.setDate(d.getDate() - searchWindowDays);
+            setStartDate(d.toISOString().slice(0, 10));
+        }
+    };
+
+    // Candidate parent donation groups in current date window & filters
+    const candidateGroups: ParentDonationGroup[] = useMemo(() => {
+        if (!isOpen) return [];
+        const sourceDonations = inMemoryDonations || [];
+        if (sourceDonations.length === 0) return [];
+
+        return getCandidateGiftsForPayout(sourceDonations, {
+            payoutDate,
+            startDate: startDate.trim() || undefined,
+            endDate: endDate.trim() || undefined,
+            paymentMethodFilter,
+            includeBatched,
+            searchWindowDays
+        });
+    }, [isOpen, inMemoryDonations, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
+
+    // Filtered candidate groups based on candidate search box
+    const visibleCandidateGroups = useMemo(() => {
+        if (!candidateSearchQuery.trim()) return candidateGroups;
+        const q = candidateSearchQuery.toLowerCase();
+        return candidateGroups.filter(p => {
+            const donor = (p.donorName || '').toLowerCase();
+            const date = (p.date || '').toLowerCase();
+            const method = (p.paymentMethod || '').toLowerCase();
+            const funds = p.designations.map(d => (d.fundName || '').toLowerCase()).join(' ');
+            const amount = p.gross.toString();
+            return donor.includes(q) || date.includes(q) || method.includes(q) || funds.includes(q) || amount.includes(q);
+        });
+    }, [candidateGroups, candidateSearchQuery]);
+
+    // Compute live aggregates from selectedParentIds
+    const { activeGross, activeFees, activeNet, activeTithe, activeDonations, activeParentCount } = useMemo(() => {
+        let gross = 0;
+        let fees = 0;
+        let tithe = 0;
+        let parentCount = 0;
+        const selectedGifts: DetailedDonation[] = [];
+
+        candidateGroups.forEach(p => {
+            if (selectedParentIds.has(p.rootId)) {
+                parentCount += 1;
+                gross += p.gross;
+                fees += p.fee;
+                tithe += p.tithe;
+                selectedGifts.push(...p.designations);
+            }
+        });
+
+        return {
+            activeGross: Math.round(gross * 100) / 100,
+            activeFees: Math.round(fees * 100) / 100,
+            activeNet: Math.round((gross - fees) * 100) / 100,
+            activeTithe: Math.round(tithe * 100) / 100,
+            activeDonations: selectedGifts,
+            activeParentCount: parentCount
+        };
+    }, [candidateGroups, selectedParentIds]);
+
+    // Dynamic fund breakdown from active donations
+    const activeFundsBreakdown: GivingBatchFundBreakdown[] = useMemo(() => {
+        const fundMap = new Map<string, GivingBatchFundBreakdown>();
+        activeDonations.forEach(d => {
+            const fKey = `${d.fundId || d.fundName}_${d.campusId || 'main'}`;
+            if (!fundMap.has(fKey)) {
+                fundMap.set(fKey, {
+                    fundId: d.fundId || 'unknown',
+                    fundName: d.fundName || 'General Giving',
+                    campusId: d.campusId || null,
+                    campusName: d.campusName || null,
+                    grossAmount: 0,
+                    feeAmount: 0,
+                    netAmount: 0,
+                    donationCount: 0
+                });
+            }
+            const f = fundMap.get(fKey)!;
+            f.grossAmount = Math.round((f.grossAmount + (d.amount || 0)) * 100) / 100;
+            f.feeAmount = Math.round((f.feeAmount + Math.abs(d.fee || 0)) * 100) / 100;
+            f.netAmount = Math.round((f.grossAmount - f.feeAmount) * 100) / 100;
+            f.donationCount += 1;
+        });
+
+        return Array.from(fundMap.values()).sort((a, b) => b.grossAmount - a.grossAmount);
+    }, [activeDonations]);
+
     if (!isOpen) return null;
 
+    // Run smart algorithmic matcher
     const handleRunMatch = async () => {
         const numAmount = parseFloat(targetAmount);
         if (isNaN(numAmount) || numAmount <= 0) {
@@ -79,17 +186,15 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         setMatching(true);
         setMatchResult(null);
 
-        // Allow UI to update loading state before running calculations
+        // Yield to allow UI spinner
         await new Promise(r => setTimeout(r, 20));
 
         try {
             let candidateDonations: DetailedDonation[] = [];
 
             if (inMemoryDonations && inMemoryDonations.length > 0) {
-                // Use already loaded in-memory donations (instant, zero network latency)
-                candidateDonations = inMemoryDonations.filter(d => !d.batchId);
+                candidateDonations = inMemoryDonations;
             } else {
-                // Fetch unbatched online donations from Firestore as fallback
                 let sinceDate: string;
                 if (startDate) {
                     sinceDate = startDate.slice(0, 10);
@@ -99,17 +204,12 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
                     sinceDate = minDate.toISOString().slice(0, 10);
                 }
-                candidateDonations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate);
-            }
-
-            if (candidateDonations.length === 0) {
-                setError('No unbatched online donations found within the search window. Please run a Giving sync first or widen the window.');
-                setMatching(false);
-                return;
+                candidateDonations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, includeBatched);
             }
 
             const numFees = targetFees ? parseFloat(targetFees) : undefined;
             const numTithe = targetTitheGross ? parseFloat(targetTitheGross) : undefined;
+
             const res = matchDonationsForPayout(candidateDonations, {
                 payoutDate,
                 startDate: startDate.trim() || undefined,
@@ -119,18 +219,25 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 targetFees: isNaN(numFees!) ? undefined : numFees,
                 targetTitheGross: isNaN(numTithe!) ? undefined : numTithe,
                 stripePayoutId: stripePayoutId.trim() || undefined,
-                searchWindowDays
+                searchWindowDays,
+                paymentMethodFilter,
+                includeBatched
             });
 
             if (!res || res.matchedDonations.length === 0) {
-                setError(`Could not find a combination of unbatched online gifts matching ${targetMode === 'gross' ? 'Gross' : 'Net'} $${numAmount.toFixed(2)}. Try widening the search window or adjusting the amount.`);
+                setError(`Could not find a combination of online gifts matching ${targetMode === 'gross' ? 'Gross' : 'Net'} $${numAmount.toFixed(2)} with the selected filters. Try switching the method filter (Card/ACH/All) or adjusting the date window.`);
                 setMatching(false);
                 return;
             }
 
             setMatchResult(res);
-            // Select all matched donations by default
-            setSelectedDonationIds(new Set(res.matchedDonations.map(d => d.id)));
+            // Select all matched parent donations
+            const matchedParentIds = new Set<string>();
+            res.matchedDonations.forEach(d => {
+                const rootId = d.id.includes('_') ? d.id.split('_')[0] : d.id;
+                matchedParentIds.add(rootId);
+            });
+            setSelectedParentIds(matchedParentIds);
         } catch (err: any) {
             console.error('Matching error:', err);
             setError(err.message || 'An error occurred while matching transactions.');
@@ -139,59 +246,70 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         }
     };
 
-    // Recalculate dynamic totals if user toggles individual checkboxes
-    const activeDonations = matchResult 
-        ? matchResult.matchedDonations.filter(d => selectedDonationIds.has(d.id))
-        : [];
-    const activeGross = Math.round(activeDonations.reduce((s, d) => s + (d.amount || 0), 0) * 100) / 100;
-    const activeFees = Math.round(activeDonations.reduce((s, d) => s + Math.abs(d.fee || 0), 0) * 100) / 100;
-    const activeNet = Math.round((activeGross - activeFees) * 100) / 100;
-
-    const toggleDonation = (id: string) => {
-        setSelectedDonationIds(prev => {
+    // Toggle individual parent donation
+    const toggleParentDonation = (rootId: string) => {
+        setSelectedParentIds(prev => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            if (next.has(rootId)) {
+                next.delete(rootId);
+            } else {
+                next.add(rootId);
+            }
             return next;
         });
     };
 
+    // Bulk selection helpers
+    const selectAllVisible = () => {
+        setSelectedParentIds(prev => {
+            const next = new Set(prev);
+            visibleCandidateGroups.forEach(p => next.add(p.rootId));
+            return next;
+        });
+    };
+
+    const deselectAllVisible = () => {
+        setSelectedParentIds(prev => {
+            const next = new Set(prev);
+            visibleCandidateGroups.forEach(p => next.delete(p.rootId));
+            return next;
+        });
+    };
+
+    const resetSelection = () => {
+        setSelectedParentIds(new Set());
+        setMatchResult(null);
+    };
+
+    // Calculate difference metrics against target inputs
+    const numTargetAmount = parseFloat(targetAmount) || 0;
+    const numTargetFees = parseFloat(targetFees) || 0;
+    const numTargetTithe = parseFloat(targetTitheGross) || 0;
+
+    const targetGrossVal = targetMode === 'gross' ? numTargetAmount : (numTargetAmount > 0 && numTargetFees > 0 ? numTargetAmount + numTargetFees : 0);
+    const targetNetVal = targetMode === 'net' ? numTargetAmount : (targetGrossVal > 0 && numTargetFees > 0 ? targetGrossVal - numTargetFees : 0);
+
+    const grossDiff = targetGrossVal > 0 ? Math.round((activeGross - targetGrossVal) * 100) / 100 : 0;
+    const netDiff = targetNetVal > 0 ? Math.round((activeNet - targetNetVal) * 100) / 100 : 0;
+    const feesDiff = numTargetFees > 0 ? Math.round((activeFees - numTargetFees) * 100) / 100 : 0;
+    const titheDiff = numTargetTithe > 0 ? Math.round((activeTithe - numTargetTithe) * 100) / 100 : 0;
+
+    const isExactMatchActive = (
+        (targetMode === 'net' && numTargetAmount > 0 && Math.abs(netDiff) < 0.005) ||
+        (targetMode === 'gross' && numTargetAmount > 0 && Math.abs(grossDiff) < 0.005)
+    ) && (numTargetTithe === 0 || Math.abs(titheDiff) < 0.005);
+
     const handleCreateBatch = async () => {
-        if (!matchResult || activeDonations.length === 0) return;
+        if (activeDonations.length === 0) return;
 
         setCreatingBatch(true);
         setError(null);
 
         try {
             const pDateStr = payoutDate.slice(0, 10);
-            const payoutId = stripePayoutId.trim() || matchResult.suggestedPayoutId;
+            const payoutId = stripePayoutId.trim() || (matchResult ? matchResult.suggestedPayoutId : `payout_${pDateStr.replace(/-/g, '')}`);
             const batchId = `stripe_${payoutId}`;
             const batchName = `${pDateStr} Stripe ${payoutId}`;
-
-            // Recompute active fund breakdown
-            const fundMap = new Map<string, GivingBatchFundBreakdown>();
-            activeDonations.forEach(d => {
-                const fKey = `${d.fundId || d.fundName}_${d.campusId || 'main'}`;
-                if (!fundMap.has(fKey)) {
-                    fundMap.set(fKey, {
-                        fundId: d.fundId || 'unknown',
-                        fundName: d.fundName || 'General Giving',
-                        campusId: d.campusId || null,
-                        campusName: d.campusName || null,
-                        grossAmount: 0,
-                        feeAmount: 0,
-                        netAmount: 0,
-                        donationCount: 0
-                    });
-                }
-                const f = fundMap.get(fKey)!;
-                f.grossAmount = Math.round((f.grossAmount + (d.amount || 0)) * 100) / 100;
-                f.feeAmount = Math.round((f.feeAmount + Math.abs(d.fee || 0)) * 100) / 100;
-                f.netAmount = Math.round((f.grossAmount - f.feeAmount) * 100) / 100;
-                f.donationCount += 1;
-            });
-
-            const fundsBreakdown = Array.from(fundMap.values()).sort((a, b) => b.grossAmount - a.grossAmount);
 
             const newBatch: GivingBatch = {
                 id: batchId,
@@ -204,7 +322,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 totalFees: activeFees,
                 totalNet: activeNet,
                 donationCount: activeDonations.length,
-                fundsBreakdown,
+                fundsBreakdown: activeFundsBreakdown,
                 stripePayoutId: payoutId,
                 paidOutDate: pDateStr
             };
@@ -226,12 +344,13 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+            <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-4 sm:my-8 flex flex-col max-h-[90vh]">
+                
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-sm">
                             <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
@@ -242,7 +361,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 </span>
                             </h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Enter your Stripe payout date and deposit total. The matcher will bundle the exact gifts.
+                                Match Stripe bank payouts with exact donor gifts, with support for Card/ACH schedules, fees, and multi-fund tithes.
                             </p>
                         </div>
                     </div>
@@ -254,340 +373,518 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                {/* Body Content */}
+                <div className="p-6 space-y-5 overflow-y-auto flex-1">
                     {error && (
                         <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                            <span>{error}</span>
+                            <div className="flex-1">
+                                <span className="font-semibold">Match Notice: </span>
+                                {error}
+                            </div>
                         </div>
                     )}
 
-                    {/* Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800">
-                        {/* Payout Date */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-purple-500" />
-                                Stripe Payout Date *
-                            </label>
-                            <input
-                                type="date"
-                                value={payoutDate}
-                                onChange={(e) => setPayoutDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                        </div>
-
-                        {/* Target Amount & Mode */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                                    <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                                    Target Deposit *
-                                </label>
-                                <div className="flex items-center gap-1 text-[11px]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTargetMode('net')}
-                                        className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
-                                            targetMode === 'net' 
-                                                ? 'bg-purple-600 text-white' 
-                                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                        }`}
-                                    >
-                                        Net Bank
-                                    </button>
-                                    <span className="text-slate-300 dark:text-slate-700">|</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTargetMode('gross')}
-                                        className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
-                                            targetMode === 'gross' 
-                                                ? 'bg-purple-600 text-white' 
-                                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                        }`}
-                                    >
-                                        Gross
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder={targetMode === 'gross' ? '10263.91' : '10107.40'}
-                                    value={targetAmount}
-                                    onChange={(e) => setTargetAmount(e.target.value)}
-                                    className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Target Tithe Gross */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Building className="w-3.5 h-3.5 text-indigo-500" />
-                                Target Tithe Gross <span className="text-slate-400 font-normal">(Optional)</span>
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="e.g. 7655.48"
-                                    value={targetTitheGross}
-                                    onChange={(e) => setTargetTitheGross(e.target.value)}
-                                    className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Window Start Date */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                Transaction Start Date
-                            </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                        </div>
-
-                        {/* Window End Date */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                Transaction End Date
-                            </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                        </div>
-
-                        {/* Optional Expected Fees */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                                Expected Fees <span className="text-slate-400 font-normal">(Optional)</span>
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="e.g. 156.51"
-                                    value={targetFees}
-                                    onChange={(e) => setTargetFees(e.target.value)}
-                                    className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Optional Stripe Payout ID */}
-                        <div className="sm:col-span-2 lg:col-span-3">
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                                Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="e.g. po_1N8... or dep_..."
-                                value={stripePayoutId}
-                                onChange={(e) => setStripePayoutId(e.target.value)}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Find Match Button */}
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            onClick={handleRunMatch}
-                            disabled={matching || !targetAmount}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
-                        >
-                            {matching ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Analyzing Unbatched Gifts...
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="w-4 h-4" />
-                                    Find Matching Transactions
-                                </>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Match Results */}
-                    {matchResult && (
-                        <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-                            {/* Status Banner */}
-                            <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
-                                matchResult.isExactMatch
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
-                                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
-                            }`}>
-                                <div className="flex items-center gap-2.5">
-                                    {matchResult.isExactMatch ? (
-                                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                    ) : (
-                                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                                    )}
-                                    <div>
-                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                                            {matchResult.isExactMatch ? 'Exact 100% Match Found' : 'Closest Match Found'}
-                                        </h4>
-                                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                                            {matchResult.isExactMatch 
-                                                ? `Identified ${activeDonations.length} gifts summing exactly to your payout.`
-                                                : `Difference: $${matchResult.difference.toFixed(2)} from target amount.`}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-4 text-right">
-                                    {matchResult.totalTitheGross !== undefined && (
-                                        <div>
-                                            <span className="text-[10px] uppercase tracking-wider text-indigo-500 font-semibold block">Tithe</span>
-                                            <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                                                ${matchResult.totalTitheGross.toFixed(2)}
-                                            </span>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block">Gross</span>
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                            ${activeGross.toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block">Fees</span>
-                                        <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
-                                            -${activeFees.toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div className="pl-3 border-l border-slate-200 dark:border-slate-700">
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block">Net Deposit</span>
-                                        <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                                            ${activeNet.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Fund Splits Breakdown Chips */}
+                    {/* Primary Controls Grid */}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Payout Date */}
                             <div>
-                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-                                    Fund Breakdown Allocation
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {matchResult.fundsBreakdown.map(f => (
-                                        <span 
-                                            key={`${f.fundId}_${f.campusId}`}
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-purple-500" />
+                                    Stripe Payout Date *
+                                </label>
+                                <input
+                                    type="date"
+                                    value={payoutDate}
+                                    onChange={(e) => handlePayoutDateChange(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            {/* Target Amount & Mode */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                                        Target Deposit *
+                                    </label>
+                                    <div className="flex items-center bg-slate-200 dark:bg-slate-700/60 p-0.5 rounded-md text-[11px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTargetMode('net')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all ${
+                                                targetMode === 'net' 
+                                                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                            }`}
                                         >
-                                            <span className="font-semibold">{f.fundName}:</span>
-                                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">${f.grossAmount.toFixed(2)}</span>
-                                            <span className="text-slate-400 text-[10px]">({f.donationCount})</span>
-                                        </span>
-                                    ))}
+                                            Net Bank
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTargetMode('gross')}
+                                            className={`px-2 py-0.5 rounded font-semibold transition-all ${
+                                                targetMode === 'gross' 
+                                                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Gross
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm font-semibold">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder={targetMode === 'gross' ? '3751.20' : '3736.69'}
+                                        value={targetAmount}
+                                        onChange={(e) => setTargetAmount(e.target.value)}
+                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
                                 </div>
                             </div>
 
-                            {/* Matched Transactions List */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-                                    <span>Matched Gifts ({activeDonations.length} of {matchResult.matchedDonations.length} selected)</span>
-                                    <span>Check or uncheck to adjust</span>
-                                </div>
-                                <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
-                                    {matchResult.matchedDonations.map(d => {
-                                        const isChecked = selectedDonationIds.has(d.id);
-                                        return (
-                                            <label 
-                                                key={d.id}
-                                                className={`flex items-center justify-between px-3.5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-xs transition-colors ${
-                                                    isChecked ? 'bg-purple-50/20' : 'opacity-60'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2.5">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={() => toggleDonation(d.id)}
-                                                        className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500"
-                                                    />
-                                                    <div>
-                                                        <span className="font-semibold text-slate-900 dark:text-white">
-                                                            {d.donorName || 'Donor'}
-                                                        </span>
-                                                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                                            <span>{d.date.slice(0, 10)}</span>
-                                                            <span>•</span>
-                                                            <span className="capitalize">{d.paymentMethod || 'online'}</span>
-                                                            <span>•</span>
-                                                            <span>{d.fundName}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-right">
-                                                    <div className="font-bold text-slate-900 dark:text-white">
-                                                        ${(d.amount || 0).toFixed(2)}
-                                                    </div>
-                                                    {d.fee ? (
-                                                        <div className="text-[10px] text-slate-400">
-                                                            fee -${Math.abs(d.fee).toFixed(2)}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Batch Naming & Action */}
-                            <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <div>
-                                    <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
-                                        Batch To Be Created
+                            {/* Payment Method Selector (Card vs ACH vs All) */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5">
+                                        <CreditCard className="w-3.5 h-3.5 text-blue-500" />
+                                        Payment Method
                                     </span>
-                                    <p className="font-bold text-sm text-slate-900 dark:text-white font-mono">
-                                        {payoutDate.slice(0, 10)} Stripe {stripePayoutId.trim() || matchResult.suggestedPayoutId}
-                                    </p>
+                                    <span className="text-[10px] text-slate-400 font-normal">Stripe splits methods</span>
+                                </label>
+                                <div className="grid grid-cols-3 gap-1 bg-slate-200/80 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethodFilter('card')}
+                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                            paymentMethodFilter === 'card'
+                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        Card Only
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethodFilter('ach')}
+                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                            paymentMethodFilter === 'ach'
+                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        ACH Only
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethodFilter('all')}
+                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                            paymentMethodFilter === 'all'
+                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        All Online
+                                    </button>
                                 </div>
+                            </div>
 
+                            {/* Transaction Start Date */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                    Window Start Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            {/* Transaction End Date */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                    Window End Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            {/* Target Tithe Gross */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <Building className="w-3.5 h-3.5 text-indigo-500" />
+                                    Target Tithe Gross <span className="text-slate-400 font-normal">(Optional)</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="e.g. 2407.20"
+                                        value={targetTitheGross}
+                                        onChange={(e) => setTargetTitheGross(e.target.value)}
+                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Optional Expected Fees */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                                    Expected Fees <span className="text-slate-400 font-normal">(Optional)</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="e.g. 14.51"
+                                        value={targetFees}
+                                        onChange={(e) => setTargetFees(e.target.value)}
+                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Optional Stripe Payout ID */}
+                            <div className="sm:col-span-1 lg:col-span-2">
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                                    Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. po_1S2K4s... or dep_..."
+                                    value={stripePayoutId}
+                                    onChange={(e) => setStripePayoutId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Additional Options & Action Bar */}
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={includeBatched}
+                                    onChange={(e) => setIncludeBatched(e.target.checked)}
+                                    className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500"
+                                />
+                                <span>Include already-batched gifts</span>
+                                <span className="text-[11px] text-slate-400 font-normal">(allows re-bundling gifts synced with PCO auto-batches)</span>
+                            </label>
+
+                            <div className="flex items-center gap-2">
+                                {selectedParentIds.size > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={resetSelection}
+                                        className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        Clear Selection
+                                    </button>
+                                )}
                                 <button
                                     type="button"
-                                    onClick={handleCreateBatch}
-                                    disabled={creatingBatch || activeDonations.length === 0}
-                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all"
+                                    onClick={handleRunMatch}
+                                    disabled={matching || !targetAmount}
+                                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all shrink-0"
                                 >
-                                    {creatingBatch ? (
+                                    {matching ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Creating Batch...
+                                            Analyzing Gifts...
                                         </>
                                     ) : (
                                         <>
-                                            <Check className="w-4 h-4" />
-                                            Confirm & Create Batch
+                                            <Sparkles className="w-4 h-4" />
+                                            Find Matching Transactions
                                         </>
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Running Scoreboard / Comparison Summary */}
+                    {(candidateGroups.length > 0 || selectedParentIds.size > 0) && (
+                        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-4">
+                            {/* Scoreboard Metrics Row */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {/* Gross Scorecard */}
+                                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                                        <span>SELECTED GROSS</span>
+                                        {targetGrossVal > 0 && (
+                                            <span className={Math.abs(grossDiff) < 0.005 ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                                                {grossDiff === 0 ? '✓ Matched' : `${grossDiff > 0 ? '+' : ''}$${grossDiff.toFixed(2)}`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white">
+                                        ${activeGross.toFixed(2)}
+                                    </div>
+                                    {targetGrossVal > 0 && (
+                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                            Target: ${targetGrossVal.toFixed(2)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fees Scorecard */}
+                                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                                        <span>FEES</span>
+                                        {numTargetFees > 0 && (
+                                            <span className={Math.abs(feesDiff) < 0.005 ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                                                {feesDiff === 0 ? '✓ Matched' : `${feesDiff > 0 ? '+' : ''}$${feesDiff.toFixed(2)}`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-base font-bold text-rose-600 dark:text-rose-400">
+                                        -${activeFees.toFixed(2)}
+                                    </div>
+                                    {numTargetFees > 0 && (
+                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                            Expected: ${numTargetFees.toFixed(2)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Tithe Scorecard (if provided or present) */}
+                                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center justify-between text-[11px] text-indigo-500 font-semibold mb-1">
+                                        <span>TITHE GROSS</span>
+                                        {numTargetTithe > 0 && (
+                                            <span className={Math.abs(titheDiff) < 0.005 ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                                                {titheDiff === 0 ? '✓ Matched' : `${titheDiff > 0 ? '+' : ''}$${titheDiff.toFixed(2)}`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-base font-bold text-indigo-600 dark:text-indigo-400">
+                                        ${activeTithe.toFixed(2)}
+                                    </div>
+                                    {numTargetTithe > 0 && (
+                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                            Target: ${numTargetTithe.toFixed(2)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Net Bank Deposit Scorecard */}
+                                <div className={`p-3 rounded-lg border ${
+                                    isExactMatchActive 
+                                        ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' 
+                                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'
+                                }`}>
+                                    <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
+                                        <span>NET BANK DEPOSIT</span>
+                                        {targetNetVal > 0 && (
+                                            <span className={Math.abs(netDiff) < 0.005 ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                                                {netDiff === 0 ? '✓ Matched' : `${netDiff > 0 ? '+' : ''}$${netDiff.toFixed(2)}`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                                        ${activeNet.toFixed(2)}
+                                    </div>
+                                    {targetNetVal > 0 && (
+                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                            Target: ${targetNetVal.toFixed(2)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Fund Allocation Breakdown Chips */}
+                            {activeFundsBreakdown.length > 0 && (
+                                <div>
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
+                                        Fund Allocation ({activeDonations.length} total gift designations)
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {activeFundsBreakdown.map(f => (
+                                            <span 
+                                                key={`${f.fundId}_${f.campusId}`}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                                            >
+                                                <span className="font-semibold">{f.fundName}:</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">${f.grossAmount.toFixed(2)}</span>
+                                                <span className="text-slate-400 text-[10px]">({f.donationCount})</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Candidate Gift Inspector Header & Search */}
+                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Candidate Gifts ({activeParentCount} of {candidateGroups.length} selected)
+                                        </span>
+                                        <span className="text-[11px] text-slate-400">
+                                            • Method: <span className="capitalize font-semibold text-slate-600 dark:text-slate-300">{paymentMethodFilter}</span>
+                                        </span>
+                                    </div>
+
+                                    {/* Action buttons & Search */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search donor, fund..."
+                                                value={candidateSearchQuery}
+                                                onChange={(e) => setCandidateSearchQuery(e.target.value)}
+                                                className="pl-8 pr-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-purple-500 w-36 sm:w-48"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={selectAllVisible}
+                                            className="px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg transition-colors"
+                                        >
+                                            Select All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={deselectAllVisible}
+                                            className="px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                        >
+                                            Deselect All
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Transaction List */}
+                                <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+                                    {visibleCandidateGroups.length === 0 ? (
+                                        <div className="p-8 text-center text-xs text-slate-400">
+                                            No candidate donations found matching the current filters and date window.
+                                        </div>
+                                    ) : (
+                                        visibleCandidateGroups.map(p => {
+                                            const isChecked = selectedParentIds.has(p.rootId);
+                                            return (
+                                                <label 
+                                                    key={p.rootId}
+                                                    className={`flex items-center justify-between px-3.5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-xs transition-colors ${
+                                                        isChecked ? 'bg-purple-50/25 dark:bg-purple-950/20' : 'opacity-60'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => toggleParentDonation(p.rootId)}
+                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500 cursor-pointer"
+                                                        />
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-slate-900 dark:text-white">
+                                                                    {p.donorName || 'Donor'}
+                                                                </span>
+                                                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase">
+                                                                    {p.paymentMethod || p.paymentSource || 'Online'}
+                                                                </span>
+                                                                {p.batchId && (
+                                                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                                                        Batch #{p.batchId}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                                                <span>{p.date ? p.date.slice(0, 10) : ''}</span>
+                                                                <span>•</span>
+                                                                <span>
+                                                                    {p.designations.map(d => d.fundName).join(', ')}
+                                                                </span>
+                                                                {p.tithe > 0 && (
+                                                                    <>
+                                                                        <span>•</span>
+                                                                        <span className="text-indigo-600 dark:text-indigo-400 font-medium">Tithe: ${p.tithe.toFixed(2)}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right">
+                                                        <div className="font-bold text-slate-900 dark:text-white">
+                                                            ${p.gross.toFixed(2)}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 flex items-center justify-end gap-1.5">
+                                                            {p.fee > 0 && <span className="text-rose-500 font-medium">fee -${p.fee.toFixed(2)}</span>}
+                                                            <span>•</span>
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">net ${p.net.toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Batch Confirmation & Create Button */}
+                    {activeDonations.length > 0 && (
+                        <div className="p-4 bg-purple-50/60 dark:bg-purple-950/30 rounded-xl border border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div>
+                                <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider block">
+                                    Batch Summary To Be Created
+                                </span>
+                                <p className="font-bold text-sm text-slate-900 dark:text-white font-mono mt-0.5">
+                                    {payoutDate.slice(0, 10)} Stripe {stripePayoutId.trim() || (matchResult ? matchResult.suggestedPayoutId : `payout_${payoutDate.slice(0, 10).replace(/-/g, '')}`)}
+                                </p>
+                                <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2 mt-1">
+                                    <span>{activeDonations.length} gifts</span>
+                                    <span>•</span>
+                                    <span>Gross: ${activeGross.toFixed(2)}</span>
+                                    <span>•</span>
+                                    <span>Fees: -${activeFees.toFixed(2)}</span>
+                                    <span>•</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">Net: ${activeNet.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleCreateBatch}
+                                disabled={creatingBatch || activeDonations.length === 0}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all shrink-0"
+                            >
+                                {creatingBatch ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Creating Batch...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" />
+                                        Confirm & Create Batch ({activeDonations.length} Gifts)
+                                    </>
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>
@@ -595,3 +892,4 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         </div>
     );
 };
+

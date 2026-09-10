@@ -10,6 +10,8 @@ export interface PayoutMatchOptions {
     targetTitheGross?: number;
     stripePayoutId?: string;
     searchWindowDays?: number; // default 14 days before payout date
+    paymentMethodFilter?: 'all' | 'card' | 'ach';
+    includeBatched?: boolean;
 }
 
 export interface PayoutMatchResult {
@@ -25,7 +27,7 @@ export interface PayoutMatchResult {
     suggestedPayoutId: string;
 }
 
-interface ParentDonationGroup {
+export interface ParentDonationGroup {
     rootId: string;
     gross: number;
     fee: number;
@@ -34,19 +36,19 @@ interface ParentDonationGroup {
     date: string;
     donorName: string;
     paymentMethod: string;
+    paymentSource: string;
+    batchId?: string | null;
     designations: DetailedDonation[];
 }
 
 /**
- * Intelligent subset matcher for Stripe payouts.
- * Groups by parent donation (so multi-fund split gifts are kept intact),
- * and uses branch-and-bound optimization to find the combination matching target amounts.
+ * Filter and group all matching candidate donations for a payout window.
  */
-export function matchDonationsForPayout(
+export function getCandidateGiftsForPayout(
     allDonations: DetailedDonation[],
     options: PayoutMatchOptions
-): PayoutMatchResult | null {
-    const { payoutDate, startDate, endDate, targetGross, targetNet, targetFees, targetTitheGross, stripePayoutId } = options;
+): ParentDonationGroup[] {
+    const { payoutDate, startDate, endDate, paymentMethodFilter = 'all', includeBatched = false } = options;
     const windowDays = options.searchWindowDays || 14;
 
     const pDateStr = (endDate || payoutDate).slice(0, 10);
@@ -60,12 +62,25 @@ export function matchDonationsForPayout(
         minDateStr = minDate.toISOString().slice(0, 10);
     }
 
-    // 1. Filter online unbatched donations within window
+    // Filter online donations within window
     const candidates = allDonations.filter(d => {
-        if (d.batchId) return false;
+        if (!includeBatched && d.batchId) return false;
+
+        const src = (d.paymentSource || '') + ' ' + (d.paymentMethod || '');
+        const isCashOrCheck = /cash|check/i.test(d.paymentSource || '') || /cash|check/i.test(d.paymentMethod || '');
+        if (isCashOrCheck) return false;
+
+        const isCard = /card|visa|mastercard|discover|amex|credit|debit/i.test(src);
+        const isAch = /ach|bank|checking|savings|union|fcu|wells|chase|bokf/i.test(src);
+
+        if (paymentMethodFilter === 'card') {
+            if (!isCard && isAch) return false;
+        } else if (paymentMethodFilter === 'ach') {
+            if (!isAch && isCard) return false;
+        }
+
         const isOnline = (d.fee != null && Math.abs(d.fee) > 0) ||
-            (d.paymentSource && /stripe|card|ach|online/i.test(d.paymentSource)) ||
-            (d.paymentMethod && /card|ach|stripe/i.test(d.paymentMethod)) ||
+            /stripe|card|ach|online|visa|mastercard/i.test(src) ||
             !!d.stripe_payout_id || !!d.stripePayoutId;
         if (!isOnline) return false;
 
@@ -73,9 +88,9 @@ export function matchDonationsForPayout(
         return dDateStr >= minDateStr && dDateStr <= pDateStr;
     });
 
-    if (candidates.length === 0) return null;
+    if (candidates.length === 0) return [];
 
-    // 2. Group designations by parent donation ID
+    // Group designations by parent donation ID
     const parentMap = new Map<string, DetailedDonation[]>();
     candidates.forEach(d => {
         const rootId = d.id.includes('_') ? d.id.split('_')[0] : d.id;
@@ -100,9 +115,30 @@ export function matchDonationsForPayout(
             date: first.date,
             donorName: first.donorName || 'Donor',
             paymentMethod: first.paymentMethod || 'card',
+            paymentSource: first.paymentSource || 'Online',
+            batchId: first.batchId || null,
             designations: desigs
         };
     });
+
+    parents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return parents;
+}
+
+/**
+ * Intelligent subset matcher for Stripe payouts.
+ * Groups by parent donation (so multi-fund split gifts are kept intact),
+ * and uses branch-and-bound optimization to find the combination matching target amounts.
+ */
+export function matchDonationsForPayout(
+    allDonations: DetailedDonation[],
+    options: PayoutMatchOptions
+): PayoutMatchResult | null {
+    const { payoutDate, endDate, targetGross, targetNet, targetFees, targetTitheGross, stripePayoutId } = options;
+    const pDateStr = (endDate || payoutDate).slice(0, 10);
+
+    const parents = getCandidateGiftsForPayout(allDonations, options);
+    if (parents.length === 0) return null;
 
     // Determine target in cents
     const hasTargetGross = targetGross !== undefined && targetGross > 0;
