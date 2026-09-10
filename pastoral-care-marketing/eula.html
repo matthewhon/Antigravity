@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>End-User License Agreement (EULA) | Pastoral Care for Planning Center</title>
+  <meta name="description" content="End-User License Agreement (EULA) for Pastoral Care for Planning Center and Pastoral Care Messaging by Barnabas Software." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #4A8FCC;
+      --blue-dark: #2C5282;
+      --blue-deeper: #1A3A5C;
+      --navy: #0F2540;
+      --gold: #F6AD1C;
+      --gold-light: #FDE68A;
+      --gold-dark: #D97706;
+      --white: #FFFFFF;
+      --gray-50: #F8FAFC;
+      --gray-100: #F1F5F9;
+      --gray-200: #E2E8F0;
+      --gray-300: #CBD5E1;
+      --gray-400: #94A3B8;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1E293B;
+      --radius: 16px;
+      --shadow: 0 20px 60px rgba(15,37,64,0.08);
+      --shadow-sm: 0 4px 16px rgba(15,37,64,0.06);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--gray-800);
+      background: var(--white);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    /* ── NAVIGATION ───────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      padding: 0 2rem;
+      height: 72px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(74,143,204,0.12);
+      transition: box-shadow 0.3s;
+    }
+    nav.scrolled { box-shadow: 0 4px 24px rgba(15,37,64,0.08); }
+    .nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+    .nav-logo img { height: 44px; width: auto; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .nav-logo-text strong { font-size: 0.95rem; font-weight: 800; color: var(--blue-dark); letter-spacing: -0.01em; }
+    .nav-logo-text span { font-size: 0.68rem; font-weight: 500; color: var(--gray-400); letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 1.5rem; }
+    .nav-links a {
+      text-decoration: none; color: var(--blue-dark); font-weight: 600;
+      font-size: 0.88rem; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold-dark); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: var(--navy) !important; font-weight: 700 !important;
+      padding: 0.55rem 1.3rem; border-radius: 50px;
+      box-shadow: 0 4px 16px rgba(246,173,28,0.3);
+      transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    .nav-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(246,173,28,0.4) !important; }
+
+    /* ── HEADER BANNER ────────────────────────────── */
+    .legal-header {
+      padding: 130px 2rem 50px;
+      background: linear-gradient(165deg, var(--navy) 0%, var(--blue-deeper) 55%, #1A3A5C 100%);
+      color: var(--white);
+      position: relative;
+      overflow: hidden;
+    }
+    .legal-header::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 75% 40%, rgba(74,143,204,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .legal-header-inner {
+      max-width: 1040px; margin: 0 auto; position: relative; z-index: 1;
+    }
+    .legal-badge {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      background: rgba(246,173,28,0.15); border: 1px solid rgba(246,173,28,0.35);
+      color: var(--gold); padding: 0.35rem 0.9rem; border-radius: 50px;
+      font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 1.2rem;
+    }
+    .legal-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 4.5vw, 3.2rem);
+      font-weight: 800; line-height: 1.15;
+      margin-bottom: 0.8rem;
+    }
+    .legal-meta {
+      display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;
+      color: rgba(255,255,255,0.72); font-size: 0.88rem;
+    }
+    .legal-meta span strong { color: var(--white); }
+
+    /* ── CONTENT LAYOUT ───────────────────────────── */
+    .legal-container {
+      max-width: 1100px; margin: 0 auto;
+      padding: 50px 2rem 100px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 3.5rem;
+      align-items: start;
+    }
+
+    /* ── TABLE OF CONTENTS (SIDEBAR) ──────────────── */
+    .legal-sidebar {
+      position: sticky;
+      top: 100px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+    .legal-sidebar h3 {
+      font-size: 0.85rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--blue-dark); margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid rgba(74,143,204,0.2);
+    }
+    .legal-toc {
+      list-style: none; display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .legal-toc a {
+      color: var(--gray-600); text-decoration: none; font-size: 0.82rem;
+      padding: 0.35rem 0.6rem; border-radius: 6px;
+      line-height: 1.35; display: block;
+      transition: all 0.2s ease;
+    }
+    .legal-toc a:hover {
+      background: rgba(74,143,204,0.12);
+      color: var(--blue-dark);
+      font-weight: 600;
+      transform: translateX(3px);
+    }
+
+    /* ── LEGAL BODY CONTENT ───────────────────────── */
+    .legal-body {
+      color: var(--gray-700);
+      font-size: 0.97rem;
+      line-height: 1.75;
+    }
+
+    .legal-notice-box {
+      background: rgba(74,143,204,0.08);
+      border-left: 4px solid var(--blue);
+      border-radius: 0 12px 12px 0;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2.5rem;
+      font-size: 0.94rem;
+      color: var(--navy);
+    }
+    .legal-notice-box strong { color: var(--blue-dark); }
+
+    .apple-highlight-box {
+      background: rgba(246,173,28,0.09);
+      border-left: 4px solid var(--gold-dark);
+      border-radius: 0 12px 12px 0;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0 2rem;
+      font-size: 0.92rem;
+      color: #78350F;
+    }
+    .apple-highlight-box strong { color: #92400E; }
+
+    .legal-section {
+      margin-bottom: 3rem;
+      scroll-margin-top: 100px;
+    }
+    .legal-section h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 1rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+    .legal-section h2 .sec-num {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: 0.05em;
+    }
+    .legal-section h3 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--blue-dark);
+      margin: 1.5rem 0 0.6rem;
+    }
+    .legal-section p {
+      margin-bottom: 1rem;
+    }
+    .legal-section ul, .legal-section ol {
+      padding-left: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+    .legal-section li {
+      margin-bottom: 0.5rem;
+    }
+    .legal-section strong {
+      color: var(--navy);
+    }
+
+    .key-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.88rem;
+    }
+    .key-table th, .key-table td {
+      border: 1px solid var(--gray-200);
+      padding: 0.75rem 1rem;
+      text-align: left;
+    }
+    .key-table th {
+      background: var(--gray-100);
+      color: var(--navy);
+      font-weight: 700;
+    }
+    .key-table tr:nth-child(even) {
+      background: var(--gray-50);
+    }
+
+    /* ── FOOTER ───────────────────────────────────── */
+    footer {
+      background: #060E1C; color: rgba(255,255,255,0.6);
+      padding: 60px 2rem 30px;
+    }
+    .footer-inner { max-width: 1200px; margin: 0 auto; }
+    .footer-grid {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem;
+      margin-bottom: 3rem;
+    }
+    .footer-brand-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .footer-brand-header img { height: 52px; width: auto; }
+    .footer-brand-header .footer-logo-text strong { display: block; font-size: 1rem; font-weight: 800; color: var(--white); }
+    .footer-brand-header .footer-logo-text span { font-size: 0.72rem; color: rgba(255,255,255,0.45); letter-spacing: 0.03em; }
+    .footer-brand p { font-size: 0.875rem; line-height: 1.65; max-width: 280px; }
+    .footer-col h4 { color: var(--white); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.2rem; }
+    .footer-col a { display: block; color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.875rem; margin-bottom: 0.6rem; transition: color 0.2s; }
+    .footer-col a:hover { color: var(--gold); }
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    .footer-bottom p { font-size: 0.8rem; }
+    .footer-bottom .made-with { color: rgba(255,255,255,0.4); font-size: 0.8rem; }
+    .footer-bottom .made-with span { color: var(--gold); }
+
+    /* ── RESPONSIVE ───────────────────────────────── */
+    @media (max-width: 900px) {
+      .legal-container { grid-template-columns: 1fr; gap: 2rem; }
+      .legal-sidebar { position: static; max-height: none; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav id="main-nav">
+  <a href="index.html" class="nav-logo">
+    <img src="assets/logo-icon-transparent.png" alt="Pastoral Care for Planning Center" />
+    <div class="nav-logo-text">
+      <strong>Pastoral Care</strong>
+      <span>FOR PLANNING CENTER &bull; BY BARNABAS SOFTWARE</span>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html#features">Features</a>
+    <a href="index.html#tour">Product Tour</a>
+    <a href="index.html#iphone-app">📱 iPhone App</a>
+    <a href="index.html#pricing">Pricing</a>
+    <a href="https://pastoralcare.barnabassoftware.com" class="nav-cta" target="_blank">Sign In →</a>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<header class="legal-header">
+  <div class="legal-header-inner">
+    <div class="legal-badge">✦ Legal &amp; Compliance</div>
+    <h1>End-User License Agreement (EULA)</h1>
+    <div class="legal-meta">
+      <span>Effective Date: <strong>September 10, 2026</strong></span>
+      <span>Last Updated: <strong>September 10, 2026</strong></span>
+      <span>Licensor: <strong>Barnabas Software</strong></span>
+      <span>App Store ID: <strong>6773807604</strong></span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN CONTAINER -->
+<main class="legal-container">
+  
+  <!-- SIDEBAR TOC -->
+  <aside class="legal-sidebar" aria-label="Table of Contents">
+    <h3>Contents</h3>
+    <ul class="legal-toc">
+      <li><a href="#acceptance">1. Acceptance &amp; Parties</a></li>
+      <li><a href="#license-grant">2. Scope of License</a></li>
+      <li><a href="#apple-terms">3. Apple App Store Terms</a></li>
+      <li><a href="#permitted-use">4. Permitted Use &amp; Conduct</a></li>
+      <li><a href="#church-data">5. Church Data &amp; Ownership</a></li>
+      <li><a href="#integrations">6. Third-Party Integrations</a></li>
+      <li><a href="#communications">7. SMS &amp; Messaging Compliance</a></li>
+      <li><a href="#billing">8. Fees, Subscriptions &amp; Payments</a></li>
+      <li><a href="#intellectual-property">9. Intellectual Property</a></li>
+      <li><a href="#disclaimers">10. Disclaimer of Warranties</a></li>
+      <li><a href="#liability">11. Limitation of Liability</a></li>
+      <li><a href="#termination">12. Term &amp; Termination</a></li>
+      <li><a href="#compliance">13. Legal &amp; Export Compliance</a></li>
+      <li><a href="#governing-law">14. Governing Law &amp; Disputes</a></li>
+      <li><a href="#contact">15. Contact Information</a></li>
+    </ul>
+  </aside>
+
+  <!-- BODY CONTENT -->
+  <article class="legal-body">
+
+    <div class="legal-notice-box">
+      <strong>PLEASE READ CAREFULLY:</strong> This End-User License Agreement ("Agreement" or "EULA") is a binding legal contract between you ("Licensee," "User," "you," or the church organization you represent) and <strong>Barnabas Software</strong> ("Barnabas Software," "Licensor," "we," "our," or "us"). By downloading, installing, accessing, or using <strong>Pastoral Care for Planning Center</strong> (web application), <strong>Pastoral Care Messaging</strong> (iOS and iPadOS application), or any associated software, APIs, tools, or documentation (collectively, the "Application"), you agree to be bound by the terms of this Agreement. If you do not agree to these terms, do not install, access, or use the Application.
+    </div>
+
+    <!-- SECTION 1 -->
+    <section id="acceptance" class="legal-section">
+      <h2><span class="sec-num">01.</span> Acceptance of Terms &amp; Parties</h2>
+      <p>This Agreement governs your acquisition and use of the Application whether accessed via the Apple App Store, our web-based platform at <a href="https://pastoralcare.barnabassoftware.com" target="_blank" rel="noopener">pastoralcare.barnabassoftware.com</a>, or any related mobile or desktop interfaces. If you are entering into this Agreement on behalf of a church, parish, denomination, ministry, or other legal entity, you represent and warrant that you have the authority to legally bind that organization to these terms.</p>
+      <p>Our <a href="https://www.barnabassoftware.com/privacy.html" target="_blank" rel="noopener">Privacy Policy</a> and <a href="delete-data.html">Data Retention &amp; Deletion Policy</a> are incorporated into and form an integral part of this Agreement.</p>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section id="license-grant" class="legal-section">
+      <h2><span class="sec-num">02.</span> Grant &amp; Scope of License</h2>
+      <p>Subject to your continuous compliance with this Agreement and timely payment of any applicable subscription fees, Barnabas Software grants you a limited, revocable, non-exclusive, non-transferable, non-sublicensable license to:</p>
+      <ul>
+        <li>Download, install, and run the <strong>Pastoral Care Messaging</strong> mobile application on authorized Apple-branded devices (iPhone, iPad) that you own or control, in accordance with the Usage Rules set forth in the Apple Media Services Terms and Conditions;</li>
+        <li>Access and utilize the <strong>Pastoral Care for Planning Center</strong> web application and dashboard solely for the internal ministry, administrative, financial, pastoral care, and communication operations of your church or ministry; and</li>
+        <li>Permit authorized staff members, pastoral leaders, and approved volunteer team members within your organization to access and operate the Application under your organization's subscription.</li>
+      </ul>
+      <p>All rights not expressly granted to you under this Agreement are strictly reserved by Barnabas Software.</p>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section id="apple-terms" class="legal-section">
+      <h2><span class="sec-num">03.</span> Apple App Store Standard &amp; Custom Terms</h2>
+      <p>If you downloaded or accessed the Application via the Apple App Store, the following terms apply in fulfillment of Apple's Licensed Application End User License Agreement requirements:</p>
+      
+      <div class="apple-highlight-box">
+        <strong>Apple Minimum Terms Summary:</strong>
+        <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+          <li><strong>Acknowledgement:</strong> You and Barnabas Software acknowledge that this Agreement is concluded between you and Barnabas Software only, and not with Apple Inc. ("Apple"). Barnabas Software, not Apple, is solely responsible for the Application and its content.</li>
+          <li><strong>Maintenance &amp; Support:</strong> Barnabas Software is solely responsible for providing any maintenance and support services with respect to the Application. Apple has no obligation whatsoever to furnish any maintenance and support services.</li>
+          <li><strong>Warranty:</strong> Barnabas Software is solely responsible for any product warranties, whether express or implied by law. In the event of any failure of the Application to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price for the Application to you (if any). To the maximum extent permitted by applicable law, Apple will have no other warranty obligation whatsoever.</li>
+          <li><strong>Product Claims:</strong> You acknowledge that Apple is not responsible for addressing any claims of the end-user or any third party relating to the Application, including product liability claims, failure to conform to legal or regulatory requirements, or consumer protection claims.</li>
+          <li><strong>Intellectual Property Claims:</strong> In the event of any third-party claim that the Application or your possession and use of the Application infringes that third party’s intellectual property rights, Barnabas Software, not Apple, will be solely responsible for the investigation, defense, settlement, and discharge of any such claim.</li>
+          <li><strong>Third-Party Beneficiary:</strong> You and Barnabas Software acknowledge and agree that Apple, and Apple’s subsidiaries, are third-party beneficiaries of this Agreement, and that, upon your acceptance of this Agreement, Apple will have the right (and will be deemed to have accepted the right) to enforce this Agreement against you as a third-party beneficiary thereof.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SECTION 4 -->
+    <section id="permitted-use" class="legal-section">
+      <h2><span class="sec-num">04.</span> Permitted Use &amp; Restrictions</h2>
+      <p>You agree to use the Application strictly for legitimate church ministry, care, outreach, communication, and administration purposes. You agree that you will not, directly or indirectly:</p>
+      <ul>
+        <li>Decompile, reverse engineer, disassemble, attempt to derive the source code of, or decrypt the Application, any underlying algorithms, or any API calls;</li>
+        <li>Modify, adapt, translate, or create derivative works from the Application or its documentation;</li>
+        <li>Rent, lease, lend, sell, sublicense, distribute, publish, or assign the Application to any third party outside your authorized organization;</li>
+        <li>Circumvent, disable, or tamper with any digital rights management, security controls, feature gates, authentication protocols, or token validation mechanisms;</li>
+        <li>Use the Application to harvest or scrape congregation records, personal contact data, or financial transactions for commercial resale, unsolicited marketing, or any unlawful purpose;</li>
+        <li>Transmit any malicious code, virus, worm, Trojan horse, or time bomb into the platform; or</li>
+        <li>Access the Application in order to build a competitive product, benchmark features against third parties without our prior written consent, or copy its unique workflow designs.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 5 -->
+    <section id="church-data" class="legal-section">
+      <h2><span class="sec-num">05.</span> Church Ownership of Data &amp; Confidentiality</h2>
+      <p><strong>Your Church Owns Your Data:</strong> As between you and Barnabas Software, your organization retains 100% sole and exclusive ownership of all congregation member lists, profile information, pastoral notes, attendance history, giving records, custom fields, and communications transmitted through the Application ("Church Data").</p>
+      <p>Barnabas Software acts strictly as a data processor and software service provider. We will never sell, lease, monetize, or disclose your Church Data to any third party or advertiser. We implement industry-standard encryption in transit (TLS 1.3) and at rest (AES-256) through Google Cloud and Firebase infrastructure to safeguard your pastoral records.</p>
+      <p>You may request a complete export or permanent deletion of your organization's data at any time pursuant to our <a href="delete-data.html">Data Deletion Policy</a>.</p>
+    </section>
+
+    <!-- SECTION 6 -->
+    <section id="integrations" class="legal-section">
+      <h2><span class="sec-num">06.</span> Third-Party Integrations &amp; APIs</h2>
+      <p>The Application interfaces with external third-party software platforms to provide seamless church operations. You acknowledge and agree that:</p>
+      <ul>
+        <li><strong>Planning Center:</strong> The Application connects with Planning Center Online (Services, People, Giving, Groups, Check-Ins, Registrations) via official OAuth 2.0 API protocols. Planning Center is owned and operated by Ministry Centered Technologies. Your use of Planning Center remains governed by your separate agreement with Ministry Centered Technologies.</li>
+        <li><strong>QuickBooks Online:</strong> When configured, the Application synchronizes batch giving deposits, campus classifications, and fund mapping with QuickBooks Online via Intuit's OAuth 2.0 API. Intuit and QuickBooks are registered trademarks of Intuit Inc. Barnabas Software is not responsible for ledger changes once successfully confirmed and deposited into your Intuit company ledger.</li>
+        <li><strong>Telecommunication Carriers:</strong> Outbound and two-way SMS/MMS services rely on underlying carrier networks and telecommunication providers (e.g., Twilio). Message deliverability is subject to carrier filtering, 10DLC campaign registration, and phone number reputation rules.</li>
+      </ul>
+      <p>Barnabas Software is not liable for service disruptions, API deprecations, or outages originating from third-party platforms outside of our direct control.</p>
+    </section>
+
+    <!-- SECTION 7 -->
+    <section id="communications" class="legal-section">
+      <h2><span class="sec-num">07.</span> SMS, Email &amp; Communications Compliance</h2>
+      <p>When utilizing the Application’s communication features (including two-way texting, automated follow-ups, and group broadcasts), you agree to comply with all applicable telecommunications, consumer protection, and privacy laws, including the <strong>Telephone Consumer Protection Act (TCPA)</strong>, <strong>CTIA Messaging Principles</strong>, <strong>A2P 10DLC regulations</strong>, and the <strong>CAN-SPAM Act</strong>.</p>
+      <p>Specifically, you represent and warrant that:</p>
+      <ul>
+        <li>You have obtained requisite consent or prior affirmative opt-in from recipients before sending automated or bulk messages;</li>
+        <li>You will honor opt-out and unsubscribe requests (e.g., STOP, CANCEL, UNSUBSCRIBE) immediately;</li>
+        <li>You will not use the Application to send spam, fraudulent solicitations, offensive material, or prohibited content; and</li>
+        <li>Your organization maintains accurate sender identification and appropriate church disclosures on outbound messaging campaigns.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 8 -->
+    <section id="billing" class="legal-section">
+      <h2><span class="sec-num">08.</span> Fees, Subscriptions &amp; Payments</h2>
+      <p>Certain editions and feature tiers of the Application require paid subscriptions. By subscribing to a paid tier:</p>
+      <ul>
+        <li><strong>Recurring Billing:</strong> Subscriptions renew automatically on a monthly or annual cycle unless canceled prior to the renewal date.</li>
+        <li><strong>In-App Purchases (iOS):</strong> If purchased through the Apple App Store, billing is processed through Apple In-App Purchase and managed through your Apple ID subscription settings. Apple’s terms and refund policies govern such transactions.</li>
+        <li><strong>Direct Billing:</strong> If invoiced or billed directly through Barnabas Software (Stripe), payment is due upon invoice receipt. Taxes are the responsibility of the subscriber unless valid 501(c)(3) tax-exempt status documentation is provided.</li>
+        <li><strong>Price Adjustments:</strong> We reserve the right to modify subscription pricing upon at least thirty (30) days prior written notice before your next renewal period.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 9 -->
+    <section id="intellectual-property" class="legal-section">
+      <h2><span class="sec-num">09.</span> Intellectual Property &amp; Proprietary Rights</h2>
+      <p>All right, title, and interest in and to the Application, including all software code, visual designs, user interfaces, branding, trademarks, logos, audio-visual materials, algorithms, workflow heuristics, and proprietary Pastor AI logic, are and remain the exclusive intellectual property of Barnabas Software and its licensors.</p>
+      <p>Any suggestions, feedback, ideas, or feature enhancement requests submitted by you regarding the Application may be incorporated into future releases by Barnabas Software without any obligation of compensation, royalty, or attribution to you.</p>
+    </section>
+
+    <!-- SECTION 10 -->
+    <section id="disclaimers" class="legal-section">
+      <h2><span class="sec-num">10.</span> Disclaimer of Warranties</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE APPLICATION IS PROVIDED ON AN <strong>"AS IS"</strong> AND <strong>"AS AVAILABLE"</strong> BASIS, WITH ALL FAULTS AND WITHOUT WARRANTY OF ANY KIND.</p>
+      <p>BARNABAS SOFTWARE DISCLAIMS ALL WARRANTIES AND CONDITIONS, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, QUIET ENJOYMENT, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE FUNCTIONS CONTAINED IN THE APPLICATION WILL MEET YOUR SPECIFIC REQUIREMENTS, THAT OPERATION WILL BE UNINTERRUPTED OR ERROR-FREE, OR THAT DEFECTS WILL BE CORRECTED IMMEDIATELY.</p>
+    </section>
+
+    <!-- SECTION 11 -->
+    <section id="liability" class="legal-section">
+      <h2><span class="sec-num">11.</span> Limitation of Liability</h2>
+      <p>TO THE EXTENT NOT PROHIBITED BY APPLICABLE LAW, IN NO EVENT SHALL BARNABAS SOFTWARE, ITS DIRECTORS, OFFICERS, EMPLOYEES, AFFILIATES, AGENTS, OR LICENSORS BE LIABLE FOR PERSONAL INJURY, OR ANY INCIDENTAL, SPECIAL, INDIRECT, PUNITIVE, OR CONSEQUENTIAL DAMAGES WHATSOEVER, INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF PROFITS, LOSS OF DONOR CONTRIBUTIONS, LOSS OF DATA, CORRUPTION OF RECORDS, BUSINESS INTERRUPTION, OR ANY OTHER COMMERCIAL DAMAGES OR LOSSES ARISING OUT OF OR RELATED TO YOUR USE OR INABILITY TO USE THE APPLICATION, HOWEVER CAUSED, REGARDLESS OF THE THEORY OF LIABILITY (CONTRACT, TORT, OR OTHERWISE).</p>
+      <p>IN NO EVENT SHALL OUR TOTAL AGGREGATE LIABILITY TO YOU FOR ALL CLAIMS EXCEED THE GREATER OF: (A) THE TOTAL AMOUNT ACTUALLY PAID BY YOU TO BARNABAS SOFTWARE FOR THE APPLICATION DURING THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO LIABILITY, OR (B) FIFTY UNITED STATES DOLLARS ($50.00 USD).</p>
+    </section>
+
+    <!-- SECTION 12 -->
+    <section id="termination" class="legal-section">
+      <h2><span class="sec-num">12.</span> Term &amp; Termination</h2>
+      <p>This Agreement is effective until terminated by either party. Your rights under this Agreement will terminate automatically without notice if you fail to comply with any of its terms or fail to pay applicable fees.</p>
+      <p>You may terminate this Agreement at any time by canceling your subscription, ceasing all access to the web platform, and deleting all copies of the mobile application from your devices. Upon termination, all licenses granted herein immediately cease. Provisions regarding Church Data ownership, intellectual property, disclaimers, limitation of liability, and governing law shall survive termination.</p>
+    </section>
+
+    <!-- SECTION 13 -->
+    <section id="compliance" class="legal-section">
+      <h2><span class="sec-num">13.</span> Legal &amp; Export Compliance</h2>
+      <p>You represent and warrant that: (i) you are not located in a country that is subject to a U.S. Government embargo, or that has been designated by the U.S. Government as a "terrorist supporting" country; and (ii) you are not listed on any U.S. Government list of prohibited or restricted parties.</p>
+    </section>
+
+    <!-- SECTION 14 -->
+    <section id="governing-law" class="legal-section">
+      <h2><span class="sec-num">14.</span> Governing Law &amp; Dispute Resolution</h2>
+      <p>This Agreement and any dispute arising from or relating to your use of the Application shall be governed by and construed in accordance with the laws of the <strong>State of Texas</strong>, United States of America, excluding its conflicts of law principles. Any legal suit, action, or proceeding arising out of or related to this Agreement shall be instituted exclusively in the federal or state courts located in Texas, and each party irrevocably submits to the exclusive personal jurisdiction of such courts.</p>
+    </section>
+
+    <!-- SECTION 15 -->
+    <section id="contact" class="legal-section">
+      <h2><span class="sec-num">15.</span> Contact Information &amp; Support</h2>
+      <p>If you have any questions, concerns, support inquiries, or legal notifications regarding this Agreement or the Application, please contact Barnabas Software at:</p>
+      
+      <table class="key-table">
+        <tbody>
+          <tr>
+            <th>Company</th>
+            <td><strong>Barnabas Software</strong></td>
+          </tr>
+          <tr>
+            <th>Product Support</th>
+            <td><a href="mailto:hello@barnabassoftware.com">hello@barnabassoftware.com</a></td>
+          </tr>
+          <tr>
+            <th>Website</th>
+            <td><a href="https://barnabassoftware.com" target="_blank" rel="noopener">barnabassoftware.com</a></td>
+          </tr>
+          <tr>
+            <th>Web Application</th>
+            <td><a href="https://pastoralcare.barnabassoftware.com" target="_blank" rel="noopener">pastoralcare.barnabassoftware.com</a></td>
+          </tr>
+          <tr>
+            <th>Data Deletion Requests</th>
+            <td><a href="delete-data.html">Request Data Deletion</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </article>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-brand-header">
+          <img src="assets/logo-icon-transparent.png" alt="Pastoral Care for Planning Center" />
+          <div class="footer-logo-text">
+            <strong>Pastoral Care</strong>
+            <span>FOR PLANNING CENTER &bull; BY BARNABAS SOFTWARE</span>
+          </div>
+        </div>
+        <p>The leading pastoral intelligence platform built natively for Planning Center churches. Shepherd your flock with data-driven care.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="index.html#personas">Who It's For</a>
+        <a href="index.html#tour">Product Tour</a>
+        <a href="index.html#iphone-app">📱 iPhone App</a>
+        <a href="index.html#pricing">Pricing</a>
+        <a href="https://pastoralcare.barnabassoftware.com" target="_blank">Sign In</a>
+        <a href="https://apps.apple.com/us/app/pastoral-care-messaging/id6773807604" target="_blank" rel="noopener" style="color:var(--gold);"> App Store →</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="https://barnabassoftware.com">Barnabas Software</a>
+        <a href="mailto:hello@barnabassoftware.com">Contact Us</a>
+        <a href="mailto:hello@barnabassoftware.com">Request Demo</a>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="https://www.barnabassoftware.com/privacy.html" target="_blank">Privacy Policy</a>
+        <a href="eula.html">End-User License Agreement (EULA)</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Data Security</a>
+        <a href="delete-data.html">Request Data Deletion</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Barnabas Software. All rights reserved.</p>
+      <p class="made-with">Made with <span>♥</span> for the local church</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Sticky nav shadow
+  const nav = document.getElementById('main-nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+</script>
+
+</body>
+</html>
