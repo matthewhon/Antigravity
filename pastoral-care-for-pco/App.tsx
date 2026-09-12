@@ -76,6 +76,7 @@ import { PublicBulletinView } from './components/PublicBulletinView';
 import { PublicGiftsTestView } from './components/PublicGiftsTestView';
 import { PublicMbtiTestView } from './components/PublicMbtiTestView';
 import { PublicDiscTestView } from './components/PublicDiscTestView';
+import { PublicNewsletterView } from './components/PublicNewsletterView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -1060,6 +1061,13 @@ const App: React.FC = () => {
   const discMatch = window.location.pathname.match(/^\/disc-test\/([^/]+)/);
   if (discMatch) {
     return <PublicDiscTestView churchId={discMatch[1]} />;
+  }
+
+  // ─── Public Newsletter / Subscribe Route (no auth required) ─────────────────
+  const newsletterMatch = window.location.pathname.match(/^\/(?:newsletter|subscribe)\/([^/]+)/);
+  if (newsletterMatch) {
+    const isEmbedded = window.location.search.includes('embedded=true');
+    return <PublicNewsletterView churchId={newsletterMatch[1]} isEmbedded={isEmbedded} />;
   }
 
   if (loading) {

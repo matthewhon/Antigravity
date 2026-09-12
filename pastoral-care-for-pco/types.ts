@@ -264,6 +264,16 @@ export interface Church {
         postmarkDomainId?: number;
         /** DNS records to display to the admin (provider-agnostic: CNAME or TXT records) */
         dnsRecords?: { host: string; type: 'CNAME' | 'TXT'; data: string; label?: string }[];
+        /** Public newsletter signup page & widget preferences */
+        newsletterSettings?: {
+            title?: string;
+            description?: string;
+            headerImageUrl?: string;
+            successMessage?: string;
+            redirectUrl?: string;
+            requireName?: boolean;
+            requirePhone?: boolean;
+        };
     };
     /** PCO sync & display preferences */
     pcoSettings?: {
@@ -1029,12 +1039,33 @@ export interface TemplateSettings {
 
 /** Tracks an individual who unsubscribed from a church's email list. */
 export interface EmailUnsubscribe {
-    id: string;           // `{churchId}_{base64email}`
+    id: string;           // `{churchId}_{base64sender}_{base64email}` or legacy `{churchId}_{base64email}`
     churchId: string;
     email: string;        // stored lowercase
+    senderEmail?: string; // specific sender address (e.g. pastor@grace.org), or '*' / undefined for all
+    senderName?: string;  // display name of sender at time of unsubscribe
     unsubscribedAt: number; // epoch ms
     campaignId?: string;
     campaignName?: string;
+    reason?: 'user_action' | 'hard_bounce' | 'spam_complaint' | 'manual' | string;
+    detail?: string;
+    source?: string;
+}
+
+/** Tracks a subscriber who joined a church's newsletter or email list. */
+export interface NewsletterSubscriber {
+    id: string;
+    churchId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    phone?: string;
+    subscribedAt: number;
+    senders?: string[];   // Array of sender email addresses subscribed to
+    status: 'active' | 'unsubscribed';
+    source?: 'landing_page' | 'widget' | 'manual' | 'qr_code' | 'pco';
+    notes?: string;
 }
 
 export interface PcoList {

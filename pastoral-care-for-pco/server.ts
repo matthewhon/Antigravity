@@ -1205,59 +1205,341 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
       try {
         const decoded = Buffer.from(token, 'base64url').toString('utf8');
-        const colonIdx = decoded.indexOf(':');
-        if (colonIdx < 1) return res.status(400).send('<h2>Invalid token.</h2>');
-        const churchId = decoded.slice(0, colonIdx);
-        const email = decoded.slice(colonIdx + 1).toLowerCase().trim();
+        const parts = decoded.split(':');
+        if (parts.length < 2) return res.status(400).send('<h2>Invalid token format.</h2>');
+        
+        const churchId = parts[0];
+        const email = parts[1].toLowerCase().trim();
+        const senderEmail = (parts[2] || '*').toLowerCase().trim();
+
         if (!churchId || !email || !email.includes('@')) {
           return res.status(400).send('<h2>Invalid unsubscribe token.</h2>');
         }
 
         const db = getDb();
-        const docId = `${churchId}_${Buffer.from(email).toString('base64url')}`;
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        const churchData = churchSnap.exists ? churchSnap.data() : null;
+        const churchName = churchData?.name || 'the church';
+        const churchLogo = churchData?.logoUrl || '';
 
-        // Check if already unsubscribed
-        const existing = await db.collection('email_unsubscribes').doc(docId).get();
-        if (!existing.exists) {
-          await db.collection('email_unsubscribes').doc(docId).set({
-            id: docId,
-            churchId,
-            email,
-            unsubscribedAt: Date.now(),
-          });
-        }
+        const docId = senderEmail && senderEmail !== '*'
+          ? `${churchId}_${Buffer.from(senderEmail).toString('base64url')}_${Buffer.from(email).toString('base64url')}`
+          : `${churchId}_all_${Buffer.from(email).toString('base64url')}`;
+
+        // Save unsubscription record
+        await db.collection('email_unsubscribes').doc(docId).set({
+          id: docId,
+          churchId,
+          email,
+          senderEmail,
+          unsubscribedAt: Date.now(),
+          reason: 'user_action'
+        }, { merge: true });
+
+        const isSpecificSender = senderEmail && senderEmail !== '*';
 
         res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Unsubscribed</title>
+  <title>Email Preferences — ${churchName}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-    .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:48px 40px;max-width:460px;width:100%;text-align:center}
-    .icon{width:64px;height:64px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}
-    h1{font-size:22px;font-weight:700;color:#0f172a;margin-bottom:12px}
-    p{font-size:15px;color:#64748b;line-height:1.6}
-    .email{font-weight:600;color:#334155}
-    .note{margin-top:20px;font-size:13px;color:#94a3b8}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:#0f172a}
+    .card{background:#fff;border-radius:20px;box-shadow:0 10px 35px -5px rgba(0,0,0,0.08),0 0 0 1px rgba(0,0,0,0.03);padding:40px;max-width:480px;width:100%;text-align:center}
+    .logo{max-height:48px;max-width:180px;object-fit:contain;margin:0 auto 20px;display:block}
+    .icon-box{width:60px;height:60px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#16a34a}
+    h1{font-size:22px;font-weight:700;color:#0f172a;margin-bottom:10px;line-height:1.3}
+    p{font-size:14px;color:#64748b;line-height:1.6}
+    .badge{display:inline-block;padding:4px 10px;background:#f1f5f9;border-radius:6px;font-weight:600;color:#334155;font-size:13px;word-break:break-all;margin:6px 0}
+    .divider{height:1px;background:#e2e8f0;margin:24px 0}
+    .actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+    button{padding:12px 18px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s ease;border:none;outline:none}
+    .btn-secondary{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+    .btn-secondary:hover{background:#f1f5f9;color:#0f172a}
+    .btn-danger{background:#fff1f2;color:#e11d48;border:1px solid #ffe4e6}
+    .btn-danger:hover{background:#ffe4e6;color:#be123c}
+    .btn-primary{background:#4f46e5;color:#fff}
+    .btn-primary:hover{background:#4338ca}
+    .status-msg{margin-top:16px;font-size:13px;font-weight:500;padding:10px;border-radius:10px;display:none}
+    .status-success{background:#f0fdf4;color:#15803d;display:block}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    ${churchLogo ? `<img src="${churchLogo}" alt="${churchName}" class="logo" />` : ''}
+    <div class="icon-box" id="status-icon">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
-    <h1>You've been unsubscribed</h1>
-    <p><span class="email">${email}</span> has been removed from this church's email list.</p>
-    <p class="note">You won't receive any further emails from this sender. If this was a mistake, please contact your church directly.</p>
+    <h1 id="main-heading">${isSpecificSender ? "You've been unsubscribed" : "Unsubscribed from all emails"}</h1>
+    <p id="main-desc">
+      <span class="badge">${email}</span> has been unsubscribed from emails sent by <span class="badge">${isSpecificSender ? senderEmail : churchName}</span>.
+    </p>
+
+    <div class="divider"></div>
+
+    <div class="actions" id="action-buttons">
+      ${isSpecificSender ? `
+        <button class="btn-danger" id="btn-unsub-all" onclick="handleAction('unsubscribe_all')">
+          Unsubscribe from ALL emails from ${churchName}
+        </button>
+        <button class="btn-secondary" id="btn-resub" onclick="handleAction('resubscribe')">
+          Undo & Re-subscribe to ${senderEmail}
+        </button>
+      ` : `
+        <button class="btn-primary" id="btn-resub" onclick="handleAction('resubscribe')">
+          Re-subscribe to emails from ${churchName}
+        </button>
+      `}
+    </div>
+
+    <div id="status-box" class="status-msg"></div>
   </div>
+
+  <script>
+    const token = '${token}';
+    async function handleAction(action) {
+      const statusBox = document.getElementById('status-box');
+      const buttons = document.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/public/email/unsubscribe-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, action })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+
+        statusBox.className = 'status-msg status-success';
+        if (action === 'unsubscribe_all') {
+          document.getElementById('main-heading').textContent = 'Unsubscribed from all emails';
+          document.getElementById('main-desc').innerHTML = '<span class="badge">${email}</span> is now unsubscribed from <strong>all</strong> emails from ${churchName}.';
+          statusBox.textContent = 'Preference updated: Unsubscribed from all lists.';
+          document.getElementById('action-buttons').innerHTML = \`
+            <button class="btn-primary" onclick="handleAction('resubscribe')">Re-subscribe to emails</button>
+          \`;
+        } else if (action === 'resubscribe') {
+          document.getElementById('main-heading').textContent = 'Re-subscribed!';
+          document.getElementById('main-desc').innerHTML = '<span class="badge">${email}</span> is re-subscribed and can receive emails again.';
+          statusBox.textContent = 'Successfully re-subscribed!';
+          document.getElementById('action-buttons').innerHTML = \`
+            <p style="font-size:13px;color:#64748b;margin-top:8px;">You will now receive updates from ${churchName}.</p>
+          \`;
+        }
+      } catch (err) {
+        statusBox.className = 'status-msg';
+        statusBox.style.display = 'block';
+        statusBox.style.background = '#fef2f2';
+        statusBox.style.color = '#b91c1c';
+        statusBox.textContent = err.message || 'Something went wrong. Please try again.';
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+  </script>
 </body>
 </html>`);
       } catch (e: any) {
         console.error('[Unsubscribe] Error:', e);
         res.status(500).send('<h2>Something went wrong. Please try again later.</h2>');
+      }
+    });
+
+    // POST /api/public/email/unsubscribe-action — interactive preference updates
+    app.post('/api/public/email/unsubscribe-action', express.json(), async (req: any, res: any) => {
+      const { token, action } = req.body || {};
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: 'Missing token' });
+      }
+      try {
+        const decoded = Buffer.from(token, 'base64url').toString('utf8');
+        const parts = decoded.split(':');
+        const churchId = parts[0];
+        const email = (parts[1] || '').toLowerCase().trim();
+        const senderEmail = (parts[2] || '*').toLowerCase().trim();
+
+        if (!churchId || !email || !email.includes('@')) {
+          return res.status(400).json({ error: 'Invalid token payload' });
+        }
+
+        const db = getDb();
+
+        if (action === 'unsubscribe_all') {
+          const allDocId = `${churchId}_all_${Buffer.from(email).toString('base64url')}`;
+          await db.collection('email_unsubscribes').doc(allDocId).set({
+            id: allDocId,
+            churchId,
+            email,
+            senderEmail: '*',
+            unsubscribedAt: Date.now(),
+            reason: 'user_action_all'
+          }, { merge: true });
+          return res.json({ success: true, mode: 'all' });
+
+        } else if (action === 'resubscribe') {
+          // Remove all matching unsubscriptions for this recipient
+          const snap = await db.collection('email_unsubscribes')
+            .where('churchId', '==', churchId)
+            .where('email', '==', email)
+            .get();
+          
+          const batch = db.batch();
+          snap.docs.forEach((docSnap: any) => {
+            batch.delete(docSnap.ref);
+          });
+          // Also try legacy and standard docId directly
+          const legacyDocId = `${churchId}_${Buffer.from(email).toString('base64url')}`;
+          const allDocId = `${churchId}_all_${Buffer.from(email).toString('base64url')}`;
+          const senderDocId = `${churchId}_${Buffer.from(senderEmail).toString('base64url')}_${Buffer.from(email).toString('base64url')}`;
+          batch.delete(db.collection('email_unsubscribes').doc(legacyDocId));
+          batch.delete(db.collection('email_unsubscribes').doc(allDocId));
+          batch.delete(db.collection('email_unsubscribes').doc(senderDocId));
+          await batch.commit();
+
+          return res.json({ success: true, resubscribed: true });
+        }
+
+        return res.status(400).json({ error: 'Unsupported action' });
+      } catch (e: any) {
+        console.error('[Unsubscribe-Action] Error:', e);
+        return res.status(500).json({ error: e.message || 'Internal server error' });
+      }
+    });
+
+    // ─── Public Newsletter Endpoints ───────────────────────────────────────────
+
+    // GET /api/public/newsletter/:churchId — public info for newsletter signup page
+    app.get('/api/public/newsletter/:churchId', async (req: any, res: any) => {
+      const { churchId } = req.params;
+      try {
+        const db = getDb();
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        if (!churchDoc.exists) {
+          return res.status(404).json({ error: 'Church organization not found' });
+        }
+        const data = churchDoc.data()!;
+        const emailSettings = data.emailSettings || {};
+        
+        // Build available sender channels list
+        const senders: { name: string; email: string; isDefault?: boolean }[] = [];
+        if (emailSettings.fromEmail) {
+          senders.push({
+            name: emailSettings.fromName || data.name || 'General Updates',
+            email: emailSettings.fromEmail,
+            isDefault: true
+          });
+        }
+        if (Array.isArray(emailSettings.additionalSenders)) {
+          emailSettings.additionalSenders.forEach((s: any) => {
+            if (s.email && !senders.some(existing => existing.email.toLowerCase() === s.email.toLowerCase())) {
+              senders.push({
+                name: s.name || s.email,
+                email: s.email,
+                isDefault: false
+              });
+            }
+          });
+        }
+
+        return res.json({
+          churchId: churchDoc.id,
+          churchName: data.name || 'Church',
+          logoUrl: data.logoUrl || null,
+          website: data.website || null,
+          newsletterSettings: emailSettings.newsletterSettings || {},
+          senders: senders.length > 0 ? senders : [{
+            name: data.name || 'Church Announcements',
+            email: emailSettings.fromEmail || 'updates@' + (data.domain || 'pastoralcare.barnabassoftware.com'),
+            isDefault: true
+          }]
+        });
+      } catch (e: any) {
+        console.error('[PublicNewsletter] GET Error:', e);
+        return res.status(500).json({ error: e.message || 'Internal server error' });
+      }
+    });
+
+    // POST /api/public/newsletter/:churchId/subscribe — subscribe to newsletter channels
+    app.post('/api/public/newsletter/:churchId/subscribe', express.json(), async (req: any, res: any) => {
+      const { churchId } = req.params;
+      const { email, firstName, lastName, name, phone, senders, source } = req.body || {};
+
+      if (!email || typeof email !== 'string' || !email.includes('@')) {
+        return res.status(400).json({ error: 'Please provide a valid email address.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanFirstName = (firstName || '').trim();
+      const cleanLastName = (lastName || '').trim();
+      const cleanFullName = (name || [cleanFirstName, cleanLastName].filter(Boolean).join(' ') || '').trim();
+      const cleanPhone = (phone || '').trim();
+      const chosenSenders: string[] = Array.isArray(senders) && senders.length > 0
+        ? senders.map(s => String(s).toLowerCase().trim())
+        : ['*'];
+
+      try {
+        const db = getDb();
+        const docId = `${churchId}_${Buffer.from(cleanEmail).toString('base64url')}`;
+
+        const subscriberData = {
+          id: docId,
+          churchId,
+          email: cleanEmail,
+          firstName: cleanFirstName || null,
+          lastName: cleanLastName || null,
+          name: cleanFullName || null,
+          phone: cleanPhone || null,
+          senders: chosenSenders,
+          subscribedAt: Date.now(),
+          status: 'active',
+          source: source || 'landing_page'
+        };
+
+        // 1. Save subscriber
+        await db.collection('newsletter_subscribers').doc(docId).set(subscriberData, { merge: true });
+
+        // 2. Clear unsubscriptions in email_unsubscribes for subscribed senders
+        const unsubSnap = await db.collection('email_unsubscribes')
+          .where('churchId', '==', churchId)
+          .where('email', '==', cleanEmail)
+          .get();
+
+        const batch = db.batch();
+        unsubSnap.docs.forEach((d: any) => {
+          const unsubData = d.data();
+          const unsubSender = (unsubData.senderEmail || '').toLowerCase().trim();
+          // If subscribed to all ('*') or matching specific sender
+          if (chosenSenders.includes('*') || chosenSenders.includes(unsubSender) || !unsubSender || unsubSender === '*') {
+            batch.delete(d.ref);
+          }
+        });
+
+        // Also delete legacy/direct docs if present
+        chosenSenders.forEach(s => {
+          const sDocId = `${churchId}_${Buffer.from(s).toString('base64url')}_${Buffer.from(cleanEmail).toString('base64url')}`;
+          batch.delete(db.collection('email_unsubscribes').doc(sDocId));
+        });
+        const allDocId = `${churchId}_all_${Buffer.from(cleanEmail).toString('base64url')}`;
+        const legacyDocId = `${churchId}_${Buffer.from(cleanEmail).toString('base64url')}`;
+        batch.delete(db.collection('email_unsubscribes').doc(allDocId));
+        batch.delete(db.collection('email_unsubscribes').doc(legacyDocId));
+
+        await batch.commit();
+
+        return res.status(200).json({
+          success: true,
+          message: 'Successfully subscribed to the newsletter.',
+          subscriber: {
+            id: docId,
+            email: cleanEmail,
+            name: cleanFullName,
+            senders: chosenSenders
+          }
+        });
+      } catch (e: any) {
+        console.error('[PublicNewsletter] Subscribe Error:', e);
+        return res.status(500).json({ error: e.message || 'Failed to process subscription' });
       }
     });
 

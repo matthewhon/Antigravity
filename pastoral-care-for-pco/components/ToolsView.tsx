@@ -1834,8 +1834,25 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
   const [smsOptOuts, setSmsOptOuts] = useState<SmsOptOut[]>([]);
   const [unsubLoading, setUnsubLoading] = useState(false);
   const [unsubSearch, setUnsubSearch] = useState('');
+  const [unsubSenderFilter, setUnsubSenderFilter] = useState('all');
   const [unsubLoaded, setUnsubLoaded] = useState(false);
   const [smsUnsubLoaded, setSmsUnsubLoaded] = useState(false);
+
+  const configuredSenders = React.useMemo(() => {
+    const list: { name: string; email: string }[] = [];
+    if (church?.emailSettings?.fromEmail) {
+      list.push({
+        name: church.emailSettings.fromName || church.name || 'Default Sender',
+        email: church.emailSettings.fromEmail.toLowerCase().trim()
+      });
+    }
+    (church?.emailSettings?.additionalSenders || []).forEach(s => {
+      if (s.email && !list.some(item => item.email === s.email.toLowerCase().trim())) {
+        list.push({ name: s.name || s.email, email: s.email.toLowerCase().trim() });
+      }
+    });
+    return list;
+  }, [church]);
 
   // ── Files state ─────────────────────────────────────────────────────────────
   const [files, setFiles] = useState<TenantFile[]>([]);
@@ -1921,9 +1938,17 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
     showToast(`${optOut.phoneNumber} has been re-subscribed.`);
   };
 
-  const filteredUnsubs = unsubSearch.trim()
-    ? unsubscribers.filter(u => u.email.toLowerCase().includes(unsubSearch.toLowerCase()))
-    : unsubscribers;
+  const filteredUnsubs = unsubscribers.filter(u => {
+    const matchesSearch = !unsubSearch.trim() || u.email.toLowerCase().includes(unsubSearch.toLowerCase());
+    const sender = (u.senderEmail || '*').toLowerCase().trim();
+    const matchesSender =
+      unsubSenderFilter === 'all'
+        ? true
+        : unsubSenderFilter === '*'
+        ? sender === '*' || !u.senderEmail
+        : sender === unsubSenderFilter.toLowerCase().trim();
+    return matchesSearch && matchesSender;
+  });
 
   const filteredSmsUnsubs = unsubSearch.trim()
     ? smsOptOuts.filter(o => o.phoneNumber.toLowerCase().includes(unsubSearch.toLowerCase()))
@@ -2279,17 +2304,36 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
             </button>
           </div>
 
-          {/* Search */}
+          {/* Search & Filter Bar */}
           {(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 && (
-            <div className="relative mb-4">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder={unsubMode === 'email' ? "Search by email…" : "Search by phone number…"}
-                value={unsubSearch}
-                onChange={e => setUnsubSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className={`${unsubMode === 'email' ? 'sm:col-span-2' : 'sm:col-span-3'} relative`}>
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={unsubMode === 'email' ? "Search by email…" : "Search by phone number…"}
+                  value={unsubSearch}
+                  onChange={e => setUnsubSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
+              {unsubMode === 'email' && (
+                <div>
+                  <select
+                    value={unsubSenderFilter}
+                    onChange={e => setUnsubSenderFilter(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                  >
+                    <option value="all">All Senders</option>
+                    <option value="*">Global Opt-outs (*)</option>
+                    {configuredSenders.map(s => (
+                      <option key={s.email} value={s.email}>
+                        From: {s.name} ({s.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
@@ -2302,7 +2346,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
             <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
               {unsubMode === 'email' ? <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" /> : <Phone size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />}
               <p className="text-slate-500 dark:text-slate-400 font-medium">
-                {unsubSearch ? 'No results match your search' : `No ${unsubMode === 'email' ? 'email' : 'SMS'} unsubscribers yet`}
+                {unsubSearch || (unsubMode === 'email' && unsubSenderFilter !== 'all') ? 'No results match your search' : `No ${unsubMode === 'email' ? 'email' : 'SMS'} unsubscribers yet`}
               </p>
               {!unsubSearch && (
                 <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
@@ -2320,6 +2364,11 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {unsubMode === 'email' ? 'Email' : 'Phone Number'}
                     </th>
+                    {unsubMode === 'email' && (
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Opted Out From
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unsubscribed</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {unsubMode === 'email' ? 'Campaign' : 'Source'}
@@ -2328,28 +2377,43 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                  {unsubMode === 'email' ? filteredUnsubs.map(u => (
-                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.email}</td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                        {u.unsubscribedAt
-                          ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                        {u.campaignName || <span className="text-slate-300 dark:text-slate-600">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleRemoveUnsubscribe(u)}
-                          title="Re-subscribe (remove from list)"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
-                        >
-                          <CheckCircle size={12} /> Re-subscribe
-                        </button>
-                      </td>
-                    </tr>
-                  )) : filteredSmsUnsubs.map(o => (
+                  {unsubMode === 'email' ? filteredUnsubs.map(u => {
+                    const isGlobal = !u.senderEmail || u.senderEmail === '*';
+                    const senderMatch = !isGlobal ? configuredSenders.find(cs => cs.email === u.senderEmail?.toLowerCase()) : null;
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200 font-mono text-xs">{u.email}</td>
+                        <td className="px-4 py-3">
+                          {isGlobal ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                              All Church Emails (*)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+                              {senderMatch ? `${senderMatch.name} (${u.senderEmail})` : u.senderEmail}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                          {u.unsubscribedAt
+                            ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                          {u.campaignName || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleRemoveUnsubscribe(u)}
+                            title="Re-subscribe (remove from list)"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
+                          >
+                            <CheckCircle size={12} /> Re-subscribe
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }) : filteredSmsUnsubs.map(o => (
                     <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                       <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{o.phoneNumber}</td>
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400">

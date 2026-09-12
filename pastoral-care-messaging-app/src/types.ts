@@ -541,12 +541,33 @@ export interface TemplateSettings {
 
 /** Tracks an individual who unsubscribed from a church's email list. */
 export interface EmailUnsubscribe {
-    id: string;           // `{churchId}_{base64email}`
+    id: string;           // `{churchId}_{base64sender}_{base64email}` or legacy `{churchId}_{base64email}`
     churchId: string;
     email: string;        // stored lowercase
+    senderEmail?: string; // specific sender address (e.g. pastor@grace.org), or '*' / undefined for all
+    senderName?: string;  // display name of sender at time of unsubscribe
     unsubscribedAt: number; // epoch ms
     campaignId?: string;
     campaignName?: string;
+    reason?: string;
+    detail?: string;
+    source?: string;
+}
+
+/** Tracks a subscriber who joined a church's newsletter or email list. */
+export interface NewsletterSubscriber {
+    id: string;
+    churchId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    phone?: string;
+    subscribedAt: number;
+    senders?: string[];
+    status: 'active' | 'unsubscribed';
+    source?: 'landing_page' | 'widget' | 'manual' | 'qr_code' | 'pco';
+    notes?: string;
 }
 
 export interface PcoList {

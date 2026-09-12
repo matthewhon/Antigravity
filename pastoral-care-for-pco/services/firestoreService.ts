@@ -1213,9 +1213,42 @@ class FirestoreService {
       }
   }
 
+  async saveEmailUnsubscribe(unsub: import('../types').EmailUnsubscribe): Promise<void> {
+      try {
+          await setDoc(doc(db, 'email_unsubscribes', unsub.id), unsub, { merge: true });
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
   async removeEmailUnsubscribe(id: string): Promise<void> {
       try {
           await deleteDoc(doc(db, 'email_unsubscribes', id));
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
+  // --- Newsletter Subscribers ---
+
+  async getNewsletterSubscribers(churchId: string): Promise<import('../types').NewsletterSubscriber[]> {
+      try {
+          const q = query(collection(db, 'newsletter_subscribers'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => ({ id: d.id, ...d.data() } as import('../types').NewsletterSubscriber))
+              .sort((a, b) => (b.subscribedAt || 0) - (a.subscribedAt || 0));
+      } catch (e) {
+          console.error('[FirestoreService] getNewsletterSubscribers failed:', e);
+          return [];
+      }
+  }
+
+  async saveNewsletterSubscriber(subscriber: import('../types').NewsletterSubscriber): Promise<void> {
+      try {
+          await setDoc(doc(db, 'newsletter_subscribers', subscriber.id), subscriber, { merge: true });
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
+  async removeNewsletterSubscriber(id: string): Promise<void> {
+      try {
+          await deleteDoc(doc(db, 'newsletter_subscribers', id));
       } catch (e) { this.handleFirestoreError(e); }
   }
 

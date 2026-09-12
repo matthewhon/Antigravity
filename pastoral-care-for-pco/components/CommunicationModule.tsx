@@ -12,11 +12,12 @@ import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 
 import { PcoImportModal } from './PcoImportModal';
-import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe, NewsletterSubscriber } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy,
+  UserCheck, ExternalLink, Download, Filter, Sparkles
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -1154,7 +1155,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 };
 
 export const CommunicationModule: React.FC<{ churchId: string; church?: Church; currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, onUpdateChurch }) => {
-  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers'>('emails');
+  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'subscribers' | 'unsubscribers'>('emails');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -1168,11 +1169,42 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
   const [isScheduling, setIsScheduling] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
+  // ── Senders list ────────────────────────────────────────────────────────────
+  const configuredSenders = React.useMemo(() => {
+    const list: { name: string; email: string }[] = [];
+    if (church?.emailSettings?.fromEmail) {
+      list.push({
+        name: church.emailSettings.fromName || church.name || 'Default Sender',
+        email: church.emailSettings.fromEmail.toLowerCase().trim()
+      });
+    }
+    (church?.emailSettings?.additionalSenders || []).forEach(s => {
+      if (s.email && !list.some(item => item.email === s.email.toLowerCase().trim())) {
+        list.push({ name: s.name || s.email, email: s.email.toLowerCase().trim() });
+      }
+    });
+    return list;
+  }, [church]);
+
   // ── Unsubscribers state ──────────────────────────────────────────────────────
   const [unsubscribers, setUnsubscribers] = useState<EmailUnsubscribe[]>([]);
   const [unsubLoading, setUnsubLoading] = useState(false);
   const [unsubSearch, setUnsubSearch] = useState('');
+  const [unsubSenderFilter, setUnsubSenderFilter] = useState('all');
   const [unsubLoaded, setUnsubLoaded] = useState(false);
+
+  // Manual Add Unsubscriber Modal State
+  const [showAddUnsubModal, setShowAddUnsubModal] = useState(false);
+  const [addUnsubEmail, setAddUnsubEmail] = useState('');
+  const [addUnsubSender, setAddUnsubSender] = useState('*');
+  const [isAddingUnsub, setIsAddingUnsub] = useState(false);
+
+  // ── Newsletter Subscribers state ─────────────────────────────────────────────
+  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
+  const [subscribersLoading, setSubscribersLoading] = useState(false);
+  const [subscribersSearch, setSubscribersSearch] = useState('');
+  const [subscribersSenderFilter, setSubscribersSenderFilter] = useState('all');
+  const [subscribersLoaded, setSubscribersLoaded] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -1199,16 +1231,134 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     }
   }, [activeTab, churchId, unsubLoaded]);
 
+  // Load newsletter subscribers lazily
+  useEffect(() => {
+    if (activeTab === 'subscribers' && !subscribersLoaded) {
+      setSubscribersLoading(true);
+      firestore.getNewsletterSubscribers(churchId)
+        .then(list => { setSubscribers(list); setSubscribersLoaded(true); })
+        .catch(() => {})
+        .finally(() => setSubscribersLoading(false));
+    }
+  }, [activeTab, churchId, subscribersLoaded]);
+
   const handleRemoveUnsubscribe = async (unsub: EmailUnsubscribe) => {
-    if (!confirm(`Re-subscribe ${unsub.email}? They will be able to receive emails from this list again.`)) return;
+    const senderLabel = unsub.senderEmail && unsub.senderEmail !== '*' ? `from ${unsub.senderEmail}` : 'from all church emails';
+    if (!confirm(`Re-subscribe ${unsub.email} (${senderLabel})? They will be able to receive emails again.`)) return;
     await firestore.removeEmailUnsubscribe(unsub.id);
     setUnsubscribers(prev => prev.filter(u => u.id !== unsub.id));
     showToast(`${unsub.email} has been re-subscribed.`);
   };
 
-  const filteredUnsubs = unsubSearch.trim()
-    ? unsubscribers.filter(u => u.email.toLowerCase().includes(unsubSearch.toLowerCase()))
-    : unsubscribers;
+  const handleAddManualUnsubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addUnsubEmail.trim() || !addUnsubEmail.includes('@')) {
+      showToast('Please enter a valid email address.', 'error');
+      return;
+    }
+    setIsAddingUnsub(true);
+    try {
+      const cleanEmail = addUnsubEmail.toLowerCase().trim();
+      const cleanSender = addUnsubSender.toLowerCase().trim();
+      const docId = cleanSender !== '*'
+        ? `${churchId}_${btoa(cleanSender).replace(/=/g, '')}_${btoa(cleanEmail).replace(/=/g, '')}`
+        : `${churchId}_all_${btoa(cleanEmail).replace(/=/g, '')}`;
+
+      const newUnsub: EmailUnsubscribe = {
+        id: docId,
+        churchId,
+        email: cleanEmail,
+        senderEmail: cleanSender,
+        unsubscribedAt: Date.now(),
+        reason: 'manual',
+        detail: 'Manually added by administrator'
+      };
+
+      await firestore.saveEmailUnsubscribe(newUnsub);
+      setUnsubscribers(prev => [newUnsub, ...prev.filter(u => u.id !== docId)]);
+      setShowAddUnsubModal(false);
+      setAddUnsubEmail('');
+      setAddUnsubSender('*');
+      showToast(`Added ${cleanEmail} to suppression list.`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to add unsubscribe', 'error');
+    } finally {
+      setIsAddingUnsub(false);
+    }
+  };
+
+  const handleRemoveSubscriber = async (sub: NewsletterSubscriber) => {
+    if (!confirm(`Remove subscriber ${sub.email}?`)) return;
+    await firestore.removeNewsletterSubscriber(sub.id);
+    setSubscribers(prev => prev.filter(s => s.id !== sub.id));
+    showToast(`Removed subscriber ${sub.email}.`);
+  };
+
+  const handleCopySignupLink = () => {
+    const url = `${window.location.origin}/newsletter/${churchId}`;
+    navigator.clipboard.writeText(url);
+    showToast('Newsletter signup link copied to clipboard!');
+  };
+
+  const handleExportSubscribersCsv = () => {
+    if (subscribers.length === 0) {
+      showToast('No subscribers to export.', 'error');
+      return;
+    }
+    const headers = ['Email', 'First Name', 'Last Name', 'Full Name', 'Phone', 'Subscribed Senders', 'Date Subscribed', 'Status', 'Source'];
+    const rows = subscribers.map(s => [
+      s.email,
+      s.firstName || '',
+      s.lastName || '',
+      s.name || '',
+      s.phone || '',
+      (s.senders || []).join('; '),
+      s.subscribedAt ? new Date(s.subscribedAt).toISOString() : '',
+      s.status,
+      s.source || ''
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `newsletter_subscribers_${churchId}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Subscribers CSV exported!');
+  };
+
+  // Filter unsubscribers
+  const filteredUnsubs = unsubscribers.filter(u => {
+    const matchesSearch = !unsubSearch.trim() || u.email.toLowerCase().includes(unsubSearch.toLowerCase());
+    const sender = (u.senderEmail || '*').toLowerCase().trim();
+    const matchesSender =
+      unsubSenderFilter === 'all'
+        ? true
+        : unsubSenderFilter === '*'
+        ? sender === '*' || !u.senderEmail
+        : sender === unsubSenderFilter.toLowerCase().trim();
+    return matchesSearch && matchesSender;
+  });
+
+  // Filter subscribers
+  const filteredSubscribers = subscribers.filter(s => {
+    const term = subscribersSearch.toLowerCase();
+    const matchesSearch =
+      !term ||
+      s.email.toLowerCase().includes(term) ||
+      (s.name && s.name.toLowerCase().includes(term)) ||
+      (s.firstName && s.firstName.toLowerCase().includes(term)) ||
+      (s.lastName && s.lastName.toLowerCase().includes(term));
+    const matchesSender =
+      subscribersSenderFilter === 'all'
+        ? true
+        : (s.senders || []).includes('*') ||
+          (s.senders || []).map(x => x.toLowerCase()).includes(subscribersSenderFilter.toLowerCase());
+    return matchesSearch && matchesSender;
+  });
 
   const handleCreate = async (name: string) => {
     setShowNewModal(false);
@@ -1402,6 +1552,21 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
           <List size={14} /> Polls
         </button>
         <button
+          onClick={() => setActiveTab('subscribers')}
+          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition ${
+            activeTab === 'subscribers'
+              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <UserCheck size={14} /> Newsletter Subscribers
+          {subscribers.length > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+              {subscribers.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('unsubscribers')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition ${
             activeTab === 'unsubscribers'
@@ -1418,92 +1583,347 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
         </button>
       </div>
 
-      {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
-      {activeTab === 'unsubscribers' && (
-        <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
-          <div className="flex items-center justify-between mb-5">
+      {/* ─── Newsletter Subscribers Tab ───────────────────────────────── */}
+      {activeTab === 'subscribers' && (
+        <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <UserMinus size={20} className="text-red-500" /> Unsubscribers
+                <UserCheck size={20} className="text-emerald-500" /> Newsletter Subscribers
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                People who have opted out of your emails. They are automatically excluded from future sends.
+                People who subscribed via your public newsletter page or embed widget.
               </p>
             </div>
-            {unsubscribers.length > 0 && (
-              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                {unsubscribers.length} total
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleCopySignupLink}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+              >
+                <Copy size={13} /> Copy Signup Link
+              </button>
+              <a
+                href={`/newsletter/${churchId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+              >
+                <ExternalLink size={13} /> View Public Page
+              </a>
+              <button
+                onClick={handleExportSubscribersCsv}
+                disabled={subscribers.length === 0}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white transition"
+              >
+                <Download size={13} /> Export CSV
+              </button>
+            </div>
           </div>
 
-          {/* Search */}
-          {unsubscribers.length > 0 && (
-            <div className="relative mb-4">
+          {/* Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="sm:col-span-2 relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by email…"
-                value={unsubSearch}
-                onChange={e => setUnsubSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                placeholder="Search subscribers by name or email…"
+                value={subscribersSearch}
+                onChange={e => setSubscribersSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
-          )}
-
-          {/* Table */}
-          {unsubLoading ? (
-            <div className="flex items-center justify-center h-40 text-slate-400">
-              <Loader2 size={22} className="animate-spin mr-2" /> Loading…
+            <div>
+              <select
+                value={subscribersSenderFilter}
+                onChange={e => setSubscribersSenderFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                <option value="all">All Channels / Senders</option>
+                {configuredSenders.map(s => (
+                  <option key={s.email} value={s.email}>
+                    {s.name} ({s.email})
+                  </option>
+                ))}
+              </select>
             </div>
-          ) : filteredUnsubs.length === 0 ? (
+          </div>
+
+          {/* Subscribers Table */}
+          {subscribersLoading ? (
+            <div className="flex items-center justify-center h-40 text-slate-400">
+              <Loader2 size={22} className="animate-spin mr-2" /> Loading subscribers…
+            </div>
+          ) : filteredSubscribers.length === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-              <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <UserCheck size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
               <p className="text-slate-500 dark:text-slate-400 font-medium">
-                {unsubSearch ? 'No results match your search' : 'No unsubscribers yet'}
+                {subscribersSearch || subscribersSenderFilter !== 'all' ? 'No subscribers match your search' : 'No newsletter subscribers yet'}
               </p>
-              {!unsubSearch && (
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                  When someone clicks "Unsubscribe" in an email, they'll appear here.
-                </p>
-              )}
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 max-w-md mx-auto">
+                Share your public link <strong>{window.location.origin}/newsletter/{churchId}</strong> or embed the widget on your church website to start gathering subscribers.
+              </p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unsubscribed</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campaign</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Subscriber</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Subscribed Channels</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Joined</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Source</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                  {filteredUnsubs.map(u => (
-                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.email}</td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                        {u.unsubscribedAt
-                          ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : '—'}
+                  {filteredSubscribers.map(sub => (
+                    <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900 dark:text-white">
+                          {sub.name || (sub.firstName ? `${sub.firstName} ${sub.lastName || ''}`.trim() : '—')}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                          {sub.email}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(!sub.senders || sub.senders.includes('*')) ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                              All Church Channels
+                            </span>
+                          ) : (
+                            sub.senders.map((sEmail, idx) => {
+                              const match = configuredSenders.find(cs => cs.email === sEmail.toLowerCase());
+                              return (
+                                <span
+                                  key={idx}
+                                  title={sEmail}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                                >
+                                  {match ? match.name : sEmail}
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                        {u.campaignName || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                        {sub.subscribedAt
+                          ? new Date(sub.subscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 capitalize">
+                        {sub.source ? sub.source.replace('_', ' ') : 'Web'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => handleRemoveUnsubscribe(u)}
-                          title="Re-subscribe (remove from list)"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
+                          onClick={() => handleRemoveSubscriber(sub)}
+                          title="Remove subscriber"
+                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition"
                         >
-                          <CheckCircle size={12} /> Re-subscribe
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
+      {activeTab === 'unsubscribers' && (
+        <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserMinus size={20} className="text-red-500" /> Unsubscribers &amp; Suppression
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                People who have opted out of emails. Suppression is managed per sender email address.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddUnsubModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-red-600 hover:bg-red-700 text-white transition shadow-sm"
+              >
+                <Plus size={13} /> Add Suppression
+              </button>
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="sm:col-span-2 relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search unsubscribers by email…"
+                value={unsubSearch}
+                onChange={e => setUnsubSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+            <div>
+              <select
+                value={unsubSenderFilter}
+                onChange={e => setUnsubSenderFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+              >
+                <option value="all">All Senders (Combined)</option>
+                <option value="*">Global / All Church Emails (*)</option>
+                {configuredSenders.map(s => (
+                  <option key={s.email} value={s.email}>
+                    From: {s.name} ({s.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
+          {unsubLoading ? (
+            <div className="flex items-center justify-center h-40 text-slate-400">
+              <Loader2 size={22} className="animate-spin mr-2" /> Loading suppression list…
+            </div>
+          ) : filteredUnsubs.length === 0 ? (
+            <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+              <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400 font-medium">
+                {unsubSearch || unsubSenderFilter !== 'all' ? 'No results match your filter' : 'No unsubscribers yet'}
+              </p>
+              {!unsubSearch && (
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                  When someone clicks "Unsubscribe" in an email, they'll appear here scoped to that sender address.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recipient Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Opted Out From</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campaign / Reason</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  {filteredUnsubs.map(u => {
+                    const isGlobal = !u.senderEmail || u.senderEmail === '*';
+                    const senderMatch = !isGlobal ? configuredSenders.find(cs => cs.email === u.senderEmail?.toLowerCase()) : null;
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200 font-mono text-xs">
+                          {u.email}
+                        </td>
+                        <td className="px-4 py-3">
+                          {isGlobal ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                              All Church Emails (*)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+                              {senderMatch ? `${senderMatch.name} (${u.senderEmail})` : u.senderEmail}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                          {u.unsubscribedAt
+                            ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                          {u.campaignName || (u.reason ? `Reason: ${u.reason}` : '—')}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleRemoveUnsubscribe(u)}
+                            title="Re-subscribe"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
+                          >
+                            <CheckCircle size={12} /> Re-subscribe
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Add Manual Suppression Modal */}
+          {showAddUnsubModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <UserMinus size={18} className="text-red-500" /> Add Email Suppression
+                  </h3>
+                  <button
+                    onClick={() => setShowAddUnsubModal(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={handleAddManualUnsubscribe} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Recipient Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="member@example.com"
+                      value={addUnsubEmail}
+                      onChange={e => setAddUnsubEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Suppress From
+                    </label>
+                    <select
+                      value={addUnsubSender}
+                      onChange={e => setAddUnsubSender(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      <option value="*">All Church Email Senders (Global)</option>
+                      {configuredSenders.map(s => (
+                        <option key={s.email} value={s.email}>
+                          Specific Sender: {s.name} ({s.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddUnsubModal(false)}
+                      className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isAddingUnsub}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition flex items-center gap-1.5"
+                    >
+                      {isAddingUnsub ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+                      Add Suppression
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

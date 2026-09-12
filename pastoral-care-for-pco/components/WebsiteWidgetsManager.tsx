@@ -189,10 +189,14 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (scale !== 1 ? `&scale=${scale}` : '')
       + (maxItems && maxItems !== '0' ? `&maxItems=${maxItems}` : '');
 
-  const iframeUrl = `${domain}/?widget=true&${commonParams}`;
+  const iframeUrl = type === 'newsletter'
+    ? `${domain}/newsletter/${churchId}?embedded=true`
+    : `${domain}/?widget=true&${commonParams}`;
   const scriptUrl = `${domain}/widget.js?${commonParams}`;
 
-  const iframeEmbedCode = `<iframe src="${iframeUrl}" width="100%" height="800" style="border:none; border-radius:12px; overflow:hidden;" allow="clipboard-write"></iframe>`;
+  const iframeEmbedCode = type === 'newsletter'
+    ? `<iframe src="${iframeUrl}" width="100%" height="650" style="border:none; border-radius:16px; overflow:hidden;" allow="clipboard-write"></iframe>`
+    : `<iframe src="${iframeUrl}" width="100%" height="800" style="border:none; border-radius:12px; overflow:hidden;" allow="clipboard-write"></iframe>`;
   const scriptEmbedCode = `<script src="${scriptUrl}" async></script>`;
 
   const colorMap: Record<string, string> = {
@@ -252,6 +256,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'events', label: 'Calendar/Events' },
                 { id: 'single_event', label: 'Featured Single Event' },
                 { id: 'forms', label: 'Forms' },
+                { id: 'newsletter', label: 'Newsletter Signup' },
                 { id: 'bubble_form', label: 'Bubble Popup Form' },
                 { id: 'popup', label: 'Legacy Pop Up Form' }
               ].map(opt => (
@@ -271,7 +276,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           </div>
 
-          {type !== 'popup' && type !== 'bubble_form' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'newsletter' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Theme Mode</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -281,7 +286,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'newsletter' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
                <div className="flex gap-2">
@@ -309,7 +314,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'newsletter' && (
             <>
               <div>
                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>

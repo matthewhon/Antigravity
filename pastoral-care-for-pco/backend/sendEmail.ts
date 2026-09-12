@@ -634,9 +634,15 @@ function buildUnsubscribeHtml(
     recipientEmail: string,
     fontFamily: string,
     appBaseUrl: string,
-    emailProvider: string
+    emailProvider: string,
+    senderEmail?: string
 ): string {
-    const token = Buffer.from(`${churchId}:${recipientEmail.toLowerCase()}`).toString('base64url');
+    const normalisedRecipient = recipientEmail.toLowerCase().trim();
+    const normalisedSender = (senderEmail || '').toLowerCase().trim();
+    const tokenPayload = normalisedSender
+        ? `${churchId}:${normalisedRecipient}:${normalisedSender}`
+        : `${churchId}:${normalisedRecipient}`;
+    const token = Buffer.from(tokenPayload).toString('base64url');
     // If Postmark, we use their mandated unsubscribe tag so they intercept it.
     const link = emailProvider === 'postmark' 
         ? '{{{pm:unsubscribe}}}' 
@@ -1468,14 +1474,23 @@ export async function executeSend(
     // 3. Base HTML template rendered per-recipient in the send loop below.
     //    (Each email gets a personalized unsubscribe link injected.)
 
-    // Load unsubscriber blocklist for this church (skip for test sends)
+    // Load unsubscriber blocklist for this church and sender (skip for test sends)
     const unsubscribedEmails = new Set<string>();
+    const resolvedFromLower = (resolvedFromEmail || '').toLowerCase().trim();
     if (!testEmail) {
         try {
             const unsubSnap = await db.collection('email_unsubscribes').where('churchId', '==', churchId).get();
-            unsubSnap.docs.forEach((d: any) => unsubscribedEmails.add((d.data().email || '').toLowerCase()));
+            unsubSnap.docs.forEach((d: any) => {
+                const data = d.data();
+                const recipient = (data.email || '').toLowerCase().trim();
+                const sender = (data.senderEmail || '').toLowerCase().trim();
+                // Suppress if global unsubscribe (no sender or '*'), or matches the current sender
+                if (!sender || sender === '*' || sender === resolvedFromLower) {
+                    if (recipient) unsubscribedEmails.add(recipient);
+                }
+            });
             if (unsubscribedEmails.size > 0) {
-                log.info(`Suppression list loaded: ${unsubscribedEmails.size} unsubscribed address(es).`, 'system', { churchId }, churchId);
+                log.info(`Suppression list loaded: ${unsubscribedEmails.size} address(es) unsubscribed from ${resolvedFromLower || 'all senders'}.`, 'system', { churchId }, churchId);
             }
         } catch (e: any) {
             log.warn(`Could not load unsubscribe list: ${e.message}`, 'system', { churchId }, churchId);
@@ -1549,7 +1564,7 @@ export async function executeSend(
             // Always include the unsubscribe footer — on test sends we use the test
             // email address so the link renders correctly, but append a note so the
             // sender knows it's a preview rather than a live unsubscribe token.
-            const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl, emailProvider)
+            const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl, emailProvider, resolvedFromEmail)
                 + (testEmail
                     ? `<div style="text-align:center;padding:0 32px 8px;"><p style="margin:0;font-family:${fontFamily};font-size:10px;color:#d1d5db;">(TEST SEND — unsubscribe link not active)</p></div>`
                     : '');

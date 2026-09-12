@@ -260,8 +260,17 @@ export async function handleGrowDailyEmail(req: any, res: any) {
         let errors: string[] = [];
 
         // 3. Filter out unsubscribed users
+        const fromEmailLower = fromEmail.toLowerCase().trim();
         const unsubSnap = await db.collection('email_unsubscribes').where('churchId', '==', churchId).get();
-        const unsubscribedEmails = new Set(unsubSnap.docs.map((d: any) => (d.data().email || '').toLowerCase()));
+        const unsubscribedEmails = new Set<string>();
+        unsubSnap.docs.forEach((d: any) => {
+            const data = d.data();
+            const recipient = (data.email || '').toLowerCase().trim();
+            const sender = (data.senderEmail || '').toLowerCase().trim();
+            if (!sender || sender === '*' || sender === fromEmailLower) {
+                if (recipient) unsubscribedEmails.add(recipient);
+            }
+        });
 
         // 4. Dispatch personalised emails
         for (const recipient of recipients) {
