@@ -14,6 +14,8 @@ interface PcoItem {
   date?: string;       // formatted display date
   imageUrl?: string;
   meta?: string;       // e.g. "32 members", "Public"
+  url?: string;
+  buttonText?: string;
   raw: any;
 }
 
@@ -54,6 +56,8 @@ const mapRegistration = (item: any): PcoItem => ({
   })(),
   imageUrl: firstImageUrl(item.attributes),
   meta: item.attributes?.archived ? 'Archived' : 'Active registration',
+  url: item.attributes?.new_registration_url || (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : undefined),
+  buttonText: 'Register Now',
   raw: item
 });
 
@@ -64,6 +68,8 @@ const mapGroup = (item: any): PcoItem => ({
   description: item.attributes?.description || '',
   imageUrl: item.attributes?.header_image?.medium || item.attributes?.header_image?.thumbnail,
   meta: `${item.attributes?.memberships_count ?? '?'} members · ${item.attributes?.schedule || 'No schedule'}`,
+  url: item.attributes?.public_church_center_web_url || (item.id ? `https://groups.planningcenteronline.com/groups/${item.id}` : undefined),
+  buttonText: 'Join Group',
   raw: item
 });
 
@@ -77,6 +83,8 @@ const mapCalendar = (item: any): PcoItem => ({
   })(),
   imageUrl: item.attributes?.image_url,
   meta: item.attributes?.location || '',
+  url: item.attributes?.registration_url || item.attributes?.app_info?.desktop_url,
+  buttonText: 'Learn More',
   raw: item
 });
 
@@ -87,6 +95,7 @@ const mapAnnouncement = (item: any): PcoItem => ({
   date: formatDate(item.attributes?.published_at || item.attributes?.created_at),
   imageUrl: firstImageUrl(item.attributes),
   meta: 'Announcement',
+  buttonText: 'Learn More',
   raw: item
 });
 
@@ -105,6 +114,8 @@ const buildBlock = (tab: PcoTab, item: PcoItem, selected: boolean): EmailBlock =
       date: item.date,
       imageUrl: item.imageUrl,
       meta: item.meta,
+      url: item.url,
+      buttonText: item.buttonText || (type === 'pco_group' ? 'Join Group' : (type === 'pco_registration' ? 'Register Now' : 'Learn More')),
       pcoId: item.id
     }
   };

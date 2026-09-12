@@ -133,6 +133,7 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
     case 'pco_event':
     case 'pco_announcement': {
       const stripTags = (html: string) => html?.replace(/<[^>]*>/g, '').trim() || '';
+      const buttonText = c.buttonText || (block.type === 'pco_group' ? 'Join Group' : (block.type === 'pco_registration' ? 'Register Now' : 'Learn More'));
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800">
           {/* Hero image — full width, natural aspect ratio */}
@@ -145,7 +146,9 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
             />
           ) : (
             <div className="w-full h-16 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 flex items-center justify-center">
-              {block.type === 'pco_announcement' ? (
+              {block.type === 'pco_group' ? (
+                <Users size={20} className="text-indigo-400" />
+              ) : block.type === 'pco_announcement' ? (
                 <Megaphone size={20} className="text-indigo-400" />
               ) : (
                 <Calendar size={20} className="text-indigo-400" />
@@ -167,9 +170,9 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
               <a
                 href={c.url} target="_blank" rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors mt-2"
               >
-                Learn More →
+                {buttonText} →
               </a>
             )}
           </div>
@@ -1297,6 +1300,69 @@ const InlineMediaEditor: React.FC<{
       </div>
     );
   }
+  if (['pco_group', 'pco_registration', 'pco_event', 'pco_announcement'].includes(block.type)) {
+    const defaultBtnText = block.type === 'pco_group' ? 'Join Group' : block.type === 'pco_registration' ? 'Register Now' : 'Learn More';
+    const typeLabel = block.type === 'pco_group' ? 'Group' : block.type === 'pco_registration' ? 'Registration' : block.type === 'pco_announcement' ? 'Announcement' : 'Event';
+    return (
+      <div className="space-y-3 p-3" onClick={e => e.stopPropagation()}>
+        <div className="text-[11px] text-slate-500 font-bold flex items-center justify-between">
+          <span>Planning Center {typeLabel}: {c.name || 'Untitled'}</span>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Title / Name</label>
+          <input
+            type="text"
+            value={c.name || ''}
+            onChange={e => onUpdate({ ...c, name: e.target.value })}
+            placeholder="Name"
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Button Text</label>
+            <input
+              type="text"
+              value={c.buttonText ?? defaultBtnText}
+              onChange={e => onUpdate({ ...c, buttonText: e.target.value })}
+              placeholder={defaultBtnText}
+              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Meta / Subtitle</label>
+            <input
+              type="text"
+              value={c.meta || ''}
+              onChange={e => onUpdate({ ...c, meta: e.target.value })}
+              placeholder="e.g. 12 members"
+              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Button URL / Link</label>
+          <input
+            type="url"
+            value={c.url || ''}
+            onChange={e => onUpdate({ ...c, url: e.target.value })}
+            placeholder="https://groups.planningcenteronline.com/..."
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Description</label>
+          <textarea
+            value={c.description || ''}
+            onChange={e => onUpdate({ ...c, description: e.target.value })}
+            placeholder="Brief description..."
+            rows={3}
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+    );
+  }
   return null;
 };
 
@@ -1373,7 +1439,12 @@ const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) =
 
 // ─── Sortable canvas block ────────────────────────────────────────────────────
 
-const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form', 'pco_form', 'pco_pledge_campaign']);
+const INLINE_EDITABLE = new Set([
+  'text', 'header', 'html', 'image', 'video', 'button', 'file',
+  'embedded_note', 'embedded_poll', 'embedded_form',
+  'pco_giving_form', 'pco_form', 'pco_pledge_campaign',
+  'pco_group', 'pco_registration', 'pco_event', 'pco_announcement'
+]);
 
 const SortableCanvasBlock: React.FC<{
   block: EmailBlock;
@@ -1703,6 +1774,7 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
       imageUrl: item.attributes?.header_image?.medium || item.attributes?.header_image?.thumbnail,
       description: item.attributes?.description,
       meta: `${item.attributes?.memberships_count ?? '?'} members`,
+      buttonText: 'Join Group',
       url: item.attributes?.public_church_center_web_url || (item.id ? `https://groups.planningcenteronline.com/groups/${item.id}` : undefined)
     })
   },

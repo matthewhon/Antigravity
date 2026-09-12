@@ -419,6 +419,7 @@ const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryCol
   const Icon = block.type === 'pco_group' ? Users : (block.type === 'pco_registration' || block.type === 'pco_form') ? ClipboardList : block.type === 'pco_announcement' ? Megaphone : CalendarDays;
   // Strip tags helper for plain-text contexts
   const stripTags = (html: string) => html.replace(/<[^>]*>/g, '').trim();
+  const btnText = c.buttonText || (block.type === 'pco_group' ? 'Join Group' : (block.type === 'pco_registration' ? 'Register Now' : 'Learn More'));
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff', marginBottom: 4 }}>
       {c.imageUrl ? (
@@ -443,7 +444,9 @@ const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryCol
           />
         )}
         {c.meta && <div style={{ fontSize: 11, color: '#94a3b8' }}>{stripTags(c.meta)}</div>}
-        <a href={c.url || '#'} style={{ display: 'inline-block', marginTop: 10, padding: '6px 16px', background: primaryColor, color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Learn More</a>
+        {c.url && (
+          <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 10, padding: '8px 18px', background: primaryColor, color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>{btnText}</a>
+        )}
       </div>
     </div>
   );

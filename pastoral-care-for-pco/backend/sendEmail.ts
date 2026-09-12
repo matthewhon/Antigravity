@@ -229,9 +229,11 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
             // PCO content cards
             case 'pco_registration':
             case 'pco_group':
-            case 'pco_event': {
+            case 'pco_event':
+            case 'pco_announcement': {
                 const c = block.content || {};
                 const strip = (h: string) => (h || '').replace(/<[^>]*>/g, '').trim();
+                const btnText = c.buttonText || (block.type === 'pco_group' ? 'Join Group' : (block.type === 'pco_registration' ? 'Register Now' : 'Learn More'));
                 return `
                   <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;background:#fff;">
                     ${c.imageUrl ? `<img src="${c.imageUrl}" alt="${c.name || ''}" style="width:100%;height:auto;display:block;" />` : ''}
@@ -240,7 +242,7 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                       <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:4px;">${c.name || ''}</div>
                       ${c.description ? `<div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:8px;">${strip(c.description)}</div>` : ''}
                       ${c.meta ? `<div style="font-size:11px;color:#94a3b8;">${strip(c.meta)}</div>` : ''}
-                      ${c.url ? `<a href="${c.url}" style="display:inline-block;margin-top:10px;padding:6px 16px;background:${primaryColor};color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">Learn More</a>` : ''}
+                      ${c.url ? `<a href="${c.url}" style="display:inline-block;margin-top:10px;padding:8px 18px;background:${primaryColor};color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">${btnText}</a>` : ''}
                     </div>
                   </div>`;
             }
