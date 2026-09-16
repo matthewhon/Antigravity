@@ -216,7 +216,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 candidateDonations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, includeBatched);
             }
 
-            const numFees = targetFees ? parseFloat(targetFees) : undefined;
+            const numFees = targetFees ? Math.abs(parseFloat(targetFees)) : undefined;
             const numTithe = targetTitheGross ? parseFloat(targetTitheGross) : undefined;
 
             const res = matchDonationsForPayout(candidateDonations, {
@@ -297,7 +297,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
     // Calculate difference metrics against target inputs
     const numTargetAmount = parseFloat(targetAmount) || 0;
-    const numTargetFees = parseFloat(targetFees) || 0;
+    const numTargetFees = Math.abs(parseFloat(targetFees) || 0);
     const numTargetTithe = parseFloat(targetTitheGross) || 0;
 
     const targetGrossVal = targetMode === 'gross' ? numTargetAmount : (numTargetAmount > 0 && numTargetFees > 0 ? numTargetAmount + numTargetFees : 0);

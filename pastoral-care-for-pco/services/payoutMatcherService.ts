@@ -139,8 +139,26 @@ export function getCandidateGiftsForPayout(
             return false;
         }
 
-        const dDateStr = (d.paid_out_date || d.payoutDate || d.date || '').slice(0, 10);
-        if (dDateStr < minDateStr || dDateStr > pDateStr) {
+        let dDateStr = '';
+        if (d.paid_out_date || d.payoutDate) {
+            dDateStr = (d.paid_out_date || d.payoutDate)!.slice(0, 10);
+        } else if (d.date) {
+            try {
+                const parsed = new Date(d.date);
+                if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const day = String(parsed.getDate()).padStart(2, '0');
+                    dDateStr = `${y}-${m}-${day}`;
+                } else {
+                    dDateStr = d.date.slice(0, 10);
+                }
+            } catch {
+                dDateStr = d.date.slice(0, 10);
+            }
+        }
+
+        if (!dDateStr || dDateStr < minDateStr || dDateStr > pDateStr) {
             excludedDateWindow++;
             return false;
         }
@@ -228,7 +246,7 @@ export function matchDonationsForPayout(
 
     log(`🚀 Starting AI Stripe Payout Matcher`);
     log(`📅 Payout Date: ${pDateStr} | Search Window: [${sDateStr} to ${pDateStr}]`);
-    log(`🎯 Target Criteria: ${targetGross ? `Gross $${targetGross.toFixed(2)}` : ''} ${targetNet ? `Net $${targetNet.toFixed(2)}` : ''} ${targetTitheGross ? `| Tithe $${targetTitheGross.toFixed(2)}` : ''} ${targetFees ? `| Fees $${targetFees.toFixed(2)}` : ''}`);
+    log(`🎯 Target Criteria: ${targetGross ? `Gross $${targetGross.toFixed(2)}` : ''} ${targetNet ? `Net $${targetNet.toFixed(2)}` : ''} ${targetTitheGross ? `| Tithe $${targetTitheGross.toFixed(2)}` : ''} ${targetFees ? `| Fees $${Math.abs(targetFees).toFixed(2)}` : ''}`);
     log(`⚙️ Filter Settings: Method=${options.paymentMethodFilter || 'all'}, IncludeBatched=${!!options.includeBatched}`);
 
     const audit: CandidateFilterAudit = {
@@ -285,7 +303,7 @@ export function matchDonationsForPayout(
 
     const targetGrossCents = hasTargetGross ? Math.round(targetGross! * 100) : 0;
     const targetNetCents = hasTargetNet ? Math.round(targetNet! * 100) : 0;
-    const targetFeeCents = targetFees !== undefined ? Math.round(targetFees * 100) : null;
+    const targetFeeCents = targetFees !== undefined ? Math.round(Math.abs(targetFees) * 100) : null;
 
     // Candidate items representation in integer cents
     const candidateItems = parents.map(p => ({
@@ -381,7 +399,7 @@ export function matchDonationsForPayout(
 
         const stack: ParentDonationGroup[] = [];
         let iterations = 0;
-        const MAX_ITERATIONS = 75000;
+        const MAX_ITERATIONS = 150000;
         const startTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
         function searchSubset(idx: number, accG: number, accF: number, accT: number) {
@@ -390,7 +408,7 @@ export function matchDonationsForPayout(
             if (iterations > MAX_ITERATIONS) return;
             if (iterations % 1000 === 0) {
                 const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-                if (now - startTime > 40) return; // 40ms safety guard
+                if (now - startTime > 1500) return; // 1500ms safety guard
             }
 
             if (idx >= n) {
@@ -452,7 +470,7 @@ export function matchDonationsForPayout(
     log(`   ⚙️ Strategy: ${matchedStrategy}`);
     if (targetGross) log(`   💵 Target Gross: $${targetGross.toFixed(2)} | Matched Gross Delta: ${grossDeltaDollars >= 0 ? '+' : ''}$${grossDeltaDollars.toFixed(2)}`);
     if (targetTitheGross) log(`   🏛️ Target Tithe: $${targetTitheGross.toFixed(2)} | Matched Tithe Delta: ${titheDeltaDollars >= 0 ? '+' : ''}$${titheDeltaDollars.toFixed(2)}`);
-    if (targetFees) log(`   💳 Expected Fees: $${targetFees.toFixed(2)} | Matched Fees Delta: ${feeDeltaDollars >= 0 ? '+' : ''}$${feeDeltaDollars.toFixed(2)}`);
+    if (targetFees) log(`   💳 Expected Fees: $${Math.abs(targetFees).toFixed(2)} | Matched Fees Delta: ${feeDeltaDollars >= 0 ? '+' : ''}$${feeDeltaDollars.toFixed(2)}`);
 
     const result = buildResult(bestChosen, pDateStr, stripePayoutId, diffDollars, isExact);
     result.matchLogs = logs;
