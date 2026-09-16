@@ -6,7 +6,7 @@ import {
   Check, X, Calendar, PhoneOff, Award, RefreshCw,
   Heart, Sparkles, AlertCircle, ArrowLeft, Users, 
   Play, LogOut, CheckCircle2, ChevronRight, Plus, 
-  CalendarCheck, History 
+  CalendarCheck, History, Share2, Link2, Copy 
 } from 'lucide-react';
 
 interface OutreachViewProps {
@@ -54,6 +54,67 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
   const [joinedSession, setJoinedSession] = useState<OutreachSession | null>(null);
   const [sessionSlots, setSessionSlots] = useState<OutreachSlot[]>([]);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>('https://pastoralcare.barnabassoftware.com');
+
+  useEffect(() => {
+    serviceFirestore.getSystemSettings().then(settings => {
+      if (settings?.apiBaseUrl) {
+        setApiBaseUrl(settings.apiBaseUrl.replace(/\/$/, ''));
+      }
+    }).catch(err => {
+      console.warn('Could not load system settings for apiBaseUrl', err);
+    });
+  }, []);
+
+  const getCampaignShareUrl = (sessionId: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const isLocalOrApp = !origin || origin.includes('localhost') || origin.includes('capacitor') || origin.startsWith('file://') || origin.includes('127.0.0.1');
+    const base = isLocalOrApp ? (apiBaseUrl || 'https://pastoralcare.barnabassoftware.com') : origin;
+    return `${base.replace(/\/$/, '')}/contact/${sessionId}`;
+  };
+
+  const handleShareCampaign = async (session: OutreachSession, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = getCampaignShareUrl(session.id);
+    const shareData = {
+      title: `Outreach Campaign: ${session.name}`,
+      text: `Join the outreach campaign "${session.name}" for ${churchName}:`,
+      url: shareUrl,
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        console.warn('Native share failed, falling back to clipboard copy:', err);
+      }
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedSessionId(session.id);
+      setTimeout(() => {
+        setCopiedSessionId(prev => (prev === session.id ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      alert(`Campaign Link:\n${shareUrl}`);
+    }
+  };
   
   // Volunteer History State
   const [myHistorySlots, setMyHistorySlots] = useState<OutreachSlot[]>([]);
@@ -500,6 +561,19 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
     }
   };
 
+  const getRiskBadgeColor = (category?: string) => {
+    switch (category) {
+      case 'Healthy':
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+      case 'At Risk':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+      case 'Disconnected':
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
+      default:
+        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
+    }
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
   };
@@ -537,16 +611,38 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
             </button>
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest leading-none text-indigo-200">Active Campaign</h3>
-              <h2 className="text-sm min-[375px]:text-base font-black truncate max-w-[200px] mt-0.5">{joinedSession.name}</h2>
+              <h2 className="text-sm min-[375px]:text-base font-black truncate max-w-[170px] min-[400px]:max-w-[220px] mt-0.5">{joinedSession.name}</h2>
             </div>
           </div>
 
-          <button
-            onClick={handleLeaveSession}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/80 hover:bg-rose-500 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
-          >
-            <LogOut size={12} /> Exit
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => handleShareCampaign(joinedSession)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95 ${
+                copiedSessionId === joinedSession.id
+                  ? 'bg-emerald-500 text-white shadow-sm'
+                  : 'bg-white/20 hover:bg-white/30 text-white'
+              }`}
+              title="Share Volunteer Calling Link"
+            >
+              {copiedSessionId === joinedSession.id ? (
+                <>
+                  <Check size={12} /> Copied!
+                </>
+              ) : (
+                <>
+                  <Share2 size={12} /> Share
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleLeaveSession}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/80 hover:bg-rose-500 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95"
+            >
+              <LogOut size={12} /> Exit
+            </button>
+          </div>
         </div>
       ) : (
         /* Regular Segmented Toggle Navigation */
@@ -609,6 +705,37 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
               </div>
             )}
 
+            {/* Volunteer Share Link Card */}
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/50 dark:border-zinc-800 rounded-3xl p-4 shadow-sm flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest leading-none">
+                  <Link2 size={12} />
+                  <span>Volunteer Calling Link</span>
+                </div>
+                <p className="text-xs font-mono text-slate-600 dark:text-zinc-400 truncate mt-1 select-all">
+                  {getCampaignShareUrl(joinedSession.id)}
+                </p>
+              </div>
+              <button
+                onClick={() => handleShareCampaign(joinedSession)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition active:scale-95 shadow-sm ${
+                  copiedSessionId === joinedSession.id
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                {copiedSessionId === joinedSession.id ? (
+                  <>
+                    <Check size={12} /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={12} /> Share Link
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* Volunteer Claimed Batch List */}
             <div className="space-y-3">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Your Assigned Contacts ({myPendingSlots.length})</h3>
@@ -650,9 +777,15 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white leading-none">{slot.assignedPersonName}</p>
-                            <span className="inline-block mt-1.5 text-[8px] font-black uppercase tracking-wider text-rose-500 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded border border-rose-100 dark:border-rose-900/10">
-                              {slot.assignedPersonRiskCategory || 'Contact'}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/20">
+                                {personRecord?.membership || personRecord?.status || 'Contact'}
+                              </span>
+                              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${getRiskBadgeColor(personRecord?.riskProfile?.category || slot.assignedPersonRiskCategory)}`}>
+                                {personRecord?.riskProfile?.category || slot.assignedPersonRiskCategory || 'Healthy'}
+                                {personRecord?.riskProfile?.score !== undefined ? ` (${personRecord.riskProfile.score})` : ''}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -709,12 +842,34 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleJoinSession(sess)}
-                        className="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-sm transition active:scale-95 shrink-0"
-                      >
-                        <Play size={10} fill="white" /> Join
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={(e) => handleShareCampaign(sess, e)}
+                          title="Share Campaign Link"
+                          className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95 border ${
+                            copiedSessionId === sess.id
+                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                              : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                          }`}
+                        >
+                          {copiedSessionId === sess.id ? (
+                            <>
+                              <Check size={12} /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Share2 size={12} /> Share
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleJoinSession(sess)}
+                          className="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-sm transition active:scale-95 shrink-0"
+                        >
+                          <Play size={10} fill="white" /> Join
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -763,10 +918,20 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
                               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                             )}
                           </div>
-                          <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide leading-none mt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/20">
+                              {item.person.membership || item.person.status || 'Contact'}
+                            </span>
+                            {item.person.riskProfile && (
+                              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${getRiskBadgeColor(item.person.riskProfile.category)}`}>
+                                {item.person.riskProfile.category} ({item.person.riskProfile.score})
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide leading-none mt-1.5">
                             {item.reason === 'birthday' ? '🎂 Birthday' : item.reason === 'anniversary' ? '💍 Anniversary' : '🚨 Forgotten Member'}
                           </p>
-                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium leading-none mt-1">
+                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium leading-none mt-0.5">
                             {item.detail}
                           </p>
                         </div>
@@ -843,9 +1008,20 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white leading-none">{slot.assignedPersonName}</p>
-                            <span className={`inline-block mt-1.5 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${isReached ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/30' : 'text-rose-700 bg-rose-50 dark:text-rose-300 dark:bg-rose-900/30'}`}>
-                              {isReached ? 'Reached / Completed' : 'No Answer'}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${isReached ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/30' : 'text-rose-700 bg-rose-50 dark:text-rose-300 dark:bg-rose-900/30'}`}>
+                                {isReached ? 'Reached' : 'No Answer'}
+                              </span>
+                              <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/20">
+                                {associatedPerson?.membership || associatedPerson?.status || 'Contact'}
+                              </span>
+                              {(associatedPerson?.riskProfile || slot.assignedPersonRiskCategory) && (
+                                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${getRiskBadgeColor(associatedPerson?.riskProfile?.category || slot.assignedPersonRiskCategory)}`}>
+                                  {associatedPerson?.riskProfile?.category || slot.assignedPersonRiskCategory || 'Healthy'}
+                                  {associatedPerson?.riskProfile?.score !== undefined ? ` (${associatedPerson.riskProfile.score})` : ''}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -1067,17 +1243,45 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
           <div className="relative w-full h-[90vh] bg-slate-50 dark:bg-zinc-950 rounded-t-[2.5rem] p-6 shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250">
             <div className="w-12 h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-full mx-auto mb-5 shrink-0" />
 
-            <div className="flex justify-between items-center mb-5 shrink-0">
-              <div>
-                <h3 className="text-lg font-black tracking-tight">{selectedContact.name}</h3>
-                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Outreach Companion Guide</p>
+            <div className="flex justify-between items-start mb-5 shrink-0">
+              <div className="flex items-center gap-3">
+                {selectedContact.avatar ? (
+                  <img
+                    src={selectedContact.avatar}
+                    alt={selectedContact.name}
+                    className="w-12 h-12 rounded-full object-cover shrink-0 border border-slate-200/60 dark:border-zinc-700"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm shrink-0 border border-indigo-100 dark:border-indigo-900/30">
+                    {getInitials(selectedContact.name)}
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-black tracking-tight leading-tight">{selectedContact.name}</h3>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/20">
+                      {selectedContact.membership || selectedContact.status || 'Contact'}
+                    </span>
+                    {(selectedContact.riskProfile || selectedSlot?.assignedPersonRiskCategory) && (
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getRiskBadgeColor(selectedContact.riskProfile?.category || selectedSlot?.assignedPersonRiskCategory)}`}>
+                        {selectedContact.riskProfile?.category || selectedSlot?.assignedPersonRiskCategory || 'Healthy'}
+                        {selectedContact.riskProfile?.score !== undefined ? ` (${selectedContact.riskProfile.score})` : ''}
+                      </span>
+                    )}
+                    {selectedContact.phone && (
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold">
+                        • {formatPhone(selectedContact.phone)}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => {
                   setSelectedContact(null);
                   setSelectedSlot(null);
                 }}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center hover:bg-slate-200"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center hover:bg-slate-200 shrink-0"
               >
                 <X size={16} />
               </button>
@@ -1085,6 +1289,23 @@ export const OutreachView: React.FC<OutreachViewProps> = ({
 
             {/* Content Body */}
             <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pb-6">
+
+              {/* Risk Factors Card (if present) */}
+              {selectedContact.riskProfile?.factors && selectedContact.riskProfile.factors.length > 0 && (
+                <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-2xl">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1.5">
+                    <AlertTriangle size={12} />
+                    <span>Risk Factors</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedContact.riskProfile.factors.map((factor, idx) => (
+                      <span key={idx} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40">
+                        {factor}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Call Script Box */}
               <div className="bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/30 rounded-2xl p-4">

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { EmailBlock, ColumnLayout } from './EmailBuilder';
 import { TemplateSettings, ServicePlanSnapshot } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
-import { CalendarDays, Users, ClipboardList, Image as ImageIcon, Megaphone } from 'lucide-react';
+import { CalendarDays, Users, ClipboardList, Image as ImageIcon, Megaphone, Folder, ChevronDown } from 'lucide-react';
 
 // ─── YouTube helper ───────────────────────────────────────────────────────────
 
@@ -573,6 +573,328 @@ const SOCIAL_LINKS: { key: keyof TemplateSettings; label: string; color: string;
   },
 ];
 
+// ─── Collapsible Section Preview Component ─────────────────────────────────────
+
+const InteractiveCollapsibleSection: React.FC<{
+  block: EmailBlock;
+  settings: TemplateSettings;
+}> = ({ block, settings }) => {
+  const c = block.content || {};
+  const [isExpanded, setIsExpanded] = useState<boolean>(!!c.defaultExpanded);
+
+  useEffect(() => {
+    setIsExpanded(!!c.defaultExpanded);
+  }, [c.defaultExpanded]);
+
+  const innerBlocks: EmailBlock[] = c.blocks || [];
+  const title = c.title || 'Groups';
+  const subtitle = c.subtitle;
+  const primaryColor = settings.primaryColor || '#4f46e5';
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 shadow-sm overflow-hidden my-3 transition-all text-left">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(p => !p)}
+        className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-3 min-w-0 pr-2">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white font-bold shadow-sm"
+            style={{ backgroundColor: primaryColor }}
+          >
+            <Folder size={18} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-base font-bold text-slate-900 dark:text-white truncate">
+              {title}
+            </div>
+            {subtitle && (
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                {subtitle}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+            {innerBlocks.length} {innerBlocks.length === 1 ? 'item' : 'items'}
+          </span>
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-transform duration-200"
+            style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          >
+            <ChevronDown size={18} />
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 animate-in fade-in duration-200">
+          {innerBlocks.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs italic">
+              No items in this section.
+            </div>
+          ) : (
+            innerBlocks.map((subBlock) => (
+              <div key={subBlock.id} className="w-full">
+                <RenderPreviewBlock block={subBlock} settings={settings} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Single Block Preview Renderer ───────────────────────────────────────────
+
+const RenderPreviewBlock: React.FC<{ block: EmailBlock; settings: TemplateSettings }> = ({ block, settings }) => {
+  if (block.type === 'text') {
+    return (
+      <div
+        className="ep-prose"
+        style={{ fontSize: 15, lineHeight: 1.65, color: settings.textColor || '#1f2937' }}
+        dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content?.text || '') }}
+      />
+    );
+  }
+  if (block.type === 'header') {
+    return (
+      <div
+        className="ep-prose"
+        style={{ color: settings.primaryColor || '#4f46e5' }}
+        dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content?.text || '') }}
+      />
+    );
+  }
+  if (block.type === 'image') {
+    return block.content?.link ? (
+      <a href={block.content.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+        <img src={block.content.src} alt={block.content.alt || ''} className="max-w-full rounded-lg" style={{ display: 'block' }} />
+      </a>
+    ) : (
+      <img src={block.content?.src} alt={block.content?.alt || ''} className="max-w-full rounded-lg" />
+    );
+  }
+  if (block.type === 'video') {
+    const src: string = block.content?.src || '';
+    const ytId = extractYouTubeId(src);
+    if (ytId) {
+      return (
+        <div className="rounded-xl overflow-hidden" style={{ position: 'relative' }}>
+          <YouTubeThumbnail url={src} videoId={ytId} />
+          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontFamily: 'sans-serif' }}>
+            ℹ️ Email recipients will see this thumbnail — clicking opens YouTube.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-xl overflow-hidden">
+        <video src={src} controls className="w-full" />
+      </div>
+    );
+  }
+  if (block.type === 'divider') {
+    return <hr className="border-t-2 border-slate-200 dark:border-slate-600 my-4" />;
+  }
+  if (block.type === 'file') {
+    return (
+      <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{block.content?.name || 'Download File'}</span>
+        <a href={block.content?.url || '#'} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">
+          Download
+        </a>
+      </div>
+    );
+  }
+  if (block.type === 'collapsible_section') {
+    return <InteractiveCollapsibleSection block={block} settings={settings} />;
+  }
+  if (block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_announcement') {
+    return <PcoContentCard block={block} primaryColor={settings.primaryColor} />;
+  }
+  if (block.type === 'pco_form') {
+    if (block.content?.displayMode === 'link') {
+      return <PcoContentCard block={block} primaryColor={settings.primaryColor} />;
+    }
+    return (
+      <>
+        <div className="block md:hidden">
+          <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+        </div>
+        <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          {block.content?.url ? (
+            <iframe
+              src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+              style={{ width: '100%', height: 750, border: 'none' }}
+              title="Planning Center Form"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+            />
+          ) : (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+              Please select a form in the builder.
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+  if (block.type === 'pco_giving_form') {
+    return (
+      <>
+        <div className="block md:hidden mb-4">
+          <a href={block.content?.url || '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff', padding: '16px', textAlign: 'center' }}>
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 32 }}>💝</span>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Give Online</div>
+              <div style={{ display: 'inline-block', padding: '10px 24px', background: settings.primaryColor || '#4f46e5', color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 600 }}>
+                {block.content?.text || 'Give Now'}
+              </div>
+            </div>
+          </a>
+        </div>
+        <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          {block.content?.url ? (
+            <iframe
+              src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+              style={{ width: '100%', height: 750, border: 'none' }}
+              title="Giving Form"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+            />
+          ) : (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+              Please configure the Giving URL in the builder.
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+  if (block.type === 'pco_service_plan') {
+    return <PcoServicePlanCard block={block} primaryColor={settings.primaryColor} textColor={settings.textColor} />;
+  }
+  if (block.type === 'pco_pledge_campaign') {
+    return <PledgeCampaignCard block={block} primaryColor={settings.primaryColor} />;
+  }
+  if (block.type === 'pco_groups_widget') {
+    return (
+      <div className="p-4 bg-white border rounded-lg">
+        <div
+          data-pcoplus-widget="groups" data-church-center-url="vbcrowlett"
+          data-caption-join="Request to join" data-caption-more-information="Learn more"
+          data-caption-close="Close" data-pcoplus-key="oVRle6Z"
+          data-show-filters="true" data-hide-location="true" data-use-modals="true"
+          data-corner-radius="4" data-image-shape="cinematic"
+          data-brand-color="#FF7461" data-button-color="#4EA0CF"
+          data-modal-color="#FFFFFF" data-text-color="#333333"
+          style={{ textAlign: 'center', color: 'rgba(90, 90, 90, 0.5)' }}>
+          Events Loading
+        </div>
+      </div>
+    );
+  }
+  if (block.type === 'pco_registrations_widget') {
+    return (
+      <div className="p-4 bg-white border rounded-lg">
+        <link rel="stylesheet" href="https://pcochef-static.s3.amazonaws.com/plusapi/css/t-events.css" media="print" onLoad={(e: any) => e.target.media='all'} />
+        <link rel="stylesheet" href="https://pcochef-static.s3.amazonaws.com/plusapi/css/s-events.css" media="print" onLoad={(e: any) => e.target.media='all'} />
+        <script src="https://pcochef-static.s3.amazonaws.com/plusapi/js/htmx.min.js" defer></script>
+        <div hx-get="https://pcochef.com/plusapi/oVRle6Z/hxregistrations/?style=ts&filter=this_month&tags=" hx-trigger="load" hx-params="*" hx-swap="innerHTML">
+          <img alt="Result loading..." className="htmx-indicator" width="150" src="https://htmx.org/img/bars.svg"/>
+        </div>
+        <script type="text/javascript" src="https://pcochef-static.s3.amazonaws.com/plusapi/js/css-events.js"></script>
+      </div>
+    );
+  }
+  if (block.type === 'html') {
+    return <div dangerouslySetInnerHTML={{ __html: block.content?.html || '' }} />;
+  }
+  if (block.type === 'columns') {
+    const layout: ColumnLayout = block.content?.layout || '2';
+    const cells: { id: string; blocks: { id: string; type: string; content: any }[] }[] = block.content?.cells || [];
+    const widths = columnWidths(layout);
+    return (
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        {cells.map((cell, idx) => (
+          <div key={cell.id} style={{ flex: `0 0 calc(${widths[idx] ?? '50%'} - 6px)`, minWidth: 0 }}>
+            {cell.blocks.length === 0 ? (
+              <div style={{ border: '1px dashed #e2e8f0', borderRadius: 8, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>
+                Empty column
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {cell.blocks.map(b => (
+                  <MiniBlockPreview key={b.id} b={b} primaryColor={settings.primaryColor} />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (block.type === 'button') {
+    const bc = block.content || {};
+    const bg = bc.color || settings.primaryColor || '#6366f1';
+    const tc = bc.textColor || '#ffffff';
+    const rad = bc.borderRadius === 'pill' ? 999 : bc.borderRadius === 'square' ? 4 : 8;
+    const pad = bc.size === 'small' ? '6px 16px' : bc.size === 'large' ? '14px 36px' : '10px 24px';
+    const fs = bc.size === 'small' ? 13 : bc.size === 'large' ? 17 : 15;
+    const alignStyle: React.CSSProperties = { display: 'flex', justifyContent: bc.align === 'left' ? 'flex-start' : bc.align === 'right' ? 'flex-end' : 'center', margin: '4px 0' };
+    return (
+      <div style={alignStyle}>
+        <a href={bc.url || '#'} style={{ background: bg, color: tc, borderRadius: rad, padding: pad, fontSize: fs, fontWeight: 700, display: 'inline-block', textDecoration: 'none' }}>
+          {bc.text || 'Click Here'}
+        </a>
+      </div>
+    );
+  }
+  if (block.type === 'pastoral_care_chart') {
+    const area = block.content?.area || 'Visits';
+    const data = block.content?.data || {};
+    const period = data.period || 'Last 30 Days';
+    const count1Text = area.toLowerCase().includes('prayer') ? 'Recent Requests' : 'Recent Visits / Care';
+    const count2Text = area.toLowerCase().includes('prayer') ? 'Answered' : 'Active / Total';
+    const val1 = data.recentCount !== undefined ? data.recentCount : '—';
+    const val2 = area.toLowerCase().includes('prayer') ? (data.answeredCount !== undefined ? data.answeredCount : '—') : (data.totalCount !== undefined ? data.totalCount : '—');
+    return (
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 shadow-sm text-left my-2">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 flex justify-between items-center text-white">
+          <span className="text-[11px] font-bold tracking-wider uppercase">Pastoral Care: {area}</span>
+          <span className="text-[10px] text-indigo-100">{period}</span>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 p-4">
+          <div className="pr-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count1Text}</div>
+            <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val1}</div>
+          </div>
+          <div className="pl-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count2Text}</div>
+            <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val2}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (block.type === 'data_chart') {
+    return (
+      <AnalyticsWidgetBlock
+        widgetId={block.content?.widgetId as AnalyticsWidgetId}
+        label={block.content?.label || 'Analytics'}
+        data={block.content?.data || {}}
+      />
+    );
+  }
+  return null;
+};
+
 // ─── Main Preview Component ───────────────────────────────────────────────────
 
 export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLogoUrl, contentType = 'blocks', content }) => {
@@ -620,224 +942,12 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
         ) : contentType === 'text' ? (
           <div style={{ whiteSpace: 'pre-wrap', fontSize: 15, lineHeight: 1.65 }}>{resolveMergeTags(content || '')}</div>
         ) : (
-          blocks.map((block) => (
+          blocks.map(block => (
             <div key={block.id}>
-            {block.type === 'text' && (
-              <div
-                className="ep-prose"
-                style={{ fontSize: 15, lineHeight: 1.65, color: settings.textColor || '#1f2937' }}
-                dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }}
-              />
-            )}
-            {block.type === 'header' && (
-              <div
-                className="ep-prose"
-                style={{ color: settings.primaryColor || '#4f46e5' }}
-                dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }}
-              />
-            )}
-            {block.type === 'image' && (
-              block.content.link
-                ? <a href={block.content.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
-                    <img src={block.content.src} alt={block.content.alt || ''} className="max-w-full rounded-lg" style={{ display: 'block' }} />
-                  </a>
-                : <img src={block.content.src} alt={block.content.alt || ''} className="max-w-full rounded-lg" />
-            )}
-            {block.type === 'video' && (() => {
-              const src: string = block.content.src || '';
-              const ytId = extractYouTubeId(src);
-              if (ytId) {
-                return (
-                  <div className="rounded-xl overflow-hidden" style={{ position: 'relative' }}>
-                    <YouTubeThumbnail url={src} videoId={ytId} />
-                    <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontFamily: 'sans-serif' }}>
-                      ℹ️ Email recipients will see this thumbnail — clicking opens YouTube.
-                    </p>
-                  </div>
-                );
-              }
-              // Non-YouTube: native video player (browser preview only)
-              return (
-                <div className="rounded-xl overflow-hidden">
-                  <video src={src} controls className="w-full" />
-                </div>
-              );
-            })()}
-
-            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_announcement') && (
-              <PcoContentCard block={block} primaryColor={settings.primaryColor} />
-            )}
-
-            {block.type === 'pco_form' && (block.content?.displayMode === 'link' ? (
-              <PcoContentCard block={block} primaryColor={settings.primaryColor} />
-            ) : (
-              <>
-                <div className="block md:hidden">
-                  <PcoContentCard block={block} primaryColor={settings.primaryColor} />
-                </div>
-                <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  {block.content?.url ? (
-                    <iframe
-                      src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
-                      style={{ width: '100%', height: 750, border: 'none' }}
-                      title="Planning Center Form"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
-                    />
-                  ) : (
-                    <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                      Please select a form in the builder.
-                    </div>
-                  )}
-                </div>
-              </>
-            ))}
-
-            {block.type === 'pco_giving_form' && (
-              <>
-                <div className="block md:hidden mb-4">
-                  <a href={block.content?.url || '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
-                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff', padding: '16px', textAlign: 'center' }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <span style={{ fontSize: 32 }}>💝</span>
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Give Online</div>
-                      <div style={{ display: 'inline-block', padding: '10px 24px', background: settings.primaryColor || '#4f46e5', color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 600 }}>
-                        {block.content?.text || 'Give Now'}
-                      </div>
-                    </div>
-                  </a>
-                </div>
-                <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  {block.content?.url ? (
-                    <iframe
-                      src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
-                      style={{ width: '100%', height: 750, border: 'none' }}
-                      title="Giving Form"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
-                    />
-                  ) : (
-                    <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                      Please configure the Giving URL in the builder.
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {block.type === 'pco_service_plan' && (
-              <PcoServicePlanCard block={block} primaryColor={settings.primaryColor} textColor={settings.textColor} />
-            )}
-
-            {block.type === 'pco_pledge_campaign' && (
-              <PledgeCampaignCard block={block} primaryColor={settings.primaryColor} />
-            )}
-
-            {block.type === 'pco_groups_widget' && (
-              <div className="p-4 bg-white border rounded-lg">
-                <div
-                  data-pcoplus-widget="groups" data-church-center-url="vbcrowlett"
-                  data-caption-join="Request to join" data-caption-more-information="Learn more"
-                  data-caption-close="Close" data-pcoplus-key="oVRle6Z"
-                  data-show-filters="true" data-hide-location="true" data-use-modals="true"
-                  data-corner-radius="4" data-image-shape="cinematic"
-                  data-brand-color="#FF7461" data-button-color="#4EA0CF"
-                  data-modal-color="#FFFFFF" data-text-color="#333333"
-                  style={{ textAlign: 'center', color: 'rgba(90, 90, 90, 0.5)' }}>
-                  Events Loading
-                </div>
-              </div>
-            )}
-            {block.type === 'pco_registrations_widget' && (
-              <div className="p-4 bg-white border rounded-lg">
-                <link rel="stylesheet" href="https://pcochef-static.s3.amazonaws.com/plusapi/css/t-events.css" media="print" onLoad={(e: any) => e.target.media='all'} />
-                <link rel="stylesheet" href="https://pcochef-static.s3.amazonaws.com/plusapi/css/s-events.css" media="print" onLoad={(e: any) => e.target.media='all'} />
-                <script src="https://pcochef-static.s3.amazonaws.com/plusapi/js/htmx.min.js" defer></script>
-                <div hx-get="https://pcochef.com/plusapi/oVRle6Z/hxregistrations/?style=ts&filter=this_month&tags=" hx-trigger="load" hx-params="*" hx-swap="innerHTML">
-                  <img alt="Result loading..." className="htmx-indicator" width="150" src="https://htmx.org/img/bars.svg"/>
-                </div>
-                <script type="text/javascript" src="https://pcochef-static.s3.amazonaws.com/plusapi/js/css-events.js"></script>
-              </div>
-            )}
-
-            {block.type === 'html' && <div dangerouslySetInnerHTML={{ __html: block.content.html }} />}
-
-            {block.type === 'columns' && (() => {
-              const layout: ColumnLayout = block.content?.layout || '2';
-              const cells: { id: string; blocks: { id: string; type: string; content: any }[] }[] = block.content?.cells || [];
-              const widths = columnWidths(layout);
-              return (
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  {cells.map((cell, idx) => (
-                    <div key={cell.id} style={{ flex: `0 0 calc(${widths[idx] ?? '50%'} - 6px)`, minWidth: 0 }}>
-                      {cell.blocks.length === 0 ? (
-                        <div style={{ border: '1px dashed #e2e8f0', borderRadius: 8, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>
-                          Empty column
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {cell.blocks.map(b => (
-                            <MiniBlockPreview key={b.id} b={b} primaryColor={settings.primaryColor} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-
-            {block.type === 'button' && (() => {
-              const bc = block.content || {};
-              const bg = bc.color || settings.primaryColor || '#6366f1';
-              const tc = bc.textColor || '#ffffff';
-              const rad = bc.borderRadius === 'pill' ? 999 : bc.borderRadius === 'square' ? 4 : 8;
-              const pad = bc.size === 'small' ? '6px 16px' : bc.size === 'large' ? '14px 36px' : '10px 24px';
-              const fs = bc.size === 'small' ? 13 : bc.size === 'large' ? 17 : 15;
-              const alignStyle: React.CSSProperties = { display: 'flex', justifyContent: bc.align === 'left' ? 'flex-start' : bc.align === 'right' ? 'flex-end' : 'center', margin: '4px 0' };
-              return (
-                <div style={alignStyle}>
-                  <a href={bc.url || '#'} style={{ background: bg, color: tc, borderRadius: rad, padding: pad, fontSize: fs, fontWeight: 700, display: 'inline-block', textDecoration: 'none' }}>
-                    {bc.text || 'Click Here'}
-                  </a>
-                </div>
-              );
-            })()}
-            {block.type === 'pastoral_care_chart' && (() => {
-              const area = block.content?.area || 'Visits';
-              const data = block.content?.data || {};
-              const period = data.period || 'Last 30 Days';
-              const count1Text = area.toLowerCase().includes('prayer') ? 'Recent Requests' : 'Recent Visits / Care';
-              const count2Text = area.toLowerCase().includes('prayer') ? 'Answered' : 'Active / Total';
-              const val1 = data.recentCount !== undefined ? data.recentCount : '—';
-              const val2 = area.toLowerCase().includes('prayer') ? (data.answeredCount !== undefined ? data.answeredCount : '—') : (data.totalCount !== undefined ? data.totalCount : '—');
-              return (
-                <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 shadow-sm text-left my-2">
-                  <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 flex justify-between items-center text-white">
-                    <span className="text-[11px] font-bold tracking-wider uppercase">Pastoral Care: {area}</span>
-                    <span className="text-[10px] text-indigo-100">{period}</span>
-                  </div>
-                  <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-700 p-4">
-                    <div className="pr-4">
-                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count1Text}</div>
-                      <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val1}</div>
-                    </div>
-                    <div className="pl-4">
-                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{count2Text}</div>
-                      <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1">{val2}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            {block.type === 'data_chart' && (
-              <AnalyticsWidgetBlock
-                widgetId={block.content.widgetId as AnalyticsWidgetId}
-                label={block.content.label || 'Analytics'}
-                data={block.content.data || {}}
-              />
-            )}
-          </div>
-        )))}
+              <RenderPreviewBlock block={block} settings={settings} />
+            </div>
+          ))
+        )}
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────── */}

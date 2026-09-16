@@ -339,17 +339,98 @@ const EmbeddedForm: React.FC<{ itemId: string; churchId: string; displayMode?: s
   );
 };
 
+// ─── Collapsible Section in Public Bulletin ──────────────────────────────────
+
+const PublicCollapsibleSection: React.FC<{
+  block: EmailBlock;
+  settings: TemplateSettings;
+  churchId: string;
+  churchLogoUrl?: string;
+}> = ({ block, settings, churchId, churchLogoUrl }) => {
+  const c = block.content || {};
+  const [isExpanded, setIsExpanded] = useState<boolean>(!!c.defaultExpanded);
+
+  const innerBlocks: EmailBlock[] = c.blocks || [];
+  const title = c.title || 'Groups';
+  const subtitle = c.subtitle;
+  const primaryColor = settings.primaryColor || '#4f46e5';
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setIsExpanded(p => !p)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+        aria-expanded={isExpanded}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, paddingRight: 8 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: primaryColor,
+              color: '#fff',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{title}</div>
+            {subtitle && (
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{subtitle}</div>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, background: '#f1f5f9', color: '#475569' }}>
+            {innerBlocks.length} {innerBlocks.length === 1 ? 'item' : 'items'}
+          </span>
+          <div style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: '#94a3b8' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div style={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9', background: '#fafbfc' }}>
+          {innerBlocks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 13, fontStyle: 'italic' }}>
+              No items in this section.
+            </div>
+          ) : (
+            <BulletinBlockRenderer
+              blocks={innerBlocks}
+              settings={settings}
+              churchId={churchId}
+              churchLogoUrl={churchLogoUrl}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Block Renderer — handles embedded types, delegates rest to EmailPreview ───
 
 const BulletinBlockRenderer: React.FC<{ blocks: EmailBlock[]; settings: TemplateSettings; churchId: string; churchLogoUrl?: string }> = ({
   blocks, settings, churchId, churchLogoUrl,
 }) => {
-  // Separate blocks into segments: runs of regular blocks and individual embedded blocks
+  // Separate blocks into segments: runs of regular blocks and individual embedded/collapsible blocks
   const segments: Array<{ type: 'regular'; blocks: EmailBlock[] } | { type: 'embedded'; block: EmailBlock }> = [];
 
   let regularRun: EmailBlock[] = [];
   for (const block of blocks) {
-    if (['embedded_note', 'embedded_poll', 'embedded_form'].includes(block.type)) {
+    if (['embedded_note', 'embedded_poll', 'embedded_form', 'collapsible_section'].includes(block.type)) {
       if (regularRun.length) {
         segments.push({ type: 'regular', blocks: regularRun });
         regularRun = [];
@@ -379,6 +460,17 @@ const BulletinBlockRenderer: React.FC<{ blocks: EmailBlock[]; settings: Template
         }
         const block = seg.block;
         const c = block.content || {};
+        if (block.type === 'collapsible_section') {
+          return (
+            <PublicCollapsibleSection
+              key={i}
+              block={block}
+              settings={settings}
+              churchId={churchId}
+              churchLogoUrl={churchLogoUrl}
+            />
+          );
+        }
         if (block.type === 'embedded_note') {
           return <EmbeddedNote key={i} itemId={c.itemId || ''} />;
         }

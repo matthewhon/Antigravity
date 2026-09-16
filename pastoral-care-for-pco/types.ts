@@ -2598,6 +2598,16 @@ export interface DigitalBulletin {
     updatedAt: number;
 }
 
+export interface CollapsibleSectionContent {
+    title: string;
+    subtitle?: string;
+    defaultExpanded?: boolean;
+    headerBgColor?: string;
+    headerTextColor?: string;
+    icon?: string;
+    blocks: any[];
+}
+
 // ─── Spiritual Gifts Test ───────────────────────────────────────────────────
 
 export type SpiritualGiftType = 'Helps' | 'Teaching' | 'Encouragement' | 'Administration' | 'Mercy' | 'Giving';

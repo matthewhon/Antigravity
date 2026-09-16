@@ -19,7 +19,7 @@ import {
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
   Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone, DollarSign,
-  ArrowUpToLine
+  ArrowUpToLine, Folder, FolderClosed, FolderOpen
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -31,6 +31,7 @@ export type BlockType =
   | 'pco_pledge_campaign'
   | 'pastoral_care_chart' | 'data_chart'
   | 'columns'
+  | 'collapsible_section'
   // Bulletin-only embedded blocks
   | 'embedded_note' | 'embedded_poll' | 'embedded_form' | 'pco_giving_form';
 
@@ -66,15 +67,16 @@ interface EmailBuilderProps {
 // ─── Block definitions for palette ───────────────────────────────────────────
 
 const BLOCK_DEFS: { type: BlockType; label: string; icon: React.ReactNode; default: any }[] = [
-  { type: 'text',    label: 'Text',    icon: <Type size={20} />,            default: { text: '<p>Start typing…</p>' } },
-  { type: 'image',   label: 'Image',   icon: <ImageIcon size={20} />,       default: { src: '' } },
-  { type: 'image',   label: 'Canva',   icon: <ImageIcon size={20} className="text-[#00c4cc]" />, default: { src: '', autoOpenCanva: true } },
-  { type: 'button',  label: 'Button',  icon: <MousePointerClick size={20} />, default: { text: 'Click Here', url: '#', align: 'center', size: 'medium', borderRadius: 'rounded', color: '', textColor: '#ffffff' } },
-  { type: 'file',    label: 'File',    icon: <File size={20} />,            default: { name: 'document.pdf', url: '#' } },
-  { type: 'divider', label: 'Divider', icon: <Minus size={20} />,           default: {} },
-  { type: 'video',   label: 'Video',   icon: <Video size={20} />,           default: { src: '' } },
-  { type: 'header',  label: 'Header',  icon: <HeadingIcon size={20} />,     default: { text: '<h2>New Heading</h2>' } },
-  { type: 'html',    label: 'HTML',    icon: <Code size={20} />,            default: { html: '<p>Custom HTML</p>' } },
+  { type: 'text',                label: 'Text',        icon: <Type size={20} />,            default: { text: '<p>Start typing…</p>' } },
+  { type: 'image',               label: 'Image',       icon: <ImageIcon size={20} />,       default: { src: '' } },
+  { type: 'image',               label: 'Canva',       icon: <ImageIcon size={20} className="text-[#00c4cc]" />, default: { src: '', autoOpenCanva: true } },
+  { type: 'button',              label: 'Button',      icon: <MousePointerClick size={20} />, default: { text: 'Click Here', url: '#', align: 'center', size: 'medium', borderRadius: 'rounded', color: '', textColor: '#ffffff' } },
+  { type: 'collapsible_section', label: 'Collapsible', icon: <FolderClosed size={20} />,   default: { title: 'Groups', subtitle: '', defaultExpanded: false, blocks: [] } },
+  { type: 'file',                label: 'File',        icon: <File size={20} />,            default: { name: 'document.pdf', url: '#' } },
+  { type: 'divider',             label: 'Divider',     icon: <Minus size={20} />,           default: {} },
+  { type: 'video',               label: 'Video',       icon: <Video size={20} />,           default: { src: '' } },
+  { type: 'header',              label: 'Header',      icon: <HeadingIcon size={20} />,     default: { text: '<h2>New Heading</h2>' } },
+  { type: 'html',                label: 'HTML',        icon: <Code size={20} />,            default: { html: '<p>Custom HTML</p>' } },
 ];
 
 // ─── Block thumbnail (shown on canvas) ───────────────────────────────────────
@@ -259,6 +261,21 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
           <span>Column layout · {block.content?.layout || '2'} columns</span>
         </div>
       );
+    case 'collapsible_section': {
+      const title = c.title || 'Collapsible Section';
+      const itemsCount = (c.blocks || []).length;
+      return (
+        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 border border-slate-200 dark:border-slate-600">
+          <div className="flex items-center gap-2 font-semibold truncate pr-2">
+            <FolderClosed size={14} className="text-indigo-500 shrink-0" />
+            <span className="truncate">{title}</span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-normal shrink-0">
+            {itemsCount} {itemsCount === 1 ? 'item' : 'items'} · {c.defaultExpanded ? 'Starts expanded' : 'Starts collapsed'}
+          </span>
+        </div>
+      );
+    }
     // ─── Bulletin-only embedded blocks ────────────────────────────────────────
     case 'embedded_note':
       return (
@@ -1498,6 +1515,8 @@ const SortableCanvasBlock: React.FC<{
           <div className="p-4">
             {block.type === 'columns' ? (
               <ColumnBlockRenderer block={block} onChange={content => onUpdate(content)} churchId={churchId} />
+            ) : block.type === 'collapsible_section' ? (
+              <CollapsibleSectionBlockRenderer block={block} onChange={content => onUpdate(content)} churchId={churchId} />
             ) : (
               <BlockThumbnail block={block} />
             )}
@@ -1960,6 +1979,375 @@ const PcoQuickPicker: React.FC<{
           ))
         )}
       </div>
+    </div>
+  );
+};
+
+// ─── Collapsible Section Block Renderer ───────────────────────────────────────
+
+const SUB_BLOCK_TYPES: { type: BlockType; label: string; icon: React.ReactNode; default: any }[] = [
+  { type: 'text', label: 'Text', icon: <Type size={14} />, default: { text: '<p>Enter details here…</p>' } },
+  { type: 'header', label: 'Heading', icon: <HeadingIcon size={14} />, default: { text: '<h3>Section Heading</h3>' } },
+  { type: 'image', label: 'Image', icon: <ImageIcon size={14} />, default: { src: '' } },
+  { type: 'button', label: 'Button', icon: <MousePointerClick size={14} />, default: { text: 'Click Here', url: '#', align: 'center', size: 'medium', borderRadius: 'rounded', color: '', textColor: '#ffffff' } },
+  { type: 'file', label: 'File', icon: <File size={14} />, default: { name: 'document.pdf', url: '#' } },
+  { type: 'divider', label: 'Divider', icon: <Minus size={14} />, default: {} },
+  { type: 'video', label: 'Video', icon: <Video size={14} />, default: { src: '' } },
+  { type: 'html', label: 'HTML', icon: <Code size={14} />, default: { html: '<p>Custom HTML</p>' } },
+  { type: 'embedded_note', label: 'Note', icon: <FileText size={14} />, default: { itemId: '', title: '' } },
+  { type: 'embedded_poll', label: 'Poll', icon: <List size={14} />, default: { itemId: '', title: '' } },
+  { type: 'embedded_form', label: 'Form', icon: <ClipboardList size={14} />, default: { itemId: '', title: '', displayMode: 'link' } },
+  { type: 'pco_giving_form', label: 'Giving Form', icon: <Heart size={14} />, default: { text: 'Give Online', url: '' } },
+];
+
+const CollapsibleSectionBlockRenderer: React.FC<{
+  block: EmailBlock;
+  onChange: (newContent: any) => void;
+  churchId?: string;
+}> = ({ block, onChange, churchId }) => {
+  const c = block.content || {};
+  const [isOpenInEditor, setIsOpenInEditor] = useState(true);
+  const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [quickPickType, setQuickPickType] = useState<PcoPickType | null>(null);
+
+  const title = c.title !== undefined ? c.title : 'Groups';
+  const subtitle = c.subtitle || '';
+  const defaultExpanded = !!c.defaultExpanded;
+  const subBlocks: EmailBlock[] = c.blocks || [];
+
+  const handleTitleChange = (newTitle: string) => {
+    onChange({ ...c, title: newTitle });
+  };
+
+  const handleSubtitleChange = (newSub: string) => {
+    onChange({ ...c, subtitle: newSub });
+  };
+
+  const toggleDefaultExpanded = () => {
+    onChange({ ...c, defaultExpanded: !defaultExpanded });
+  };
+
+  const addSubBlock = (type: BlockType, defaultContent?: any) => {
+    const def = SUB_BLOCK_TYPES.find(d => d.type === type) || BLOCK_DEFS.find(d => d.type === type);
+    const newBlock: EmailBlock = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      type,
+      content: defaultContent || (def?.default ? { ...def.default } : {}),
+    };
+    onChange({ ...c, blocks: [...subBlocks, newBlock] });
+    setSelectedSubId(newBlock.id);
+    setShowAddMenu(false);
+    setIsOpenInEditor(true);
+  };
+
+  const updateSubBlock = (id: string, newSubContent: any) => {
+    const updated = subBlocks.map(b => b.id === id ? { ...b, content: newSubContent } : b);
+    onChange({ ...c, blocks: updated });
+  };
+
+  const deleteSubBlock = (id: string) => {
+    onChange({ ...c, blocks: subBlocks.filter(b => b.id !== id) });
+    if (selectedSubId === id) setSelectedSubId(null);
+  };
+
+  const duplicateSubBlock = (id: string) => {
+    const target = subBlocks.find(b => b.id === id);
+    if (!target) return;
+    const clone: EmailBlock = {
+      ...target,
+      id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      content: { ...target.content },
+    };
+    const idx = subBlocks.findIndex(b => b.id === id);
+    const next = [...subBlocks];
+    next.splice(idx + 1, 0, clone);
+    onChange({ ...c, blocks: next });
+    setSelectedSubId(clone.id);
+  };
+
+  const moveSubBlock = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= subBlocks.length) return;
+    const next = [...subBlocks];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    onChange({ ...c, blocks: next });
+  };
+
+  const handlePcoQuickPick = (type: PcoPickType, item: any) => {
+    const newBlock: EmailBlock = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      type,
+      content: {
+        name: item.name,
+        headline: item.headline || item.name,
+        description: item.description,
+        date: item.date,
+        imageUrl: item.imageUrl,
+        meta: item.meta,
+        url: item.url || item.churchCenterUrl,
+        churchCenterUrl: item.churchCenterUrl,
+        givingButtonText: item.givingButtonText || 'Give Online',
+        pledgeButtonText: item.pledgeButtonText || 'Pledge Now',
+        goalCents: item.goalCents,
+        totalReceivedCents: item.totalReceivedCents,
+        totalPledgedCents: item.totalPledgedCents,
+        pledgeCount: item.pledgeCount,
+        donorsCount: item.donorsCount,
+        pcoId: item.id,
+        campaignId: item.campaignId || item.id,
+        rawPlan: item.rawPlan,
+      },
+    };
+    onChange({ ...c, blocks: [...subBlocks, newBlock] });
+    setSelectedSubId(newBlock.id);
+    setQuickPickType(null);
+    setShowAddMenu(false);
+    setIsOpenInEditor(true);
+  };
+
+  return (
+    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 shadow-sm overflow-hidden text-left">
+      {/* ── Header Bar ── */}
+      <div className="bg-gradient-to-r from-slate-50 to-indigo-50/40 dark:from-slate-800 dark:to-indigo-950/40 p-3.5 border-b border-indigo-100 dark:border-indigo-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsOpenInEditor(p => !p); }}
+            className="p-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition shrink-0"
+            title={isOpenInEditor ? 'Collapse in editor' : 'Expand in editor'}
+          >
+            {isOpenInEditor ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </button>
+          <div className="flex-1 min-w-0">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Section Name (e.g. Groups)"
+              className="w-full text-sm font-bold text-slate-900 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 focus:outline-none px-1 py-0.5 rounded transition"
+            />
+            <input
+              type="text"
+              value={subtitle}
+              onChange={(e) => handleSubtitleChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Optional subtitle / description..."
+              className="w-full text-xs text-slate-500 dark:text-slate-400 bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-500 focus:outline-none px-1 py-0.5 rounded mt-0.5 transition"
+            />
+          </div>
+        </div>
+
+        {/* Action / Config Controls */}
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
+          {/* Initial State Toggle */}
+          <button
+            type="button"
+            onClick={toggleDefaultExpanded}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
+              defaultExpanded
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+            }`}
+            title="Configure whether this section is expanded or collapsed when someone views the bulletin"
+          >
+            <span>Starts:</span>
+            <span className="font-bold underline">{defaultExpanded ? 'Expanded' : 'Collapsed'}</span>
+          </button>
+
+          {/* Sub-blocks count badge */}
+          <span className="text-[11px] font-medium px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+            {subBlocks.length} {subBlocks.length === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Sub-blocks Content Area (when expanded in editor) ── */}
+      {isOpenInEditor && (
+        <div className="p-3 bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
+          {subBlocks.length === 0 ? (
+            <div className="py-8 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800">
+              <Folder size={24} className="mx-auto mb-2 text-indigo-400 opacity-60" />
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">This section is empty</p>
+              <p className="text-[11px] text-slate-400 mt-1">Add items below that will be inside "{title}".</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {subBlocks.map((sb, idx) => {
+                const isSelected = selectedSubId === sb.id;
+                const isTextBlock = ['text', 'header'].includes(sb.type);
+                const isEmbedBlock = ['embedded_note', 'embedded_poll', 'embedded_form'].includes(sb.type);
+                const isEditable = INLINE_EDITABLE.has(sb.type);
+
+                return (
+                  <div
+                    key={sb.id}
+                    className={`group/sub relative rounded-xl border-2 transition-all ${
+                      isSelected
+                        ? 'border-indigo-500 bg-white dark:bg-slate-800 shadow-md shadow-indigo-100 dark:shadow-indigo-900/20'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 cursor-pointer'
+                    }`}
+                    onClick={!isSelected ? (e) => { e.stopPropagation(); setSelectedSubId(sb.id); } : undefined}
+                  >
+                    {/* Content */}
+                    <div className="p-3">
+                      {isSelected && isEditable ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          {isTextBlock ? (
+                            <InlineTextEditor block={sb} onUpdate={(content) => updateSubBlock(sb.id, content)} churchId={churchId} />
+                          ) : isEmbedBlock ? (
+                            <EmbedBlockEditor block={sb} onUpdate={(content) => updateSubBlock(sb.id, content)} churchId={churchId} />
+                          ) : (
+                            <InlineMediaEditor block={sb} onUpdate={(content) => updateSubBlock(sb.id, content)} churchId={churchId} />
+                          )}
+                        </div>
+                      ) : (
+                        <BlockThumbnail block={sb} />
+                      )}
+                    </div>
+
+                    {/* Sub-block action bar */}
+                    <div
+                      className={`absolute -top-2.5 right-2 flex items-center gap-1 opacity-0 group-hover/sub:opacity-100 transition ${isSelected ? 'opacity-100' : ''}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubId(null)}
+                          className="px-2 py-0.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-sm"
+                        >
+                          ✓ Done
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => moveSubBlock(idx, 'up')}
+                        disabled={idx === 0}
+                        className="p-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30"
+                        title="Move Up"
+                      >
+                        <ChevronUp size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveSubBlock(idx, 'down')}
+                        disabled={idx === subBlocks.length - 1}
+                        className="p-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-30"
+                        title="Move Down"
+                      >
+                        <ChevronDown size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => duplicateSubBlock(sb.id)}
+                        className="p-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        title="Duplicate"
+                      >
+                        <Copy size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSubBlock(sb.id)}
+                        className="p-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-400 hover:text-red-500"
+                        title="Delete"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add items to section footer */}
+          <div className="pt-2" onClick={(e) => e.stopPropagation()}>
+            {showAddMenu ? (
+              <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Add Item to "{title}"</span>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddMenu(false); setQuickPickType(null); }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Quick block buttons */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                  {SUB_BLOCK_TYPES.map(def => (
+                    <button
+                      key={def.type}
+                      type="button"
+                      onClick={() => addSubBlock(def.type)}
+                      className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-600 dark:text-slate-300 text-xs font-medium border border-transparent hover:border-indigo-200 transition"
+                    >
+                      {def.icon}
+                      <span className="truncate">{def.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* PCO Pickers within section */}
+                {churchId && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-3 h-3" />
+                      <span>Planning Center</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {(['pco_group', 'pco_event', 'pco_registration', 'pco_service_plan', 'pco_form'] as PcoPickType[]).map(pt => {
+                        const cfg = PCO_PICK_CONFIG[pt];
+                        const isPicking = quickPickType === pt;
+                        return (
+                          <div key={pt} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setQuickPickType(isPicking ? null : pt)}
+                              className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-medium border transition ${
+                                isPicking
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                              }`}
+                            >
+                              <span className="flex items-center gap-1.5 truncate">{cfg.icon} {cfg.label}</span>
+                              {isPicking ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {quickPickType && (
+                      <div className="mt-2">
+                        <PcoQuickPicker
+                          type={quickPickType}
+                          churchId={churchId}
+                          onPick={handlePcoQuickPick}
+                          onClose={() => setQuickPickType(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddMenu(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 border border-dashed border-indigo-300 dark:border-indigo-700 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition"
+              >
+                <Plus size={13} /> Add item to "{title}"
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
