@@ -405,31 +405,36 @@ export function matchDonationsForPayout(
     if (bestDiffCents > 0 || (targetCount !== null && bestCountDelta !== 0) || (targetTitheCents !== null && Math.abs(bestTitheDeltaCents) > 0)) {
         log(`🔍 Pass 2: Running branch-and-bound subset search across all ${n} candidate gifts...`);
 
+        // Sort candidate items descending by gross amount so branch-and-bound evaluates large items first
+        // and eliminates massive subtrees early
+        const pass2Items = [...candidateItems].sort((a, b) => b.gCents - a.gCents);
+        const p2n = pass2Items.length;
+
         // Compute suffix sums for exact bounding
-        const suffixG = new Array<number>(n + 1).fill(0);
-        const suffixN = new Array<number>(n + 1).fill(0);
-        const suffixT = new Array<number>(n + 1).fill(0);
-        for (let i = n - 1; i >= 0; i--) {
-            suffixG[i] = suffixG[i + 1] + candidateItems[i].gCents;
-            suffixN[i] = suffixN[i + 1] + candidateItems[i].nCents;
-            suffixT[i] = suffixT[i + 1] + candidateItems[i].tCents;
+        const suffixG = new Array<number>(p2n + 1).fill(0);
+        const suffixN = new Array<number>(p2n + 1).fill(0);
+        const suffixT = new Array<number>(p2n + 1).fill(0);
+        for (let i = p2n - 1; i >= 0; i--) {
+            suffixG[i] = suffixG[i + 1] + pass2Items[i].gCents;
+            suffixN[i] = suffixN[i + 1] + pass2Items[i].nCents;
+            suffixT[i] = suffixT[i + 1] + pass2Items[i].tCents;
         }
 
         const stack: ParentDonationGroup[] = [];
         let iterations = 0;
-        const MAX_ITERATIONS = 150000;
+        const MAX_ITERATIONS = 5000000;
         const startTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
         function searchSubset(idx: number, accG: number, accF: number, accT: number, strictCount: boolean) {
             if (minScore === 0) return;
             iterations++;
             if (iterations > MAX_ITERATIONS) return;
-            if (iterations % 1000 === 0) {
+            if (iterations % 5000 === 0) {
                 const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
                 if (now - startTime > 1500) return; // 1500ms safety guard
             }
 
-            if (idx >= n) {
+            if (idx >= p2n) {
                 if (stack.length > 0) {
                     evaluateSubset(stack, accG, accF, accT, 'Subset Combination Match');
                 }
@@ -445,7 +450,7 @@ export function matchDonationsForPayout(
             // Strict count pruning when requested for speed
             if (strictCount && targetCount !== null) {
                 if (stack.length > targetCount) return;
-                if ((stack.length + (n - idx)) < targetCount) return;
+                if ((stack.length + (p2n - idx)) < targetCount) return;
             }
 
             // Pruning if remaining items cannot reach target
@@ -459,12 +464,12 @@ export function matchDonationsForPayout(
             }
 
             // Include current candidate item
-            stack.push(candidateItems[idx].p);
+            stack.push(pass2Items[idx].p);
             searchSubset(
                 idx + 1,
-                accG + candidateItems[idx].gCents,
-                accF + candidateItems[idx].fCents,
-                accT + candidateItems[idx].tCents,
+                accG + pass2Items[idx].gCents,
+                accF + pass2Items[idx].fCents,
+                accT + pass2Items[idx].tCents,
                 strictCount
             );
             stack.pop();
@@ -491,6 +496,9 @@ export function matchDonationsForPayout(
         }
         return null;
     }
+
+    // Ensure matched gifts are consistently ordered by date descending
+    bestChosen.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const isExact = bestDiffCents === 0 && (targetCount === null || bestCountDelta === 0);
     const diffDollars = Math.round(bestDiffCents) / 100;
