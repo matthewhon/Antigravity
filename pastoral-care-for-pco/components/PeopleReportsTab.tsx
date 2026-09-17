@@ -43,8 +43,11 @@ const MEMBERSHIP_COLORS: Record<string, string> = {
   'Unknown': '#94a3b8',
 };
 
+type ReportSubTab = 'overview' | 'nextgen' | 'lifecycle' | 'demographics' | 'risk' | 'membership';
+
 export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('12_months');
+  const [activeReportTab, setActiveReportTab] = useState<ReportSubTab>('overview');
 
   const months = useMemo(() => {
     if (!data.allPeople || data.allPeople.length === 0) return [];
@@ -324,298 +327,341 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h4 className="text-xl font-black text-slate-900 dark:text-white">Lifecycle Status Over Time</h4>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cumulative growth of people by their Active/Inactive status.</p>
+      {/* ── Sub-tab Navigation Bar ────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-xl flex flex-wrap gap-1 border border-slate-200 dark:border-slate-700/60">
+          {[
+            { id: 'overview', label: '📊 Overview' },
+            { id: 'nextgen', label: '👶 NextGen Ministry' },
+            { id: 'lifecycle', label: '📈 Lifecycle Status' },
+            { id: 'demographics', label: '🎂 Age Demographics' },
+            { id: 'risk', label: '⚠️ Risk Profile' },
+            { id: 'membership', label: '🎖️ Membership Status' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveReportTab(tab.id as ReportSubTab)}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                activeReportTab === tab.id
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeReportTab !== 'nextgen' && (
+          <div className="flex items-center gap-2 px-2">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time Range:</span>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="3_months">Last 3 Months</option>
+              <option value="6_months">Last 6 Months</option>
+              <option value="12_months">Last 12 Months</option>
+              <option value="all_time">All Time</option>
+            </select>
           </div>
-          
-          <select
-            value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
-            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer"
-          >
-            <option value="3_months">Last 3 Months</option>
-            <option value="6_months">Last 6 Months</option>
-            <option value="12_months">Last 12 Months</option>
-            <option value="all_time">All Time</option>
-          </select>
-        </div>
-
-        <div className="h-[400px] w-full">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  {statusKeys.map(key => (
-                    <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={STATUS_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={STATUS_COLORS[key] || '#6366f1'} stopOpacity={0}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    color: '#f8fafc',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36} 
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
-                />
-                {statusKeys.map(key => (
-                  <Area 
-                    key={key}
-                    type="monotone" 
-                    dataKey={key} 
-                    stackId="1"
-                    stroke={STATUS_COLORS[key] || '#6366f1'} 
-                    strokeWidth={2}
-                    fill={`url(#color${key})`} 
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-400">
-              No data available for the selected time range.
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h4 className="text-xl font-black text-slate-900 dark:text-white">Age Demographics Over Time</h4>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Active members grouped by age bracket.</p>
-          </div>
-        </div>
-        <div className="h-[400px] w-full">
-          {ageChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={ageChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  {ageKeys.map(key => (
-                    <linearGradient key={key} id={`ageColor${key.replace('+','plus')}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={AGE_COLORS[key]} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={AGE_COLORS[key]} stopOpacity={0}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    color: '#f8fafc',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36} 
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
-                />
-                {ageKeys.map(key => (
-                  <Area 
-                    key={key}
-                    type="monotone" 
-                    dataKey={key} 
-                    stackId="1"
-                    stroke={AGE_COLORS[key]} 
-                    strokeWidth={2}
-                    fill={`url(#ageColor${key.replace('+','plus')})`} 
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-400">
-              No data available for the selected time range.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
-        <div className="mb-8">
-          <h4 className="text-xl font-black text-slate-900 dark:text-white">Risk Profile Over Time</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in risk categories over time (Active people only).</p>
-        </div>
-
-        <div className="h-[400px] w-full">
-          {riskChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={riskChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  {riskKeys.map(key => (
-                    <linearGradient key={`risk-${key}`} id={`colorRisk${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    color: '#f8fafc',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36} 
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
-                />
-                {riskKeys.map(key => (
-                  <Area 
-                    key={key}
-                    type="monotone" 
-                    dataKey={key} 
-                    stackId="1"
-                    stroke={RISK_COLORS[key] || '#6366f1'} 
-                    strokeWidth={2}
-                    fill={`url(#colorRisk${key.replace(/\s+/g, '')})`} 
-                    activeDot={{ r: 6, strokeWidth: 0, fill: RISK_COLORS[key] || '#6366f1' }}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-400">
-              No data available for the selected time range.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
-        <div className="mb-8">
-          <h4 className="text-xl font-black text-slate-900 dark:text-white">Membership Status Over Time</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in PCO membership categories (Member, Friend of Victory, etc.) over time.</p>
-        </div>
-
-        <div className="h-[400px] w-full">
-          {membershipChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={membershipChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  {membershipKeys.map(key => (
-                    <linearGradient key={`membership-${key}`} id={`colorMem${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '12px',
-                    color: '#f8fafc',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36} 
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
-                />
-                {membershipKeys.map(key => (
-                  <Area 
-                    key={key}
-                    type="monotone" 
-                    dataKey={key} 
-                    stackId="1"
-                    stroke={MEMBERSHIP_COLORS[key] || '#6366f1'} 
-                    strokeWidth={2}
-                    fill={`url(#colorMem${key.replace(/\s+/g, '')})`} 
-                    activeDot={{ r: 6, strokeWidth: 0, fill: MEMBERSHIP_COLORS[key] || '#6366f1' }}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-400">
-              No data available for the selected time range.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── NextGen Ministry Reports ────────────────────────────────────────── */}
-      <div className="border-t border-slate-200 dark:border-slate-800 pt-8">
+      {/* ── NextGen Ministry Tab ────────────────────────────────────────────── */}
+      {activeReportTab === 'nextgen' && (
         <NextGenReportsSection data={data} />
-      </div>
+      )}
+
+      {/* ── Lifecycle Status Over Time ────────────────────────────────────────── */}
+      {(activeReportTab === 'overview' || activeReportTab === 'lifecycle') && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <h4 className="text-xl font-black text-slate-900 dark:text-white">Lifecycle Status Over Time</h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cumulative growth of people by their Active/Inactive status.</p>
+            </div>
+          </div>
+
+          <div className="h-[400px] w-full">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {statusKeys.map(key => (
+                      <linearGradient key={key} id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={STATUS_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={STATUS_COLORS[key] || '#6366f1'} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: 'none', 
+                      borderRadius: '12px',
+                      color: '#f8fafc',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                    }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                  />
+                  {statusKeys.map(key => (
+                    <Area 
+                      key={key}
+                      type="monotone" 
+                      dataKey={key} 
+                      stackId="1"
+                      stroke={STATUS_COLORS[key] || '#6366f1'} 
+                      strokeWidth={2}
+                      fill={`url(#color${key})`} 
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                No data available for the selected time range.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Age Demographics Over Time ───────────────────────────────────────── */}
+      {(activeReportTab === 'overview' || activeReportTab === 'demographics') && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <h4 className="text-xl font-black text-slate-900 dark:text-white">Age Demographics Over Time</h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Active members grouped by age bracket.</p>
+            </div>
+          </div>
+          <div className="h-[400px] w-full">
+            {ageChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ageChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {ageKeys.map(key => (
+                      <linearGradient key={key} id={`ageColor${key.replace('+','plus')}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={AGE_COLORS[key]} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={AGE_COLORS[key]} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: 'none', 
+                      borderRadius: '12px',
+                      color: '#f8fafc',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                    }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                  />
+                  {ageKeys.map(key => (
+                    <Area 
+                      key={key}
+                      type="monotone" 
+                      dataKey={key} 
+                      stackId="1"
+                      stroke={AGE_COLORS[key]} 
+                      strokeWidth={2}
+                      fill={`url(#ageColor${key.replace('+','plus')})`} 
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                No data available for the selected time range.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Risk Profile Over Time ───────────────────────────────────────────── */}
+      {(activeReportTab === 'overview' || activeReportTab === 'risk') && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+          <div className="mb-8">
+            <h4 className="text-xl font-black text-slate-900 dark:text-white">Risk Profile Over Time</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in risk categories over time (Active people only).</p>
+          </div>
+
+          <div className="h-[400px] w-full">
+            {riskChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={riskChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {riskKeys.map(key => (
+                      <linearGradient key={`risk-${key}`} id={`colorRisk${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: 'none', 
+                      borderRadius: '12px',
+                      color: '#f8fafc',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                    }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                  />
+                  {riskKeys.map(key => (
+                    <Area 
+                      key={key}
+                      type="monotone" 
+                      dataKey={key} 
+                      stackId="1"
+                      stroke={RISK_COLORS[key] || '#6366f1'} 
+                      strokeWidth={2}
+                      fill={`url(#colorRisk${key.replace(/\s+/g, '')})`} 
+                      activeDot={{ r: 6, strokeWidth: 0, fill: RISK_COLORS[key] || '#6366f1' }}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                No data available for the selected time range.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Membership Status Over Time ──────────────────────────────────────── */}
+      {(activeReportTab === 'overview' || activeReportTab === 'membership') && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+          <div className="mb-8">
+            <h4 className="text-xl font-black text-slate-900 dark:text-white">Membership Status Over Time</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in PCO membership categories (Member, Friend of Victory, etc.) over time.</p>
+          </div>
+
+          <div className="h-[400px] w-full">
+            {membershipChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={membershipChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {membershipKeys.map(key => (
+                      <linearGradient key={`membership-${key}`} id={`colorMem${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: 'none', 
+                      borderRadius: '12px',
+                      color: '#f8fafc',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                    }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                  />
+                  {membershipKeys.map(key => (
+                    <Area 
+                      key={key}
+                      type="monotone" 
+                      dataKey={key} 
+                      stackId="1"
+                      stroke={MEMBERSHIP_COLORS[key] || '#6366f1'} 
+                      strokeWidth={2}
+                      fill={`url(#colorMem${key.replace(/\s+/g, '')})`} 
+                      activeDot={{ r: 6, strokeWidth: 0, fill: MEMBERSHIP_COLORS[key] || '#6366f1' }}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                No data available for the selected time range.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
