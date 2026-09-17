@@ -172,7 +172,8 @@ export function getCandidateGiftsForPayout(
         }
 
         // Use maxDateStr (+1 day ceiling) so gifts stored with UTC timestamp don't get rejected
-        if (!dDateStr || dDateStr < minDateStr || dDateStr > maxDateStr) {
+        // >= so donations ON the ceiling day (next payout cycle) are excluded
+        if (!dDateStr || dDateStr < minDateStr || dDateStr >= maxDateStr) {
             excludedDateWindow++;
             return false;
         }
@@ -194,7 +195,11 @@ export function getCandidateGiftsForPayout(
 
     const parents: ParentDonationGroup[] = Array.from(parentMap.entries()).map(([rootId, desigs]) => {
         const gross = desigs.reduce((s, d) => s + (d.amount || 0), 0);
-        const fee = desigs.reduce((s, d) => s + Math.abs(d.fee || 0), 0);
+        // For split-fund donations (e.g. id=400338830_0, _1), the Stripe fee may be stored
+        // on every designation row. Taking the max avoids multiplying the fee by split count.
+        const fee = desigs.length === 1
+            ? Math.abs(desigs[0].fee || 0)
+            : Math.max(...desigs.map(d => Math.abs(d.fee || 0)));
         // Match Tithe funds broadly: Tithe, Tithes, General, Operating, Budget, Offering, Ministry, Kingdom, Unrestricted
         const tithe = desigs
             .filter(d => /tithe|general|operating|budget|tithes|offering|ministry|kingdom|unrestricted/i.test(d.fundName || ''))
@@ -455,11 +460,12 @@ export function matchDonationsForPayout(
                 if ((stack.length + (p2n - idx)) < targetCount) return;
             }
 
-            // Tithe bounding: if tithe target is provided, prune if accumulated tithe exceeds target
-            // or if remaining tithe in suffix cannot reach target
+            // Tithe bounding: prune only if we've already exceeded the tithe target (always safe).
+            // NOTE: We intentionally do NOT prune based on suffixT lower-bound because items are
+            // sorted by gross (not tithe), so suffixT sums are unreliable and would prune valid matches.
             if (targetTitheCents !== null) {
                 if (accT > targetTitheCents) return;
-                if ((accT + suffixT[idx]) < targetTitheCents) return;
+                // Lower-bound check omitted — tithe acts as a tie-breaker in the score function instead.
             }
 
             // Fee bounding: if fee target is provided, prune with a small $1.00 tolerance for rounding

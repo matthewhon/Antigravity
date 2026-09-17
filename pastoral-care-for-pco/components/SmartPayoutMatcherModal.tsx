@@ -71,7 +71,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     });
     const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [targetAmount, setTargetAmount] = useState<string>('');
-    const [targetMode, setTargetMode] = useState<'net' | 'gross'>('gross');
+    const [targetMode, setTargetMode] = useState<'net' | 'gross'>('net');
     const [targetFees, setTargetFees] = useState<string>('');
     const [targetTitheGross, setTargetTitheGross] = useState<string>('');
     const [targetTransactionCount, setTargetTransactionCount] = useState<string>('');
@@ -787,7 +787,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                         <div className="flex items-center justify-between mb-1.5">
                                             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                                 <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                                                Target Deposit *
+                                                {targetMode === 'net' ? 'Net Bank Deposit *' : 'Gross Deposit *'}
                                             </label>
                                             <div className="flex items-center bg-slate-200 dark:bg-slate-700/60 p-0.5 rounded-md text-[11px]">
                                                 <button
@@ -819,11 +819,16 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                             <input
                                                 type="number"
                                                 step="0.01"
-                                                placeholder={targetMode === 'gross' ? '10264.99' : '10107.40'}
+                                                placeholder={targetMode === 'gross' ? 'e.g. 10264.99 (before fees)' : 'e.g. 10107.40 (your bank deposit)'}
                                                 value={targetAmount}
                                                 onChange={(e) => setTargetAmount(e.target.value)}
                                                 className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
                                             />
+                                        </div>
+                                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                                            {targetMode === 'net'
+                                                ? '⬆ Enter the amount that deposited into your bank account (after Stripe fees).'
+                                                : '⬆ Enter the total donor-charged amount before Stripe fees are deducted.'}
                                         </div>
                                         {numTargetAmount > 0 && numTargetFees > 0 && (
                                             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
@@ -977,6 +982,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                             onChange={(e) => setTargetTransactionCount(e.target.value)}
                                             className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
                                         />
+                                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                                            # of Stripe payment intents (donors), not fund split rows.
+                                        </div>
                                     </div>
                                 </div>
 

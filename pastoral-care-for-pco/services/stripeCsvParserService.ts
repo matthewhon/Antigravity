@@ -284,7 +284,7 @@ export function parseStripePayoutCsv(
                 if (Math.abs(dGross - row.gross) < 0.01) {
                     const first = desigs[0];
                     const donorMatches = first.donorName?.toLowerCase().trim() === row.name.toLowerCase().trim();
-                    const dateMatches = !row.date || Math.abs(new Date(first.date).getTime() - new Date(row.date).getTime()) <= 86400000 * 2;
+                    const dateMatches = !!row.date && Math.abs(new Date(first.date).getTime() - new Date(row.date).getTime()) <= 86400000 * 2;
                     if (donorMatches && dateMatches) {
                         matched = desigs;
                         break;
