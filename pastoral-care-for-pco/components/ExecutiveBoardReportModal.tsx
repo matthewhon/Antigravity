@@ -13,6 +13,7 @@ import {
 import { useTenantData } from '../contexts/TenantDataContext';
 import { pcoService } from '../services/pcoService';
 import { calculateMembershipHistory } from '../services/analyticsService';
+import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { PcoPerson, DetailedDonation, PcoCheckInRecord, PcoGroup, ServicesTeam, PcoCampus } from '../types';
 
 interface ExecutiveBoardReportModalProps {
@@ -408,17 +409,34 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         return { joined, departed, netChange, currentMembers, months };
     }, [membershipHistory, people]);
 
-    // ── Section B: Pastoral Risk Distribution ─────────────────────────────
+    // ── Section B: Member & Congregational Risk Profile Distribution ─────────
     const riskStats = useMemo(() => {
-        const healthy = people.filter(p => p.riskProfile?.category === 'Healthy').length;
-        const atRisk = people.filter(p => p.riskProfile?.category === 'At Risk').length;
-        const disconnected = people.filter(p => p.riskProfile?.category === 'Disconnected').length;
-        const total = people.length || 1;
+        // Target cohort (Members / Selected List / All)
+        const targetPeople = cohortPeople.length > 0 ? cohortPeople : people;
+        
+        // Check if profiles are already evaluated on the person objects
+        const hasExistingProfiles = targetPeople.some(p => p.riskProfile?.category);
+        
+        const evaluatedCohort: PcoPerson[] = hasExistingProfiles 
+            ? targetPeople 
+            : calculateBulkRisk(
+                targetPeople,
+                donations,
+                groups,
+                servicesData?.recentPlans || [],
+                teams,
+                church?.riskSettings || DEFAULT_RISK_SETTINGS
+            );
+
+        const healthy = evaluatedCohort.filter(p => p.riskProfile?.category === 'Healthy').length;
+        const atRisk = evaluatedCohort.filter(p => p.riskProfile?.category === 'At Risk').length;
+        const disconnected = evaluatedCohort.filter(p => p.riskProfile?.category === 'Disconnected').length;
+        const total = evaluatedCohort.length || 1;
         const hasRiskData = (healthy + atRisk + disconnected) > 0;
 
         // Top risk factors
         const factorCounts: Record<string, number> = {};
-        people.forEach(p => {
+        evaluatedCohort.forEach(p => {
             (p.riskProfile?.factors || []).forEach(f => {
                 factorCounts[f] = (factorCounts[f] || 0) + 1;
             });
@@ -430,12 +448,13 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
 
         return {
             healthy, atRisk, disconnected, total, hasRiskData,
-            healthyPct: hasRiskData ? Math.round((healthy / total) * 100) : null,
-            atRiskPct: hasRiskData ? Math.round((atRisk / total) * 100) : null,
-            disconnectedPct: hasRiskData ? Math.round((disconnected / total) * 100) : null,
-            topFactors
+            healthyPct: hasRiskData ? Math.round((healthy / total) * 100) : 0,
+            atRiskPct: hasRiskData ? Math.round((atRisk / total) * 100) : 0,
+            disconnectedPct: hasRiskData ? Math.round((disconnected / total) * 100) : 0,
+            topFactors,
+            cohortName: cohortLabel
         };
-    }, [people]);
+    }, [cohortPeople, people, donations, groups, servicesData, teams, church?.riskSettings, cohortLabel]);
 
     // ── Section C: Guest & Visitor Conversion Funnel Summary ──────────────
     const guestFunnelStats = useMemo(() => {
@@ -1012,12 +1031,22 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                     {/* Section 6: Pastoral Risk Distribution */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">4. Congregational Risk Distribution</h3>
+                            <div className="flex items-center justify-between mb-1">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600">
+                                    4. {selectedCohort === 'members' ? 'Member Risk Profile Distribution' : 'Congregational Risk Distribution'}
+                                </h3>
+                                <span className="text-[10px] font-semibold text-indigo-400 print:text-indigo-600 bg-indigo-950/40 border border-indigo-500/20 print:bg-indigo-50 px-2 py-0.5 rounded-full">
+                                    {selectedCohort === 'members' ? 'Members Cohort' : cohortLabel}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 print:text-slate-600 mb-3">
+                                Retention risk makeup across {selectedCohort === 'members' ? 'church members' : cohortLabel.toLowerCase()}
+                            </p>
                             {!riskStats.hasRiskData ? (
                                 <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
                                     <AlertCircle className="w-8 h-8 text-slate-600" />
                                     <p className="text-sm font-bold text-slate-400">Risk data not yet computed</p>
-                                    <p className="text-[11px] text-slate-500 max-w-[220px]">Risk profiles are calculated during your Planning Center sync. Navigate to the People view to trigger a sync.</p>
+                                    <p className="text-[11px] text-slate-500 max-w-[220px]">Evaluating attendance, giving consistency, and serving engagement.</p>
                                 </div>
                             ) : (
                             <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1027,9 +1056,9 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                     { label: 'Disconnected', count: riskStats.disconnected, pct: riskStats.disconnectedPct, color: 'text-rose-400 print:text-rose-700', bg: 'bg-rose-950/30 border-rose-500/20 print:bg-rose-50 print:border-rose-200' },
                                 ].map(s => (
                                     <div key={s.label} className={`p-3 rounded-xl border ${s.bg}`}>
-                                        <div className={`text-lg font-black ${s.color}`}>{s.pct ?? '—'}%</div>
+                                        <div className={`text-lg font-black ${s.color}`}>{s.pct ?? '0'}%</div>
                                         <div className="text-[10px] text-slate-400 font-bold">{s.label}</div>
-                                        <div className="text-[10px] text-slate-500">{s.count.toLocaleString()} people</div>
+                                        <div className="text-[10px] text-slate-500">{s.count.toLocaleString()} {selectedCohort === 'members' ? 'members' : 'people'}</div>
                                     </div>
                                 ))}
                             </div>
@@ -1172,7 +1201,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                         {selectedCohort === 'members' ? ' Church members show significantly higher discipleship engagement than general contacts.' : ''}
                                     </li>
                                     <li>
-                                        <strong>Congregational Risk:</strong> {riskStats.healthyPct}% of the database is Healthy, {riskStats.atRiskPct}% At Risk, and {riskStats.disconnectedPct}% Disconnected. 
+                                        <strong>{selectedCohort === 'members' ? 'Member Risk Profile:' : 'Congregational Risk:'}</strong> {riskStats.healthyPct}% of {selectedCohort === 'members' ? 'church members' : 'this cohort'} are Healthy, {riskStats.atRiskPct}% At Risk, and {riskStats.disconnectedPct}% Disconnected. 
                                         {riskStats.disconnectedPct > 20 ? ' ⚠️ Disconnection rate is above the 20% pastoral attention threshold.' : ' Risk profile is within a healthy range.'}
                                     </li>
                                     <li>
