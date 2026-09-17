@@ -412,10 +412,12 @@ export function matchDonationsForPayout(
 
         // Compute suffix sums for exact bounding
         const suffixG = new Array<number>(p2n + 1).fill(0);
+        const suffixF = new Array<number>(p2n + 1).fill(0);
         const suffixN = new Array<number>(p2n + 1).fill(0);
         const suffixT = new Array<number>(p2n + 1).fill(0);
         for (let i = p2n - 1; i >= 0; i--) {
             suffixG[i] = suffixG[i + 1] + pass2Items[i].gCents;
+            suffixF[i] = suffixF[i + 1] + pass2Items[i].fCents;
             suffixN[i] = suffixN[i + 1] + pass2Items[i].nCents;
             suffixT[i] = suffixT[i + 1] + pass2Items[i].tCents;
         }
@@ -451,6 +453,20 @@ export function matchDonationsForPayout(
             if (strictCount && targetCount !== null) {
                 if (stack.length > targetCount) return;
                 if ((stack.length + (p2n - idx)) < targetCount) return;
+            }
+
+            // Tithe bounding: if tithe target is provided, prune if accumulated tithe exceeds target
+            // or if remaining tithe in suffix cannot reach target
+            if (targetTitheCents !== null) {
+                if (accT > targetTitheCents) return;
+                if ((accT + suffixT[idx]) < targetTitheCents) return;
+            }
+
+            // Fee bounding: if fee target is provided, prune with a small $1.00 tolerance for rounding
+            if (targetFeeCents !== null) {
+                const feeToleranceCents = 100;
+                if (accF > targetFeeCents + feeToleranceCents) return;
+                if ((accF + suffixF[idx]) < targetFeeCents - feeToleranceCents) return;
             }
 
             // Pruning if remaining items cannot reach target

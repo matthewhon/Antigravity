@@ -2417,7 +2417,16 @@ export interface OutreachSession {
      * Stored in Firestore so unauthenticated volunteers can read it.
      * Sorted: primary (never-contacted) by risk score asc, then by name.
      */
-    eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number; riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' }[];
+    eligiblePeople?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        riskScore: number;
+        riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
+        membership?: string | null;
+        status?: string | null;
+    }[];
     /**
      * Phone-number → member-name lookup for all non-inactive church members.
      * Allows unauthenticated volunteer pages to resolve a phone number to a name.
@@ -2476,6 +2485,9 @@ export interface OutreachSlot {
     assignedPersonPhone?: string | null;
     assignedPersonEmail?: string | null;
     assignedPersonRiskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
+    assignedPersonRiskScore?: number | null;
+    assignedPersonMembership?: string | null;
+    assignedPersonStatus?: string | null;
     assignedAt: number;
     /**
      * pending   = pre-assigned, volunteer has this in their batch

@@ -159,6 +159,19 @@ const AssigningCard: React.FC = () => (
     </div>
 );
 
+const getRiskBadgeColor = (category?: string) => {
+    switch (category) {
+        case 'Healthy':
+            return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        case 'At Risk':
+            return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'Disconnected':
+            return 'bg-rose-50 text-rose-700 border-rose-200';
+        default:
+            return 'bg-slate-50 text-slate-600 border-slate-200';
+    }
+};
+
 // ─── Step 3: Contact Card ─────────────────────────────────────────────────────
 
 type Outcome = 'contacted' | 'no-answer';
@@ -169,10 +182,20 @@ interface ContactCardProps {
     churchName?: string;
     customScript?: string;
     volunteerName?: string | null;
+    eligiblePerson?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        riskScore?: number;
+        riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
+        membership?: string | null;
+        status?: string | null;
+    } | null;
     onComplete: (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, churchName, customScript, volunteerName, onComplete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, churchName, customScript, volunteerName, eligiblePerson, onComplete }) => {
     const [notes, setNotes] = useState('');
     const [category, setCategory] = useState('General Check-in');
     const [isUrgent, setIsUrgent] = useState(false);
@@ -186,7 +209,11 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, churchName
     const callerDisplayName = volunteerFirstName || 'a volunteer';
     const contactDisplayName = firstName || 'friend';
 
-    const personStatus = slot.assignedPersonRiskCategory || 'At Risk';
+    const personMembership = slot.assignedPersonMembership || eligiblePerson?.membership || eligiblePerson?.status || slot.assignedPersonStatus || 'Contact';
+    const personRiskCategory = slot.assignedPersonRiskCategory || eligiblePerson?.riskCategory || 'At Risk';
+    const personRiskScore = slot.assignedPersonRiskScore ?? eligiblePerson?.riskScore;
+
+    const personStatus = personRiskCategory || 'At Risk';
     const [selectedStatus, setSelectedStatus] = useState<string>(personStatus);
 
     useEffect(() => {
@@ -327,14 +354,21 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, churchName
 
                     <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-3">Your Contact</p>
 
-                    {/* Avatar & Name */}
+                    {/* Avatar, Name, Member Status & Risk Profile */}
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-200">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-200 shrink-0">
                             {slot.assignedPersonName.slice(0, 1).toUpperCase()}
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-black text-slate-900 leading-tight">{slot.assignedPersonName}</h2>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Reach out and check in on them</p>
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-2xl font-black text-slate-900 leading-tight truncate">{slot.assignedPersonName}</h2>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    {personMembership}
+                                </span>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${getRiskBadgeColor(personRiskCategory)}`}>
+                                    {personRiskCategory}{personRiskScore !== undefined && personRiskScore !== null ? ` (${personRiskScore})` : ''}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -902,16 +936,27 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                             </div>
                                             <div>
                                                 <p className="font-black text-slate-900 leading-tight">{slot.assignedPersonName}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className={`inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                                         slot.status === 'contacted'
                                                             ? 'bg-emerald-100 text-emerald-700'
                                                             : 'bg-rose-100 text-rose-700'
                                                     }`}>
                                                         {slot.status === 'contacted' ? '✅ Reached' : '📵 No Answer'}
                                                     </span>
+                                                    {(slot.assignedPersonMembership || session?.eligiblePeople?.find(p => p.id === slot.assignedPersonId)?.membership) && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                            {slot.assignedPersonMembership || session?.eligiblePeople?.find(p => p.id === slot.assignedPersonId)?.membership}
+                                                        </span>
+                                                    )}
+                                                    {(slot.assignedPersonRiskCategory || session?.eligiblePeople?.find(p => p.id === slot.assignedPersonId)?.riskCategory) && (
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${getRiskBadgeColor(slot.assignedPersonRiskCategory || session?.eligiblePeople?.find(p => p.id === slot.assignedPersonId)?.riskCategory)}`}>
+                                                            {slot.assignedPersonRiskCategory || session?.eligiblePeople?.find(p => p.id === slot.assignedPersonId)?.riskCategory}
+                                                            {slot.assignedPersonRiskScore !== undefined && slot.assignedPersonRiskScore !== null ? ` (${slot.assignedPersonRiskScore})` : ''}
+                                                        </span>
+                                                    )}
                                                     {slot.completedAt && (
-                                                        <span className="text-[11px] text-slate-400">
+                                                        <span className="text-[10px] text-slate-400">
                                                             {new Date(slot.completedAt).toLocaleDateString()}
                                                         </span>
                                                     )}
@@ -1274,7 +1319,15 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                 </div>
             )}
             {viewState === 'contact' && currentSlot && (
-                <ContactCard slot={currentSlot} sessionName={sessionName} churchName={session?.churchName} customScript={session?.customScript} volunteerName={volunteerName} onComplete={handleComplete} />
+                <ContactCard
+                    slot={currentSlot}
+                    sessionName={sessionName}
+                    churchName={session?.churchName}
+                    customScript={session?.customScript}
+                    volunteerName={volunteerName}
+                    eligiblePerson={session?.eligiblePeople?.find(p => p.id === currentSlot.assignedPersonId) || null}
+                    onComplete={handleComplete}
+                />
             )}
             {isDone && (
                 <AllDoneCard

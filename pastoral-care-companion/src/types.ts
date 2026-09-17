@@ -1709,7 +1709,16 @@ export interface OutreachSession {
         absenteeGroupIds?: string[];
         absenteeSince?: number;
     };
-    eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number; riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' }[];
+    eligiblePeople?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        riskScore: number;
+        riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
+        membership?: string | null;
+        status?: string | null;
+    }[];
     memberDirectory?: { phone: string; name: string }[];
     stats?: {
         contactedCount: number;
@@ -1739,6 +1748,9 @@ export interface OutreachSlot {
     assignedPersonPhone?: string | null;
     assignedPersonEmail?: string | null;
     assignedPersonRiskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
+    assignedPersonRiskScore?: number | null;
+    assignedPersonMembership?: string | null;
+    assignedPersonStatus?: string | null;
     assignedAt: number;
     status: 'pending' | 'contacted' | 'no-answer' | 'released';
     notes: string;

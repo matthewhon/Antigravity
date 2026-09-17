@@ -811,6 +811,9 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                 phone: p.phone ?? null,
                 email: p.email ?? null,
                 riskScore: p.riskProfile?.score ?? 0,
+                riskCategory: p.riskProfile?.category ?? 'Healthy',
+                membership: p.membership ?? p.status ?? null,
+                status: p.status ?? null,
             }));
     }, []);
 
