@@ -425,7 +425,7 @@ export function matchDonationsForPayout(
         const MAX_ITERATIONS = 5000000;
         const startTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
-        function searchSubset(idx: number, accG: number, accF: number, accT: number, strictCount: boolean) {
+        const searchSubset = (idx: number, accG: number, accF: number, accT: number, strictCount: boolean) => {
             if (minScore === 0) return;
             iterations++;
             if (iterations > MAX_ITERATIONS) return;

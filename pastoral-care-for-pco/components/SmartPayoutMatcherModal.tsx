@@ -19,7 +19,10 @@ import {
     Copy,
     Info,
     Landmark,
-    Hash
+    Hash,
+    FileSpreadsheet,
+    UploadCloud,
+    Upload
 } from 'lucide-react';
 import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -29,6 +32,7 @@ import {
     PayoutMatchResult, 
     ParentDonationGroup 
 } from '../services/payoutMatcherService';
+import { parseStripePayoutCsv, StripeCsvParseResult } from '../services/stripeCsvParserService';
 
 interface SmartPayoutMatcherModalProps {
     churchId: string;
@@ -36,6 +40,7 @@ interface SmartPayoutMatcherModalProps {
     onClose: () => void;
     onBatchCreated: (batch: GivingBatch, andSendToQbo?: boolean) => void;
     donations?: DetailedDonation[];
+    initialMode?: 'ai' | 'csv';
 }
 
 export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = ({
@@ -43,8 +48,20 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     isOpen,
     onClose,
     onBatchCreated,
-    donations: inMemoryDonations
+    donations: inMemoryDonations,
+    initialMode = 'ai'
 }) => {
+    // Mode state: 'csv' = 100% exact upload from Stripe export file, 'ai' = search & match unbatched gifts
+    const [activeTab, setActiveTab] = useState<'ai' | 'csv'>(initialMode);
+
+    // CSV Import State
+    const [csvFileName, setCsvFileName] = useState<string | null>(null);
+    const [csvParsing, setCsvParsing] = useState<boolean>(false);
+    const [csvResult, setCsvResult] = useState<StripeCsvParseResult | null>(null);
+    const [csvError, setCsvError] = useState<string | null>(null);
+    const [isDragOver, setIsDragOver] = useState<boolean>(false);
+    const [customBatchName, setCustomBatchName] = useState<string>('');
+
     // Input state
     const [payoutDate, setPayoutDate] = useState(() => new Date().toISOString().slice(0, 10));
     const [startDate, setStartDate] = useState<string>(() => {
@@ -118,14 +135,19 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         return () => { isMounted = false; };
     }, [isOpen, churchId, startDate, payoutDate, searchWindowDays, includeBatched, inMemoryDonations]);
 
-    // When modal opens or dates change, reset error and match
+    // When modal opens or initialMode changes, reset state
     useEffect(() => {
         if (isOpen) {
+            setActiveTab(initialMode || 'ai');
             setError(null);
+            setCsvError(null);
             setMatchResult(null);
-            setSelectedParentIds(new Set());
+            if (!csvResult) {
+                setSelectedParentIds(new Set());
+                setCustomBatchName('');
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialMode]);
 
     // When payoutDate changes, optionally adjust default window end date
     const handlePayoutDateChange = (newPayoutDate: string) => {
@@ -138,6 +160,48 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         }
     };
 
+    // Process Stripe Payout CSV upload
+    const handleCsvFile = async (file: File) => {
+        setCsvParsing(true);
+        setCsvError(null);
+        setCsvFileName(file.name);
+        try {
+            const text = await file.text();
+            let combined = [...(inMemoryDonations || []), ...fetchedDonations];
+            let result = parseStripePayoutCsv(text, churchId, combined);
+
+            // If minDate is available, attempt to load all database donations back to that date
+            if (result.minDate && churchId) {
+                try {
+                    const moreFromDb = await firestore.getUnbatchedOnlineDonations(churchId, result.minDate, true);
+                    const mergedMap = new Map<string, DetailedDonation>();
+                    combined.forEach(d => mergedMap.set(d.id, d));
+                    moreFromDb.forEach(d => mergedMap.set(d.id, d));
+                    combined = Array.from(mergedMap.values());
+                    setFetchedDonations(combined);
+                    // Re-parse with enriched database donations
+                    result = parseStripePayoutCsv(text, churchId, combined);
+                } catch (e) {
+                    console.warn('Could not fetch additional donations from DB for CSV matching:', e);
+                }
+            }
+
+            setCsvResult(result);
+            setPayoutDate(result.maxDate);
+            setEndDate(result.maxDate);
+            setStartDate(result.minDate);
+            setStripePayoutId(result.suggestedPayoutId);
+            setCustomBatchName(result.suggestedBatchName);
+            setSelectedParentIds(new Set(result.parentGroups.map(p => p.rootId)));
+        } catch (err: any) {
+            console.error('Failed to parse Stripe CSV:', err);
+            setCsvError(err.message || 'Failed to parse CSV file.');
+            setCsvResult(null);
+        } finally {
+            setCsvParsing(false);
+        }
+    };
+
     // Active pool of candidate donations (combining fetched with in-memory)
     const activeCandidatePool = useMemo(() => {
         if (fetchedDonations.length > 0) return fetchedDonations;
@@ -147,6 +211,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     // Candidate parent donation groups in current date window & filters
     const candidateGroups: ParentDonationGroup[] = useMemo(() => {
         if (!isOpen) return [];
+        if (activeTab === 'csv') {
+            return csvResult ? csvResult.parentGroups : [];
+        }
         if (activeCandidatePool.length === 0) return [];
 
         return getCandidateGiftsForPayout(activeCandidatePool, {
@@ -157,7 +224,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
             includeBatched,
             searchWindowDays
         });
-    }, [isOpen, activeCandidatePool, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
+    }, [isOpen, activeTab, csvResult, activeCandidatePool, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
 
     // Filtered candidate groups based on candidate search box
     const visibleCandidateGroups = useMemo(() => {
@@ -343,13 +410,25 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     };
 
     // Calculate difference metrics against target inputs
-    const numTargetAmount = parseFloat(targetAmount) || 0;
-    const numTargetFees = Math.abs(parseFloat(targetFees) || 0);
-    const numTargetTithe = parseFloat(targetTitheGross) || 0;
-    const numTargetCount = parseInt(targetTransactionCount, 10) || 0;
+    const numTargetAmount = activeTab === 'csv' && csvResult 
+        ? csvResult.totalGross 
+        : (parseFloat(targetAmount) || 0);
+    const numTargetFees = activeTab === 'csv' && csvResult 
+        ? csvResult.totalFees 
+        : Math.abs(parseFloat(targetFees) || 0);
+    const numTargetTithe = activeTab === 'csv' && csvResult 
+        ? csvResult.totalTithe 
+        : (parseFloat(targetTitheGross) || 0);
+    const numTargetCount = activeTab === 'csv' && csvResult 
+        ? csvResult.transactionCount 
+        : (parseInt(targetTransactionCount, 10) || 0);
 
-    const targetGrossVal = targetMode === 'gross' ? numTargetAmount : (numTargetAmount > 0 && numTargetFees > 0 ? numTargetAmount + numTargetFees : 0);
-    const targetNetVal = targetMode === 'net' ? numTargetAmount : (targetGrossVal > 0 && numTargetFees > 0 ? targetGrossVal - numTargetFees : 0);
+    const targetGrossVal = activeTab === 'csv' && csvResult 
+        ? csvResult.totalGross 
+        : (targetMode === 'gross' ? numTargetAmount : (numTargetAmount > 0 && numTargetFees > 0 ? numTargetAmount + numTargetFees : 0));
+    const targetNetVal = activeTab === 'csv' && csvResult 
+        ? csvResult.totalNet 
+        : (targetMode === 'net' ? numTargetAmount : (targetGrossVal > 0 && numTargetFees > 0 ? targetGrossVal - numTargetFees : 0));
 
     const grossDiff = targetGrossVal > 0 ? Math.round((activeGross - targetGrossVal) * 100) / 100 : 0;
     const netDiff = targetNetVal > 0 ? Math.round((activeNet - targetNetVal) * 100) / 100 : 0;
@@ -359,7 +438,8 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
     const isExactMatchActive = (
         (targetMode === 'net' && numTargetAmount > 0 && Math.abs(netDiff) < 0.005) ||
-        (targetMode === 'gross' && numTargetAmount > 0 && Math.abs(grossDiff) < 0.005)
+        (targetMode === 'gross' && numTargetAmount > 0 && Math.abs(grossDiff) < 0.005) ||
+        (activeTab === 'csv' && csvResult && Math.abs(grossDiff) < 0.005 && Math.abs(netDiff) < 0.005)
     ) && (numTargetTithe === 0 || Math.abs(titheDiff) < 0.005) && (numTargetCount === 0 || countDiff === 0);
 
     const handleCreateBatch = async (andSendToQbo: boolean = false) => {
@@ -370,9 +450,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
         try {
             const pDateStr = payoutDate.slice(0, 10);
-            const payoutId = stripePayoutId.trim() || (matchResult ? matchResult.suggestedPayoutId : `payout_${pDateStr.replace(/-/g, '')}`);
+            const payoutId = stripePayoutId.trim() || (csvResult ? csvResult.suggestedPayoutId : (matchResult ? matchResult.suggestedPayoutId : `payout_${pDateStr.replace(/-/g, '')}`));
             const batchId = `stripe_${payoutId}`;
-            const batchName = `${pDateStr} Stripe ${payoutId}`;
+            const batchName = customBatchName.trim() || (csvResult ? csvResult.suggestedBatchName : `${pDateStr} Stripe ${payoutId}`);
 
             const newBatch: GivingBatch = {
                 id: batchId,
@@ -438,394 +518,581 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
                 {/* Body Content */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                    {/* Alternate Match Auto-Recovery Suggestion Banner */}
-                    {matchResult?.alternateMatchSuggestion && (
-                        <div className="p-3.5 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-purple-900 dark:text-purple-200 flex items-center justify-between gap-3 shadow-xs">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                                <div>
-                                    <span className="font-bold">Exact Match Found under Alternate Mode: </span>
-                                    {matchResult.alternateMatchSuggestion.reason}
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setTargetMode(matchResult.alternateMatchSuggestion!.suggestedMode);
-                                    setTargetAmount(matchResult.alternateMatchSuggestion!.suggestedAmount.toFixed(2));
-                                    setError(null);
-                                    setTimeout(() => handleRunMatch(), 50);
-                                }}
-                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shrink-0 shadow-xs"
-                            >
-                                Switch to {matchResult.alternateMatchSuggestion.suggestedMode === 'net' ? 'Net Bank ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')' : 'Gross ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')'}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Candidate Pool Batched Tip */}
-                    {!includeBatched && candidateGroups.length > 0 && targetGrossVal > 0 && (
-                        (() => {
-                            const totalAvailableGross = candidateGroups.reduce((acc, p) => acc + p.gross, 0);
-                            if (totalAvailableGross < targetGrossVal) {
-                                return (
-                                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                                            <span>
-                                                Available gifts in window (<strong>${totalAvailableGross.toFixed(2)}</strong>) are less than target (<strong>${targetGrossVal.toFixed(2)}</strong>). Some gifts may already be marked with a Planning Center batch ID.
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIncludeBatched(true)}
-                                            className="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shrink-0"
-                                        >
-                                            Include Batched Gifts
-                                        </button>
-                                    </div>
-                                );
-                            }
-                            return null;
-                        })()
-                    )}
-
-                    {error && (
-                        <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                            <div className="flex-1">
-                                <span className="font-semibold">Match Notice: </span>
-                                {error}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Primary Controls Grid */}
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {/* Payout Date */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-purple-500" />
-                                    Stripe Payout Date *
-                                </label>
-                                <input
-                                    type="date"
-                                    value={payoutDate}
-                                    onChange={(e) => handlePayoutDateChange(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            {/* Target Amount & Mode */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                                        Target Deposit *
-                                    </label>
-                                    <div className="flex items-center bg-slate-200 dark:bg-slate-700/60 p-0.5 rounded-md text-[11px]">
-                                        <button
-                                            type="button"
-                                            onClick={() => setTargetMode('net')}
-                                            className={`px-2 py-0.5 rounded font-semibold transition-all ${
-                                                targetMode === 'net' 
-                                                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
-                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                            }`}
-                                        >
-                                            Net Bank
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setTargetMode('gross')}
-                                            className={`px-2 py-0.5 rounded font-semibold transition-all ${
-                                                targetMode === 'gross' 
-                                                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
-                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                            }`}
-                                        >
-                                            Gross
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm font-semibold">$</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder={targetMode === 'gross' ? '10264.99' : '10107.40'}
-                                        value={targetAmount}
-                                        onChange={(e) => setTargetAmount(e.target.value)}
-                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                                {numTargetAmount > 0 && numTargetFees > 0 && (
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
-                                        <span>{targetMode === 'gross' ? 'Est. Net Bank Deposit:' : 'Est. Gross Deposit:'}</span>
-                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                            ${targetMode === 'gross' ? (Math.max(0, numTargetAmount - numTargetFees)).toFixed(2) : (numTargetAmount + numTargetFees).toFixed(2)}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Payment Method Selector (Card vs ACH vs All) */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                                    <span className="flex items-center gap-1.5">
-                                        <CreditCard className="w-3.5 h-3.5 text-blue-500" />
-                                        Payment Method
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 font-normal">All online methods default</span>
-                                </label>
-                                <div className="grid grid-cols-3 gap-1 bg-slate-200/80 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethodFilter('all')}
-                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
-                                            paymentMethodFilter === 'all'
-                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        All Online
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethodFilter('card')}
-                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
-                                            paymentMethodFilter === 'card'
-                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        Card Only
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethodFilter('ach')}
-                                        className={`py-1.5 px-2 rounded-md transition-all text-center ${
-                                            paymentMethodFilter === 'ach'
-                                                ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
-                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        ACH Only
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Transaction Start Date */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                    Window Start Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            {/* Transaction End Date */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                    Window End Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            {/* Target Tithe Gross */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <Building className="w-3.5 h-3.5 text-indigo-500" />
-                                    Target Tithe Gross <span className="text-slate-400 font-normal">(Optional)</span>
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="e.g. 7655.48"
-                                        value={targetTitheGross}
-                                        onChange={(e) => setTargetTitheGross(e.target.value)}
-                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Optional Expected Fees */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                                    Expected Fees <span className="text-slate-400 font-normal">(Optional)</span>
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="e.g. 157.59"
-                                        value={targetFees}
-                                        onChange={(e) => setTargetFees(e.target.value)}
-                                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Optional Stripe Payout ID */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                                    Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. po_1S2K4s... or dep_..."
-                                    value={stripePayoutId}
-                                    onChange={(e) => setStripePayoutId(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            {/* Optional Transaction Count */}
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                                    <Hash className="w-3.5 h-3.5 text-purple-500" />
-                                    Transaction Count <span className="text-slate-400 font-normal">(Optional)</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    placeholder="e.g. 56"
-                                    value={targetTransactionCount}
-                                    onChange={(e) => setTargetTransactionCount(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Additional Options & Action Bar */}
-                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
-                                <input
-                                    type="checkbox"
-                                    checked={includeBatched}
-                                    onChange={(e) => setIncludeBatched(e.target.checked)}
-                                    className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500"
-                                />
-                                <span>Include already-batched gifts</span>
-                                <span className="text-[11px] text-slate-400 font-normal">(allows re-bundling gifts synced with PCO batches)</span>
-                            </label>
-
-                            <div className="flex items-center gap-2">
-                                {matchLogs.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDiagnostics(!showDiagnostics)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800/60 transition-colors"
-                                    >
-                                        <Terminal className="w-3.5 h-3.5 text-purple-500" />
-                                        {showDiagnostics ? 'Hide Diagnostics' : 'View Diagnostics'}
-                                    </button>
-                                )}
-                                {selectedParentIds.size > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={resetSelection}
-                                        className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5" />
-                                        Clear Selection
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={handleRunMatch}
-                                    disabled={matching || !targetAmount}
-                                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all shrink-0"
-                                >
-                                    {matching ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Analyzing Gifts...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="w-4 h-4" />
-                                            Find Matching Transactions
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                    {/* Mode Selector Tabs: CSV Import vs AI Heuristic Search */}
+                    <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab('csv');
+                                setError(null);
+                            }}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                activeTab === 'csv'
+                                    ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span>Import Stripe Payout CSV</span>
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                                100% Exact
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab('ai');
+                                setError(null);
+                            }}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                activeTab === 'ai'
+                                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <span>AI Search & Filter Matcher</span>
+                        </button>
                     </div>
 
-                    {/* Diagnostics Drawer (Collapsible) */}
-                    {showDiagnostics && (
-                        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 overflow-hidden text-xs font-mono shadow-sm">
-                            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 select-none">
-                                <div className="flex items-center gap-2">
-                                    <Terminal className="w-4 h-4 text-purple-400" />
-                                    <span className="font-bold text-slate-200">AI Matcher Diagnostics & Trace Log</span>
-                                    {matchResult?.searchStrategy && (
-                                        <span className="px-2 py-0.5 rounded text-[10px] bg-purple-900/60 text-purple-300 border border-purple-800">
-                                            {matchResult.searchStrategy}
-                                        </span>
-                                    )}
+                    {/* CSV IMPORT MODE */}
+                    {activeTab === 'csv' && (
+                        <div className="space-y-4">
+                            {!csvResult ? (
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                                    onDragLeave={() => setIsDragOver(false)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        setIsDragOver(false);
+                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                            handleCsvFile(e.dataTransfer.files[0]);
+                                        }
+                                    }}
+                                    className={`p-8 border-2 border-dashed rounded-2xl text-center transition-all ${
+                                        isDragOver 
+                                            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30' 
+                                            : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50/50 dark:bg-slate-800/30'
+                                    }`}
+                                >
+                                    <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 shadow-xs">
+                                        <UploadCloud className="w-7 h-7" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                        Drop your Stripe Payout CSV here
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+                                        Upload the Stripe transaction export file (with Date, Type, Source, Name, Fund, Gross, Fee, Net, and Donation # in Description).
+                                    </p>
+                                    <label className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-sm transition-colors">
+                                        {csvParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                        <span>{csvParsing ? 'Parsing file...' : 'Choose Stripe CSV File'}</span>
+                                        <input
+                                            type="file"
+                                            accept=".csv,text/csv"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files[0]) {
+                                                    handleCsvFile(e.target.files[0]);
+                                                }
+                                            }}
+                                        />
+                                    </label>
                                 </div>
-                                <div className="flex items-center gap-2">
+                            ) : (
+                                <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                <FileSpreadsheet className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                    <span>{csvFileName || 'Stripe Payout Export'}</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200">
+                                                        ✓ {csvResult.transactionCount} transactions parsed
+                                                    </span>
+                                                </div>
+                                                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    Window: {csvResult.minDate} to {csvResult.maxDate} • {csvResult.matchedExistingCount} linked to database records{csvResult.synthesizedCount > 0 ? ` • ${csvResult.synthesizedCount} auto-imported from CSV` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors shrink-0">
+                                            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                                            <span>Upload Different File</span>
+                                            <input
+                                                type="file"
+                                                accept=".csv,text/csv"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                        handleCsvFile(e.target.files[0]);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {/* Warnings if any gifts were previously in another batch */}
+                                    {csvResult.warningMessages.length > 0 && (
+                                        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                                            <div className="font-semibold flex items-center gap-1.5">
+                                                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                                <span>Notice: {csvResult.alreadyBatchedCount} gifts in this file were previously assigned to another batch.</span>
+                                            </div>
+                                            <div className="text-[11px] text-amber-700 dark:text-amber-300 pl-5">
+                                                They are selected and will be reassigned to this payout batch upon creation.
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Batch Metadata Fields */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/60">
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                                Payout Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={payoutDate}
+                                                onChange={(e) => handlePayoutDateChange(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white font-medium outline-none focus:ring-1 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                                Stripe Payout ID
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="payout_20260913"
+                                                value={stripePayoutId}
+                                                onChange={(e) => setStripePayoutId(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white font-mono outline-none focus:ring-1 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                                Batch Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Batch Name"
+                                                value={customBatchName}
+                                                onChange={(e) => setCustomBatchName(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white font-medium outline-none focus:ring-1 focus:ring-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {csvError && (
+                                <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-semibold">CSV Import Error: </span>
+                                        {csvError}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* AI SEARCH & FILTER MODE */}
+                    {activeTab === 'ai' && (
+                        <div className="space-y-5">
+                            {/* Alternate Match Auto-Recovery Suggestion Banner */}
+                            {matchResult?.alternateMatchSuggestion && (
+                                <div className="p-3.5 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-purple-900 dark:text-purple-200 flex items-center justify-between gap-3 shadow-xs">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                        <div>
+                                            <span className="font-bold">Exact Match Found under Alternate Mode: </span>
+                                            {matchResult.alternateMatchSuggestion.reason}
+                                        </div>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            navigator.clipboard.writeText(matchLogs.join('\n'));
-                                            setCopiedLogs(true);
-                                            setTimeout(() => setCopiedLogs(false), 2000);
+                                            setTargetMode(matchResult.alternateMatchSuggestion!.suggestedMode);
+                                            setTargetAmount(matchResult.alternateMatchSuggestion!.suggestedAmount.toFixed(2));
+                                            setError(null);
+                                            setTimeout(() => handleRunMatch(), 50);
                                         }}
-                                        className="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 transition-colors"
+                                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shrink-0 shadow-xs"
                                     >
-                                        <Copy className="w-3 h-3" />
-                                        {copiedLogs ? 'Copied!' : 'Copy Logs'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowDiagnostics(false)}
-                                        className="p-1 rounded text-slate-400 hover:text-slate-200"
-                                    >
-                                        <X className="w-3.5 h-3.5" />
+                                        Switch to {matchResult.alternateMatchSuggestion.suggestedMode === 'net' ? 'Net Bank ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')' : 'Gross ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')'}
                                     </button>
                                 </div>
-                            </div>
-                            <div className="p-3.5 space-y-1 max-h-52 overflow-y-auto bg-slate-950 text-[11px] leading-relaxed select-text">
-                                {matchLogs.length === 0 ? (
-                                    <div className="text-slate-500 italic">Click "Find Matching Transactions" to run the matcher and generate diagnostic trace logs.</div>
-                                ) : (
-                                    matchLogs.map((logLine, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            className={
-                                                logLine.includes('EXACT MATCH') || logLine.includes('✨') ? 'text-emerald-400 font-semibold' :
-                                                logLine.includes('❌') || logLine.includes('⚠️') ? 'text-rose-400 font-semibold' :
-                                                logLine.includes('🚫') ? 'text-amber-400' :
-                                                logLine.includes('🎯') || logLine.includes('🚀') ? 'text-purple-300' :
-                                                'text-slate-300'
-                                            }
-                                        >
-                                            {logLine}
+                            )}
+
+                            {/* Candidate Pool Batched Tip */}
+                            {!includeBatched && candidateGroups.length > 0 && targetGrossVal > 0 && (
+                                (() => {
+                                    const totalAvailableGross = candidateGroups.reduce((acc, p) => acc + p.gross, 0);
+                                    if (totalAvailableGross < targetGrossVal) {
+                                        return (
+                                            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                                                    <span>
+                                                        Available gifts in window (<strong>${totalAvailableGross.toFixed(2)}</strong>) are less than target (<strong>${targetGrossVal.toFixed(2)}</strong>). Some gifts may already be marked with a Planning Center batch ID.
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIncludeBatched(true)}
+                                                    className="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shrink-0"
+                                                >
+                                                    Include Batched Gifts
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()
+                            )}
+
+                            {error && (
+                                <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <div className="flex-1">
+                                        <span className="font-semibold">Match Notice: </span>
+                                        {error}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Primary Controls Grid */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {/* Payout Date */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Calendar className="w-3.5 h-3.5 text-purple-500" />
+                                            Stripe Payout Date *
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={payoutDate}
+                                            onChange={(e) => handlePayoutDateChange(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Target Amount & Mode */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                                <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                                                Target Deposit *
+                                            </label>
+                                            <div className="flex items-center bg-slate-200 dark:bg-slate-700/60 p-0.5 rounded-md text-[11px]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTargetMode('net')}
+                                                    className={`px-2 py-0.5 rounded font-semibold transition-all ${
+                                                        targetMode === 'net' 
+                                                            ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
+                                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                                    }`}
+                                                >
+                                                    Net Bank
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTargetMode('gross')}
+                                                    className={`px-2 py-0.5 rounded font-semibold transition-all ${
+                                                        targetMode === 'gross' 
+                                                            ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs' 
+                                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                                    }`}
+                                                >
+                                                    Gross
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))
-                                )}
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-slate-400 text-sm font-semibold">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder={targetMode === 'gross' ? '10264.99' : '10107.40'}
+                                                value={targetAmount}
+                                                onChange={(e) => setTargetAmount(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                        {numTargetAmount > 0 && numTargetFees > 0 && (
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+                                                <span>{targetMode === 'gross' ? 'Est. Net Bank Deposit:' : 'Est. Gross Deposit:'}</span>
+                                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                    ${targetMode === 'gross' ? (Math.max(0, numTargetAmount - numTargetFees)).toFixed(2) : (numTargetAmount + numTargetFees).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Payment Method Selector (Card vs ACH vs All) */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5">
+                                                <CreditCard className="w-3.5 h-3.5 text-blue-500" />
+                                                Payment Method
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 font-normal">All online methods default</span>
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-1 bg-slate-200/80 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethodFilter('all')}
+                                                className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                                    paymentMethodFilter === 'all'
+                                                        ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                All Online
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethodFilter('card')}
+                                                className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                                    paymentMethodFilter === 'card'
+                                                        ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                Card Only
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethodFilter('ach')}
+                                                className={`py-1.5 px-2 rounded-md transition-all text-center ${
+                                                    paymentMethodFilter === 'ach'
+                                                        ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                ACH Only
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Transaction Start Date */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                            Window Start Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Transaction End Date */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                            Window End Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Target Tithe Gross */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Building className="w-3.5 h-3.5 text-indigo-500" />
+                                            Target Tithe Gross <span className="text-slate-400 font-normal">(Optional)</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="e.g. 7655.48"
+                                                value={targetTitheGross}
+                                                onChange={(e) => setTargetTitheGross(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Optional Expected Fees */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                                            Expected Fees <span className="text-slate-400 font-normal">(Optional)</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="e.g. 157.59"
+                                                value={targetFees}
+                                                onChange={(e) => setTargetFees(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Optional Stripe Payout ID */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                                            Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. po_1S2K4s... or dep_..."
+                                            value={stripePayoutId}
+                                            onChange={(e) => setStripePayoutId(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Optional Transaction Count */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <Hash className="w-3.5 h-3.5 text-purple-500" />
+                                            Transaction Count <span className="text-slate-400 font-normal">(Optional)</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            placeholder="e.g. 56"
+                                            value={targetTransactionCount}
+                                            onChange={(e) => setTargetTransactionCount(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Additional Options & Action Bar */}
+                                <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeBatched}
+                                            onChange={(e) => setIncludeBatched(e.target.checked)}
+                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 dark:border-slate-700 focus:ring-purple-500"
+                                        />
+                                        <span>Include already-batched gifts</span>
+                                        <span className="text-[11px] text-slate-400 font-normal">(allows re-bundling gifts synced with PCO batches)</span>
+                                    </label>
+
+                                    <div className="flex items-center gap-2">
+                                        {matchLogs.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDiagnostics(!showDiagnostics)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800/60 transition-colors"
+                                            >
+                                                <Terminal className="w-3.5 h-3.5 text-purple-500" />
+                                                {showDiagnostics ? 'Hide Diagnostics' : 'View Diagnostics'}
+                                            </button>
+                                        )}
+                                        {selectedParentIds.size > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={resetSelection}
+                                                className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                Clear Selection
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleRunMatch}
+                                            disabled={matching || !targetAmount}
+                                            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all shrink-0"
+                                        >
+                                            {matching ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    Analyzing Gifts...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="w-4 h-4" />
+                                                    Find Matching Transactions
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Diagnostics Drawer (Collapsible) */}
+                            {showDiagnostics && (
+                                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 overflow-hidden text-xs font-mono shadow-sm">
+                                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 select-none">
+                                        <div className="flex items-center gap-2">
+                                            <Terminal className="w-4 h-4 text-purple-400" />
+                                            <span className="font-bold text-slate-200">AI Matcher Diagnostics & Trace Log</span>
+                                            {matchResult?.searchStrategy && (
+                                                <span className="px-2 py-0.5 rounded text-[10px] bg-purple-900/60 text-purple-300 border border-purple-800">
+                                                    {matchResult.searchStrategy}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(matchLogs.join('\n'));
+                                                    setCopiedLogs(true);
+                                                    setTimeout(() => setCopiedLogs(false), 2000);
+                                                }}
+                                                className="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 transition-colors"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                                {copiedLogs ? 'Copied!' : 'Copy Logs'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDiagnostics(false)}
+                                                className="p-1 rounded text-slate-400 hover:text-slate-200"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-3.5 space-y-1 max-h-52 overflow-y-auto bg-slate-950 text-[11px] leading-relaxed select-text">
+                                        {matchLogs.length === 0 ? (
+                                            <div className="text-slate-500 italic">Click "Find Matching Transactions" to run the matcher and generate diagnostic trace logs.</div>
+                                        ) : (
+                                            matchLogs.map((logLine, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    className={
+                                                        logLine.includes('EXACT MATCH') || logLine.includes('✨') ? 'text-emerald-400 font-semibold' :
+                                                        logLine.includes('❌') || logLine.includes('⚠️') ? 'text-rose-400 font-semibold' :
+                                                        logLine.includes('🚫') ? 'text-amber-400' :
+                                                        logLine.includes('🎯') || logLine.includes('🚀') ? 'text-purple-300' :
+                                                        'text-slate-300'
+                                                    }
+                                                >
+                                                    {logLine}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1082,7 +1349,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     Batch Summary To Be Created
                                 </span>
                                 <p className="font-bold text-sm text-slate-900 dark:text-white font-mono mt-0.5">
-                                    {payoutDate.slice(0, 10)} Stripe {stripePayoutId.trim() || (matchResult ? matchResult.suggestedPayoutId : `payout_${payoutDate.slice(0, 10).replace(/-/g, '')}`)}
+                                    {customBatchName.trim() || (csvResult ? csvResult.suggestedBatchName : `${payoutDate.slice(0, 10)} Stripe ${stripePayoutId.trim() || (matchResult ? matchResult.suggestedPayoutId : `payout_${payoutDate.slice(0, 10).replace(/-/g, '')}`)}`)}
                                 </p>
                                 <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2 mt-1">
                                     <span>{activeDonations.length} gifts</span>

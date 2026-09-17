@@ -13,7 +13,7 @@ import {
     Landmark, CreditCard, CheckCircle2, AlertCircle, RefreshCw, 
     Settings, Search, ArrowUpRight, Check, ExternalLink, Calendar,
     DollarSign, Filter, Layers, ChevronRight, Trash2, Sparkles,
-    Split
+    Split, Upload, FileSpreadsheet
 } from 'lucide-react';
 
 interface GivingBatchesViewProps {
@@ -41,6 +41,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     const [previewBatch, setPreviewBatch] = useState<GivingBatch | null>(null);
     const [isMatcherModalOpen, setIsMatcherModalOpen] = useState(false);
+    const [matcherInitialMode, setMatcherInitialMode] = useState<'ai' | 'csv'>('ai');
 
     const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'synced' | 'stripe' | 'manual'>('all');
     const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>('all');
@@ -428,7 +429,23 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
 
                         <button
                             type="button"
-                            onClick={() => setIsMatcherModalOpen(true)}
+                            onClick={() => {
+                                setMatcherInitialMode('csv');
+                                setIsMatcherModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors shadow-sm"
+                            title="Upload Stripe transaction export CSV to instantly create batch"
+                        >
+                            <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            Import Stripe CSV
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMatcherInitialMode('ai');
+                                setIsMatcherModalOpen(true);
+                            }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors shadow-sm"
                             title="AI Match unbatched online transactions to a Stripe payout deposit"
                         >
@@ -719,6 +736,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 onClose={() => setIsMatcherModalOpen(false)}
                 churchId={churchId}
                 donations={donations}
+                initialMode={matcherInitialMode}
                 onBatchCreated={(newBatch, andSendToQbo) => {
                     setBatches(prev => [newBatch, ...prev.filter(b => b.id !== newBatch.id)]);
                     if (andSendToQbo) {
