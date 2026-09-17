@@ -88,29 +88,46 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         return Array.from(years).sort((a, b) => b - a);
     }, [donations]);
 
-    // Group Member IDs lookup
+    // Group Member IDs lookup — uses both g.members array AND p.groupIds on each person
     const allGroupMemberIds = useMemo(() => {
         const s = new Set<string>();
+        // Primary: iterate groups.members
         groups.forEach(g => {
             (g.members || []).forEach(m => {
                 const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
                 if (id) s.add(String(id));
             });
+            // Also capture by group ID match on person.groupIds
+        });
+        // Secondary: p.groupIds — more reliably populated from PCO sync
+        const groupIdSet = new Set(groups.map(g => String(g.id)));
+        people.forEach(p => {
+            if (p.groupIds && p.groupIds.length > 0) {
+                const inAGroup = p.groupIds.some(gid => groupIdSet.has(String(gid)));
+                if (inAGroup || p.groupIds.length > 0) s.add(String(p.id));
+            }
         });
         return s;
-    }, [groups]);
+    }, [groups, people]);
 
-    // Team Member IDs lookup
+    // Team Member IDs lookup — uses t.members AND servingStats/teams presence on person
     const allVolunteerMemberIds = useMemo(() => {
         const s = new Set<string>();
+        // Primary: iterate teams.members
         teams.forEach(t => {
             (t.members || []).forEach(m => {
                 const id = m.personId || m.id;
                 if (id) s.add(String(id));
             });
         });
+        // Secondary: anyone with servingStats.last90DaysCount > 0 is a volunteer
+        people.forEach(p => {
+            if (p.servingStats && (p.servingStats.last90DaysCount || 0) > 0) {
+                s.add(String(p.id));
+            }
+        });
         return s;
-    }, [teams]);
+    }, [teams, people]);
 
     // Filter People by Cohort
     const { cohortPeople, cohortPersonIds, cohortLabel, cohortDescription } = useMemo(() => {
@@ -364,6 +381,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         const atRisk = people.filter(p => p.riskProfile?.category === 'At Risk').length;
         const disconnected = people.filter(p => p.riskProfile?.category === 'Disconnected').length;
         const total = people.length || 1;
+        const hasRiskData = (healthy + atRisk + disconnected) > 0;
 
         // Top risk factors
         const factorCounts: Record<string, number> = {};
@@ -378,10 +396,10 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             .map(([factor, count]) => ({ factor, count, pct: Math.round((count / total) * 100) }));
 
         return {
-            healthy, atRisk, disconnected, total,
-            healthyPct: Math.round((healthy / total) * 100),
-            atRiskPct: Math.round((atRisk / total) * 100),
-            disconnectedPct: Math.round((disconnected / total) * 100),
+            healthy, atRisk, disconnected, total, hasRiskData,
+            healthyPct: hasRiskData ? Math.round((healthy / total) * 100) : null,
+            atRiskPct: hasRiskData ? Math.round((atRisk / total) * 100) : null,
+            disconnectedPct: hasRiskData ? Math.round((disconnected / total) * 100) : null,
             topFactors
         };
     }, [people]);
@@ -557,27 +575,27 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* PCO List / Cohort Selector */}
-                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-xs">
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-xs min-w-0 max-w-[280px]">
                             <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Cohort:</span>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Cohort:</span>
                             <select 
                                 value={selectedCohort}
                                 onChange={(e) => setSelectedCohort(e.target.value)}
-                                className="bg-transparent border-none text-xs font-bold text-white outline-none cursor-pointer focus:ring-0"
+                                className="bg-transparent border-none text-xs font-bold text-white outline-none cursor-pointer focus:ring-0 min-w-0 max-w-[160px] truncate"
                             >
-                                <option value="members" className="bg-slate-800 text-white">⭐ Church Members (PCO Status)</option>
-                                <option value="all" className="bg-slate-800 text-white">🌐 All Profiles (Full Database)</option>
+                                <option value="members" className="bg-slate-800 text-white">⭐ Church Members</option>
+                                <option value="all" className="bg-slate-800 text-white">🌐 All Profiles</option>
                                 {pcoLists.length > 0 && (
                                     <optgroup label="Planning Center Lists" className="bg-slate-800 text-indigo-300">
                                         {pcoLists.map(l => (
-                                            <option key={l.id} value={l.id} className="bg-slate-800 text-white">📋 List: {l.name}</option>
+                                            <option key={l.id} value={l.id} className="bg-slate-800 text-white">📋 {l.name}</option>
                                         ))}
                                     </optgroup>
                                 )}
                             </select>
-                            {isLoadingList && <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />}
+                            {isLoadingList && <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin shrink-0" />}
                         </div>
 
                         {/* Year Selector */}
@@ -973,6 +991,13 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
                             <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">4. Congregational Risk Distribution</h3>
+                            {!riskStats.hasRiskData ? (
+                                <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+                                    <AlertCircle className="w-8 h-8 text-slate-600" />
+                                    <p className="text-sm font-bold text-slate-400">Risk data not yet computed</p>
+                                    <p className="text-[11px] text-slate-500 max-w-[220px]">Risk profiles are calculated during your Planning Center sync. Navigate to the People view to trigger a sync.</p>
+                                </div>
+                            ) : (
                             <div className="grid grid-cols-3 gap-3 mb-4">
                                 {[
                                     { label: 'Healthy', count: riskStats.healthy, pct: riskStats.healthyPct, color: 'text-emerald-400 print:text-emerald-700', bg: 'bg-emerald-950/30 border-emerald-500/20 print:bg-emerald-50 print:border-emerald-200' },
@@ -980,13 +1005,14 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                     { label: 'Disconnected', count: riskStats.disconnected, pct: riskStats.disconnectedPct, color: 'text-rose-400 print:text-rose-700', bg: 'bg-rose-950/30 border-rose-500/20 print:bg-rose-50 print:border-rose-200' },
                                 ].map(s => (
                                     <div key={s.label} className={`p-3 rounded-xl border ${s.bg}`}>
-                                        <div className={`text-lg font-black ${s.color}`}>{s.pct}%</div>
+                                        <div className={`text-lg font-black ${s.color}`}>{s.pct ?? '—'}%</div>
                                         <div className="text-[10px] text-slate-400 font-bold">{s.label}</div>
                                         <div className="text-[10px] text-slate-500">{s.count.toLocaleString()} people</div>
                                     </div>
                                 ))}
                             </div>
-                            {riskStats.topFactors.length > 0 && (
+                            )}
+                            {riskStats.hasRiskData && riskStats.topFactors.length > 0 && (
                                 <div className="space-y-2">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Top Disengagement Factors</p>
                                     {riskStats.topFactors.map(f => (
