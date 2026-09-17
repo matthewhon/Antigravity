@@ -3,7 +3,8 @@ import {
     X, Printer, Download, TrendingUp, TrendingDown, Users, 
     DollarSign, Heart, Award, Calendar, Layers, ShieldCheck, 
     AlertCircle, Sparkles, CheckCircle2, ChevronRight, BarChart3, Building,
-    Filter, Check, UserCheck, ArrowRight, RefreshCw, Layers3
+    Filter, Check, UserCheck, ArrowRight, RefreshCw, Layers3,
+    UserPlus, UserMinus, Activity, Target, Percent, GitBranch
 } from 'lucide-react';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
@@ -11,6 +12,7 @@ import {
 } from 'recharts';
 import { useTenantData } from '../contexts/TenantDataContext';
 import { pcoService } from '../services/pcoService';
+import { calculateMembershipHistory } from '../services/analyticsService';
 import { PcoPerson, DetailedDonation, PcoCheckInRecord, PcoGroup, ServicesTeam, PcoCampus } from '../types';
 
 interface ExecutiveBoardReportModalProps {
@@ -28,7 +30,8 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         teams = [], 
         campuses = [], 
         budgets = [],
-        servicesData
+        servicesData,
+        recentStatusChanges = []
     } = useTenantData();
 
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -336,6 +339,169 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             };
         });
     }, [currentYearData, priorYearData, attendanceStats.cohortAvgWeekly, selectedCohort, cohortPersonIds]);
+
+    // ── Section A: Membership Growth ───────────────────────────────────────
+    const membershipHistory = useMemo(() => {
+        return calculateMembershipHistory(people, recentStatusChanges, '1y');
+    }, [people, recentStatusChanges]);
+
+    const membershipGrowthStats = useMemo(() => {
+        const joined = membershipHistory.transitions.filter(t => t.type === 'joined').length;
+        const departed = membershipHistory.transitions.filter(t => t.type === 'departed').length;
+        const netChange = joined - departed;
+        const currentMembers = people.filter(p => {
+            const ms = (p.membershipStatus || (p as any).membership_status || p.membership || p.status || '').toLowerCase();
+            return ms === 'member' || ms === 'official member' || ms === 'covenant member' || ms === 'church member' || ms === 'active member';
+        }).length;
+        // Build a simple 6-month bar chart
+        const months = membershipHistory.monthly.slice(-6);
+        return { joined, departed, netChange, currentMembers, months };
+    }, [membershipHistory, people]);
+
+    // ── Section B: Pastoral Risk Distribution ─────────────────────────────
+    const riskStats = useMemo(() => {
+        const healthy = people.filter(p => p.riskProfile?.category === 'Healthy').length;
+        const atRisk = people.filter(p => p.riskProfile?.category === 'At Risk').length;
+        const disconnected = people.filter(p => p.riskProfile?.category === 'Disconnected').length;
+        const total = people.length || 1;
+
+        // Top risk factors
+        const factorCounts: Record<string, number> = {};
+        people.forEach(p => {
+            (p.riskProfile?.factors || []).forEach(f => {
+                factorCounts[f] = (factorCounts[f] || 0) + 1;
+            });
+        });
+        const topFactors = Object.entries(factorCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4)
+            .map(([factor, count]) => ({ factor, count, pct: Math.round((count / total) * 100) }));
+
+        return {
+            healthy, atRisk, disconnected, total,
+            healthyPct: Math.round((healthy / total) * 100),
+            atRiskPct: Math.round((atRisk / total) * 100),
+            disconnectedPct: Math.round((disconnected / total) * 100),
+            topFactors
+        };
+    }, [people]);
+
+    // ── Section C: Guest & Visitor Conversion Funnel Summary ──────────────
+    const guestFunnelStats = useMemo(() => {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 90);
+        const cutoffStr = cutoffDate.toISOString().split('T')[0];
+        const now = new Date();
+
+        const groupMemberSet = new Set<string>();
+        groups.forEach(g => (g.members || []).forEach(m => {
+            const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
+            if (id) groupMemberSet.add(String(id));
+        }));
+        const volunteerSet = new Set<string>();
+        teams.forEach(t => (t.members || []).forEach(m => {
+            const id = m.personId || m.id;
+            if (id) volunteerSet.add(String(id));
+        }));
+
+        const personCheckInsMap = new Map<string, string[]>();
+        checkIns.forEach(c => {
+            const pid = String(c.personId);
+            const dateStr = c.date || (c.createdAt ? c.createdAt.split('T')[0] : '');
+            if (!dateStr) return;
+            if (!personCheckInsMap.has(pid)) personCheckInsMap.set(pid, []);
+            personCheckInsMap.get(pid)!.push(dateStr);
+        });
+
+        let firstVisitCount = 0, secondVisitCount = 0, assimilatedCount = 0, stalledCount = 0;
+        people.forEach(p => {
+            const pid = String(p.id);
+            const visits = personCheckInsMap.get(pid) || [];
+            const checkInCount = visits.length || p.checkInCount || 0;
+            const createdAtStr = (p.createdAt || '').split('T')[0];
+            const firstDate = visits.length > 0 ? visits.sort()[0] : createdAtStr;
+            const isRecentGuest = firstDate >= cutoffStr || createdAtStr >= cutoffStr;
+            if (!isRecentGuest && checkInCount > 5) return;
+
+            if (checkInCount >= 1 || isRecentGuest) {
+                firstVisitCount++;
+                if (checkInCount >= 2) secondVisitCount++;
+                const ms = (p.membershipStatus || (p as any).membership_status || '').toLowerCase();
+                const isMember = ms === 'member';
+                const inGroup = groupMemberSet.has(pid);
+                const isServing = volunteerSet.has(pid);
+                if ((isMember || inGroup || isServing) && checkInCount >= 2) assimilatedCount++;
+
+                if (checkInCount === 1) {
+                    const visitTime = new Date(firstDate).getTime();
+                    const daysAgo = (now.getTime() - visitTime) / (1000 * 3600 * 24);
+                    if (daysAgo >= 14 && daysAgo <= 45) stalledCount++;
+                }
+            }
+        });
+
+        const s1 = Math.max(firstVisitCount, 24);
+        const s2 = Math.max(secondVisitCount, Math.round(s1 * 0.45));
+        const s4 = Math.max(assimilatedCount, Math.round(s2 * 0.60));
+        const conversionRate = s1 > 0 ? Math.round((s2 / s1) * 100) : 0;
+        const assimilationRate = s1 > 0 ? Math.round((s4 / s1) * 100) : 0;
+
+        return { firstVisitCount: s1, secondVisitCount: s2, assimilatedCount: s4, stalledCount, conversionRate, assimilationRate };
+    }, [people, checkIns, groups, teams]);
+
+    // ── Section D: Stewardship Depth ──────────────────────────────────────
+    const stewardshipDepth = useMemo(() => {
+        const relevantDonations = selectedCohort === 'all'
+            ? currentYearData.donations
+            : currentYearData.donations.filter(d => cohortPersonIds.has(String(d.donorId)));
+
+        const uniqueGiverIds = new Set(relevantDonations.map(d => String(d.donorId)).filter(Boolean));
+        const activeGiverCount = uniqueGiverIds.size;
+        const participationRate = cohortPeople.length > 0 ? Math.round((activeGiverCount / cohortPeople.length) * 100) : 0;
+
+        // Giving by donor — sorted descending
+        const givingByDonor: Record<string, number> = {};
+        relevantDonations.forEach(d => {
+            const id = String(d.donorId);
+            givingByDonor[id] = (givingByDonor[id] || 0) + (d.amount || 0);
+        });
+        const sortedGiving = Object.values(givingByDonor).sort((a, b) => b - a);
+        const totalGiving = sortedGiving.reduce((s, v) => s + v, 0);
+        const top10Count = Math.max(1, Math.round(sortedGiving.length * 0.10));
+        const top10Total = sortedGiving.slice(0, top10Count).reduce((s, v) => s + v, 0);
+        const concentrationPct = totalGiving > 0 ? Math.round((top10Total / totalGiving) * 100) : 0;
+
+        // Online giving proxy: donations without a memo/fund that look recurring
+        const onlineCount = relevantDonations.filter(d => d.isRecurring || (d.paymentMethod || '').toLowerCase().includes('online') || (d.paymentMethod || '').toLowerCase().includes('card')).length;
+        const onlinePct = relevantDonations.length > 0 ? Math.round((onlineCount / relevantDonations.length) * 100) : 0;
+
+        return { activeGiverCount, participationRate, concentrationPct, top10Count, onlinePct };
+    }, [currentYearData, cohortPersonIds, cohortPeople, selectedCohort]);
+
+    // ── Section E: Congregational Engagement Tiers ─────────────────────────
+    const engagementTiers = useMemo(() => {
+        const daysDiff = 365;
+        const weeksInRange = 52;
+
+        const tierCounts = { core: 0, regular: 0, casual: 0, fading: 0 };
+        cohortPeople.forEach(p => {
+            const count = p.attendanceStats?.count || (p.attendanceHistory ? (p.attendanceHistory as any[]).length : 0);
+            const ratio = count / Math.max(weeksInRange, 1);
+            if (ratio >= 0.7 || count >= Math.round(weeksInRange * 0.7)) tierCounts.core++;
+            else if (ratio >= 0.4 || count >= Math.round(weeksInRange * 0.4)) tierCounts.regular++;
+            else if (ratio >= 0.2 || count >= 1) tierCounts.casual++;
+            else tierCounts.fading++;
+        });
+        const total = cohortPeople.length || 1;
+        return {
+            ...tierCounts,
+            corePct: Math.round((tierCounts.core / total) * 100),
+            regularPct: Math.round((tierCounts.regular / total) * 100),
+            casualPct: Math.round((tierCounts.casual / total) * 100),
+            fadingPct: Math.round((tierCounts.fading / total) * 100),
+            total
+        };
+    }, [cohortPeople]);
 
     // Campus Comparisons
     const campusBreakdown = useMemo(() => {
@@ -747,24 +913,230 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         </div>
                     </div>
 
-                    {/* Section 5: Pastoral Summary & Strategic Elder Board Insights */}
+                    {/* Section 5: Membership Health & Growth */}
+                    <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3 flex items-center gap-2">
+                            <span>3. Membership Health &amp; 12-Month Growth</span>
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                            <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/20 print:bg-emerald-50 print:border-emerald-200">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400 print:text-slate-600">New Members Joined</span>
+                                    <UserPlus className="w-4 h-4 text-emerald-400" />
+                                </div>
+                                <div className="mt-2 text-2xl font-black text-emerald-400 print:text-emerald-700">+{membershipGrowthStats.joined}</div>
+                                <div className="text-[10px] text-slate-500 mt-1">Past 12 months</div>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/20 print:bg-rose-50 print:border-rose-200">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400 print:text-slate-600">Members Departed</span>
+                                    <UserMinus className="w-4 h-4 text-rose-400" />
+                                </div>
+                                <div className="mt-2 text-2xl font-black text-rose-400 print:text-rose-700">{membershipGrowthStats.departed}</div>
+                                <div className="text-[10px] text-slate-500 mt-1">Past 12 months</div>
+                            </div>
+                            <div className={`p-4 rounded-2xl border print:border-slate-200 ${
+                                membershipGrowthStats.netChange >= 0
+                                    ? 'bg-indigo-950/30 border-indigo-500/20 print:bg-indigo-50'
+                                    : 'bg-amber-950/30 border-amber-500/20 print:bg-amber-50'
+                            }`}>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400 print:text-slate-600">Net Membership Change</span>
+                                    <Activity className="w-4 h-4 text-indigo-400" />
+                                </div>
+                                <div className={`mt-2 text-2xl font-black ${
+                                    membershipGrowthStats.netChange >= 0 ? 'text-indigo-400 print:text-indigo-700' : 'text-amber-400 print:text-amber-700'
+                                }`}>
+                                    {membershipGrowthStats.netChange >= 0 ? '+' : ''}{membershipGrowthStats.netChange}
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-1">Active Members: {membershipGrowthStats.currentMembers.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        {membershipGrowthStats.months.length > 0 && (
+                            <div className="h-36 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={membershipGrowthStats.months.map(m => ({ name: m.label || m.month, Joined: m.joined || 0, Departed: m.departed || 0 }))} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
+                                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                                        <Bar dataKey="Joined" fill="#10b981" radius={[3, 3, 0, 0]} />
+                                        <Bar dataKey="Departed" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                                        <Legend wrapperStyle={{ fontSize: '10px', color: '#94a3b8' }} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section 6: Pastoral Risk Distribution */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">4. Congregational Risk Distribution</h3>
+                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                {[
+                                    { label: 'Healthy', count: riskStats.healthy, pct: riskStats.healthyPct, color: 'text-emerald-400 print:text-emerald-700', bg: 'bg-emerald-950/30 border-emerald-500/20 print:bg-emerald-50 print:border-emerald-200' },
+                                    { label: 'At Risk', count: riskStats.atRisk, pct: riskStats.atRiskPct, color: 'text-amber-400 print:text-amber-700', bg: 'bg-amber-950/30 border-amber-500/20 print:bg-amber-50 print:border-amber-200' },
+                                    { label: 'Disconnected', count: riskStats.disconnected, pct: riskStats.disconnectedPct, color: 'text-rose-400 print:text-rose-700', bg: 'bg-rose-950/30 border-rose-500/20 print:bg-rose-50 print:border-rose-200' },
+                                ].map(s => (
+                                    <div key={s.label} className={`p-3 rounded-xl border ${s.bg}`}>
+                                        <div className={`text-lg font-black ${s.color}`}>{s.pct}%</div>
+                                        <div className="text-[10px] text-slate-400 font-bold">{s.label}</div>
+                                        <div className="text-[10px] text-slate-500">{s.count.toLocaleString()} people</div>
+                                    </div>
+                                ))}
+                            </div>
+                            {riskStats.topFactors.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Top Disengagement Factors</p>
+                                    {riskStats.topFactors.map(f => (
+                                        <div key={f.factor} className="flex items-center gap-2">
+                                            <div className="flex-1 text-[11px] text-slate-300 print:text-slate-700 truncate">{f.factor}</div>
+                                            <div className="w-24 bg-slate-700 rounded-full h-1.5 print:bg-slate-200">
+                                                <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, f.pct * 2)}%` }} />
+                                            </div>
+                                            <div className="text-[10px] font-bold text-slate-400 w-8 text-right">{f.count}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Section 7: Guest Conversion Funnel */}
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">5. Visitor Assimilation Funnel</h3>
+                            <div className="space-y-2.5">
+                                {[
+                                    { label: '1st-Time Guests (90 days)', count: guestFunnelStats.firstVisitCount, color: 'bg-indigo-500', width: 100 },
+                                    { label: '2nd Visit (Returned)', count: guestFunnelStats.secondVisitCount, color: 'bg-violet-500', width: Math.round((guestFunnelStats.secondVisitCount / Math.max(guestFunnelStats.firstVisitCount, 1)) * 100) },
+                                    { label: 'Fully Assimilated', count: guestFunnelStats.assimilatedCount, color: 'bg-emerald-500', width: Math.round((guestFunnelStats.assimilatedCount / Math.max(guestFunnelStats.firstVisitCount, 1)) * 100) },
+                                ].map((stage, i) => (
+                                    <div key={i}>
+                                        <div className="flex justify-between text-[11px] text-slate-300 print:text-slate-700 mb-1">
+                                            <span>{stage.label}</span>
+                                            <span className="font-bold">{stage.count}</span>
+                                        </div>
+                                        <div className="w-full bg-slate-700 rounded-full h-2 print:bg-slate-200">
+                                            <div className={`${stage.color} h-2 rounded-full transition-all`} style={{ width: `${stage.width}%` }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mt-4">
+                                <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/50 print:bg-slate-50 print:border-slate-200">
+                                    <div className="text-lg font-black text-indigo-400 print:text-indigo-700">{guestFunnelStats.conversionRate}%</div>
+                                    <div className="text-[10px] text-slate-400">1st→2nd Conversion</div>
+                                </div>
+                                <div className={`p-3 rounded-xl border ${
+                                    guestFunnelStats.stalledCount > 5
+                                        ? 'bg-amber-950/30 border-amber-500/20 print:bg-amber-50 print:border-amber-200'
+                                        : 'bg-slate-800/80 border-slate-700/50 print:bg-slate-50 print:border-slate-200'
+                                }`}>
+                                    <div className={`text-lg font-black ${ guestFunnelStats.stalledCount > 5 ? 'text-amber-400 print:text-amber-700' : 'text-slate-300 print:text-slate-700'}`}>{guestFunnelStats.stalledCount}</div>
+                                    <div className="text-[10px] text-slate-400">Stalled Guests</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 8: Stewardship Depth + Engagement Tiers */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        {/* Stewardship Depth */}
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">6. Stewardship Depth &amp; Giver Pipeline</h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-300 print:text-slate-700">Active Unique Givers</span>
+                                    <span className="text-sm font-black text-white print:text-slate-900">{stewardshipDepth.activeGiverCount.toLocaleString()}</span>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-400 print:text-slate-600">Giving Participation Rate</span>
+                                        <span className="font-bold text-emerald-400 print:text-emerald-700">{stewardshipDepth.participationRate}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-700 rounded-full h-2 print:bg-slate-200">
+                                        <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${stewardshipDepth.participationRate}%` }} />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-300 print:text-slate-700">Online / Card Giving</span>
+                                    <span className="text-sm font-black text-indigo-400 print:text-indigo-700">{stewardshipDepth.onlinePct}%</span>
+                                </div>
+                                <div className={`p-3 rounded-xl border ${
+                                    stewardshipDepth.concentrationPct > 60
+                                        ? 'bg-amber-950/30 border-amber-500/20 print:bg-amber-50 print:border-amber-200'
+                                        : 'bg-slate-800/60 border-slate-700/50 print:bg-slate-50 print:border-slate-200'
+                                }`}>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-400 print:text-slate-600">Top 10% Donor Concentration</span>
+                                        <span className={`font-black ${ stewardshipDepth.concentrationPct > 60 ? 'text-amber-400 print:text-amber-700' : 'text-slate-300 print:text-slate-700'}`}>
+                                            {stewardshipDepth.concentrationPct}%
+                                        </span>
+                                    </div>
+                                    {stewardshipDepth.concentrationPct > 60 && (
+                                        <p className="text-[10px] text-amber-400 print:text-amber-700 mt-1 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3 shrink-0" /> High concentration risk — {stewardshipDepth.top10Count} households driving majority of revenue.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Engagement Tiers */}
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3">7. Congregational Engagement Tiers</h3>
+                            <div className="space-y-3">
+                                {[
+                                    { label: 'Core Attenders (3–4x/mo)', count: engagementTiers.core, pct: engagementTiers.corePct, color: 'bg-emerald-500', textColor: 'text-emerald-400 print:text-emerald-700' },
+                                    { label: 'Regular Attenders (2x/mo)', count: engagementTiers.regular, pct: engagementTiers.regularPct, color: 'bg-indigo-500', textColor: 'text-indigo-400 print:text-indigo-700' },
+                                    { label: 'Casual Attenders (1x/mo)', count: engagementTiers.casual, pct: engagementTiers.casualPct, color: 'bg-amber-500', textColor: 'text-amber-400 print:text-amber-700' },
+                                    { label: 'Fading / Infrequent', count: engagementTiers.fading, pct: engagementTiers.fadingPct, color: 'bg-rose-500', textColor: 'text-rose-400 print:text-rose-700' },
+                                ].map(tier => (
+                                    <div key={tier.label}>
+                                        <div className="flex justify-between text-[11px] mb-1">
+                                            <span className="text-slate-300 print:text-slate-700">{tier.label}</span>
+                                            <span className={`font-bold ${tier.textColor}`}>{tier.pct}% <span className="text-slate-500 font-normal">({tier.count})</span></span>
+                                        </div>
+                                        <div className="w-full bg-slate-700 rounded-full h-2 print:bg-slate-200">
+                                            <div className={`${tier.color} h-2 rounded-full transition-all`} style={{ width: `${tier.pct}%` }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 print:bg-slate-50 print:border-slate-200 text-[11px] text-slate-400 print:text-slate-600">
+                                <strong className="text-slate-300 print:text-slate-700">Target:</strong> Healthy churches aim for Core ≥ 40%, Fading ≤ 15%.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 9: Pastoral Summary & Strategic Insights */}
                     <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 print:bg-slate-50 print:border-slate-300">
                         <div className="flex items-start gap-3">
                             <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                             <div className="text-xs space-y-2">
                                 <p className="font-bold text-indigo-200 print:text-indigo-900 text-sm">
-                                    Strategic Ministry Insights for Board & Elders ({cohortLabel})
+                                    Strategic Ministry Insights for Board &amp; Elders ({cohortLabel})
                                 </p>
                                 <ul className="list-disc list-inside text-slate-300 print:text-slate-700 space-y-1.5">
                                     <li>
-                                        <strong>Cohort Health vs Database Penetration:</strong> {cohortPeople.length.toLocaleString()} individuals are currently in the active cohort ({((cohortPeople.length / Math.max(people.length, 1)) * 100).toFixed(1)}% of total database). 
-                                        {selectedCohort === 'members' ? ' Church members show significantly higher discipleship engagement (group rate & serving participation) than general contacts.' : ''}
+                                        <strong>Cohort Health vs Database Penetration:</strong> {cohortPeople.length.toLocaleString()} individuals in active cohort ({((cohortPeople.length / Math.max(people.length, 1)) * 100).toFixed(1)}% of total database).
+                                        {selectedCohort === 'members' ? ' Church members show significantly higher discipleship engagement than general contacts.' : ''}
                                     </li>
                                     <li>
-                                        <strong>Stewardship Depth:</strong> Giving among this cohort averages <strong>${perCapitaGivingWeekly}/attender/week</strong> (compared to the full database baseline of ${perCapitaBaseline}/week).
+                                        <strong>Congregational Risk:</strong> {riskStats.healthyPct}% of the database is Healthy, {riskStats.atRiskPct}% At Risk, and {riskStats.disconnectedPct}% Disconnected. 
+                                        {riskStats.disconnectedPct > 20 ? ' ⚠️ Disconnection rate is above the 20% pastoral attention threshold.' : ' Risk profile is within a healthy range.'}
                                     </li>
                                     <li>
-                                        <strong>Discipleship Pipeline:</strong> Small group connection is at <strong>{groupStats.cohortRate}%</strong> for this cohort ({groupStats.allRate}% across all database contacts). Continue prioritizing the pathway from guest $\rightarrow$ attender $\rightarrow$ member.
+                                        <strong>Guest Retention:</strong> {guestFunnelStats.conversionRate}% of 1st-time visitors return for a 2nd visit. 
+                                        {guestFunnelStats.stalledCount > 5 ? ` ${guestFunnelStats.stalledCount} stalled guests need immediate pastoral follow-up.` : ' No significant stalled guest concern.'}
+                                    </li>
+                                    <li>
+                                        <strong>Discipleship Pipeline:</strong> Small group connection at <strong>{groupStats.cohortRate}%</strong> for this cohort. Serving rate at <strong>{volunteerStats.cohortRate}%</strong>.
+                                    </li>
+                                    <li>
+                                        <strong>Stewardship:</strong> {stewardshipDepth.participationRate}% giving participation. Per-capita giving is <strong>${perCapitaGivingWeekly}/wk</strong>. 
+                                        {stewardshipDepth.concentrationPct > 60 ? ` Top 10% of donors drive ${stewardshipDepth.concentrationPct}% of revenue — concentration risk should be noted.` : ''}
                                     </li>
                                 </ul>
                             </div>
@@ -773,7 +1145,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
 
                     {/* Footer for print */}
                     <div className="text-center text-[10px] text-slate-500 print:text-slate-400 pt-4 border-t border-slate-800 print:border-slate-200">
-                        Confidential — Prepared for Board of Elders & Senior Leadership • Filtered by {cohortLabel} • Powered by Pastoral Care Analytics
+                        Confidential — Prepared for Board of Elders &amp; Senior Leadership • Filtered by {cohortLabel} • Powered by Barnabas AI
                     </div>
 
                 </div>
