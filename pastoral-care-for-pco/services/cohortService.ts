@@ -5,6 +5,9 @@ export interface CohortFilterConfig {
     includeGiving: boolean;
     includeGroups: boolean;
     includeServing: boolean;
+    selectedGroupId?: string | null;
+    membershipStatus?: string | null;
+    cohortBasis?: 'created_at' | 'first_check_in' | 'group_joined_at';
 }
 
 /**
@@ -27,8 +30,8 @@ function formatCohortLabel(yyyyMm: string): string {
 
 /**
  * Computes cohort retention analytics.
- * Groups people by their PCO profile creation month, aggregates activity dates across 
- * various signals, and tracks retention percentages from Month 0 to Month 12.
+ * Groups people by their PCO profile creation month (or first check-in / group join date),
+ * aggregates activity dates across various signals, and tracks retention percentages from Month 0 to Month 12.
  */
 export function calculateCohorts(
     people: PcoPerson[],
@@ -38,13 +41,83 @@ export function calculateCohorts(
     checkIns: PcoCheckInRecord[],
     config: CohortFilterConfig
 ): CohortData[] {
-    // 1. Group people by profile creation month (e.g., "2026-01")
+    // 1. Identify target people subset based on group & membership status filters
+    let targetPeople = people;
+
+    // Filter by group if selected
+    let selectedGroup: PcoGroup | undefined;
+    const groupMemberJoinDates = new Map<string, string>(); // personId -> YYYY-MM
+
+    if (config.selectedGroupId && groups) {
+        selectedGroup = groups.find(g => g.id === config.selectedGroupId);
+        if (selectedGroup) {
+            const memberIds = new Set<string>();
+            if (selectedGroup.memberIds && selectedGroup.memberIds.length > 0) {
+                selectedGroup.memberIds.forEach(id => memberIds.add(id));
+            }
+            if (selectedGroup.leaderIds && selectedGroup.leaderIds.length > 0) {
+                selectedGroup.leaderIds.forEach(id => memberIds.add(id));
+            }
+            if (selectedGroup.memberJoins && selectedGroup.memberJoins.length > 0) {
+                selectedGroup.memberJoins.forEach(mj => {
+                    memberIds.add(mj.id);
+                    if (mj.joinedAt) {
+                        groupMemberJoinDates.set(mj.id, mj.joinedAt.substring(0, 7));
+                    }
+                });
+            }
+            targetPeople = targetPeople.filter(p => memberIds.has(p.id));
+        }
+    }
+
+    // Filter by membership status if selected (and not 'all')
+    if (config.membershipStatus && config.membershipStatus !== 'all') {
+        const targetStatus = config.membershipStatus.toLowerCase();
+        targetPeople = targetPeople.filter(p => {
+            const mem = (p.membership || 'visitor').toLowerCase();
+            if (targetStatus === 'visitor' || targetStatus === 'visitors') {
+                return mem.includes('visitor') || mem.includes('guest') || mem.includes('newcomer');
+            }
+            if (targetStatus === 'member' || targetStatus === 'members') {
+                return mem.includes('member');
+            }
+            if (targetStatus === 'regular attender' || targetStatus === 'attender') {
+                return mem.includes('regular') || mem.includes('attender');
+            }
+            return mem === targetStatus;
+        });
+    }
+
+    // Build map of earliest check-in month if cohortBasis is 'first_check_in'
+    const personFirstCheckInMap = new Map<string, string>();
+    if (config.cohortBasis === 'first_check_in' && checkIns) {
+        checkIns.forEach(ci => {
+            if (ci.personId && ci.createdAt) {
+                const checkInMonth = ci.createdAt.substring(0, 7);
+                const existing = personFirstCheckInMap.get(ci.personId);
+                if (!existing || checkInMonth < existing) {
+                    personFirstCheckInMap.set(ci.personId, checkInMonth);
+                }
+            }
+        });
+    }
+
+    // 2. Group people into cohort buckets (YYYY-MM)
     const cohortMembersMap = new Map<string, string[]>(); // YYYY-MM -> personIds[]
     const personCohortMap = new Map<string, string>(); // personId -> YYYY-MM
 
-    people.forEach(person => {
-        if (!person.createdAt) return;
-        const cohortMonth = person.createdAt.substring(0, 7); // "YYYY-MM"
+    targetPeople.forEach(person => {
+        let cohortMonth: string | undefined;
+
+        if (config.cohortBasis === 'group_joined_at' && groupMemberJoinDates.has(person.id)) {
+            cohortMonth = groupMemberJoinDates.get(person.id);
+        } else if (config.cohortBasis === 'first_check_in') {
+            cohortMonth = personFirstCheckInMap.get(person.id) || (person.createdAt ? person.createdAt.substring(0, 7) : undefined);
+        } else {
+            cohortMonth = person.createdAt ? person.createdAt.substring(0, 7) : undefined;
+        }
+
+        if (!cohortMonth || !cohortMonth.match(/^\d{4}-\d{2}$/)) return;
         
         const list = cohortMembersMap.get(cohortMonth) || [];
         list.push(person.id);
@@ -52,7 +125,7 @@ export function calculateCohorts(
         personCohortMap.set(person.id, cohortMonth);
     });
 
-    // 2. Aggregate activity months for each person based on active filters
+    // 3. Aggregate activity months for each person based on active filters
     const personActivityMonths = new Map<string, Set<string>>(); // personId -> Set of "YYYY-MM"
 
     const addActivity = (personId: string, dateStr: string) => {
@@ -115,10 +188,8 @@ export function calculateCohorts(
         });
     }
 
-    // 3. Compile cohort data list
+    // 4. Compile cohort data list
     const cohortList: CohortData[] = [];
-
-    // Sort cohorts chronologically (newest first for display, or oldest first? Let's do chronological oldest-first or newest-first. Heatmaps typically show chronological oldest-first so they read top-to-bottom, or newest at the top. Let's sort oldest-first.)
     const sortedCohortMonths = Array.from(cohortMembersMap.keys()).sort();
 
     sortedCohortMonths.forEach(cohortMonth => {
@@ -137,7 +208,7 @@ export function calculateCohorts(
                 const activities = personActivityMonths.get(personId);
                 if (!activities) return;
 
-                // Month 0 always counts if they had any activity, or we assume they are active at Month 0
+                // Month 0 counts if they had any activity, or default active at Month 0
                 if (m === 0) {
                     activeCount++;
                     return;
