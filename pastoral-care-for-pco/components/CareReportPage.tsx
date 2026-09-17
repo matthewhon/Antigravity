@@ -1,9 +1,11 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { 
     PcoPerson, PeopleDashboardData, PastoralNote, CareFollowUpLog, 
-    RiskSettings, Church, OutreachSession, OutreachSlot, StatusChangeRecord
+    RiskSettings, Church, OutreachSession, OutreachSlot, StatusChangeRecord,
+    DetailedDonation, PcoGroup, ServicesDashboardData, PcoCheckInRecord
 } from '../types';
 import { MembershipHistoryWidget } from './MembershipHistoryWidget';
+import { CohortAnalytics } from './CohortAnalytics';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { firestore } from '../services/firestoreService';
 import { 
@@ -123,6 +125,10 @@ interface CareReportPageProps {
     riskSettings?: RiskSettings;
     church?: Church;
     recentStatusChanges?: StatusChangeRecord[];
+    donations?: DetailedDonation[];
+    groups?: PcoGroup[];
+    services?: ServicesDashboardData | null;
+    checkIns?: PcoCheckInRecord[];
     onAddNote?: (personId: string, type: PastoralNote['type'], content: string) => Promise<void>;
     onMarkFollowedUp?: (personId: string) => void;
     onDismiss?: (personId: string, signal: string) => void;
@@ -405,14 +411,19 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     riskSettings = DEFAULT_RISK_SETTINGS,
     church,
     recentStatusChanges = [],
+    donations = [],
+    groups = [],
+    services = null,
+    checkIns = [],
     onAddNote,
     onMarkFollowedUp,
     onDismiss,
 }) => {
     // --- Report Tab Selection ---
-    const [activeReportTab, setActiveReportTab] = useState<'directory' | 'sessions' | 'callers' | 'membership'>(() => {
+    const [activeReportTab, setActiveReportTab] = useState<'directory' | 'membership' | 'cohorts' | 'sessions' | 'callers'>(() => {
         const search = window.location.search;
         if (search.includes('tab=membership')) return 'membership';
+        if (search.includes('tab=cohort') || search.includes('tab=retention')) return 'cohorts';
         if (search.includes('tab=sessions') || search.includes('tab=outreach')) return 'sessions';
         if (search.includes('tab=callers')) return 'callers';
         return 'directory';
@@ -863,6 +874,16 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                         <TrendingUp size={14} /> Membership Changes
                     </button>
                     <button
+                        onClick={() => setActiveReportTab('cohorts')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
+                            activeReportTab === 'cohorts'
+                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                        }`}
+                    >
+                        <Activity size={14} /> Cohort Retention
+                    </button>
+                    <button
                         onClick={() => setActiveReportTab('sessions')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
                             activeReportTab === 'sessions'
@@ -1281,6 +1302,21 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                     <MembershipHistoryWidget
                         people={peopleData.allPeople || []}
                         statusChanges={recentStatusChanges.length > 0 ? recentStatusChanges : (peopleData.recentStatusChanges || [])}
+                    />
+                </div>
+            )}
+
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {/* TAB: COHORT RETENTION ANALYSIS                                    */}
+            {/* ═════════════════════════════════════════════════════════════════ */}
+            {activeReportTab === 'cohorts' && (
+                <div className="space-y-6">
+                    <CohortAnalytics
+                        people={peopleData?.allPeople || []}
+                        donations={donations}
+                        groups={groups}
+                        services={services}
+                        checkIns={checkIns}
                     />
                 </div>
             )}
