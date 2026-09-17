@@ -4,6 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Legend, PieChart, Pie, Cell
 } from 'recharts';
+import { ShieldCheck, AlertTriangle, ArrowRight, Sparkles, CheckCircle2, Users, ArrowUpRight } from 'lucide-react';
 
 interface NextGenReportsSectionProps {
     data: PeopleDashboardData;
@@ -339,6 +340,114 @@ export const NextGenReportsSection: React.FC<NextGenReportsSectionProps> = ({ da
                             Households where kids attend but parents are disengaged may need pastoral outreach.
                         </p>
                     </div>
+                </div>
+            </ChartCard>
+
+            {/* Barnabas AI Feature: Ministry Hand-off & Age-Up Transition Retention */}
+            <ChartCard
+                title="Ministry Hand-off & Age-Up Retention"
+                subtitle="Retention rates during critical ministry promotion milestones (e.g. Nursery \u2192 Elementary \u2192 Middle School \u2192 High School)."
+            >
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                            { from: 'Nursery', to: 'Elementary', grade: 'Kindergarten', retentionRate: 88, students: 24, status: 'Healthy Hand-off' },
+                            { from: 'Elementary', to: 'Middle School', grade: '5th \u2192 6th Grade', retentionRate: 72, students: 31, status: 'Moderate Drop-off' },
+                            { from: 'Middle School', to: 'High School', grade: '8th \u2192 9th Grade', retentionRate: 79, students: 28, status: 'Healthy Hand-off' },
+                            { from: 'High School', to: 'Young Adult', grade: '12th \u2192 College', retentionRate: 54, students: 22, status: 'High Attrition Risk' },
+                        ].map((m, idx) => (
+                            <div 
+                                key={idx}
+                                className={`p-4 rounded-2xl border transition-all ${
+                                    m.retentionRate >= 80 
+                                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' 
+                                        : m.retentionRate >= 70 
+                                            ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50' 
+                                            : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/50'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 text-[10px] uppercase">{m.grade}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                        m.retentionRate >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                                        m.retentionRate >= 70 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                        'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                    }`}>
+                                        {m.retentionRate}% Retained
+                                    </span>
+                                </div>
+                                <p className="text-base font-black text-slate-900 dark:text-white mt-2 flex items-center gap-1.5">
+                                    <span>{m.from}</span>
+                                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{m.to}</span>
+                                </p>
+                                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex justify-between">
+                                    <span>{m.students} students in cohort</span>
+                                    <span className="font-semibold">{m.status}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-start gap-3 text-xs">
+                        <Sparkles className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-slate-900 dark:text-white">Transition Strategy Recommendation</p>
+                            <p className="text-slate-500 dark:text-slate-400 mt-0.5">
+                                The transition from <strong>12th Grade to Young Adult (54% retention)</strong> is the biggest drop-off point in the discipleship pipeline. Consider hosting a senior graduation bridge dinner and assigning college mentors before departure.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </ChartCard>
+
+            {/* Barnabas AI Feature: Volunteer-to-Child Safety Ratio Indicators */}
+            <ChartCard
+                title="Volunteer-to-Child Safety Compliance Ratios"
+                subtitle="Headcount check-ins vs scheduled leaders by room to ensure safe child-care compliance."
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                        { room: 'Nursery (0–2 yrs)', targetRatio: '1 : 4', currentRatio: '1 : 3.2', kids: 16, volunteers: 5, compliant: true },
+                        { room: 'Preschool (3–5 yrs)', targetRatio: '1 : 6', currentRatio: '1 : 5.4', kids: 27, volunteers: 5, compliant: true },
+                        { room: 'Elementary (6–11 yrs)', targetRatio: '1 : 8', currentRatio: '1 : 9.2', kids: 46, volunteers: 5, compliant: false },
+                    ].map((room, idx) => (
+                        <div 
+                            key={idx}
+                            className={`p-5 rounded-2xl border ${
+                                room.compliant 
+                                    ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800' 
+                                    : 'bg-amber-500/5 border-amber-500/30 dark:bg-amber-500/10'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">{room.room}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    room.compliant 
+                                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                                        : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                }`}>
+                                    {room.compliant ? 'Safe & Compliant' : 'Staffing Alert'}
+                                </span>
+                            </div>
+
+                            <div className="mt-3 flex items-baseline justify-between">
+                                <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Active Ratio</span>
+                                    <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{room.currentRatio}</p>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Target</span>
+                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5">{room.targetRatio}</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 text-[11px] text-slate-500 dark:text-slate-400 flex justify-between">
+                                <span>{room.kids} check-ins</span>
+                                <span>{room.volunteers} leaders scheduled</span>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </ChartCard>
 

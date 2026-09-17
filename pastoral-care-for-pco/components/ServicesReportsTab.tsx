@@ -3,13 +3,15 @@ import { ServicesDashboardData, PcoPerson, AttendanceRecord, ServicePlanSnapshot
 import { 
     Search, Download, Users, Calendar, AlertTriangle, ChevronDown, 
     Music, TrendingUp, CheckCircle, Clock, Heart, List, HelpCircle,
-    ShieldCheck, Sparkles, BarChart2, Flame, UserCheck, UserX
+    ShieldCheck, Sparkles, BarChart2, Flame, UserCheck, UserX, UserPlus
 } from 'lucide-react';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
     BarChart, Bar, Legend, Cell, PieChart, Pie
 } from 'recharts';
 import { ExecutiveBoardReportModal } from './ExecutiveBoardReportModal';
+import { VisitorAssimilationFunnel } from './VisitorAssimilationFunnel';
+import { VolunteerFatigueWidget } from './VolunteerFatigueWidget';
 
 interface ServicesReportsTabProps {
     servicesData: ServicesDashboardData | null;
@@ -69,7 +71,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
     churchId,
     pcoConnected
 }) => {
-    const [activeTab, setActiveTab] = useState<'attendance' | 'volunteers' | 'staffing' | 'songs'>('attendance');
+    const [activeTab, setActiveTab] = useState<'attendance' | 'visitors' | 'volunteers' | 'staffing' | 'songs'>('attendance');
     const [datePreset, setDatePreset] = useState('last_90');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
@@ -126,7 +128,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
         return { total, avg, guests, regulars, volunteers, digitalCheckins, headcounts };
     }, [attendanceDataFiltered]);
 
-    // Holy Insights Feature: Attendance Frequency Segmentation (Core, Regular, Casual, Fading)
+    // Barnabas AI Feature: Attendance Frequency Segmentation (Core, Regular, Casual, Fading)
     const [frequencyTierFilter, setFrequencyTierFilter] = useState<'all' | 'core' | 'regular' | 'casual' | 'fading'>('all');
     const [isExecutiveReportOpen, setIsExecutiveReportOpen] = useState(false);
 
@@ -195,7 +197,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
         };
     }, [people, start, end]);
 
-    // Holy Insights Feature: Room Capacity & 80% Bottleneck Indicators
+    // Barnabas AI Feature: Room Capacity & 80% Bottleneck Indicators
     const roomCapacityStats = useMemo(() => {
         const avg = attendanceStats.avg > 0 ? attendanceStats.avg : 480;
         const rooms = [
@@ -460,7 +462,8 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
             <div className="flex border-b border-slate-200 dark:border-slate-800">
                 {[
                     { id: 'attendance', label: 'Attendance & Headcounts', icon: <TrendingUp size={16} /> },
-                    { id: 'volunteers', label: 'Volunteer Engagement', icon: <Users size={16} /> },
+                    { id: 'visitors', label: 'Visitor Funnel', icon: <UserPlus size={16} /> },
+                    { id: 'volunteers', label: 'Volunteer Fatigue', icon: <Flame size={16} /> },
                     { id: 'staffing', label: 'Service Staffing', icon: <CheckCircle size={16} /> },
                     { id: 'songs', label: 'Song Rotation', icon: <Music size={16} /> }
                 ].map(tab => (
@@ -683,7 +686,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                         </div>
                     </div>
 
-                    {/* Holy Insights Feature 1: Room Capacity & 80% Growth Bottleneck Warning */}
+                    {/* Barnabas AI Feature 1: Room Capacity & 80% Growth Bottleneck Warning */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                             <div>
@@ -708,7 +711,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                                     className={`p-4 rounded-xl border transition-all ${
                                         room.isBottleneck 
                                             ? 'bg-amber-500/5 border-amber-500/30 dark:bg-amber-500/10' 
-                                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800'
+                                             : 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -747,14 +750,14 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                         </div>
                     </div>
 
-                    {/* Holy Insights Feature 2: Attendance Frequency Segmentation */}
+                    {/* Barnabas AI Feature 2: Attendance Frequency Segmentation */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                                     <span>Attendance Frequency Segmentation</span>
                                     <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 text-[10px] font-black uppercase tracking-wider">
-                                        Holy Insights
+                                        Barnabas AI
                                     </span>
                                 </h4>
                                 <p className="text-xs text-slate-400 mt-0.5">
@@ -867,151 +870,14 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                 </div>
             )}
 
-            {/* TAB CONTENT: 2. Volunteer Engagement & Burnout */}
+            {/* TAB CONTENT: 2. Visitor Assimilation Funnel */}
+            {activeTab === 'visitors' && (
+                <VisitorAssimilationFunnel />
+            )}
+
+            {/* TAB CONTENT: 3. Volunteer Engagement & Burnout Engine */}
             {activeTab === 'volunteers' && (
-                <div className="space-y-6">
-                    {/* Summary cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {[
-                            { label: 'Active Volunteers', value: volunteerStats.totalActive, color: 'text-indigo-600 dark:text-indigo-400', icon: <Users size={18} /> },
-                            { label: 'Avg serving count (90d)', value: volunteerStats.avgServed, color: 'text-emerald-600 dark:text-emerald-400', icon: <Calendar size={18} /> },
-                            { label: 'At Burnout Risk', value: volunteerStats.highRisk, color: 'text-rose-600 dark:text-rose-400', icon: <AlertTriangle size={18} /> },
-                            { label: 'Medium Risk', value: volunteerStats.medRisk, color: 'text-amber-600 dark:text-amber-400', icon: <Clock size={18} /> },
-                        ].map(s => (
-                            <div key={s.label} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex items-center gap-4 shadow-sm">
-                                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center shrink-0">
-                                    {s.icon}
-                                </div>
-                                <div>
-                                    <p className={`text-2xl font-black tracking-tight ${s.color}`}>{s.value}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{s.label}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Chart layout grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Serving Frequency Distribution */}
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-                            <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4">Serving Frequency (Last 90 Days)</h4>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={[
-                                        { range: '1 time', count: volunteerStats.count1x },
-                                        { range: '2-3 times', count: volunteerStats.count2to3x },
-                                        { range: '4-6 times', count: volunteerStats.count4to6x },
-                                        { range: '7+ times', count: volunteerStats.count7plus }
-                                    ]}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-800" />
-                                        <XAxis dataKey="range" tick={{fontSize: 10}} stroke="#94a3b8" />
-                                        <YAxis tick={{fontSize: 10}} stroke="#94a3b8" />
-                                        <Tooltip contentStyle={TOOLTIP_STYLE} />
-                                        <Bar dataKey="count" fill="#4f46e5" radius={[4, 4, 0, 0]}>
-                                            <Cell fill="#6366f1" />
-                                            <Cell fill="#4f46e5" />
-                                            <Cell fill="#3730a3" />
-                                            <Cell fill="#1e1b4b" />
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        {/* Risk level distribution */}
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-                            <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4">Burnout Risk Distribution</h4>
-                            <div className="h-64 flex items-center justify-center">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={[
-                                                { name: 'Low Risk', value: volunteerStats.lowRisk, color: '#10b981' },
-                                                { name: 'Medium Risk', value: volunteerStats.medRisk, color: '#f59e0b' },
-                                                { name: 'High Risk', value: volunteerStats.highRisk, color: '#ef4444' }
-                                            ].filter(v => v.value > 0)}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {[
-                                                { name: 'Low Risk', value: volunteerStats.lowRisk, color: '#10b981' },
-                                                { name: 'Medium Risk', value: volunteerStats.medRisk, color: '#f59e0b' },
-                                                { name: 'High Risk', value: volunteerStats.highRisk, color: '#ef4444' }
-                                            ].filter(v => v.value > 0).map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip contentStyle={TOOLTIP_STYLE} />
-                                        <Legend />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Volunteer Serving Stats</h4>
-                            <p className="text-xs text-slate-400 mt-0.5">{volunteerRows.length} active roster volunteers</p>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700">
-                                    <tr>
-                                        {['Volunteer', 'Serving Count (90d)', 'Burnout Risk', 'Next scheduled', 'Recent Teams'].map(col => (
-                                            <th key={col} className="px-6 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                                                {col}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                    {volunteerRows.length > 0 ? (
-                                        volunteerRows.map((row, i) => (
-                                            <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                                <td className="px-6 py-3">
-                                                    <p className="text-xs font-bold text-slate-900 dark:text-white">{row.name}</p>
-                                                    {row.email && <p className="text-[10px] text-slate-400">{row.email}</p>}
-                                                </td>
-                                                <td className="px-6 py-3 text-xs font-black text-slate-900 dark:text-white">
-                                                    {row.servingCount} times
-                                                </td>
-                                                <td className="px-6 py-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        row.riskLevel === 'High' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' :
-                                                        row.riskLevel === 'Medium' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                        'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                    }`}>
-                                                        {row.riskLevel} Risk
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                                    {row.nextServiceDate 
-                                                        ? new Date(row.nextServiceDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'}) 
-                                                        : <span className="text-slate-300 dark:text-slate-600">—</span>}
-                                                </td>
-                                                <td className="px-6 py-3 text-xs text-slate-600 dark:text-slate-300 truncate max-w-[240px]">
-                                                    {row.recentServices.map(s => s.teamName).filter(Boolean).filter((v, idx, arr) => arr.indexOf(v) === idx).join(', ') || 'No team'}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-16 text-center text-slate-400 dark:text-slate-500">
-                                                No volunteers found. Make sure PCO is connected and volunteer serving history is synced.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <VolunteerFatigueWidget />
             )}
 
             {/* TAB CONTENT: 3. Service Staffing */}

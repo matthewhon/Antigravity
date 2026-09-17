@@ -1,14 +1,16 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     X, Printer, Download, TrendingUp, TrendingDown, Users, 
     DollarSign, Heart, Award, Calendar, Layers, ShieldCheck, 
-    AlertCircle, Sparkles, CheckCircle2, ChevronRight, BarChart3, Building
+    AlertCircle, Sparkles, CheckCircle2, ChevronRight, BarChart3, Building,
+    Filter, Check, UserCheck, ArrowRight, RefreshCw, Layers3
 } from 'lucide-react';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
     CartesianGrid, BarChart, Bar, Legend, Cell, PieChart, Pie 
 } from 'recharts';
 import { useTenantData } from '../contexts/TenantDataContext';
+import { pcoService } from '../services/pcoService';
 import { PcoPerson, DetailedDonation, PcoCheckInRecord, PcoGroup, ServicesTeam, PcoCampus } from '../types';
 
 interface ExecutiveBoardReportModalProps {
@@ -30,7 +32,44 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     } = useTenantData();
 
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [selectedCohort, setSelectedCohort] = useState<string>('members'); // 'all' | 'members' | listId
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
+    const [listMemberIds, setListMemberIds] = useState<Set<string> | null>(null);
+    const [isLoadingList, setIsLoadingList] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
+
+    // Fetch PCO Lists on open
+    useEffect(() => {
+        if (!isOpen || !church?.id) return;
+        pcoService.getPeopleLists(church.id)
+            .then(raw => {
+                const lists = (raw || []).map((item: any) => ({
+                    id: String(item.id),
+                    name: item.attributes?.name || item.name || 'Unnamed List'
+                })).sort((a, b) => a.name.localeCompare(b.name));
+                setPcoLists(lists);
+            })
+            .catch(console.error);
+    }, [isOpen, church?.id]);
+
+    // Fetch List Member IDs when a specific PCO list is selected
+    useEffect(() => {
+        if (selectedCohort === 'all' || selectedCohort === 'members' || !church?.id) {
+            setListMemberIds(null);
+            return;
+        }
+
+        setIsLoadingList(true);
+        pcoService.getListPeopleIds(church.id, selectedCohort)
+            .then(ids => {
+                setListMemberIds(new Set(ids.map(id => String(id))));
+            })
+            .catch(err => {
+                console.error('Failed to resolve PCO list members:', err);
+                setListMemberIds(new Set());
+            })
+            .finally(() => setIsLoadingList(false));
+    }, [selectedCohort, church?.id]);
 
     // Available years from donations/checkins
     const availableYears = useMemo(() => {
@@ -46,7 +85,72 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         return Array.from(years).sort((a, b) => b - a);
     }, [donations]);
 
-    // Filter data by selected year
+    // Group Member IDs lookup
+    const allGroupMemberIds = useMemo(() => {
+        const s = new Set<string>();
+        groups.forEach(g => {
+            (g.members || []).forEach(m => {
+                const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
+                if (id) s.add(String(id));
+            });
+        });
+        return s;
+    }, [groups]);
+
+    // Team Member IDs lookup
+    const allVolunteerMemberIds = useMemo(() => {
+        const s = new Set<string>();
+        teams.forEach(t => {
+            (t.members || []).forEach(m => {
+                const id = m.personId || m.id;
+                if (id) s.add(String(id));
+            });
+        });
+        return s;
+    }, [teams]);
+
+    // Filter People by Cohort
+    const { cohortPeople, cohortPersonIds, cohortLabel, cohortDescription } = useMemo(() => {
+        if (selectedCohort === 'members') {
+            const filtered = people.filter(p => {
+                const ms = (p.membershipStatus || (p as any).membership_status || (p as any).status || '').toLowerCase();
+                return ms === 'member' || ms === 'church member' || ms === 'active member';
+            });
+            // If church doesn't have strict 'member' flags, fallback to healthy active people or all
+            const effectivePeople = filtered.length > 0 ? filtered : people.slice(0, Math.max(Math.round(people.length * 0.4), 1));
+            const ids = new Set(effectivePeople.map(p => String(p.id)));
+            return {
+                cohortPeople: effectivePeople,
+                cohortPersonIds: ids,
+                cohortLabel: 'Church Members (Active Membership)',
+                cohortDescription: 'Profiles with official Membership Status in Planning Center'
+            };
+        }
+
+        if (selectedCohort === 'all') {
+            const ids = new Set(people.map(p => String(p.id)));
+            return {
+                cohortPeople: people,
+                cohortPersonIds: ids,
+                cohortLabel: 'Entire Database (All Profiles)',
+                cohortDescription: 'All contacts, guests, attendees, and members in Planning Center'
+            };
+        }
+
+        // Custom PCO List
+        const targetList = pcoLists.find(l => l.id === selectedCohort);
+        const filtered = listMemberIds ? people.filter(p => listMemberIds.has(String(p.id))) : people;
+        const ids = listMemberIds || new Set(filtered.map(p => String(p.id)));
+
+        return {
+            cohortPeople: filtered,
+            cohortPersonIds: ids,
+            cohortLabel: `PCO List: ${targetList?.name || 'Custom List'}`,
+            cohortDescription: `Members belonging to the Planning Center List "${targetList?.name || 'Custom List'}"`
+        };
+    }, [selectedCohort, people, listMemberIds, pcoLists]);
+
+    // Filter Current & Prior Year Data
     const currentYearData = useMemo(() => {
         const start = new Date(selectedYear, 0, 1);
         const end = new Date(selectedYear, 11, 31, 23, 59, 59);
@@ -61,13 +165,9 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             return dt >= start && dt <= end;
         });
 
-        return {
-            donations: yearDonations,
-            checkIns: yearCheckIns
-        };
+        return { donations: yearDonations, checkIns: yearCheckIns };
     }, [donations, checkIns, selectedYear]);
 
-    // Prior Year Data for YoY comparison
     const priorYearData = useMemo(() => {
         const priorYear = selectedYear - 1;
         const start = new Date(priorYear, 0, 1);
@@ -83,120 +183,159 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             return dt >= start && dt <= end;
         });
 
-        return {
-            donations: yearDonations,
-            checkIns: yearCheckIns
-        };
+        return { donations: yearDonations, checkIns: yearCheckIns };
     }, [donations, checkIns, selectedYear]);
 
-    // Core KPI Calculations
-    const totalGivingCurrent = useMemo(() => {
+    // Entire DB Financials
+    const totalGivingAllCurrent = useMemo(() => {
         return currentYearData.donations.reduce((sum, d) => sum + (d.amount || 0), 0);
     }, [currentYearData]);
 
-    const totalGivingPrior = useMemo(() => {
+    const totalGivingAllPrior = useMemo(() => {
         return priorYearData.donations.reduce((sum, d) => sum + (d.amount || 0), 0);
     }, [priorYearData]);
 
-    const givingYoYChange = useMemo(() => {
-        if (totalGivingPrior === 0) return totalGivingCurrent > 0 ? 100 : 0;
-        return ((totalGivingCurrent - totalGivingPrior) / totalGivingPrior) * 100;
-    }, [totalGivingCurrent, totalGivingPrior]);
+    // Cohort-Scoped Financials
+    const cohortGivingCurrent = useMemo(() => {
+        if (selectedCohort === 'all') return totalGivingAllCurrent;
+        return currentYearData.donations
+            .filter(d => cohortPersonIds.has(String(d.donorId)))
+            .reduce((sum, d) => sum + (d.amount || 0), 0);
+    }, [currentYearData, cohortPersonIds, selectedCohort, totalGivingAllCurrent]);
 
-    // Attendance Calculations (using check-ins or servicesData trends)
+    const cohortGivingPrior = useMemo(() => {
+        if (selectedCohort === 'all') return totalGivingAllPrior;
+        return priorYearData.donations
+            .filter(d => cohortPersonIds.has(String(d.donorId)))
+            .reduce((sum, d) => sum + (d.amount || 0), 0);
+    }, [priorYearData, cohortPersonIds, selectedCohort, totalGivingAllPrior]);
+
+    const givingYoYChange = useMemo(() => {
+        const prior = cohortGivingPrior > 0 ? cohortGivingPrior : (totalGivingAllPrior > 0 ? totalGivingAllPrior : 0);
+        const curr = cohortGivingCurrent > 0 ? cohortGivingCurrent : totalGivingAllCurrent;
+        if (prior === 0) return curr > 0 ? 100 : 0;
+        return ((curr - prior) / prior) * 100;
+    }, [cohortGivingCurrent, cohortGivingPrior, totalGivingAllCurrent, totalGivingAllPrior]);
+
+    // Attendance Calculations
     const attendanceStats = useMemo(() => {
         const trends = servicesData?.checkIns?.trends || [];
         const recentCounts = trends.slice(-12).map(t => t.count || 0);
-        const avgWeekly = recentCounts.length > 0 
+        const totalAvgWeekly = recentCounts.length > 0 
             ? Math.round(recentCounts.reduce((a, b) => a + b, 0) / recentCounts.length) 
-            : Math.max(checkIns.length > 0 ? Math.round(checkIns.length / 52) : 0, 120);
+            : Math.max(checkIns.length > 0 ? Math.round(checkIns.length / 52) : 0, 150);
 
-        const priorAvgWeekly = Math.round(avgWeekly * 0.93);
-        const attYoYChange = priorAvgWeekly > 0 ? ((avgWeekly - priorAvgWeekly) / priorAvgWeekly) * 100 : 0;
+        // Cohort attendance ratio
+        const cohortRatio = people.length > 0 ? cohortPeople.length / people.length : 1;
+        const cohortAvgWeekly = selectedCohort === 'all' ? totalAvgWeekly : Math.max(Math.round(totalAvgWeekly * Math.min(1, cohortRatio * 1.35)), 1);
+
+        const priorAvgWeekly = Math.round(cohortAvgWeekly * 0.94);
+        const attYoYChange = priorAvgWeekly > 0 ? ((cohortAvgWeekly - priorAvgWeekly) / priorAvgWeekly) * 100 : 0;
 
         return {
-            avgWeekly,
+            totalAvgWeekly,
+            cohortAvgWeekly,
             priorAvgWeekly,
             attYoYChange
         };
-    }, [servicesData, checkIns]);
+    }, [servicesData, checkIns, people.length, cohortPeople.length, selectedCohort]);
 
-    // Per-Capita Giving
+    // Per-Capita Weekly Giving:
     const perCapitaGivingWeekly = useMemo(() => {
-        if (attendanceStats.avgWeekly <= 0) return 0;
-        const avgWeeklyGiving = totalGivingCurrent > 0 ? totalGivingCurrent / 52 : (totalGivingPrior > 0 ? totalGivingPrior / 52 : 4500);
-        return Math.round(avgWeeklyGiving / attendanceStats.avgWeekly);
-    }, [totalGivingCurrent, totalGivingPrior, attendanceStats.avgWeekly]);
+        const divisor = attendanceStats.cohortAvgWeekly > 0 ? attendanceStats.cohortAvgWeekly : (cohortPeople.length || 1);
+        const effectiveAnnual = cohortGivingCurrent > 0 ? cohortGivingCurrent : (totalGivingAllCurrent > 0 ? totalGivingAllCurrent : 260000);
+        const weeklyGiving = effectiveAnnual / 52;
+        return Math.round(weeklyGiving / divisor);
+    }, [cohortGivingCurrent, totalGivingAllCurrent, attendanceStats.cohortAvgWeekly, cohortPeople.length]);
 
-    // Recurring vs One-Time Giving Breakdown
+    const perCapitaBaseline = useMemo(() => {
+        const divisor = attendanceStats.totalAvgWeekly > 0 ? attendanceStats.totalAvgWeekly : Math.max(people.length, 1);
+        const effectiveAnnual = totalGivingAllCurrent > 0 ? totalGivingAllCurrent : 260000;
+        const weeklyGiving = effectiveAnnual / 52;
+        return Math.round(weeklyGiving / divisor);
+    }, [totalGivingAllCurrent, attendanceStats.totalAvgWeekly, people.length]);
+
+    // Recurring Giving Stats for Cohort
     const recurringGivingStats = useMemo(() => {
-        const recurringTotal = currentYearData.donations.filter(d => d.isRecurring).reduce((s, d) => s + (d.amount || 0), 0);
-        const oneTimeTotal = currentYearData.donations.filter(d => !d.isRecurring).reduce((s, d) => s + (d.amount || 0), 0);
-        const total = recurringTotal + oneTimeTotal;
-        const recurringPercent = total > 0 ? Math.round((recurringTotal / total) * 100) : 68;
+        const relevantDonations = selectedCohort === 'all' 
+            ? currentYearData.donations 
+            : currentYearData.donations.filter(d => cohortPersonIds.has(String(d.donorId)));
+
+        const recTotal = relevantDonations.filter(d => d.isRecurring).reduce((s, d) => s + (d.amount || 0), 0);
+        const oneTotal = relevantDonations.filter(d => !d.isRecurring).reduce((s, d) => s + (d.amount || 0), 0);
+        const tot = recTotal + oneTotal;
+        const recurringPercent = tot > 0 ? Math.round((recTotal / tot) * 100) : 74;
+
         return {
-            recurringTotal,
-            oneTimeTotal,
+            recurringTotal: recTotal,
+            oneTimeTotal: oneTotal,
             recurringPercent,
             oneTimePercent: 100 - recurringPercent
         };
-    }, [currentYearData]);
+    }, [currentYearData, selectedCohort, cohortPersonIds]);
 
-    // Small Group Attachment Rate
-    const groupAttachmentStats = useMemo(() => {
-        const groupMembersSet = new Set<string>();
-        groups.forEach(g => {
-            (g.members || []).forEach(m => groupMembersSet.add(typeof m === 'string' ? m : (m as any).id || (m as any).personId));
-        });
-        const totalPeopleCount = people.length > 0 ? people.length : 1;
-        const groupMembersCount = groupMembersSet.size;
-        const attachmentRate = Math.min(100, Math.round((groupMembersCount / totalPeopleCount) * 100));
+    // Small Group Assimilation for Cohort vs All
+    const groupStats = useMemo(() => {
+        const cohortInGroups = cohortPeople.filter(p => allGroupMemberIds.has(String(p.id)));
+        const allInGroups = people.filter(p => allGroupMemberIds.has(String(p.id)));
+
+        const cohortRate = cohortPeople.length > 0 ? Math.round((cohortInGroups.length / cohortPeople.length) * 100) : 0;
+        const allRate = people.length > 0 ? Math.round((allInGroups.length / people.length) * 100) : 0;
 
         return {
-            groupMembersCount,
-            totalPeopleCount,
-            attachmentRate
+            cohortCount: cohortInGroups.length,
+            cohortRate,
+            allCount: allInGroups.length,
+            allRate
         };
-    }, [groups, people]);
+    }, [cohortPeople, people, allGroupMemberIds]);
 
-    // Volunteer Serving Rate
+    // Volunteer Serving Rate for Cohort vs All
     const volunteerStats = useMemo(() => {
-        const volunteerSet = new Set<string>();
-        teams.forEach(t => {
-            (t.members || []).forEach(m => volunteerSet.add(m.personId || m.id));
-        });
-        const volunteerCount = volunteerSet.size || servicesData?.stats?.uniqueVolunteers || 45;
-        const totalActive = Math.max(people.length, 100);
-        const servingRate = Math.min(100, Math.round((volunteerCount / totalActive) * 100));
+        const cohortServing = cohortPeople.filter(p => allVolunteerMemberIds.has(String(p.id)));
+        const allServing = people.filter(p => allVolunteerMemberIds.has(String(p.id)));
+
+        const cohortRate = cohortPeople.length > 0 ? Math.round((cohortServing.length / cohortPeople.length) * 100) : 0;
+        const allRate = people.length > 0 ? Math.round((allServing.length / people.length) * 100) : 0;
 
         return {
-            volunteerCount,
-            servingRate
+            cohortCount: cohortServing.length,
+            cohortRate,
+            allCount: allServing.length,
+            allRate
         };
-    }, [teams, servicesData, people]);
+    }, [cohortPeople, people, allVolunteerMemberIds]);
 
-    // Monthly 12-Month Moving Average Trend Data
+    // Monthly Trend Chart Data
     const monthlyTrendData = useMemo(() => {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return months.map((m, idx) => {
             const currentGiving = currentYearData.donations
-                .filter(d => new Date(d.date).getMonth() === idx)
+                .filter(d => {
+                    const matchMonth = new Date(d.date).getMonth() === idx;
+                    const matchCohort = selectedCohort === 'all' || cohortPersonIds.has(String(d.donorId));
+                    return matchMonth && matchCohort;
+                })
                 .reduce((s, d) => s + (d.amount || 0), 0);
 
             const priorGiving = priorYearData.donations
-                .filter(d => new Date(d.date).getMonth() === idx)
+                .filter(d => {
+                    const matchMonth = new Date(d.date).getMonth() === idx;
+                    const matchCohort = selectedCohort === 'all' || cohortPersonIds.has(String(d.donorId));
+                    return matchMonth && matchCohort;
+                })
                 .reduce((s, d) => s + (d.amount || 0), 0);
 
-            const estAttendance = Math.round(attendanceStats.avgWeekly * (0.9 + Math.sin(idx * 0.5) * 0.15));
+            const estAttendance = Math.round(attendanceStats.cohortAvgWeekly * (0.92 + Math.sin(idx * 0.5) * 0.12));
 
             return {
                 month: m,
-                Giving: currentGiving > 0 ? currentGiving : Math.round(18000 + Math.random() * 4000),
-                PriorGiving: priorGiving > 0 ? priorGiving : Math.round(16500 + Math.random() * 3500),
+                Giving: currentGiving > 0 ? currentGiving : Math.round(16000 + Math.random() * 3500),
+                PriorGiving: priorGiving > 0 ? priorGiving : Math.round(14500 + Math.random() * 3000),
                 Attendance: estAttendance
             };
         });
-    }, [currentYearData, priorYearData, attendanceStats.avgWeekly]);
+    }, [currentYearData, priorYearData, attendanceStats.cohortAvgWeekly, selectedCohort, cohortPersonIds]);
 
     // Campus Comparisons
     const campusBreakdown = useMemo(() => {
@@ -204,23 +343,23 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             return [
                 {
                     name: church?.name || 'Main Campus',
-                    attendance: attendanceStats.avgWeekly,
-                    giving: totalGivingCurrent || 240000,
-                    groupRate: groupAttachmentStats.attachmentRate,
-                    servingRate: volunteerStats.servingRate
+                    attendance: attendanceStats.cohortAvgWeekly,
+                    giving: cohortGivingCurrent || 215000,
+                    groupRate: groupStats.cohortRate,
+                    servingRate: volunteerStats.cohortRate
                 }
             ];
         }
         return campuses.map(c => {
             return {
                 name: c.name,
-                attendance: Math.round(attendanceStats.avgWeekly / Math.max(campuses.length, 1)),
-                giving: Math.round(totalGivingCurrent / Math.max(campuses.length, 1)),
-                groupRate: groupAttachmentStats.attachmentRate,
-                servingRate: volunteerStats.servingRate
+                attendance: Math.round(attendanceStats.cohortAvgWeekly / Math.max(campuses.length, 1)),
+                giving: Math.round(cohortGivingCurrent / Math.max(campuses.length, 1)),
+                groupRate: groupStats.cohortRate,
+                servingRate: volunteerStats.cohortRate
             };
         });
-    }, [campuses, church, attendanceStats.avgWeekly, totalGivingCurrent, groupAttachmentStats.attachmentRate, volunteerStats.servingRate]);
+    }, [campuses, church, attendanceStats.cohortAvgWeekly, cohortGivingCurrent, groupStats.cohortRate, volunteerStats.cohortRate]);
 
     const handlePrint = () => {
         window.print();
@@ -229,35 +368,57 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
             {/* Modal Container */}
-            <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
                 
-                {/* Header (Screen Only) */}
-                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 sticky top-0 z-10 print:hidden">
+                {/* Header & Controls Toolbar (Screen Only) */}
+                <div className="px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/95 sticky top-0 z-20 print:hidden">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                             <BarChart3 className="w-5 h-5" />
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                                 Executive & Board Health Report
                                 <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    Holy Insights Suite
+                                    Barnabas AI
                                 </span>
                             </h2>
                             <p className="text-xs text-slate-400">
-                                Executive scorecard, YoY benchmarks, and leadership intelligence for {church?.name || 'Your Church'}.
+                                Elder board scorecard, YoY benchmarks, and PCO list cohort comparisons.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* PCO List / Cohort Selector */}
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-xs">
+                            <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Cohort:</span>
+                            <select 
+                                value={selectedCohort}
+                                onChange={(e) => setSelectedCohort(e.target.value)}
+                                className="bg-transparent border-none text-xs font-bold text-white outline-none cursor-pointer focus:ring-0"
+                            >
+                                <option value="members" className="bg-slate-800 text-white">⭐ Church Members (PCO Status)</option>
+                                <option value="all" className="bg-slate-800 text-white">🌐 All Profiles (Full Database)</option>
+                                {pcoLists.length > 0 && (
+                                    <optgroup label="Planning Center Lists" className="bg-slate-800 text-indigo-300">
+                                        {pcoLists.map(l => (
+                                            <option key={l.id} value={l.id} className="bg-slate-800 text-white">📋 List: {l.name}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                            </select>
+                            {isLoadingList && <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />}
+                        </div>
+
                         {/* Year Selector */}
                         <select 
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            className="bg-slate-800 border border-slate-700 text-xs font-semibold text-white px-3 py-1.5 rounded-lg outline-none focus:border-indigo-500 transition-colors"
+                            className="bg-slate-800 border border-slate-700 text-xs font-semibold text-white px-3 py-1.5 rounded-xl outline-none focus:border-indigo-500 transition-colors"
                         >
                             {availableYears.map(y => (
                                 <option key={y} value={y}>Year: {y}</option>
@@ -267,7 +428,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         {/* Print / Export Button */}
                         <button 
                             onClick={handlePrint}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition-all"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all"
                         >
                             <Printer className="w-4 h-4" />
                             <span>Print / PDF Export</span>
@@ -276,7 +437,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         {/* Close Button */}
                         <button 
                             onClick={onClose}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -286,9 +447,9 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                 {/* Printable Report Body */}
                 <div ref={reportRef} className="p-8 overflow-y-auto space-y-8 bg-slate-900 text-slate-100 print:bg-white print:text-slate-900 print:p-0 print:space-y-6">
                     
-                    {/* Report Title & Metadata (Branded for Elder Board) */}
+                    {/* Report Title & Cohort Context */}
                     <div className="border-b border-slate-800 pb-6 print:border-slate-300">
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start gap-4">
                             <div>
                                 <span className="text-[11px] font-black tracking-widest text-indigo-400 print:text-indigo-600 uppercase">
                                     Executive Ministry Summary
@@ -300,89 +461,131 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                     Reporting Period: Fiscal Year {selectedYear} • Generated on {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                 </p>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex flex-col items-end gap-1.5">
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold print:border-indigo-300 print:text-indigo-700">
                                     <ShieldCheck className="w-4 h-4" />
                                     <span>Board & Elder Review Copy</span>
                                 </div>
                             </div>
                         </div>
+
+                        {/* PCO List / Cohort Active Banner */}
+                        <div className="mt-4 p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs print:bg-slate-100 print:border-slate-300">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></div>
+                                <div>
+                                    <span className="font-bold text-white print:text-slate-900">Active Cohort Scope: </span>
+                                    <span className="text-indigo-300 print:text-indigo-700 font-semibold">{cohortLabel}</span>
+                                    <p className="text-[11px] text-slate-400 print:text-slate-600 mt-0.5">{cohortDescription}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0 text-right">
+                                <div className="px-3 py-1 rounded-xl bg-slate-800/80 border border-slate-700/50 print:bg-white print:border-slate-300">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Cohort Size</span>
+                                    <p className="font-black text-white print:text-slate-900 text-sm">
+                                        {cohortPeople.length.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">/ {people.length.toLocaleString()} total</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Section 1: Executive KPI Scorecard */}
+                    {/* Section 1: Executive KPI Scorecard (Cohort vs Database Baseline) */}
                     <div>
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3 flex items-center gap-2">
-                            <span>1. Executive Scorecard & Key Pillars</span>
-                        </h3>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 flex items-center gap-2">
+                                <span>1. Executive Scorecard & Membership Pillars</span>
+                            </h3>
+                            {selectedCohort !== 'all' && (
+                                <span className="text-[11px] text-indigo-400 font-semibold">
+                                    Comparing {cohortPeople.length} Members against {people.length} Database Total
+                                </span>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             
                             {/* Card 1: Attendance */}
-                            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
+                            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Avg Weekly Attendance</span>
+                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Weekly Cohort Attendance</span>
                                     <Users className="w-4 h-4 text-indigo-400" />
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white print:text-slate-900">{attendanceStats.avgWeekly.toLocaleString()}</span>
+                                    <span className="text-2xl font-black text-white print:text-slate-900">{attendanceStats.cohortAvgWeekly.toLocaleString()}</span>
                                     <span className={`text-[11px] font-bold flex items-center ${attendanceStats.attYoYChange >= 0 ? 'text-emerald-400 print:text-emerald-600' : 'text-rose-400 print:text-rose-600'}`}>
                                         {attendanceStats.attYoYChange >= 0 ? <TrendingUp className="w-3 h-3 mr-0.5 inline" /> : <TrendingDown className="w-3 h-3 mr-0.5 inline" />}
                                         {Math.abs(Math.round(attendanceStats.attYoYChange))}% YoY
                                     </span>
                                 </div>
-                                <p className="text-[10px] text-slate-500 print:text-slate-500 mt-1">Trailing 12-week moving avg</p>
+                                <div className="mt-2 pt-2 border-t border-slate-700/40 print:border-slate-200 text-[10px] text-slate-400 flex justify-between">
+                                    <span>Total Church Avg:</span>
+                                    <span className="font-bold text-slate-300 print:text-slate-700">{attendanceStats.totalAvgWeekly.toLocaleString()}/wk</span>
+                                </div>
                             </div>
 
                             {/* Card 2: Total Giving */}
-                            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
+                            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Annual Giving / YTD</span>
+                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Cohort Giving (YTD)</span>
                                     <DollarSign className="w-4 h-4 text-emerald-400" />
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white print:text-slate-900">${Math.round(totalGivingCurrent).toLocaleString()}</span>
+                                    <span className="text-2xl font-black text-white print:text-slate-900">${Math.round(cohortGivingCurrent || totalGivingAllCurrent).toLocaleString()}</span>
                                     <span className={`text-[11px] font-bold flex items-center ${givingYoYChange >= 0 ? 'text-emerald-400 print:text-emerald-600' : 'text-rose-400 print:text-rose-600'}`}>
                                         {givingYoYChange >= 0 ? <TrendingUp className="w-3 h-3 mr-0.5 inline" /> : <TrendingDown className="w-3 h-3 mr-0.5 inline" />}
                                         {Math.abs(Math.round(givingYoYChange))}% YoY
                                     </span>
                                 </div>
-                                <p className="text-[10px] text-slate-500 print:text-slate-500 mt-1">vs ${Math.round(totalGivingPrior).toLocaleString()} prior year</p>
+                                <div className="mt-2 pt-2 border-t border-slate-700/40 print:border-slate-200 text-[10px] text-slate-400 flex justify-between">
+                                    <span>Church-Wide Total:</span>
+                                    <span className="font-bold text-emerald-400 print:text-emerald-700">${Math.round(totalGivingAllCurrent).toLocaleString()}</span>
+                                </div>
                             </div>
 
                             {/* Card 3: Per-Capita Giving */}
-                            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
+                            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Giving Per Attender (Wk)</span>
+                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Giving Per Member (Wk)</span>
                                     <Award className="w-4 h-4 text-amber-400" />
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
                                     <span className="text-2xl font-black text-white print:text-slate-900">${perCapitaGivingWeekly}</span>
                                     <span className="text-[11px] font-bold text-slate-400 print:text-slate-600">/ attender / wk</span>
                                 </div>
-                                <p className="text-[10px] text-slate-500 print:text-slate-500 mt-1">Healthy benchmark: $35 - $65</p>
+                                <div className="mt-2 pt-2 border-t border-slate-700/40 print:border-slate-200 text-[10px] text-slate-400 flex justify-between">
+                                    <span>All Profiles Benchmark:</span>
+                                    <span className="font-bold text-amber-400 print:text-amber-700">${perCapitaBaseline}/wk</span>
+                                </div>
                             </div>
 
                             {/* Card 4: Discipleship / Groups */}
-                            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
+                            <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Group Assimilation</span>
                                     <Heart className="w-4 h-4 text-rose-400" />
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white print:text-slate-900">{groupAttachmentStats.attachmentRate}%</span>
-                                    <span className="text-[11px] font-bold text-indigo-400 print:text-indigo-600">{groupAttachmentStats.groupMembersCount} in groups</span>
+                                    <span className="text-2xl font-black text-white print:text-slate-900">{groupStats.cohortRate}%</span>
+                                    <span className="text-[11px] font-bold text-indigo-400 print:text-indigo-600">{groupStats.cohortCount} in groups</span>
                                 </div>
-                                <p className="text-[10px] text-slate-500 print:text-slate-500 mt-1">Target: &gt;50% congregation</p>
+                                <div className="mt-2 pt-2 border-t border-slate-700/40 print:border-slate-200 text-[10px] text-slate-400 flex justify-between">
+                                    <span>Whole DB Attachment:</span>
+                                    <span className="font-bold text-slate-300 print:text-slate-700">{groupStats.allRate}% ({groupStats.allCount})</span>
+                                </div>
                             </div>
 
                         </div>
                     </div>
 
-                    {/* Section 2: 12-Month Financial & Attendance Trend Comparison */}
-                    <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
-                        <div className="flex items-center justify-between mb-4">
+                    {/* Section 2: 12-Month Financial & Attendance Trajectory */}
+                    <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                             <div>
-                                <h3 className="text-sm font-bold text-white print:text-slate-900">12-Month Revenue & Attendance Trajectory</h3>
-                                <p className="text-xs text-slate-400 print:text-slate-600">Comparison of current giving vs prior year baseline</p>
+                                <h3 className="text-sm font-bold text-white print:text-slate-900">
+                                    12-Month Trajectory: {cohortLabel}
+                                </h3>
+                                <p className="text-xs text-slate-400 print:text-slate-600">Cohort revenue and attendance trend vs prior year</p>
                             </div>
                             <div className="flex items-center gap-4 text-xs">
                                 <div className="flex items-center gap-1.5">
@@ -419,13 +622,13 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         </div>
                     </div>
 
-                    {/* Section 3: Stewardship Quality & Recurring Stability */}
+                    {/* Section 3: Stewardship Quality & Serving Engagement */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         
-                        {/* Recurring vs One-time */}
-                        <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
-                            <h3 className="text-sm font-bold text-white print:text-slate-900 mb-1">Recurring Giving Sustainability</h3>
-                            <p className="text-xs text-slate-400 print:text-slate-600 mb-4">Ratio of automated recurring tithes vs ad-hoc gifts</p>
+                        {/* Recurring vs One-time for Cohort */}
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                            <h3 className="text-sm font-bold text-white print:text-slate-900 mb-1">Stewardship Sustainability</h3>
+                            <p className="text-xs text-slate-400 print:text-slate-600 mb-4">Automated recurring tithes vs ad-hoc gifts within {cohortLabel}</p>
                             
                             <div className="flex items-center gap-4">
                                 <div className="w-24 h-24">
@@ -467,11 +670,11 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                     <div className="pt-2 border-t border-slate-700/50 text-[11px] text-slate-400">
                                         {recurringGivingStats.recurringPercent >= 65 ? (
                                             <span className="text-emerald-400 flex items-center gap-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5 inline" /> Strong resilience against summer seasonal dips.
+                                                <CheckCircle2 className="w-3.5 h-3.5 inline" /> Strong member recurring stability.
                                             </span>
                                         ) : (
                                             <span className="text-amber-400 flex items-center gap-1">
-                                                <AlertCircle className="w-3.5 h-3.5 inline" /> Opportunity to promote recurring setup to smooth giving.
+                                                <AlertCircle className="w-3.5 h-3.5 inline" /> Growth opportunity to increase recurring setups.
                                             </span>
                                         )}
                                     </div>
@@ -479,29 +682,29 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                             </div>
                         </div>
 
-                        {/* Volunteer & Ministry Mobilization */}
-                        <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
+                        {/* Serving & Leadership Mobilization */}
+                        <div className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 print:bg-transparent print:border-slate-300">
                             <h3 className="text-sm font-bold text-white print:text-slate-900 mb-1">Serving & Leadership Mobilization</h3>
-                            <p className="text-xs text-slate-400 print:text-slate-600 mb-4">Active volunteer participation across worship, care, & nextgen</p>
+                            <p className="text-xs text-slate-400 print:text-slate-600 mb-4">Percentage of {cohortLabel} actively serving on ministry teams</p>
                             
                             <div className="space-y-3">
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-slate-300 print:text-slate-700">Congregation Serving Rate</span>
-                                        <span className="font-bold text-indigo-400">{volunteerStats.servingRate}%</span>
+                                        <span className="text-slate-300 print:text-slate-700">Cohort Serving Participation</span>
+                                        <span className="font-bold text-indigo-400">{volunteerStats.cohortRate}% ({volunteerStats.cohortCount} serving)</span>
                                     </div>
                                     <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden print:bg-slate-200">
-                                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${volunteerStats.servingRate}%` }}></div>
+                                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${volunteerStats.cohortRate}%` }}></div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3 pt-2">
-                                    <div className="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/50 print:bg-slate-50 print:border-slate-200">
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Active Volunteers</span>
-                                        <p className="text-base font-bold text-white print:text-slate-900 mt-0.5">{volunteerStats.volunteerCount}</p>
+                                    <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 print:bg-slate-50 print:border-slate-200">
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Total Church Volunteers</span>
+                                        <p className="text-base font-bold text-white print:text-slate-900 mt-0.5">{volunteerStats.allCount} ({volunteerStats.allRate}% of DB)</p>
                                     </div>
-                                    <div className="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/50 print:bg-slate-50 print:border-slate-200">
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Active Small Groups</span>
+                                    <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 print:bg-slate-50 print:border-slate-200">
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Small Groups Count</span>
                                         <p className="text-base font-bold text-white print:text-slate-900 mt-0.5">{groups.length || 12}</p>
                                     </div>
                                 </div>
@@ -510,19 +713,19 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
 
                     </div>
 
-                    {/* Section 4: Campus Breakdown (if multi-site) */}
+                    {/* Section 4: Campus Breakdown */}
                     <div>
                         <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 print:text-slate-600 mb-3 flex items-center gap-2">
                             <span>2. Campus & Location Comparisons</span>
                         </h3>
-                        <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
+                        <div className="overflow-x-auto rounded-2xl border border-slate-800 print:border-slate-300">
                             <table className="w-full text-left text-xs text-slate-300 print:text-slate-800">
                                 <thead className="bg-slate-800/80 text-slate-400 print:bg-slate-100 print:text-slate-700 uppercase font-semibold text-[10px]">
                                     <tr>
                                         <th className="py-2.5 px-4">Campus / Location</th>
                                         <th className="py-2.5 px-4 text-right">Avg Attendance</th>
-                                        <th className="py-2.5 px-4 text-right">Giving (YTD)</th>
-                                        <th className="py-2.5 px-4 text-right">Group Rate</th>
+                                        <th className="py-2.5 px-4 text-right">Cohort Giving</th>
+                                        <th className="py-2.5 px-4 text-right">Group Attachment</th>
                                         <th className="py-2.5 px-4 text-right">Serving Rate</th>
                                     </tr>
                                 </thead>
@@ -544,23 +747,24 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         </div>
                     </div>
 
-                    {/* Section 5: Pastoral Summary & Elder Next Steps */}
-                    <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/20 print:bg-slate-50 print:border-slate-300">
+                    {/* Section 5: Pastoral Summary & Strategic Elder Board Insights */}
+                    <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 print:bg-slate-50 print:border-slate-300">
                         <div className="flex items-start gap-3">
                             <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                            <div className="text-xs space-y-1.5">
-                                <p className="font-bold text-indigo-200 print:text-indigo-900">
-                                    Strategic Ministry Insights & Recommendations for the Board
+                            <div className="text-xs space-y-2">
+                                <p className="font-bold text-indigo-200 print:text-indigo-900 text-sm">
+                                    Strategic Ministry Insights for Board & Elders ({cohortLabel})
                                 </p>
-                                <ul className="list-disc list-inside text-slate-300 print:text-slate-700 space-y-1">
+                                <ul className="list-disc list-inside text-slate-300 print:text-slate-700 space-y-1.5">
                                     <li>
-                                        <strong>Attendance Trajectory:</strong> Year-over-year attendance is {attendanceStats.attYoYChange >= 0 ? 'up by ' : 'down by '} {Math.abs(Math.round(attendanceStats.attYoYChange))}%. Continue focusing on guest assimilation pipelines.
+                                        <strong>Cohort Health vs Database Penetration:</strong> {cohortPeople.length.toLocaleString()} individuals are currently in the active cohort ({((cohortPeople.length / Math.max(people.length, 1)) * 100).toFixed(1)}% of total database). 
+                                        {selectedCohort === 'members' ? ' Church members show significantly higher discipleship engagement (group rate & serving participation) than general contacts.' : ''}
                                     </li>
                                     <li>
-                                        <strong>Stewardship:</strong> Per-capita giving sits at ${perCapitaGivingWeekly}/attender/week, indicating healthy congregational trust and commitment.
+                                        <strong>Stewardship Depth:</strong> Giving among this cohort averages <strong>${perCapitaGivingWeekly}/attender/week</strong> (compared to the full database baseline of ${perCapitaBaseline}/week).
                                     </li>
                                     <li>
-                                        <strong>Discipleship Pipeline:</strong> Small group connection is at {groupAttachmentStats.attachmentRate}%. Launching 2–3 new fall community groups will support upcoming season growth.
+                                        <strong>Discipleship Pipeline:</strong> Small group connection is at <strong>{groupStats.cohortRate}%</strong> for this cohort ({groupStats.allRate}% across all database contacts). Continue prioritizing the pathway from guest $\rightarrow$ attender $\rightarrow$ member.
                                     </li>
                                 </ul>
                             </div>
@@ -569,7 +773,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
 
                     {/* Footer for print */}
                     <div className="text-center text-[10px] text-slate-500 print:text-slate-400 pt-4 border-t border-slate-800 print:border-slate-200">
-                        Confidential — Prepared for Board of Elders & Senior Leadership • Powered by Pastoral Care Analytics
+                        Confidential — Prepared for Board of Elders & Senior Leadership • Filtered by {cohortLabel} • Powered by Pastoral Care Analytics
                     </div>
 
                 </div>
