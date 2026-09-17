@@ -8,6 +8,7 @@ export interface PayoutMatchOptions {
     targetNet?: number;
     targetFees?: number;
     targetTitheGross?: number;
+    targetTransactionCount?: number;
     stripePayoutId?: string;
     searchWindowDays?: number; // default 14 days before payout date
     paymentMethodFilter?: 'all' | 'card' | 'ach';
@@ -21,6 +22,7 @@ export interface PayoutMatchResult {
     totalFees: number;
     totalNet: number;
     totalTitheGross?: number;
+    transactionCount: number;
     matchedDonations: DetailedDonation[];
     fundsBreakdown: GivingBatchFundBreakdown[];
     recommendedBatchName: string;
@@ -240,13 +242,13 @@ export function matchDonationsForPayout(
         logs.push(msg);
     };
 
-    const { payoutDate, endDate, startDate, targetGross, targetNet, targetFees, targetTitheGross, stripePayoutId } = options;
+    const { payoutDate, endDate, startDate, targetGross, targetNet, targetFees, targetTitheGross, targetTransactionCount, stripePayoutId } = options;
     const pDateStr = (endDate || payoutDate).slice(0, 10);
     const sDateStr = startDate ? startDate.slice(0, 10) : 'Auto';
 
     log(`🚀 Starting AI Stripe Payout Matcher`);
     log(`📅 Payout Date: ${pDateStr} | Search Window: [${sDateStr} to ${pDateStr}]`);
-    log(`🎯 Target Criteria: ${targetGross ? `Gross $${targetGross.toFixed(2)}` : ''} ${targetNet ? `Net $${targetNet.toFixed(2)}` : ''} ${targetTitheGross ? `| Tithe $${targetTitheGross.toFixed(2)}` : ''} ${targetFees ? `| Fees $${Math.abs(targetFees).toFixed(2)}` : ''}`);
+    log(`🎯 Target Criteria: ${targetGross ? `Gross $${targetGross.toFixed(2)}` : ''} ${targetNet ? `Net $${targetNet.toFixed(2)}` : ''} ${targetTitheGross ? `| Tithe $${targetTitheGross.toFixed(2)}` : ''} ${targetFees ? `| Fees $${Math.abs(targetFees).toFixed(2)}` : ''} ${targetTransactionCount ? `| Count: ${targetTransactionCount} gifts` : ''}`);
     log(`⚙️ Filter Settings: Method=${options.paymentMethodFilter || 'all'}, IncludeBatched=${!!options.includeBatched}`);
 
     const audit: CandidateFilterAudit = {
@@ -292,9 +294,10 @@ export function matchDonationsForPayout(
     const targetTitheCents = targetTitheGross !== undefined && targetTitheGross > 0
         ? Math.round(targetTitheGross * 100)
         : null;
+    const targetCount = targetTransactionCount !== undefined && targetTransactionCount > 0 ? targetTransactionCount : null;
 
-    if (!hasTargetGross && !hasTargetNet && !targetTitheCents) {
-        log(`ℹ️ No target amount provided — returning all ${parents.length} candidate gifts in window.`);
+    if (!hasTargetGross && !hasTargetNet && !targetTitheCents && !targetCount) {
+        log(`ℹ️ No target amount or count provided — returning all ${parents.length} candidate gifts in window.`);
         const res = buildResult(parents, pDateStr, stripePayoutId, 0, true);
         res.matchLogs = logs;
         res.searchStrategy = 'All Candidates';
@@ -320,13 +323,14 @@ export function matchDonationsForPayout(
     let bestGrossDeltaCents = Infinity;
     let bestTitheDeltaCents = Infinity;
     let bestFeeDeltaCents = Infinity;
+    let bestCountDelta = Infinity;
     let matchedStrategy = '';
 
     /**
      * Scoring function:
      * Primary constraint is Gross (or Net) difference.
      * We scale diff by 1,000,000 so that ANY closer gross match strictly beats a worse gross match,
-     * while Tithe and Fees serve as optimal tie-breakers and ranking guidance.
+     * while transaction count, Tithe, and Fees serve as optimal tie-breakers and ranking guidance.
      */
     function evaluateSubset(chosen: ParentDonationGroup[], accG: number, accF: number, accT: number, strategy: string) {
         const accN = accG - accF;
@@ -337,11 +341,12 @@ export function matchDonationsForPayout(
             diff = Math.abs(accN - targetNetCents);
         }
 
+        const countDiff = targetCount !== null ? Math.abs(chosen.length - targetCount) : 0;
         const titheDiff = targetTitheCents !== null ? Math.abs(accT - targetTitheCents) : 0;
         const feeDiff = targetFeeCents !== null ? Math.abs(accF - targetFeeCents) : 0;
 
-        // Dominant score: gross/net diff dominates completely, with tithe and fee acting as tiebreakers
-        const score = (diff * 1000000) + (titheDiff * 2) + feeDiff;
+        // Dominant score: gross/net diff dominates completely (x1,000,000), transaction count difference (x100), tithe diff (x2), fee diff (x1)
+        const score = (diff * 1000000) + (countDiff * 100) + (titheDiff * 2) + feeDiff;
 
         if (score < minScore) {
             minScore = score;
@@ -349,6 +354,7 @@ export function matchDonationsForPayout(
             bestGrossDeltaCents = hasTargetGross ? (accG - targetGrossCents) : 0;
             bestTitheDeltaCents = targetTitheCents !== null ? (accT - targetTitheCents) : 0;
             bestFeeDeltaCents = targetFeeCents !== null ? (accF - targetFeeCents) : 0;
+            bestCountDelta = targetCount !== null ? (chosen.length - targetCount) : 0;
             bestChosen = [...chosen];
             matchedStrategy = strategy;
         }
@@ -369,22 +375,22 @@ export function matchDonationsForPayout(
             currentF += candidateItems[j].fCents;
             currentT += candidateItems[j].tCents;
             evaluateSubset(sub, currentG, currentF, currentT, 'Contiguous Time Window');
-            if (bestDiffCents === 0 && (targetTitheCents === null || bestTitheDeltaCents === 0) && (targetFeeCents === null || bestFeeDeltaCents === 0)) {
+            if (bestDiffCents === 0 && (targetCount === null || bestCountDelta === 0) && (targetTitheCents === null || bestTitheDeltaCents === 0) && (targetFeeCents === null || bestFeeDeltaCents === 0)) {
                 break;
             }
         }
         if (minScore === 0) break;
     }
 
-    if (bestDiffCents === 0) {
+    if (bestDiffCents === 0 && (targetCount === null || bestCountDelta === 0)) {
         log(`✨ Pass 1 Succeeded: Found exact contiguous window match! (${bestChosen?.length} gifts)`);
     } else {
-        log(`ℹ️ Pass 1 closest contiguous diff: $${(bestDiffCents / 100).toFixed(2)}`);
+        log(`ℹ️ Pass 1 closest contiguous diff: $${(bestDiffCents / 100).toFixed(2)}${targetCount !== null ? ` (Count: ${bestChosen?.length || 0}/${targetCount})` : ''}`);
     }
 
     // ─── PASS 2: Dynamic Branch-and-Bound Subset Search ─────────────────────
-    // If not exact or if search can improve secondary criteria
-    if (bestDiffCents > 0 || (targetTitheCents !== null && Math.abs(bestTitheDeltaCents) > 0)) {
+    // If not exact or if search can improve secondary criteria (like transaction count or tithe)
+    if (bestDiffCents > 0 || (targetCount !== null && bestCountDelta !== 0) || (targetTitheCents !== null && Math.abs(bestTitheDeltaCents) > 0)) {
         log(`🔍 Pass 2: Running branch-and-bound subset search across all ${n} candidate gifts...`);
 
         // Compute suffix sums for exact bounding
@@ -402,7 +408,7 @@ export function matchDonationsForPayout(
         const MAX_ITERATIONS = 150000;
         const startTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
-        function searchSubset(idx: number, accG: number, accF: number, accT: number) {
+        function searchSubset(idx: number, accG: number, accF: number, accT: number, strictCount: boolean) {
             if (minScore === 0) return;
             iterations++;
             if (iterations > MAX_ITERATIONS) return;
@@ -424,9 +430,14 @@ export function matchDonationsForPayout(
             if (hasTargetGross && accG > targetGrossCents) return;
             if (hasTargetNet && accN > targetNetCents) return;
 
+            // Strict count pruning when requested for speed
+            if (strictCount && targetCount !== null) {
+                if (stack.length > targetCount) return;
+                if ((stack.length + (n - idx)) < targetCount) return;
+            }
+
             // Pruning if remaining items cannot reach target
             if (hasTargetGross && (accG + suffixG[idx]) < targetGrossCents) {
-                // Record the best we can do with remaining, then prune
                 evaluateSubset(stack, accG, accF, accT, 'Partial Subset');
                 return;
             }
@@ -441,15 +452,23 @@ export function matchDonationsForPayout(
                 idx + 1,
                 accG + candidateItems[idx].gCents,
                 accF + candidateItems[idx].fCents,
-                accT + candidateItems[idx].tCents
+                accT + candidateItems[idx].tCents,
+                strictCount
             );
             stack.pop();
 
             // Exclude current candidate item
-            searchSubset(idx + 1, accG, accF, accT);
+            searchSubset(idx + 1, accG, accF, accT, strictCount);
         }
 
-        searchSubset(0, 0, 0, 0);
+        // If targetCount is specified, first run with strict count pruning for instant exact convergence
+        if (targetCount !== null) {
+            searchSubset(0, 0, 0, 0, true);
+        }
+        // If not exact match yet or targetCount not specified, run/fallback to general search
+        if (minScore !== 0 && iterations < MAX_ITERATIONS) {
+            searchSubset(0, 0, 0, 0, false);
+        }
         log(`ℹ️ Pass 2 completed ${iterations} search iterations in ${Math.round(((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime))}ms`);
     }
 
@@ -458,11 +477,12 @@ export function matchDonationsForPayout(
         return null;
     }
 
-    const isExact = bestDiffCents === 0;
+    const isExact = bestDiffCents === 0 && (targetCount === null || bestCountDelta === 0);
     const diffDollars = Math.round(bestDiffCents) / 100;
     const grossDeltaDollars = Math.round(bestGrossDeltaCents) / 100;
     const titheDeltaDollars = Math.round(bestTitheDeltaCents) / 100;
     const feeDeltaDollars = Math.round(bestFeeDeltaCents) / 100;
+    const countDelta = targetCount !== null ? bestChosen.length - targetCount : 0;
 
     log(`🏁 Match Results Summary:`);
     log(`   🎯 Match Type: ${isExact ? 'EXACT MATCH ($0.00 difference)' : `APPROXIMATE MATCH (difference: $${diffDollars.toFixed(2)})`}`);
@@ -471,6 +491,7 @@ export function matchDonationsForPayout(
     if (targetGross) log(`   💵 Target Gross: $${targetGross.toFixed(2)} | Matched Gross Delta: ${grossDeltaDollars >= 0 ? '+' : ''}$${grossDeltaDollars.toFixed(2)}`);
     if (targetTitheGross) log(`   🏛️ Target Tithe: $${targetTitheGross.toFixed(2)} | Matched Tithe Delta: ${titheDeltaDollars >= 0 ? '+' : ''}$${titheDeltaDollars.toFixed(2)}`);
     if (targetFees) log(`   💳 Expected Fees: $${Math.abs(targetFees).toFixed(2)} | Matched Fees Delta: ${feeDeltaDollars >= 0 ? '+' : ''}$${feeDeltaDollars.toFixed(2)}`);
+    if (targetCount) log(`   🔢 Target Count: ${targetCount} gifts | Matched Count Delta: ${countDelta >= 0 ? '+' : ''}${countDelta}`);
 
     const result = buildResult(bestChosen, pDateStr, stripePayoutId, diffDollars, isExact);
     result.matchLogs = logs;
@@ -577,6 +598,7 @@ function buildResult(
         totalFees: finalFees,
         totalNet: finalNet,
         totalTitheGross: finalTithe,
+        transactionCount: parents.length,
         matchedDonations: allDesignations,
         fundsBreakdown,
         recommendedBatchName,

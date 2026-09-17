@@ -18,7 +18,8 @@ import {
     ChevronUp,
     Copy,
     Info,
-    Landmark
+    Landmark,
+    Hash
 } from 'lucide-react';
 import { DetailedDonation, GivingBatch, GivingBatchFundBreakdown } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -56,6 +57,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     const [targetMode, setTargetMode] = useState<'net' | 'gross'>('gross');
     const [targetFees, setTargetFees] = useState<string>('');
     const [targetTitheGross, setTargetTitheGross] = useState<string>('');
+    const [targetTransactionCount, setTargetTransactionCount] = useState<string>('');
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
@@ -218,6 +220,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
             const numFees = targetFees ? Math.abs(parseFloat(targetFees)) : undefined;
             const numTithe = targetTitheGross ? parseFloat(targetTitheGross) : undefined;
+            const numCount = targetTransactionCount ? parseInt(targetTransactionCount, 10) : undefined;
 
             const res = matchDonationsForPayout(candidateDonations, {
                 payoutDate,
@@ -227,6 +230,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 targetNet: targetMode === 'net' ? numAmount : undefined,
                 targetFees: isNaN(numFees!) ? undefined : numFees,
                 targetTitheGross: isNaN(numTithe!) ? undefined : numTithe,
+                targetTransactionCount: isNaN(numCount!) ? undefined : numCount,
                 stripePayoutId: stripePayoutId.trim() || undefined,
                 searchWindowDays,
                 paymentMethodFilter,
@@ -299,6 +303,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     const numTargetAmount = parseFloat(targetAmount) || 0;
     const numTargetFees = Math.abs(parseFloat(targetFees) || 0);
     const numTargetTithe = parseFloat(targetTitheGross) || 0;
+    const numTargetCount = parseInt(targetTransactionCount, 10) || 0;
 
     const targetGrossVal = targetMode === 'gross' ? numTargetAmount : (numTargetAmount > 0 && numTargetFees > 0 ? numTargetAmount + numTargetFees : 0);
     const targetNetVal = targetMode === 'net' ? numTargetAmount : (targetGrossVal > 0 && numTargetFees > 0 ? targetGrossVal - numTargetFees : 0);
@@ -307,11 +312,12 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     const netDiff = targetNetVal > 0 ? Math.round((activeNet - targetNetVal) * 100) / 100 : 0;
     const feesDiff = numTargetFees > 0 ? Math.round((activeFees - numTargetFees) * 100) / 100 : 0;
     const titheDiff = numTargetTithe > 0 ? Math.round((activeTithe - numTargetTithe) * 100) / 100 : 0;
+    const countDiff = numTargetCount > 0 ? activeParentCount - numTargetCount : 0;
 
     const isExactMatchActive = (
         (targetMode === 'net' && numTargetAmount > 0 && Math.abs(netDiff) < 0.005) ||
         (targetMode === 'gross' && numTargetAmount > 0 && Math.abs(grossDiff) < 0.005)
-    ) && (numTargetTithe === 0 || Math.abs(titheDiff) < 0.005);
+    ) && (numTargetTithe === 0 || Math.abs(titheDiff) < 0.005) && (numTargetCount === 0 || countDiff === 0);
 
     const handleCreateBatch = async (andSendToQbo: boolean = false) => {
         if (activeDonations.length === 0) return;
@@ -582,7 +588,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                             </div>
 
                             {/* Optional Stripe Payout ID */}
-                            <div className="sm:col-span-1 lg:col-span-2">
+                            <div>
                                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                                     <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                                     Stripe Payout ID <span className="text-slate-400 font-normal">(Optional)</span>
@@ -593,6 +599,23 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     value={stripePayoutId}
                                     onChange={(e) => setStripePayoutId(e.target.value)}
                                     className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-mono placeholder:font-sans focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            {/* Optional Transaction Count */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                    <Hash className="w-3.5 h-3.5 text-purple-500" />
+                                    Transaction Count <span className="text-slate-400 font-normal">(Optional)</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    placeholder="e.g. 56"
+                                    value={targetTransactionCount}
+                                    onChange={(e) => setTargetTransactionCount(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-purple-500 outline-none"
                                 />
                             </div>
                         </div>
@@ -715,7 +738,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     {(candidateGroups.length > 0 || selectedParentIds.size > 0) && (
                         <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-4">
                             {/* Scoreboard Metrics Row */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                                 {/* Gross Scorecard */}
                                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                                     <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-1">
@@ -796,6 +819,26 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                     {targetNetVal > 0 && (
                                         <div className="text-[10px] text-slate-400 mt-0.5">
                                             Target: ${targetNetVal.toFixed(2)}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Transactions Count Scorecard */}
+                                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-semibold mb-1">
+                                        <span>TRANSACTIONS</span>
+                                        {numTargetCount > 0 && (
+                                            <span className={countDiff === 0 ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                                                {countDiff === 0 ? '✓ Matched' : `${countDiff > 0 ? '+' : ''}${countDiff}`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-base font-bold text-purple-600 dark:text-purple-400">
+                                        {activeParentCount}
+                                    </div>
+                                    {numTargetCount > 0 && (
+                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                            Target: {numTargetCount}
                                         </div>
                                     )}
                                 </div>
