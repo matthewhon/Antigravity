@@ -13,6 +13,12 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          'https': path.resolve(__dirname, 'services/emptyMock.ts'),
+          'http': path.resolve(__dirname, 'services/emptyMock.ts'),
+          'node:https': path.resolve(__dirname, 'services/emptyMock.ts'),
+          'node:http': path.resolve(__dirname, 'services/emptyMock.ts'),
+          'node:fs': path.resolve(__dirname, 'services/emptyMock.ts'),
+          'fs': path.resolve(__dirname, 'services/emptyMock.ts')
         }
       },
       build: {

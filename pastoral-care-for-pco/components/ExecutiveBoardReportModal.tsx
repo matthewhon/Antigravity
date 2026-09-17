@@ -6,7 +6,7 @@ import {
     Filter, Check, UserCheck, ArrowRight, RefreshCw, Layers3,
     UserPlus, UserMinus, Activity, Target, Percent, GitBranch,
     Baby, Flame, CheckSquare, Zap, Compass, PieChart as PieChartIcon,
-    AlertTriangle, HeartHandshake, BookOpen, Clock
+    AlertTriangle, HeartHandshake, BookOpen, Clock, Download, Presentation
 } from 'lucide-react';
 import { 
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
@@ -17,6 +17,7 @@ import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
 import { calculateMembershipHistory } from '../services/analyticsService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from '../services/riskService';
+import { generateBoardReportPresentation } from '../services/boardReportPptxService';
 import { 
     PcoPerson, DetailedDonation, PcoCheckInRecord, PcoGroup, 
     ServicesTeam, PcoCampus, BudgetRecord, GiftsTestResponse, 
@@ -51,6 +52,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
     const [listMemberIds, setListMemberIds] = useState<Set<string> | null>(null);
     const [isLoadingList, setIsLoadingList] = useState(false);
+    const [isExportingPptx, setIsExportingPptx] = useState(false);
     
     // Assessment Test Responses State
     const [giftsResponses, setGiftsResponses] = useState<GiftsTestResponse[]>([]);
@@ -928,6 +930,106 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         window.print();
     };
 
+    const handleExportPptx = async () => {
+        try {
+            setIsExportingPptx(true);
+            await generateBoardReportPresentation({
+                churchName: church?.name || 'Grace Community Church',
+                year: selectedYear,
+                cohortLabel,
+                cohortDescription,
+                cohortSize: cohortPeople.length,
+                totalPeopleCount: people.length,
+                attendance: {
+                    cohortAvgWeekly: attendanceStats.cohortAvgWeekly,
+                    totalAvgWeekly: attendanceStats.totalAvgWeekly,
+                    attYoYChange: attendanceStats.attYoYChange
+                },
+                financials: {
+                    operatingActual: financialBudgetStats.totalOperatingActual,
+                    ytdBudgetTarget: financialBudgetStats.ytdOperatingBudgetTarget,
+                    variancePct: financialBudgetStats.operatingBudgetVariancePct,
+                    varianceAmount: financialBudgetStats.operatingBudgetVarianceAmount,
+                    designatedActual: financialBudgetStats.totalDesignatedActual,
+                    operatingYoYChange: financialBudgetStats.operatingYoYChange,
+                    operatingFundNames: financialBudgetStats.operatingFundNames
+                },
+                averageGift: {
+                    cohortAvg: averageGiftStats.cohortAvg,
+                    churchWideAvg: averageGiftStats.churchWideAvg,
+                    avgGiftYoYChange: averageGiftStats.avgGiftYoYChange
+                },
+                groups: {
+                    cohortRate: groupStats.cohortRate,
+                    cohortCount: groupStats.cohortCount,
+                    allRate: groupStats.allRate
+                },
+                nextGen: {
+                    weeklyAvgKids: nextGenStats.weeklyAvgKids,
+                    uniqueKidsCount: nextGenStats.uniqueKidsCount,
+                    familyRetentionRate: nextGenStats.familyRetentionRate,
+                    kidsPctOfTotal: nextGenStats.kidsPctOfTotal
+                },
+                pastoralCare: {
+                    completedTouches: pastoralCareStats.completedTouches,
+                    totalTouches: pastoralCareStats.totalTouches,
+                    shepherdingCoveragePct: pastoralCareStats.shepherdingCoveragePct,
+                    vulnerableContactedCount: pastoralCareStats.vulnerableContactedCount,
+                    vulnerableTotal: pastoralCareStats.vulnerableTotal,
+                    careVelocityDays: pastoralCareStats.careVelocityDays
+                },
+                volunteerSustainability: {
+                    forwardRosterFillPct: volunteerSustainabilityStats.forwardRosterFillPct,
+                    highFatigueCount: volunteerSustainabilityStats.highFatigueCount,
+                    burnoutConsecutive: volunteerSustainabilityStats.burnoutConsecutive,
+                    highCapacityServices: volunteerSustainabilityStats.highCapacityServices
+                },
+                spiritualGifts: {
+                    adoptionPct: assessmentStats.adoptionPct,
+                    assessedCount: assessmentStats.assessedCount,
+                    giftDeploymentRate: assessmentStats.giftDeploymentRate,
+                    topGiftsText: assessmentStats.topGifts.map(g => `${g.gift} (${g.count})`).join(', ') || 'Helps, Teaching, Encouragement'
+                },
+                riskDistribution: {
+                    healthyPct: riskStats.healthyPct,
+                    healthyCount: riskStats.healthy,
+                    atRiskPct: riskStats.atRiskPct,
+                    atRiskCount: riskStats.atRisk,
+                    disconnectedPct: riskStats.disconnectedPct,
+                    disconnectedCount: riskStats.disconnected
+                },
+                visitorFunnel: {
+                    firstVisitCount: guestFunnelStats.firstVisitCount,
+                    secondVisitCount: guestFunnelStats.secondVisitCount,
+                    assimilatedCount: guestFunnelStats.assimilatedCount,
+                    conversionRate: guestFunnelStats.conversionRate,
+                    stalledCount: guestFunnelStats.stalledCount
+                },
+                engagementTiers: {
+                    corePct: engagementTiers.corePct,
+                    coreCount: engagementTiers.core,
+                    regularPct: engagementTiers.regularPct,
+                    regularCount: engagementTiers.regular,
+                    casualPct: engagementTiers.casualPct,
+                    casualCount: engagementTiers.casual,
+                    fadingPct: engagementTiers.fadingPct,
+                    fadingCount: engagementTiers.fading
+                },
+                insights: [
+                    `Operating Budget Pacing: Operating giving is tracking at $${Math.round(financialBudgetStats.totalOperatingActual).toLocaleString()} (${financialBudgetStats.operatingBudgetVariancePct >= 0 ? '+' : ''}${financialBudgetStats.operatingBudgetVariancePct}% vs YTD budget target of $${Math.round(financialBudgetStats.ytdOperatingBudgetTarget).toLocaleString()}). Designated campaigns brought in $${Math.round(financialBudgetStats.totalDesignatedActual).toLocaleString()}.`,
+                    `Average Gift & Participation: Average donation size is $${averageGiftStats.cohortAvg.toLocaleString()} with ${stewardshipDepth.participationRate}% giving participation.`,
+                    `NextGen Vitality: Weekly kids attendance is averaging ${nextGenStats.weeklyAvgKids.toLocaleString()} (${nextGenStats.kidsPctOfTotal}% of total Sunday congregation) with a ${nextGenStats.familyRetentionRate}% family retention rate.`,
+                    `Volunteer Fatigue & Roster: Forward 3-week serving positions are ${volunteerSustainabilityStats.forwardRosterFillPct}% filled. ${volunteerSustainabilityStats.highFatigueCount > 0 ? `${volunteerSustainabilityStats.highFatigueCount} volunteers have served >${volunteerSustainabilityStats.burnoutConsecutive} consecutive Sundays and need rotation rest.` : 'Volunteer fatigue levels are healthy.'}`,
+                    `Pastoral Care & Discipleship: ${pastoralCareStats.shepherdingCoveragePct}% of vulnerable members have received pastoral touchpoints. Small group connection is at ${groupStats.cohortRate}% and spiritual gifts assessment adoption is at ${assessmentStats.adoptionPct}% (${assessmentStats.giftDeploymentRate}% placement alignment).`
+                ]
+            });
+        } catch (err) {
+            console.error('Failed to export PowerPoint presentation:', err);
+        } finally {
+            setIsExportingPptx(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -1057,10 +1159,25 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                             ))}
                         </select>
 
+                        {/* PowerPoint Export Button */}
+                        <button 
+                            onClick={handleExportPptx}
+                            disabled={isExportingPptx}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+                            title="Export slide deck for Board & Elder presentation (.pptx)"
+                        >
+                            {isExportingPptx ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Presentation className="w-4 h-4" />
+                            )}
+                            <span>{isExportingPptx ? 'Generating Slides...' : 'Export PPTX'}</span>
+                        </button>
+
                         {/* Print / Export Button */}
                         <button 
                             onClick={handlePrint}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
                         >
                             <Printer className="w-4 h-4" />
                             <span>Print / PDF Export</span>
