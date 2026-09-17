@@ -964,6 +964,24 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                     cohortCount: groupStats.cohortCount,
                     allRate: groupStats.allRate
                 },
+                monthlyTrend: monthlyTrendData.map(m => ({
+                    month: m.month,
+                    giving: m.Giving,
+                    priorGiving: m.PriorGiving,
+                    attendance: m.Attendance
+                })),
+                recurringGiving: {
+                    recurringPercent: recurringGivingStats.recurringPercent,
+                    oneTimePercent: recurringGivingStats.oneTimePercent,
+                    recurringTotal: recurringGivingStats.recurringTotal,
+                    oneTimeTotal: recurringGivingStats.oneTimeTotal
+                },
+                stewardshipDepth: {
+                    activeGiverCount: stewardshipDepth.activeGiverCount,
+                    participationRate: stewardshipDepth.participationRate,
+                    concentrationPct: stewardshipDepth.concentrationPct,
+                    onlinePct: stewardshipDepth.onlinePct
+                },
                 nextGen: {
                     weeklyAvgKids: nextGenStats.weeklyAvgKids,
                     uniqueKidsCount: nextGenStats.uniqueKidsCount,
@@ -988,7 +1006,8 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                     adoptionPct: assessmentStats.adoptionPct,
                     assessedCount: assessmentStats.assessedCount,
                     giftDeploymentRate: assessmentStats.giftDeploymentRate,
-                    topGiftsText: assessmentStats.topGifts.map(g => `${g.gift} (${g.count})`).join(', ') || 'Helps, Teaching, Encouragement'
+                    topGiftsText: assessmentStats.topGifts.map(g => `${g.gift} (${g.count})`).join(', ') || 'Helps, Teaching, Encouragement',
+                    distribution: assessmentStats.topGifts.map(g => ({ gift: g.gift, count: g.count }))
                 },
                 riskDistribution: {
                     healthyPct: riskStats.healthyPct,
