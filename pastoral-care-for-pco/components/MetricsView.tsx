@@ -5,6 +5,8 @@ import { firestore } from '../services/firestoreService';
 import { StatCard, WidgetWrapper } from './SharedUI';
 import { syncYoutubeMetrics } from '../services/youtubeService';
 import WidgetsController from './WidgetsController';
+import { useTenantData } from '../contexts/TenantDataContext';
+import { calculateNewGroupEngagements, calculateNewServiceEngagements } from '../services/analyticsService';
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -51,6 +53,7 @@ interface MetricsViewPropsExtended extends MetricsViewProps {
 }
 
 export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, systemSettings, onUpdateChurch, onUpdateWidgets, activePage = 'Dashboard' }) => {
+    const { groups = [], people = [], checkIns = [], servicesData = null } = useTenantData();
     const activeTab = activePage;
     const [definitions, setDefinitions] = useState<MetricDefinition[]>([]);
     const [ministries, setMinistries] = useState<Ministry[]>([]);
@@ -174,7 +177,67 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                 firestore.getMinistries(churchId),
                 firestore.getMetricEntries(churchId)
             ]);
-            setDefinitions(fetchedDefs);
+            let updatedDefs = [...fetchedDefs];
+            let groupsMin = fetchedMinistries.find(m => m.id === 'min_groups' || m.name.toLowerCase() === 'groups');
+            let servicesMin = fetchedMinistries.find(m => m.id === 'min_services' || m.name.toLowerCase() === 'services');
+
+            if (!groupsMin) {
+                groupsMin = { id: 'min_groups', churchId, name: 'Groups', isActive: true };
+                try {
+                    await firestore.saveMinistry(groupsMin);
+                    fetchedMinistries.push(groupsMin);
+                } catch (e) {
+                    console.error("Failed to seed Groups ministry", e);
+                }
+            }
+
+            if (!servicesMin) {
+                servicesMin = { id: 'min_services', churchId, name: 'Services', isActive: true };
+                try {
+                    await firestore.saveMinistry(servicesMin);
+                    fetchedMinistries.push(servicesMin);
+                } catch (e) {
+                    console.error("Failed to seed Services ministry", e);
+                }
+            }
+
+            const hasGroupsDef = updatedDefs.some(d => d.id === 'def_groups_new_engagements' || (d.ministryId === groupsMin?.id && d.name.toLowerCase().includes('new group engagement')));
+            if (!hasGroupsDef && groupsMin) {
+                const groupsDef: MetricDefinition = {
+                    id: 'def_groups_new_engagements',
+                    churchId,
+                    ministryId: groupsMin.id,
+                    name: 'New Group Engagements',
+                    type: 'number',
+                    isActive: true
+                };
+                try {
+                    await firestore.saveMetricDefinition(groupsDef);
+                    updatedDefs.push(groupsDef);
+                } catch (e) {
+                    console.error("Failed to seed Groups metric definition", e);
+                }
+            }
+
+            const hasServicesDef = updatedDefs.some(d => d.id === 'def_services_new_engagements' || (d.ministryId === servicesMin?.id && d.name.toLowerCase().includes('new service engagement')));
+            if (!hasServicesDef && servicesMin) {
+                const servicesDef: MetricDefinition = {
+                    id: 'def_services_new_engagements',
+                    churchId,
+                    ministryId: servicesMin.id,
+                    name: 'New Service Engagements',
+                    type: 'number',
+                    isActive: true
+                };
+                try {
+                    await firestore.saveMetricDefinition(servicesDef);
+                    updatedDefs.push(servicesDef);
+                } catch (e) {
+                    console.error("Failed to seed Services metric definition", e);
+                }
+            }
+
+            setDefinitions(updatedDefs);
             setMinistries(fetchedMinistries);
             setEntries(fetchedEntries);
             
@@ -199,6 +262,8 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             { id: 'census_poverty', label: 'Census: Poverty Rate', icon: '📉' },
             { id: 'missional_gap', label: 'Missional Gap', icon: '🏙️' },
             { id: 'city_penetration', label: 'City Penetration', icon: '📍' },
+            { id: 'groups_new_engagement', label: 'New Group Engagements', icon: '🌱' },
+            { id: 'services_new_engagement', label: 'New Service Engagements', icon: '✨' },
         ];
 
         const showYoutube = church?.metricsSettings?.showYoutubeWidgets || false;
@@ -545,6 +610,76 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     </WidgetWrapper>
                 );
             }
+        }
+
+        if (id === 'groups_new_engagement') {
+            const stats = calculateNewGroupEngagements(groups, people);
+            const isPositive = !stats.growthRate.startsWith('-');
+            return (
+                <WidgetWrapper title="New Group Engagements" onRemove={() => handleRemoveWidget(id)} source="Groups Ministry">
+                    <div className="flex flex-col h-full justify-between">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <div className="text-3xl font-black text-slate-850 dark:text-white tracking-tight tabular-nums">
+                                    {stats.thisMonthCount}
+                                </div>
+                                <div className="text-[11px] font-medium text-slate-400 mt-0.5">
+                                    New engagements this month (vs {stats.lastMonthCount} last mo)
+                                </div>
+                            </div>
+                            <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                                {stats.growthRate}
+                            </div>
+                        </div>
+                        <div className="h-28 w-full mt-2">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={stats.monthlyTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: currentTheme === 'dark' ? '#0f172a' : '#ffffff', borderColor: currentTheme === 'dark' ? '#334155' : '#e2e8f0', borderRadius: '8px', fontSize: '12px' }} formatter={(val: any) => [val, 'New Engagements']} />
+                                    <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
+        }
+
+        if (id === 'services_new_engagement') {
+            const stats = servicesData?.newEngagementsStats || calculateNewServiceEngagements(checkIns, servicesData?.futurePlans, people);
+            const isPositive = !stats.growthRate.startsWith('-');
+            return (
+                <WidgetWrapper title="New Service Engagements" onRemove={() => handleRemoveWidget(id)} source="Services Ministry">
+                    <div className="flex flex-col h-full justify-between">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <div className="text-3xl font-black text-slate-850 dark:text-white tracking-tight tabular-nums">
+                                    {stats.thisMonthCount}
+                                </div>
+                                <div className="text-[11px] font-medium text-slate-400 mt-0.5">
+                                    New engagements this month (vs {stats.lastMonthCount} last mo)
+                                </div>
+                            </div>
+                            <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                                {stats.growthRate}
+                            </div>
+                        </div>
+                        <div className="h-28 w-full mt-2">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={stats.monthlyTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: axisColor }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: currentTheme === 'dark' ? '#0f172a' : '#ffffff', borderColor: currentTheme === 'dark' ? '#334155' : '#e2e8f0', borderRadius: '8px', fontSize: '12px' }} formatter={(val: any) => [val, 'New Engagements']} />
+                                    <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
         }
 
         if (id === 'youtube_channel') {

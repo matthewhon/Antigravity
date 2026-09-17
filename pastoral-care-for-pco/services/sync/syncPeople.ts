@@ -165,6 +165,8 @@ export const syncPeopleData = async (churchId: string) => {
                 checkInCount: 0,
                 primaryCampusId,
                 primaryCampusName,
+                grade: attrs.grade != null ? Number(attrs.grade) : null,
+                graduationYear: attrs.graduation_year != null ? Number(attrs.graduation_year) : null,
             } as PcoPerson;
         }
     );

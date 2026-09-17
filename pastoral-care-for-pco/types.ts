@@ -398,6 +398,10 @@ export interface PcoPerson {
     field_data?: { field_definition: { name: string }, value: string }[];
     primaryCampusId?: string | null;
     primaryCampusName?: string | null;
+    /** PCO school grade: 0 = Kindergarten, 1–12 = grades 1–12. null if not set. */
+    grade?: number | null;
+    /** PCO graduation year (4-digit). Populated for older youth / young adults. */
+    graduationYear?: number | null;
 }
 
 export interface PcoGroup {
@@ -439,6 +443,34 @@ export interface PeopleDashboardData {
     progressStats?: ProgressStats;
     recentRiskChanges?: RiskChangeRecord[];
     recentStatusChanges?: StatusChangeRecord[];
+    nextGenStats?: {
+        totalNextGen: number;
+        gradeBreakdown: { grade: string; count: number }[];
+        ageGroupAttendance: { ageGroup: string; avgCheckIns: number; totalCheckIns: number; withCheckInPct: number }[];
+        /** People in PCO Services scheduled plans */
+        servingCount: number;
+        servingByAgeGroup: { ageGroup: string; count: number }[];
+        /** NextGen individuals who have given directly (in their own name) */
+        directGivingCount: number;
+        directGivingYtd: number;
+        /** Households with a NextGen member where at least one adult is a donor */
+        givingHouseholdCount: number;
+        givingHouseholdTotal: number;
+        newNextGenThisMonth: number;
+        /** % of NextGen records that have a birthdate (data quality) */
+        withBirthdatePct: number;
+        milestones: { salvations: number; baptisms: number };
+        retentionByGrade: { grade: string; healthy: number; atRisk: number; disconnected: number }[];
+        guardianEngagement: { bothEngaged: number; oneEngaged: number; neitherEngaged: number };
+    };
+}
+
+
+export interface NewEngagementSummary {
+    thisMonthCount: number;
+    lastMonthCount: number;
+    growthRate: string;
+    monthlyTrend: { month: string; count: number }[];
 }
 
 export interface GroupsDashboardData {
@@ -449,6 +481,7 @@ export interface GroupsDashboardData {
     recentGroups: PcoGroup[];
     genderDistribution?: DemographicData[];
     progressStats?: ProgressStats;
+    newEngagementsStats?: NewEngagementSummary;
 }
 
 export interface LifecycleDonor {
@@ -625,6 +658,7 @@ export interface ServicesDashboardData {
     recentPlans?: ServicePlanSnapshot[];
     plans?: ServicePlanSnapshot[];
     progressStats?: ProgressStats;
+    newEngagementsStats?: NewEngagementSummary;
 }
 
 export interface CensusStats {

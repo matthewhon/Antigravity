@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, ServicesTeam, RiskSettings, 
     RiskChangeRecord, StatusChangeRecord, ServicesDashboardData, AttendanceRecord,
-    PeopleDashboardData, GroupsDashboardData, AttendanceData, GivingFilter, DonorLifecycleSettings
+    PeopleDashboardData, GroupsDashboardData, AttendanceData, GivingFilter, DonorLifecycleSettings,
+    ServicePlanSnapshot
 } from '../types';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS, calculatePeopleDashboardData, calculateGroupsDashboardData } from '../services/analyticsService';
@@ -50,11 +51,13 @@ export function usePeopleDashboardData(
     people: PcoPerson[],
     riskEnrichedPeople: PcoPerson[],
     recentRiskChanges: RiskChangeRecord[],
-    recentStatusChanges: StatusChangeRecord[]
+    recentStatusChanges: StatusChangeRecord[],
+    donations: DetailedDonation[] = [],
+    servicePlans: ServicePlanSnapshot[] = []
 ) {
     return useMemo<PeopleDashboardData>(() => {
-        return calculatePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
-    }, [people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges]);
+        return calculatePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges, donations, servicePlans);
+    }, [people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges, donations, servicePlans]);
 }
 
 export function useGivingAnalyticsData(

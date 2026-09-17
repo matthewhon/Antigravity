@@ -1,5 +1,5 @@
 
-import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord, MembershipHistoryData, MembershipTimeFilter, MembershipMonthlyPoint, MembershipTransitionItem, MembershipTransitionBreakdown } from '../types';
+import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord, MembershipHistoryData, MembershipTimeFilter, MembershipMonthlyPoint, MembershipTransitionItem, MembershipTransitionBreakdown, PcoCheckInRecord, NewEngagementSummary } from '../types';
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -381,7 +381,9 @@ export const calculateServicesAnalytics = (
     plans: ServicePlanSnapshot[],
     teams: ServicesTeam[],
     attendance: AttendanceRecord[],
-    filter: ServicesFilter
+    filter: ServicesFilter,
+    checkIns: PcoCheckInRecord[] = [],
+    people: PcoPerson[] = []
 ): ServicesDashboardData => {
     // 1. Determine Date Range
     const now = new Date();
@@ -684,7 +686,8 @@ export const calculateServicesAnalytics = (
         },
         futurePlans,
         recentPlans: plans, // Make all plans available for risk bulk calculation
-        progressStats: { thisMonth: servingThisMonth.size, lastMonth: servingLastMonth.size }
+        progressStats: { thisMonth: servingThisMonth.size, lastMonth: servingLastMonth.size },
+        newEngagementsStats: calculateNewServiceEngagements(checkIns, plans, people)
     };
 };
 
@@ -816,7 +819,9 @@ export const calculatePeopleDashboardData = (
     people: PcoPerson[],
     riskEnrichedPeople: PcoPerson[],
     recentRiskChanges: RiskChangeRecord[],
-    recentStatusChanges: StatusChangeRecord[]
+    recentStatusChanges: StatusChangeRecord[],
+    donations: DetailedDonation[] = [],
+    servicePlans: ServicePlanSnapshot[] = []
 ): PeopleDashboardData => {
     const total = people.length;
     const members = people.filter(p => p.membership === 'Member').length;
@@ -954,7 +959,432 @@ export const calculatePeopleDashboardData = (
             householdList
         },
         recentRiskChanges,
-        recentStatusChanges
+        recentStatusChanges,
+        nextGenStats: calculateNextGenStats(riskEnrichedPeople, donations, servicePlans),
+    };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NextGen Analytics
+// Covers ages 0–25 (inclusive). Grade-level breakdown uses PCO's integer grade
+// field (0 = Kindergarten, 1–12 = school grades). Ages 19–25 without a grade
+// are grouped as "Young Adults".
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NEXTGEN_MAX_AGE = 25;
+
+/** Compute a person's age from their birthdate string (YYYY-MM-DD or YYYY). */
+function computeAge(birthdate: string): number | null {
+    if (!birthdate) return null;
+    const birth = new Date(birthdate);
+    if (isNaN(birth.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    if (
+        now.getMonth() < birth.getMonth() ||
+        (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())
+    ) age--;
+    return age;
+}
+
+/** Map an age (0–25) to a display bucket label. */
+function ageGroupLabel(age: number): string {
+    if (age <= 5)  return '0–5 (Nursery)';
+    if (age <= 11) return '6–11 (Elementary)';
+    if (age <= 14) return '12–14 (Middle School)';
+    if (age <= 18) return '15–18 (High School)';
+    return '19–25 (Young Adult)';
+}
+
+/** Convert PCO integer grade to a display label. */
+function gradeLabel(grade: number): string {
+    if (grade === 0) return 'Kindergarten';
+    if (grade >= 1 && grade <= 12) return `${grade}th Grade`;
+    return 'Unknown';
+}
+
+const GRADE_ORDER = [
+    'Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade',
+    '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade',
+    '10th Grade', '11th Grade', '12th Grade', 'Young Adult', 'Unknown'
+];
+
+function gradeDisplayLabel(grade: number): string {
+    if (grade === 0) return 'Kindergarten';
+    const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
+    const suffix = suffixes[grade] || 'th';
+    return `${grade}${suffix} Grade`;
+}
+
+export const calculateNextGenStats = (
+    people: PcoPerson[],
+    donations: DetailedDonation[],
+    servicePlans: ServicePlanSnapshot[] = []
+): NonNullable<PeopleDashboardData['nextGenStats']> => {
+
+    const currentYear = new Date().getFullYear();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // ── Identify NextGen people ──────────────────────────────────────────────
+    const nextGen = people.filter(p => {
+        if (p.child === true) return true;
+        if (p.age != null) return p.age <= NEXTGEN_MAX_AGE;
+        if (p.birthdate) {
+            const age = computeAge(p.birthdate);
+            return age != null && age <= NEXTGEN_MAX_AGE;
+        }
+        return false;
+    });
+
+    const totalNextGen = nextGen.length;
+
+    // ── Grade breakdown ──────────────────────────────────────────────────────
+    const gradeCounts = new Map<string, number>();
+    nextGen.forEach(p => {
+        let label: string;
+        if (p.grade != null) {
+            label = gradeDisplayLabel(p.grade);
+        } else {
+            const age = p.age ?? (p.birthdate ? computeAge(p.birthdate) : null);
+            label = (age != null && age >= 19) ? 'Young Adult' : 'Unknown';
+        }
+        gradeCounts.set(label, (gradeCounts.get(label) || 0) + 1);
+    });
+    const gradeBreakdown = GRADE_ORDER
+        .filter(g => gradeCounts.has(g))
+        .map(g => ({ grade: g, count: gradeCounts.get(g)! }));
+
+    // ── Attendance by age group ──────────────────────────────────────────────
+    const ageGroupBuckets = new Map<string, { total: number; count: number; withCheckIn: number }>();
+    nextGen.forEach(p => {
+        const age = p.age ?? (p.birthdate ? computeAge(p.birthdate) : null);
+        if (age == null) return;
+        const label = ageGroupLabel(age);
+        if (!ageGroupBuckets.has(label)) ageGroupBuckets.set(label, { total: 0, count: 0, withCheckIn: 0 });
+        const bucket = ageGroupBuckets.get(label)!;
+        bucket.count++;
+        const checkIns = p.checkInCount || 0;
+        bucket.total += checkIns;
+        if (checkIns > 0) bucket.withCheckIn++;
+    });
+    const ageGroupOrder = ['0–5 (Nursery)', '6–11 (Elementary)', '12–14 (Middle School)', '15–18 (High School)', '19–25 (Young Adult)'];
+    const ageGroupAttendance = ageGroupOrder
+        .filter(label => ageGroupBuckets.has(label))
+        .map(label => {
+            const b = ageGroupBuckets.get(label)!;
+            return {
+                ageGroup: label,
+                totalCheckIns: b.total,
+                avgCheckIns: b.count > 0 ? Math.round((b.total / b.count) * 10) / 10 : 0,
+                withCheckInPct: b.count > 0 ? Math.round((b.withCheckIn / b.count) * 100) : 0,
+            };
+        });
+
+    // ── Serving in PCO Services ──────────────────────────────────────────────
+    const nextGenIds = new Set(nextGen.map(p => p.id));
+    const servingIds = new Set<string>();
+    servicePlans.forEach(plan => {
+        (plan.teamMembers || []).forEach(tm => {
+            if (nextGenIds.has(tm.personId)) servingIds.add(tm.personId);
+        });
+    });
+    const servingCount = servingIds.size;
+
+    const servingByAgeGroupMap = new Map<string, number>();
+    servingIds.forEach(id => {
+        const person = nextGen.find(p => p.id === id);
+        if (!person) return;
+        const age = person.age ?? (person.birthdate ? computeAge(person.birthdate) : null);
+        if (age == null) return;
+        const label = ageGroupLabel(age);
+        servingByAgeGroupMap.set(label, (servingByAgeGroupMap.get(label) || 0) + 1);
+    });
+    const servingByAgeGroup = ageGroupOrder
+        .filter(label => servingByAgeGroupMap.has(label))
+        .map(label => ({ ageGroup: label, count: servingByAgeGroupMap.get(label)! }));
+
+    // ── Direct giving by NextGen individuals ─────────────────────────────────
+    const currentYearStr = String(currentYear);
+    const directGiversMap = new Map<string, number>(); // personId → YTD total
+    donations.forEach(d => {
+        if (!nextGenIds.has(d.donorId)) return;
+        if (!d.date?.startsWith(currentYearStr)) return;
+        directGiversMap.set(d.donorId, (directGiversMap.get(d.donorId) || 0) + (d.amount || 0));
+    });
+    // Also catch people with givingStats.ytd > 0 even if no donation records loaded
+    nextGen.forEach(p => {
+        if ((p.givingStats?.ytd ?? 0) > 0 && !directGiversMap.has(p.id)) {
+            directGiversMap.set(p.id, p.givingStats!.ytd);
+        }
+    });
+    const directGivingCount = directGiversMap.size;
+    const directGivingYtd = Array.from(directGiversMap.values()).reduce((s, v) => s + v, 0);
+
+    // ── Giving households (a NextGen member's household has a giving adult) ──
+    const householdToMembers = new Map<string, PcoPerson[]>();
+    people.forEach(p => {
+        if (!p.householdId) return;
+        if (!householdToMembers.has(p.householdId)) householdToMembers.set(p.householdId, []);
+        householdToMembers.get(p.householdId)!.push(p);
+    });
+
+    let givingHouseholdCount = 0;
+    let givingHouseholdTotal = 0;
+    const countedHouseholds = new Set<string>();
+    nextGen.forEach(p => {
+        if (!p.householdId || countedHouseholds.has(p.householdId)) return;
+        const members = householdToMembers.get(p.householdId) || [];
+        const hasGivingAdult = members.some(m => {
+            if (nextGenIds.has(m.id)) return false; // exclude NextGen members themselves
+            return m.isDonor === true || (m.givingStats?.ytd ?? 0) > 0;
+        });
+        if (hasGivingAdult) {
+            givingHouseholdCount++;
+            countedHouseholds.add(p.householdId);
+            // Sum adult giving for that household
+            members.forEach(m => {
+                if (!nextGenIds.has(m.id)) {
+                    givingHouseholdTotal += m.givingStats?.ytd ?? 0;
+                }
+            });
+        }
+    });
+
+    // ── Spiritual milestones ─────────────────────────────────────────────────
+    let salvations = 0;
+    let baptisms = 0;
+    nextGen.forEach(p => {
+        if (p.spiritualMilestones?.salvationDate || p.salvationDate) salvations++;
+        if (p.spiritualMilestones?.baptismDate || p.baptismDate) baptisms++;
+    });
+
+    // ── Retention by grade ───────────────────────────────────────────────────
+    const retentionMap = new Map<string, { healthy: number; atRisk: number; disconnected: number }>();
+    nextGen.forEach(p => {
+        let label: string;
+        if (p.grade != null) {
+            label = gradeDisplayLabel(p.grade);
+        } else {
+            const age = p.age ?? (p.birthdate ? computeAge(p.birthdate) : null);
+            label = (age != null && age >= 19) ? 'Young Adult' : 'Unknown';
+        }
+        if (!retentionMap.has(label)) retentionMap.set(label, { healthy: 0, atRisk: 0, disconnected: 0 });
+        const bucket = retentionMap.get(label)!;
+        const cat = p.riskProfile?.category;
+        if (cat === 'Healthy') bucket.healthy++;
+        else if (cat === 'At Risk') bucket.atRisk++;
+        else bucket.disconnected++;
+    });
+    const retentionByGrade = GRADE_ORDER
+        .filter(g => retentionMap.has(g))
+        .map(g => ({ grade: g, ...retentionMap.get(g)! }));
+
+    // ── Guardian engagement ──────────────────────────────────────────────────
+    let bothEngaged = 0;
+    let oneEngaged = 0;
+    let neitherEngaged = 0;
+    const processedHouseholds = new Set<string>();
+    nextGen.forEach(p => {
+        if (!p.householdId || processedHouseholds.has(p.householdId)) return;
+        processedHouseholds.add(p.householdId);
+        const members = householdToMembers.get(p.householdId) || [];
+        const guardians = members.filter(m => !nextGenIds.has(m.id));
+        if (guardians.length === 0) return;
+        const engagedCount = guardians.filter(g => g.riskProfile?.category === 'Healthy').length;
+        if (engagedCount >= 2) bothEngaged++;
+        else if (engagedCount === 1) oneEngaged++;
+        else neitherEngaged++;
+    });
+
+    // ── New NextGen this month ────────────────────────────────────────────────
+    const newNextGenThisMonth = nextGen.filter(p => new Date(p.createdAt) >= thirtyDaysAgo).length;
+
+    // ── Data quality: % with a birthdate ─────────────────────────────────────
+    const withBirthdate = nextGen.filter(p => !!p.birthdate).length;
+    const withBirthdatePct = totalNextGen > 0 ? Math.round((withBirthdate / totalNextGen) * 100) : 0;
+
+    return {
+        totalNextGen,
+        gradeBreakdown,
+        ageGroupAttendance,
+        servingCount,
+        servingByAgeGroup,
+        directGivingCount,
+        directGivingYtd,
+        givingHouseholdCount,
+        givingHouseholdTotal,
+        newNextGenThisMonth,
+        withBirthdatePct,
+        milestones: { salvations, baptisms },
+        retentionByGrade,
+        guardianEngagement: { bothEngaged, oneEngaged, neitherEngaged },
+    };
+};
+
+export const calculateNewGroupEngagements = (
+    groups: PcoGroup[],
+    people?: PcoPerson[]
+): NewEngagementSummary => {
+    const personFirstGroupDate = new Map<string, string>();
+
+    groups.forEach(g => {
+        if (g.attendanceHistory) {
+            g.attendanceHistory.forEach(h => {
+                const dateStr = (h.date || '').split('T')[0];
+                if (!dateStr) return;
+                if (h.attendeeIds) {
+                    h.attendeeIds.forEach(pid => {
+                        const existing = personFirstGroupDate.get(pid);
+                        if (!existing || dateStr < existing) {
+                            personFirstGroupDate.set(pid, dateStr);
+                        }
+                    });
+                }
+            });
+        }
+    });
+
+    if (people) {
+        people.forEach(p => {
+            if (p.id && (p.joinedAt || p.createdAt)) {
+                const inGroup = groups.some(g => g.memberIds?.includes(p.id));
+                if (inGroup) {
+                    const dateStr = (p.joinedAt || p.createdAt || '').split('T')[0];
+                    if (dateStr) {
+                        const existing = personFirstGroupDate.get(p.id);
+                        if (!existing || dateStr < existing) {
+                            personFirstGroupDate.set(p.id, dateStr);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const now = new Date();
+    const thisMonthStr = now.toISOString().substring(0, 7);
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStr = lastMonthDate.toISOString().substring(0, 7);
+
+    const monthlyCounts = new Map<string, number>();
+
+    personFirstGroupDate.forEach((dateStr) => {
+        const monthKey = dateStr.substring(0, 7);
+        if (monthKey.length === 7) {
+            monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+        }
+    });
+
+    const thisMonthCount = monthlyCounts.get(thisMonthStr) || 0;
+    const lastMonthCount = monthlyCounts.get(lastMonthStr) || 0;
+
+    let growthRate = '0%';
+    if (lastMonthCount > 0) {
+        const rate = ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100;
+        growthRate = `${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%`;
+    } else if (thisMonthCount > 0) {
+        growthRate = '+100%';
+    }
+
+    const monthlyTrend: { month: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toISOString().substring(0, 7);
+        const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthlyTrend.push({
+            month: label,
+            count: monthlyCounts.get(key) || 0
+        });
+    }
+
+    return {
+        thisMonthCount,
+        lastMonthCount,
+        growthRate,
+        monthlyTrend
+    };
+};
+
+export const calculateNewServiceEngagements = (
+    checkIns: PcoCheckInRecord[] = [],
+    plans: ServicePlanSnapshot[] = [],
+    people: PcoPerson[] = []
+): NewEngagementSummary => {
+    const personFirstServiceDate = new Map<string, string>();
+
+    if (checkIns) {
+        checkIns.forEach(ci => {
+            if (ci.personId && ci.createdAt) {
+                const dateStr = ci.createdAt.split('T')[0];
+                if (dateStr) {
+                    const existing = personFirstServiceDate.get(ci.personId);
+                    if (!existing || dateStr < existing) {
+                        personFirstServiceDate.set(ci.personId, dateStr);
+                    }
+                }
+            }
+        });
+    }
+
+    if (plans) {
+        plans.forEach(plan => {
+            const dateStr = (plan.sortDate || '').split('T')[0];
+            if (!dateStr) return;
+            if (plan.teamMembers) {
+                plan.teamMembers.forEach(item => {
+                    if (item.personId) {
+                        const existing = personFirstServiceDate.get(item.personId);
+                        if (!existing || dateStr < existing) {
+                            personFirstServiceDate.set(item.personId, dateStr);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    const now = new Date();
+    const thisMonthStr = now.toISOString().substring(0, 7);
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStr = lastMonthDate.toISOString().substring(0, 7);
+
+    const monthlyCounts = new Map<string, number>();
+
+    personFirstServiceDate.forEach((dateStr) => {
+        const monthKey = dateStr.substring(0, 7);
+        if (monthKey.length === 7) {
+            monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+        }
+    });
+
+    const thisMonthCount = monthlyCounts.get(thisMonthStr) || 0;
+    const lastMonthCount = monthlyCounts.get(lastMonthStr) || 0;
+
+    let growthRate = '0%';
+    if (lastMonthCount > 0) {
+        const rate = ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100;
+        growthRate = `${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%`;
+    } else if (thisMonthCount > 0) {
+        growthRate = '+100%';
+    }
+
+    const monthlyTrend: { month: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toISOString().substring(0, 7);
+        const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthlyTrend.push({
+            month: label,
+            count: monthlyCounts.get(key) || 0
+        });
+    }
+
+    return {
+        thisMonthCount,
+        lastMonthCount,
+        growthRate,
+        monthlyTrend
     };
 };
 
@@ -1046,7 +1476,8 @@ export const calculateGroupsDashboardData = (
         allGroups: groups,
         recentGroups: groups.slice(0, 5),
         genderDistribution,
-        progressStats: { thisMonth: attendedThisMonth.size, lastMonth: attendedLastMonth.size }
+        progressStats: { thisMonth: attendedThisMonth.size, lastMonth: attendedLastMonth.size },
+        newEngagementsStats: calculateNewGroupEngagements(groups, people)
     };
 };
 

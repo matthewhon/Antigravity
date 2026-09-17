@@ -64,6 +64,7 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_health_factors', label: 'Health Factors', icon: '🧭', size: 'sm', description: 'Factors driving group health scores.' },
     { id: 'groups_type_performance', label: 'Type Performance', icon: '🏆', size: 'lg', description: 'How each group type is performing.' },
     { id: 'groups_visitor_funnel', label: 'Visitor Engagement', icon: '👋', size: 'sm', description: 'Visitor-to-member group journey.' },
+    { id: 'groups_new_engagement', label: 'New Group Engagements', icon: '🌱', size: 'md', description: 'First-time group engagement trends and monthly growth.' },
     { id: 'groups_leader_load', label: 'Leader Load', icon: '🧑‍🏫', size: 'sm', description: 'How many groups each leader carries.' },
     { id: 'groups_by_campus', label: 'Groups by Campus', icon: '🏢', size: 'lg', description: 'Group counts by campus.' },
     { id: 'groups_age_demographics', label: 'Age Demographics', icon: '🎂', size: 'lg', description: 'Age mix within groups.' },
@@ -80,6 +81,7 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'struggling_teams', label: 'Struggling Teams Radar', icon: '🚨', size: 'full', description: 'Health diagnostic of struggling, understaffed, and high-burnout serving teams.' },
     { id: 'team_talent_matcher', label: 'Team Candidate Matcher', icon: '🎯', size: 'lg', description: 'Assessment-based volunteer recommendations (Gifts, DISC, MBTI) with leader outreach.' },
     { id: 'team_fit_reallocation', label: 'Team Fit & Reallocation', icon: '🔄', size: 'lg', description: 'Evaluates current volunteer fit and recommends better-suited teams.' },
+    { id: 'services_new_engagement', label: 'New Service Engagements', icon: '✨', size: 'md', description: 'First-time service check-ins and volunteer engagement trend.' },
     { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈', size: 'sm', description: 'Attendance trend over recent weeks.' },
     { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌', size: 'sm', description: 'First-time guests each week.' },
     { id: 'volunteer_health', label: 'Volunteer Health', icon: '❤️‍🩹', size: 'sm', description: 'Health of your volunteer base.' },
@@ -99,6 +101,7 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
 
 export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
     { id: 'checkin_history', label: 'Check-ins', icon: '✅', size: 'full', description: 'Attendance check-in history.' },
+    { id: 'services_new_engagement', label: 'New Service Engagements', icon: '✨', size: 'md', description: 'First-time service check-ins and volunteer engagement trend.' },
     { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈', size: 'sm', description: 'Attendance trend over recent weeks.' },
     { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌', size: 'sm', description: 'First-time guests each week.' },
     { id: 'digital_vs_physical', label: 'Digital vs In-Person', icon: '💻', size: 'sm', description: 'Online vs. in-person attendance.' },

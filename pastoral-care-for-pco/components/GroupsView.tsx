@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { GroupsDashboardData, GlobalStats, PeopleDashboardData, PcoPerson, GroupRiskSettings } from '../types';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine
 } from 'recharts';
 import WidgetsController from './WidgetsController';
 import { GROUPS_WIDGETS, getWidgetSpan } from '../constants/widgetRegistry';
@@ -1132,6 +1132,45 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </WidgetWrapper>
                   </div>
               );
+          case 'groups_new_engagement': {
+              const stats = data?.newEngagementsStats || { thisMonthCount: 0, lastMonthCount: 0, growthRate: '0%', monthlyTrend: [] };
+              const isPositive = !stats.growthRate.startsWith('-');
+              return (
+                  <div key="groups_new_engagement" className="col-span-1 md:col-span-2">
+                      <WidgetWrapper title="New Group Engagements" onRemove={() => handleRemoveWidget(id)} source="First Group Activity">
+                          <div className="flex flex-col h-full justify-between">
+                              <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                      <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight tabular-nums">
+                                          {stats.thisMonthCount}
+                                      </div>
+                                      <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                                          New engagements this month (vs {stats.lastMonthCount} last mo)
+                                      </div>
+                                  </div>
+                                  <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                                      {stats.growthRate}
+                                  </div>
+                              </div>
+                              <div className="h-28 w-full mt-2">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                      <LineChart data={stats.monthlyTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#f1f5f9'} />
+                                          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                          <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                          <Tooltip
+                                              contentStyle={{ backgroundColor: isDark ? '#0f172a' : '#ffffff', borderColor: isDark ? '#334155' : '#e2e8f0', borderRadius: '8px', fontSize: '12px' }}
+                                              formatter={(value: any) => [value, 'New Engagements']}
+                                          />
+                                          <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+                                      </LineChart>
+                                  </ResponsiveContainer>
+                              </div>
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          }
           case 'groups_leader_load':
               return (
                   <div key="groups_leader_load" className="col-span-1">

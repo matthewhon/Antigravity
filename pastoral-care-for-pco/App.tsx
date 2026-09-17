@@ -939,7 +939,7 @@ const App: React.FC = () => {
   // --- Derived Data Calculations ---
 
   const riskEnrichedPeople = useRiskEnrichedPeople(visiblePeople, visibleGroups, visibleDonations, visibleServicesData, visibleTeams, church?.riskSettings);
-  const peopleDashboardData = usePeopleDashboardData(visiblePeople, riskEnrichedPeople, visibleRecentRiskChanges, visibleRecentStatusChanges);
+  const peopleDashboardData = usePeopleDashboardData(visiblePeople, riskEnrichedPeople, visibleRecentRiskChanges, visibleRecentStatusChanges, visibleDonations, visibleServicesData?.recentPlans ?? []);
   const givingAnalyticsData = useGivingAnalyticsData(visibleDonations, givingFilter, givingDateRange, visiblePeople, church?.donorLifecycleSettings);
   const groupsDashboardData = useGroupsDashboardData(visibleGroups, visiblePeople);
   const attendanceChartData = useAttendanceChartData(visibleAttendance);

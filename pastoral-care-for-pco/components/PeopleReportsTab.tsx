@@ -3,6 +3,7 @@ import { PeopleDashboardData } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
+import { NextGenReportsSection } from './NextGenReportsSection';
 
 interface PeopleReportsTabProps {
   data: PeopleDashboardData;
@@ -609,6 +610,11 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── NextGen Ministry Reports ────────────────────────────────────────── */}
+      <div className="border-t border-slate-200 dark:border-slate-800 pt-8">
+        <NextGenReportsSection data={data} />
       </div>
     </div>
   );
