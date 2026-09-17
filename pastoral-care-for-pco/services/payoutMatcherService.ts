@@ -30,6 +30,12 @@ export interface PayoutMatchResult {
     matchLogs?: string[];
     closestMatchSummary?: string;
     searchStrategy?: string;
+    candidateAudit?: CandidateFilterAudit;
+    alternateMatchSuggestion?: {
+        suggestedMode: 'gross' | 'net';
+        suggestedAmount: number;
+        reason: string;
+    };
 }
 
 export interface ParentDonationGroup {
@@ -73,6 +79,11 @@ export function getCandidateGiftsForPayout(
     const windowDays = options.searchWindowDays || 14;
 
     const pDateStr = (endDate || payoutDate).slice(0, 10);
+    // Add +1 day buffer to ceiling to account for UTC timezone offsets (e.g. evening local donations stored as next day UTC)
+    const pDateCeiling = new Date(pDateStr);
+    pDateCeiling.setDate(pDateCeiling.getDate() + 1);
+    const maxDateStr = pDateCeiling.toISOString().slice(0, 10);
+
     let minDateStr: string;
     if (startDate) {
         minDateStr = startDate.slice(0, 10);
@@ -160,7 +171,8 @@ export function getCandidateGiftsForPayout(
             }
         }
 
-        if (!dDateStr || dDateStr < minDateStr || dDateStr > pDateStr) {
+        // Use maxDateStr (+1 day ceiling) so gifts stored with UTC timestamp don't get rejected
+        if (!dDateStr || dDateStr < minDateStr || dDateStr > maxDateStr) {
             excludedDateWindow++;
             return false;
         }
@@ -183,9 +195,9 @@ export function getCandidateGiftsForPayout(
     const parents: ParentDonationGroup[] = Array.from(parentMap.entries()).map(([rootId, desigs]) => {
         const gross = desigs.reduce((s, d) => s + (d.amount || 0), 0);
         const fee = desigs.reduce((s, d) => s + Math.abs(d.fee || 0), 0);
-        // Match Tithe funds broadly: "Tithe", "Tithes", "General", "General Fund", "Operating", "Tithe & Offering", etc.
+        // Match Tithe funds broadly: Tithe, Tithes, General, Operating, Budget, Offering, Ministry, Kingdom, Unrestricted
         const tithe = desigs
-            .filter(d => /tithe|general|operating|budget|tithes|offering/i.test(d.fundName || ''))
+            .filter(d => /tithe|general|operating|budget|tithes|offering|ministry|kingdom|unrestricted/i.test(d.fundName || ''))
             .reduce((s, d) => s + (d.amount || 0), 0);
         const net = gross - fee;
         const first = desigs[0];
@@ -474,6 +486,9 @@ export function matchDonationsForPayout(
 
     if (!bestChosen || bestChosen.length === 0) {
         log(`❌ No matching transaction combinations found.`);
+        if (audit.excludedBatchedPCO > 0 && !options.includeBatched) {
+            log(`💡 Recommendation: ${audit.excludedBatchedPCO} gifts were skipped because they already have Planning Center batch IDs. Try enabling "Include already-batched gifts".`);
+        }
         return null;
     }
 
@@ -496,8 +511,49 @@ export function matchDonationsForPayout(
     const result = buildResult(bestChosen, pDateStr, stripePayoutId, diffDollars, isExact);
     result.matchLogs = logs;
     result.searchStrategy = matchedStrategy;
+    result.candidateAudit = audit;
+
     if (!isExact) {
         result.closestMatchSummary = `Closest match found is off by $${diffDollars.toFixed(2)} (${matchedStrategy}). You can manually toggle gifts below to reconcile.`;
+        if (audit.excludedBatchedPCO > 0 && !options.includeBatched) {
+            log(`💡 Note: ${audit.excludedBatchedPCO} gifts were excluded because of existing batch IDs. Check "Include already-batched gifts" if needed.`);
+        }
+    }
+
+    // Auto-detect Gross vs Net inversion (e.g. user entered Net into Gross mode or vice versa)
+    if (!isExact && targetFees && (hasTargetGross || hasTargetNet)) {
+        const feeVal = Math.abs(targetFees);
+        if (hasTargetGross && targetGross) {
+            const impliedNet = Math.round((targetGross - feeVal) * 100) / 100;
+            const netAltMatch = matchDonationsForPayout(allDonations, {
+                ...options,
+                targetGross: undefined,
+                targetNet: impliedNet
+            });
+            if (netAltMatch && netAltMatch.isExactMatch) {
+                result.alternateMatchSuggestion = {
+                    suggestedMode: 'net',
+                    suggestedAmount: impliedNet,
+                    reason: `An exact match was found when treating $${targetGross.toFixed(2)} as Gross and matching Net Bank Deposit $${impliedNet.toFixed(2)} (less fees -$${feeVal.toFixed(2)}).`
+                };
+                log(`✨ Auto-Recovery: Found exact match by matching Net Bank Deposit $${impliedNet.toFixed(2)}!`);
+            }
+        } else if (hasTargetNet && targetNet) {
+            const impliedGross = Math.round((targetNet + feeVal) * 100) / 100;
+            const grossAltMatch = matchDonationsForPayout(allDonations, {
+                ...options,
+                targetNet: undefined,
+                targetGross: impliedGross
+            });
+            if (grossAltMatch && grossAltMatch.isExactMatch) {
+                result.alternateMatchSuggestion = {
+                    suggestedMode: 'gross',
+                    suggestedAmount: impliedGross,
+                    reason: `An exact match was found when matching Gross $${impliedGross.toFixed(2)} (Net $${targetNet.toFixed(2)} + fees $${feeVal.toFixed(2)}).`
+                };
+                log(`✨ Auto-Recovery: Found exact match by matching Gross $${impliedGross.toFixed(2)}!`);
+            }
+        }
     }
 
     // Print styled console log table for browser debugging

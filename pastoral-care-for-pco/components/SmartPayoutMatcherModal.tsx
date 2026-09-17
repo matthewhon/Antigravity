@@ -77,6 +77,46 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     // Selected parent donation IDs (keeps designations grouped)
     const [selectedParentIds, setSelectedParentIds] = useState<Set<string>>(new Set());
     const [creatingBatch, setCreatingBatch] = useState(false);
+    const [fetchedDonations, setFetchedDonations] = useState<DetailedDonation[]>([]);
+    const [loadingCandidates, setLoadingCandidates] = useState(false);
+
+    // Fetch candidate donations directly from Firestore whenever window or batched status changes
+    useEffect(() => {
+        if (!isOpen || !churchId) return;
+
+        let isMounted = true;
+        const loadDonations = async () => {
+            setLoadingCandidates(true);
+            try {
+                let sinceDate: string;
+                if (startDate) {
+                    const s = new Date(startDate);
+                    s.setDate(s.getDate() - 2); // safety padding
+                    sinceDate = s.toISOString().slice(0, 10);
+                } else {
+                    const p = new Date(payoutDate);
+                    p.setDate(p.getDate() - (searchWindowDays + 5));
+                    sinceDate = p.toISOString().slice(0, 10);
+                }
+
+                const fromDb = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, includeBatched);
+                if (isMounted) {
+                    // Merge DB donations with in-memory donations (deduplicating by ID)
+                    const mergedMap = new Map<string, DetailedDonation>();
+                    (inMemoryDonations || []).forEach(d => mergedMap.set(d.id, d));
+                    fromDb.forEach(d => mergedMap.set(d.id, d));
+                    setFetchedDonations(Array.from(mergedMap.values()));
+                }
+            } catch (err) {
+                console.error('Failed to load candidate donations:', err);
+            } finally {
+                if (isMounted) setLoadingCandidates(false);
+            }
+        };
+
+        loadDonations();
+        return () => { isMounted = false; };
+    }, [isOpen, churchId, startDate, payoutDate, searchWindowDays, includeBatched, inMemoryDonations]);
 
     // When modal opens or dates change, reset error and match
     useEffect(() => {
@@ -98,13 +138,18 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         }
     };
 
+    // Active pool of candidate donations (combining fetched with in-memory)
+    const activeCandidatePool = useMemo(() => {
+        if (fetchedDonations.length > 0) return fetchedDonations;
+        return inMemoryDonations || [];
+    }, [fetchedDonations, inMemoryDonations]);
+
     // Candidate parent donation groups in current date window & filters
     const candidateGroups: ParentDonationGroup[] = useMemo(() => {
         if (!isOpen) return [];
-        const sourceDonations = inMemoryDonations || [];
-        if (sourceDonations.length === 0) return [];
+        if (activeCandidatePool.length === 0) return [];
 
-        return getCandidateGiftsForPayout(sourceDonations, {
+        return getCandidateGiftsForPayout(activeCandidatePool, {
             payoutDate,
             startDate: startDate.trim() || undefined,
             endDate: endDate.trim() || undefined,
@@ -112,7 +157,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
             includeBatched,
             searchWindowDays
         });
-    }, [isOpen, inMemoryDonations, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
+    }, [isOpen, activeCandidatePool, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
 
     // Filtered candidate groups based on candidate search box
     const visibleCandidateGroups = useMemo(() => {
@@ -201,11 +246,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         await new Promise(r => setTimeout(r, 20));
 
         try {
-            let candidateDonations: DetailedDonation[] = [];
+            let candidateDonations: DetailedDonation[] = activeCandidatePool;
 
-            if (inMemoryDonations && inMemoryDonations.length > 0) {
-                candidateDonations = inMemoryDonations;
-            } else {
+            if (candidateDonations.length === 0) {
                 let sinceDate: string;
                 if (startDate) {
                     sinceDate = startDate.slice(0, 10);
@@ -395,6 +438,58 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
                 {/* Body Content */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                    {/* Alternate Match Auto-Recovery Suggestion Banner */}
+                    {matchResult?.alternateMatchSuggestion && (
+                        <div className="p-3.5 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-purple-900 dark:text-purple-200 flex items-center justify-between gap-3 shadow-xs">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                <div>
+                                    <span className="font-bold">Exact Match Found under Alternate Mode: </span>
+                                    {matchResult.alternateMatchSuggestion.reason}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setTargetMode(matchResult.alternateMatchSuggestion!.suggestedMode);
+                                    setTargetAmount(matchResult.alternateMatchSuggestion!.suggestedAmount.toFixed(2));
+                                    setError(null);
+                                    setTimeout(() => handleRunMatch(), 50);
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shrink-0 shadow-xs"
+                            >
+                                Switch to {matchResult.alternateMatchSuggestion.suggestedMode === 'net' ? 'Net Bank ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')' : 'Gross ($' + matchResult.alternateMatchSuggestion.suggestedAmount.toFixed(2) + ')'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Candidate Pool Batched Tip */}
+                    {!includeBatched && candidateGroups.length > 0 && targetGrossVal > 0 && (
+                        (() => {
+                            const totalAvailableGross = candidateGroups.reduce((acc, p) => acc + p.gross, 0);
+                            if (totalAvailableGross < targetGrossVal) {
+                                return (
+                                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                                            <span>
+                                                Available gifts in window (<strong>${totalAvailableGross.toFixed(2)}</strong>) are less than target (<strong>${targetGrossVal.toFixed(2)}</strong>). Some gifts may already be marked with a Planning Center batch ID.
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIncludeBatched(true)}
+                                            className="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shrink-0"
+                                        >
+                                            Include Batched Gifts
+                                        </button>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()
+                    )}
+
                     {error && (
                         <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
