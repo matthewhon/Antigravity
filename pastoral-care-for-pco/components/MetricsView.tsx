@@ -10,6 +10,8 @@ import { calculateNewGroupEngagements, calculateNewServiceEngagements } from '..
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { ExecutiveBoardReportModal } from './ExecutiveBoardReportModal';
+import { FileText, ShieldCheck } from 'lucide-react';
 
 interface MetricsViewProps {
     churchId: string;
@@ -77,6 +79,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
     // Dashboard State
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('Year');
+    const [isExecutiveReportOpen, setIsExecutiveReportOpen] = useState(false);
     
     // Drag & Drop Refs
     const dragItem = useRef<number | null>(null);
@@ -1046,16 +1049,23 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{pageTitle}</h3>
                     <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">{pageSubtitle}</p>
                 </div>
-                {activeTab === 'Dashboard' && onUpdateWidgets && (
-                    <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsExecutiveReportOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Executive & Board Report</span>
+                    </button>
+                    {activeTab === 'Dashboard' && onUpdateWidgets && (
                         <WidgetsController 
                             availableWidgets={availableWidgets}
                             visibleWidgets={visibleWidgets}
                             onUpdate={onUpdateWidgets}
                             currentTheme={currentUser.theme}
                         />
-                    </div>
-                )}
+                    )}
+                </div>
             </header>
 
             {activeTab === 'Settings' && (
@@ -1181,6 +1191,12 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     </div>
                 </div>
             )}
+
+            {/* Executive & Board Health Report Modal */}
+            <ExecutiveBoardReportModal 
+                isOpen={isExecutiveReportOpen}
+                onClose={() => setIsExecutiveReportOpen(false)}
+            />
         </div>
     );
 };
