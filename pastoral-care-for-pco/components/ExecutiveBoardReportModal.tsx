@@ -35,11 +35,18 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     } = useTenantData();
 
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-    const [selectedCohort, setSelectedCohort] = useState<string>('members'); // 'all' | 'members' | listId
+    const [selectedCohort, setSelectedCohort] = useState<string>(() => {
+        try { return localStorage.getItem('boardReport_cohort') || 'members'; } catch { return 'members'; }
+    });
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
     const [listMemberIds, setListMemberIds] = useState<Set<string> | null>(null);
     const [isLoadingList, setIsLoadingList] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
+
+    // Persist cohort selection across sessions
+    useEffect(() => {
+        try { localStorage.setItem('boardReport_cohort', selectedCohort); } catch {}
+    }, [selectedCohort]);
 
     // Fetch PCO Lists on open
     useEffect(() => {
