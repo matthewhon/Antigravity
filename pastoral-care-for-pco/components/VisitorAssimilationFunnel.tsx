@@ -26,24 +26,45 @@ export const VisitorAssimilationFunnel: React.FC<VisitorAssimilationFunnelProps>
     const groupMemberSet = useMemo(() => {
         const s = new Set<string>();
         groups.forEach(g => {
-            (g.members || []).forEach(m => {
+            (g.memberIds || []).forEach(mid => { if (mid) s.add(String(mid)); });
+            (g.leaderIds || []).forEach(lid => { if (lid) s.add(String(lid)); });
+            (g.memberJoins || []).forEach(mj => { if (mj?.id) s.add(String(mj.id)); });
+            (g.attendanceHistory || []).forEach(h => {
+                (h.attendeeIds || []).forEach(aid => { if (aid) s.add(String(aid)); });
+            });
+            ((g as any).members || []).forEach((m: any) => {
                 const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
                 if (id) s.add(String(id));
             });
         });
+        const groupIdSet = new Set(groups.map(g => String(g.id)));
+        people.forEach(p => {
+            if (p.groupIds && p.groupIds.length > 0) {
+                const inAGroup = p.groupIds.some(gid => groupIdSet.has(String(gid)));
+                if (inAGroup || groupIdSet.size === 0) s.add(String(p.id));
+            }
+        });
         return s;
-    }, [groups]);
+    }, [groups, people]);
 
     const volunteerSet = useMemo(() => {
         const s = new Set<string>();
         teams.forEach(t => {
-            (t.members || []).forEach(m => {
+            (t.memberIds || []).forEach(mid => { if (mid) s.add(String(mid)); });
+            (t.leaderPersonIds || []).forEach(lid => { if (lid) s.add(String(lid)); });
+            (t.scheduledMemberIds || []).forEach(sid => { if (sid) s.add(String(sid)); });
+            ((t as any).members || []).forEach((m: any) => {
                 const id = m.personId || m.id;
                 if (id) s.add(String(id));
             });
         });
+        people.forEach(p => {
+            if (p.servingStats && ((p.servingStats.last90DaysCount || 0) > 0 || (p.servingStats.recentServices && p.servingStats.recentServices.length > 0))) {
+                s.add(String(p.id));
+            }
+        });
         return s;
-    }, [teams]);
+    }, [teams, people]);
 
     // Group check-ins per person sorted chronologically
     const personCheckInsMap = useMemo(() => {

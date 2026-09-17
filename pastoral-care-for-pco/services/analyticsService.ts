@@ -1229,6 +1229,16 @@ export const calculateNewGroupEngagements = (
     const personFirstGroupDate = new Map<string, string>();
 
     groups.forEach(g => {
+        if (g.memberJoins) {
+            g.memberJoins.forEach(mj => {
+                const dateStr = (mj.joinedAt || '').split('T')[0];
+                if (!dateStr || !mj.id) return;
+                const existing = personFirstGroupDate.get(mj.id);
+                if (!existing || dateStr < existing) {
+                    personFirstGroupDate.set(mj.id, dateStr);
+                }
+            });
+        }
         if (g.attendanceHistory) {
             g.attendanceHistory.forEach(h => {
                 const dateStr = (h.date || '').split('T')[0];
@@ -1247,10 +1257,10 @@ export const calculateNewGroupEngagements = (
 
     if (people) {
         people.forEach(p => {
-            if (p.id && (p.joinedAt || p.createdAt)) {
-                const inGroup = groups.some(g => g.memberIds?.includes(p.id));
+            if (p.id && (p.createdAt || (p as any).joinedAt)) {
+                const inGroup = groups.some(g => (g.memberIds?.includes(p.id) || g.leaderIds?.includes(p.id)));
                 if (inGroup) {
-                    const dateStr = (p.joinedAt || p.createdAt || '').split('T')[0];
+                    const dateStr = ((p as any).joinedAt || p.createdAt || '').split('T')[0];
                     if (dateStr) {
                         const existing = personFirstGroupDate.get(p.id);
                         if (!existing || dateStr < existing) {

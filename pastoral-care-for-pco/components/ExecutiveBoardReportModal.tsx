@@ -95,41 +95,67 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         return Array.from(years).sort((a, b) => b - a);
     }, [donations]);
 
-    // Group Member IDs lookup — uses both g.members array AND p.groupIds on each person
+    // Group Member IDs lookup — extracts member IDs across all PCO group schemas (memberIds, leaderIds, memberJoins, attendanceHistory, groupIds)
     const allGroupMemberIds = useMemo(() => {
         const s = new Set<string>();
-        // Primary: iterate groups.members
+        // 1. Groups data (PCO sync writes memberIds, leaderIds, memberJoins, attendeeIds)
         groups.forEach(g => {
-            (g.members || []).forEach(m => {
-                const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
+            (g.memberIds || []).forEach(mid => {
+                if (mid) s.add(String(mid));
+            });
+            (g.leaderIds || []).forEach(lid => {
+                if (lid) s.add(String(lid));
+            });
+            (g.memberJoins || []).forEach(mj => {
+                if (mj?.id) s.add(String(mj.id));
+            });
+            (g.attendanceHistory || []).forEach(h => {
+                (h.attendeeIds || []).forEach(aid => {
+                    if (aid) s.add(String(aid));
+                });
+            });
+            // Alternate / legacy runtime representations
+            ((g as any).members || []).forEach((m: any) => {
+                const id = typeof m === 'string' ? m : m?.id || m?.personId;
                 if (id) s.add(String(id));
             });
-            // Also capture by group ID match on person.groupIds
         });
-        // Secondary: p.groupIds — more reliably populated from PCO sync
+        // 2. Person-level group assignments
         const groupIdSet = new Set(groups.map(g => String(g.id)));
         people.forEach(p => {
             if (p.groupIds && p.groupIds.length > 0) {
                 const inAGroup = p.groupIds.some(gid => groupIdSet.has(String(gid)));
-                if (inAGroup || p.groupIds.length > 0) s.add(String(p.id));
+                if (inAGroup || groupIdSet.size === 0) {
+                    s.add(String(p.id));
+                }
             }
         });
         return s;
     }, [groups, people]);
 
-    // Team Member IDs lookup — uses t.members AND servingStats/teams presence on person
+    // Team Member IDs lookup — extracts volunteer IDs across all Services team schemas (memberIds, leaderPersonIds, scheduledMemberIds, servingStats)
     const allVolunteerMemberIds = useMemo(() => {
         const s = new Set<string>();
-        // Primary: iterate teams.members
+        // 1. Services Teams data
         teams.forEach(t => {
-            (t.members || []).forEach(m => {
-                const id = m.personId || m.id;
+            (t.memberIds || []).forEach(mid => {
+                if (mid) s.add(String(mid));
+            });
+            (t.leaderPersonIds || []).forEach(lid => {
+                if (lid) s.add(String(lid));
+            });
+            (t.scheduledMemberIds || []).forEach(sid => {
+                if (sid) s.add(String(sid));
+            });
+            // Alternate / legacy runtime representations
+            ((t as any).members || []).forEach((m: any) => {
+                const id = typeof m === 'string' ? m : m?.personId || m?.id;
                 if (id) s.add(String(id));
             });
         });
-        // Secondary: anyone with servingStats.last90DaysCount > 0 is a volunteer
+        // 2. Serving stats on individual person profiles
         people.forEach(p => {
-            if (p.servingStats && (p.servingStats.last90DaysCount || 0) > 0) {
+            if (p.servingStats && ((p.servingStats.last90DaysCount || 0) > 0 || (p.servingStats.recentServices && p.servingStats.recentServices.length > 0))) {
                 s.add(String(p.id));
             }
         });
@@ -418,17 +444,6 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         const cutoffStr = cutoffDate.toISOString().split('T')[0];
         const now = new Date();
 
-        const groupMemberSet = new Set<string>();
-        groups.forEach(g => (g.members || []).forEach(m => {
-            const id = typeof m === 'string' ? m : (m as any).id || (m as any).personId;
-            if (id) groupMemberSet.add(String(id));
-        }));
-        const volunteerSet = new Set<string>();
-        teams.forEach(t => (t.members || []).forEach(m => {
-            const id = m.personId || m.id;
-            if (id) volunteerSet.add(String(id));
-        }));
-
         const personCheckInsMap = new Map<string, string[]>();
         checkIns.forEach(c => {
             const pid = String(c.personId);
@@ -451,10 +466,10 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             if (checkInCount >= 1 || isRecentGuest) {
                 firstVisitCount++;
                 if (checkInCount >= 2) secondVisitCount++;
-                const ms = (p.membershipStatus || (p as any).membership_status || '').toLowerCase();
-                const isMember = ms === 'member';
-                const inGroup = groupMemberSet.has(pid);
-                const isServing = volunteerSet.has(pid);
+                const ms = (p.membershipStatus || (p as any).membership_status || (p as any).status || '').toLowerCase();
+                const isMember = ms === 'member' || ms === 'church member' || ms === 'active member';
+                const inGroup = allGroupMemberIds.has(pid);
+                const isServing = allVolunteerMemberIds.has(pid);
                 if ((isMember || inGroup || isServing) && checkInCount >= 2) assimilatedCount++;
 
                 if (checkInCount === 1) {
