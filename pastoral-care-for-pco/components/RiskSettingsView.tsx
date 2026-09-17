@@ -153,6 +153,45 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
                                 </div>
                             </div>
                         )}
+
+                        {/* Engagement Tier Definitions */}
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                                Engagement Tier Thresholds (% of Weeks Attended)
+                            </span>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">
+                                        ⭐ Core Attender (3–4x/mo)
+                                    </label>
+                                    <div className="flex items-center space-x-1">
+                                        <input 
+                                            type="number"
+                                            min="50" max="100" step="5"
+                                            value={localSettings.attendanceConfig?.coreMinRatio ?? 70}
+                                            onChange={(e) => handleAttendanceConfigChange('coreMinRatio', parseInt(e.target.value, 10) || 70)}
+                                            className="w-full bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-xs font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-bold text-slate-400">%</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">
+                                        Regular Attender (2x/mo)
+                                    </label>
+                                    <div className="flex items-center space-x-1">
+                                        <input 
+                                            type="number"
+                                            min="20" max="70" step="5"
+                                            value={localSettings.attendanceConfig?.regularMinRatio ?? 40}
+                                            onChange={(e) => handleAttendanceConfigChange('regularMinRatio', parseInt(e.target.value, 10) || 40)}
+                                            className="w-full bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-xs font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-xs font-bold text-slate-400">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <WeightSlider 
@@ -168,8 +207,8 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
                     onChange={(v) => handleWeightChange('serving', v)} 
                 />
                 
-                <div className="pl-6 ml-2 border-l-2 border-slate-100 dark:border-slate-800 pb-2">
-                    <div className="flex justify-between items-center mb-2">
+                <div className="pl-6 ml-2 border-l-2 border-slate-100 dark:border-slate-800 pb-2 space-y-3">
+                    <div className="flex justify-between items-center">
                         <div>
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Target Serve Frequency</span>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Times scheduled in last 90 days for full score</span>
@@ -181,6 +220,45 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
                             onChange={(e) => handleTargetChange('serving90Days', e.target.value)}
                             className="w-16 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-sm font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
                         />
+                    </div>
+
+                    {/* Burnout & Fatigue Thresholds */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-400 block">
+                            Volunteer Burnout & Fatigue Triggers
+                        </span>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">
+                                    Consecutive Sundays
+                                </label>
+                                <div className="flex items-center space-x-1">
+                                    <input 
+                                        type="number"
+                                        min="2" max="12"
+                                        value={localSettings.targets?.burnoutConsecutiveWeeks ?? 3}
+                                        onChange={(e) => handleTargetChange('burnoutConsecutiveWeeks', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-xs font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-400">wks</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1">
+                                    Max Services in 90d
+                                </label>
+                                <div className="flex items-center space-x-1">
+                                    <input 
+                                        type="number"
+                                        min="4" max="30"
+                                        value={localSettings.targets?.burnout90DayMax ?? 6}
+                                        onChange={(e) => handleTargetChange('burnout90DayMax', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-xs font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-400">svcs</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <WeightSlider 

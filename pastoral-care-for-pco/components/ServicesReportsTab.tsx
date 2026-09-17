@@ -12,6 +12,7 @@ import {
 import { ExecutiveBoardReportModal } from './ExecutiveBoardReportModal';
 import { VisitorAssimilationFunnel } from './VisitorAssimilationFunnel';
 import { VolunteerFatigueWidget } from './VolunteerFatigueWidget';
+import { useTenantData } from '../contexts/TenantDataContext';
 
 interface ServicesReportsTabProps {
     servicesData: ServicesDashboardData | null;
@@ -131,9 +132,18 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
     // Barnabas AI Feature: Attendance Frequency Segmentation (Core, Regular, Casual, Fading)
     const [frequencyTierFilter, setFrequencyTierFilter] = useState<'all' | 'core' | 'regular' | 'casual' | 'fading'>('all');
     const [isExecutiveReportOpen, setIsExecutiveReportOpen] = useState(false);
+    const { church } = useTenantData();
 
+    const coreMinRatio = (church?.riskSettings?.attendanceConfig?.coreMinRatio ?? 70) / 100;
+    const regularMinRatio = (church?.riskSettings?.attendanceConfig?.regularMinRatio ?? 40) / 100;
+    const casualMinRatio = (church?.riskSettings?.attendanceConfig?.casualMinRatio ?? 20) / 100;
+    const capacityLimitPct = church?.needsAttentionSettings?.serviceCapacityThresholdPct ?? 80;
+
+    // ----------------------------------------------------
+    // Sub-Report 2: Attendance Frequency Tiers
+    // ----------------------------------------------------
     const frequencySegmentation = useMemo(() => {
-        const daysDiff = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        const daysDiff = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
         const weeksInRange = Math.max(1, Math.round(daysDiff / 7));
 
         const attenderList = people.map(p => {
@@ -145,15 +155,15 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
             let tierLabel = 'Fading / Infrequent (<1x/mo)';
             let color = '#ef4444';
 
-            if (ratio >= 0.7 || count >= Math.round(weeksInRange * 0.7)) {
+            if (ratio >= coreMinRatio || count >= Math.round(weeksInRange * coreMinRatio)) {
                 tier = 'core';
                 tierLabel = 'Core Attender (3-4x/mo)';
                 color = '#10b981';
-            } else if (ratio >= 0.4 || count >= Math.round(weeksInRange * 0.4)) {
+            } else if (ratio >= regularMinRatio || count >= Math.round(weeksInRange * regularMinRatio)) {
                 tier = 'regular';
                 tierLabel = 'Regular Attender (2x/mo)';
                 color = '#6366f1';
-            } else if (ratio >= 0.2 || count >= 1) {
+            } else if (ratio >= casualMinRatio || count >= 1) {
                 tier = 'casual';
                 tierLabel = 'Casual Attender (1x/mo)';
                 color = '#f59e0b';
@@ -195,9 +205,9 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
             total,
             chartData
         };
-    }, [people, start, end]);
+    }, [people, start, end, coreMinRatio, regularMinRatio, casualMinRatio]);
 
-    // Barnabas AI Feature: Room Capacity & 80% Bottleneck Indicators
+    // Barnabas AI Feature: Room Capacity & Bottleneck Indicators
     const roomCapacityStats = useMemo(() => {
         const avg = attendanceStats.avg > 0 ? attendanceStats.avg : 480;
         const rooms = [
@@ -209,14 +219,14 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
 
         return rooms.map(r => {
             const utilization = Math.min(125, Math.round((r.currentAvg / r.capacity) * 100));
-            const isBottleneck = utilization >= 80;
+            const isBottleneck = utilization >= capacityLimitPct;
             return {
                 ...r,
                 utilization,
                 isBottleneck
             };
         });
-    }, [attendanceStats.avg]);
+    }, [attendanceStats.avg, capacityLimitPct]);
 
     const exportAttendanceCsv = () => {
         const header = 'Date,Regulars,Guests,Volunteers,Digital Check-ins,Manual Headcounts,Total\n';
@@ -691,7 +701,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                             <div>
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                    <span>Service Room Capacity & 80% Bottleneck Indicators</span>
+                                    <span>Service Room Capacity &amp; {capacityLimitPct}% Bottleneck Indicators</span>
                                     {roomCapacityStats.some(r => r.isBottleneck) && (
                                         <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider">
                                             Bottleneck Alert
@@ -699,7 +709,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                                     )}
                                 </h4>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Church health metric: Services operating at &ge;80% capacity reach growth plateaus and require an added service or overflow.
+                                    Church health metric: Services operating at &ge;{capacityLimitPct}% capacity reach growth plateaus and require an added service or overflow.
                                 </p>
                             </div>
                         </div>
@@ -742,7 +752,7 @@ export const ServicesReportsTab: React.FC<ServicesReportsTabProps> = ({
                                     {room.isBottleneck && (
                                         <p className="mt-2 text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
                                             <AlertTriangle className="w-3 h-3 shrink-0" />
-                                            Nearing capacity limit (80%+)
+                                            Nearing capacity limit ({capacityLimitPct}%+)
                                         </p>
                                     )}
                                 </div>

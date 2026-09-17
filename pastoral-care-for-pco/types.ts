@@ -46,12 +46,26 @@ export interface AttendanceRiskConfig {
     childAttendanceMode?: 'max' | 'sum';
     /** Percentage weight (0-100) applied to child check-ins when scoring parent attendance (default: 100) */
     childAttendanceWeight?: number;
+    /** Minimum attendance ratio (0-100%) for Core Attenders (3-4x/mo, default: 70) */
+    coreMinRatio?: number;
+    /** Minimum attendance ratio (0-100%) for Regular Attenders (2x/mo, default: 40) */
+    regularMinRatio?: number;
+    /** Minimum attendance ratio (0-100%) for Casual Attenders (1x/mo, default: 20) */
+    casualMinRatio?: number;
 }
 
 export interface RiskSettings {
     weights: { attendance: number, groups: number, serving: number, giving: number, membership: number };
     thresholds: { healthyMin: number, atRiskMin: number };
-    targets?: { serving90Days: number };
+    targets?: {
+        serving90Days: number;
+        /** Consecutive Sundays served before burnout alert is triggered (default: 3) */
+        burnoutConsecutiveWeeks?: number;
+        /** Maximum services scheduled in 90 days before fatigue warning (default: 6) */
+        burnout90DayMax?: number;
+        /** Maximum serving teams before cross-department overload warning (default: 2) */
+        multiTeamMax?: number;
+    };
     attendanceConfig?: AttendanceRiskConfig;
 }
 
@@ -93,6 +107,7 @@ export interface NeedsAttentionSettings {
         lapsedDonors: boolean;
         pendingOutreach: boolean;
         neverContacted: boolean;
+        serviceCapacity?: boolean;
     };
     /** Flag people who moved to At Risk within this many days. */
     riskChangeWindowDays: number;
@@ -104,6 +119,8 @@ export interface NeedsAttentionSettings {
     openPositionsLookaheadDays: number;
     /** Flag outreach/group-care slots left pending for this many hours. */
     pendingOutreachHours: number;
+    /** Flag room/service capacity bottlenecks when utilization exceeds this percentage (default: 80) */
+    serviceCapacityThresholdPct?: number;
     /** Row count at which a row renders amber, then red. */
     severity: { warn: number; critical: number };
 }
@@ -117,12 +134,14 @@ export const DEFAULT_NEEDS_ATTENTION_SETTINGS: NeedsAttentionSettings = {
         lapsedDonors: true,
         pendingOutreach: true,
         neverContacted: true,
+        serviceCapacity: true,
     },
     riskChangeWindowDays: 7,
     unansweredTextHours: 24,
     groupAttendanceGapWeeks: 3,
     openPositionsLookaheadDays: 7,
     pendingOutreachHours: 48,
+    serviceCapacityThresholdPct: 80,
     severity: { warn: 5, critical: 15 },
 };
 

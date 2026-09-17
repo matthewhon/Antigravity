@@ -60,6 +60,11 @@ const ROWS: RowSpec[] = [
         key: 'neverContacted', icon: '🧩', title: 'Never contacted',
         hint: 'At-risk people no outreach session has ever reached.',
     },
+    {
+        key: 'serviceCapacity', icon: '🏛️', title: 'Service capacity warning',
+        field: 'serviceCapacityThresholdPct', unit: '% capacity',
+        hint: 'Flag services and rooms operating at or above this utilization limit.',
+    },
 ];
 
 const NeedsAttentionSettingsView: React.FC<NeedsAttentionSettingsViewProps> = ({ settings, onSave }) => {

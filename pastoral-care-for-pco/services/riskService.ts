@@ -14,12 +14,18 @@ export const DEFAULT_RISK_SETTINGS: RiskSettings = {
         atRiskMin: 40
     },
     targets: {
-        serving90Days: 4
+        serving90Days: 4,
+        burnoutConsecutiveWeeks: 3,
+        burnout90DayMax: 6,
+        multiTeamMax: 2
     },
     attendanceConfig: {
         includeChildCheckIns: true,
         childAttendanceMode: 'max',
-        childAttendanceWeight: 100
+        childAttendanceWeight: 100,
+        coreMinRatio: 70,
+        regularMinRatio: 40,
+        casualMinRatio: 20
     }
 };
 

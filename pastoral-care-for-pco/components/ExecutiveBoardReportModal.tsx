@@ -541,14 +541,17 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     const engagementTiers = useMemo(() => {
         const daysDiff = 365;
         const weeksInRange = 52;
+        const coreRatio = (church?.riskSettings?.attendanceConfig?.coreMinRatio ?? 70) / 100;
+        const regularRatio = (church?.riskSettings?.attendanceConfig?.regularMinRatio ?? 40) / 100;
+        const casualRatio = (church?.riskSettings?.attendanceConfig?.casualMinRatio ?? 20) / 100;
 
         const tierCounts = { core: 0, regular: 0, casual: 0, fading: 0 };
         cohortPeople.forEach(p => {
             const count = p.attendanceStats?.count || (p.attendanceHistory ? (p.attendanceHistory as any[]).length : 0);
             const ratio = count / Math.max(weeksInRange, 1);
-            if (ratio >= 0.7 || count >= Math.round(weeksInRange * 0.7)) tierCounts.core++;
-            else if (ratio >= 0.4 || count >= Math.round(weeksInRange * 0.4)) tierCounts.regular++;
-            else if (ratio >= 0.2 || count >= 1) tierCounts.casual++;
+            if (ratio >= coreRatio || count >= Math.round(weeksInRange * coreRatio)) tierCounts.core++;
+            else if (ratio >= regularRatio || count >= Math.round(weeksInRange * regularRatio)) tierCounts.regular++;
+            else if (ratio >= casualRatio || count >= 1) tierCounts.casual++;
             else tierCounts.fading++;
         });
         const total = cohortPeople.length || 1;
@@ -560,7 +563,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
             fadingPct: Math.round((tierCounts.fading / total) * 100),
             total
         };
-    }, [cohortPeople]);
+    }, [cohortPeople, church?.riskSettings?.attendanceConfig]);
 
     // Campus Comparisons
     const campusBreakdown = useMemo(() => {

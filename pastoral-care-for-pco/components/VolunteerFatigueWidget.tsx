@@ -16,10 +16,14 @@ export const VolunteerFatigueWidget: React.FC<VolunteerFatigueWidgetProps> = ({
     onSelectPerson,
     onSendMessage
 }) => {
-    const { people = [], teams = [], servicesData } = useTenantData();
+    const { church, people = [], teams = [], servicesData } = useTenantData();
 
     const [riskFilter, setRiskFilter] = useState<'all' | 'high' | 'multi_role' | 'consecutive'>('all');
     const [searchQuery, setSearchQuery] = useState('');
+
+    const consecutiveWeeksLimit = church?.riskSettings?.targets?.burnoutConsecutiveWeeks ?? 3;
+    const max90DayServing = church?.riskSettings?.targets?.burnout90DayMax ?? 6;
+    const multiTeamLimit = church?.riskSettings?.targets?.multiTeamMax ?? 2;
 
     // Compute Volunteer Fatigue Analysis
     const fatigueAnalysis = useMemo(() => {
@@ -39,13 +43,13 @@ export const VolunteerFatigueWidget: React.FC<VolunteerFatigueWidgetProps> = ({
 
             const recent = stats.recentServices || [];
             
-            // Check consecutive weeks served (e.g. >= 3 services within 25 days)
+            // Check consecutive weeks served using church threshold
             const servingCount90 = stats.last90DaysCount || 0;
-            const isConsecutiveHeavy = servingCount90 >= 6 || (recent.length >= 3);
+            const isConsecutiveHeavy = servingCount90 >= max90DayServing || (recent.length >= consecutiveWeeksLimit);
             
             // Check multi-department serving
             const uniqueTeams = new Set(recent.map(s => s.teamName).filter(Boolean));
-            const isMultiRole = uniqueTeams.size >= 2 || servingCount90 >= 8;
+            const isMultiRole = uniqueTeams.size >= multiTeamLimit || servingCount90 >= (max90DayServing + 2);
 
             // Calculate fatigue score (0-100)
             let fatigueScore = Math.min(100, Math.round((servingCount90 / 12) * 60 + (isMultiRole ? 25 : 0) + (isConsecutiveHeavy ? 20 : 0)));
@@ -139,7 +143,7 @@ export const VolunteerFatigueWidget: React.FC<VolunteerFatigueWidgetProps> = ({
                         </span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                        Detect volunteers serving &ge;3 consecutive weeks or cross-scheduled in multiple departments before burnout occurs.
+                        Detect volunteers serving &ge;{consecutiveWeeksLimit} consecutive weeks or cross-scheduled in multiple departments before burnout occurs.
                     </p>
                 </div>
 
@@ -185,7 +189,7 @@ export const VolunteerFatigueWidget: React.FC<VolunteerFatigueWidgetProps> = ({
                     }`}
                 >
                     <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">&ge;3 Consecutive Sundays</span>
+                        <span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">&ge;{consecutiveWeeksLimit} Consecutive Sundays</span>
                         <Calendar className="w-4 h-4 text-amber-500" />
                     </div>
                     <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
