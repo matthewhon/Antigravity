@@ -352,9 +352,9 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         const currentMembers = people.filter(p => {
             const ms = (p.membershipStatus || (p as any).membership_status || p.membership || p.status || '').toLowerCase();
             return ms === 'member' || ms === 'official member' || ms === 'covenant member' || ms === 'church member' || ms === 'active member';
-        }).length;
-        // Build a simple 6-month bar chart
-        const months = membershipHistory.monthly.slice(-6);
+        }).length || membershipHistory.stats?.currentMembers || 0;
+        // Build a simple 6-month bar chart from chartPoints
+        const months = (membershipHistory.chartPoints || []).slice(-6);
         return { joined, departed, netChange, currentMembers, months };
     }, [membershipHistory, people]);
 
@@ -955,7 +955,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                         {membershipGrowthStats.months.length > 0 && (
                             <div className="h-36 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={membershipGrowthStats.months.map(m => ({ name: m.label || m.month, Joined: m.joined || 0, Departed: m.departed || 0 }))} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                                    <BarChart data={membershipGrowthStats.months.map(m => ({ name: m.month, Joined: m.joined || 0, Departed: m.departed || 0 }))} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
                                         <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
                                         <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} allowDecimals={false} />
