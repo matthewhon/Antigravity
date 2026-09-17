@@ -756,18 +756,15 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     // Risk Stats
     const riskStats = useMemo(() => {
         const targetPeople = cohortPeople.length > 0 ? cohortPeople : people;
-        const hasExistingProfiles = targetPeople.some(p => p.riskProfile?.category);
         
-        const evaluatedCohort: PcoPerson[] = hasExistingProfiles 
-            ? targetPeople 
-            : calculateBulkRisk(
-                targetPeople,
-                donations,
-                groups,
-                servicesData?.recentPlans || [],
-                teams,
-                church?.riskSettings || DEFAULT_RISK_SETTINGS
-            );
+        const evaluatedCohort: PcoPerson[] = calculateBulkRisk(
+            targetPeople,
+            donations,
+            groups,
+            servicesData?.recentPlans || [],
+            teams,
+            church?.riskSettings || DEFAULT_RISK_SETTINGS
+        );
 
         const healthy = evaluatedCohort.filter(p => p.riskProfile?.category === 'Healthy').length;
         const atRisk = evaluatedCohort.filter(p => p.riskProfile?.category === 'At Risk').length;

@@ -101,7 +101,8 @@ const calculatePersonRisk = (
     score += givingScore * settings.weights.giving;
     
     // 5. Membership
-    const isMember = person.membership === 'Member';
+    const ms = (person.membershipStatus || person.membership || (person as any).membership_status || (person as any).status || '').toLowerCase().trim();
+    const isMember = ms === 'member' || ms === 'church member' || ms === 'active member' || ms === 'official member' || ms === 'covenant member' || ms === 'regular';
     score += (isMember ? 1 : 0) * settings.weights.membership;
 
     // Categorize
@@ -131,7 +132,32 @@ export const calculateBulkRisk = (
     settings: RiskSettings
 ): PcoPerson[] => {
     // Pre-process context data for speed
-    const donorIds = new Set(donations.map(d => d.donorId));
+    const donorIds = new Set(donations.map(d => String(d.donorId)));
+
+    // Pre-process groups across all PCO schemas
+    const groupMemberIdSet = new Set<string>();
+    groups.forEach(g => {
+        (g.memberIds || []).forEach(id => id && groupMemberIdSet.add(String(id)));
+        (g.leaderIds || []).forEach(id => id && groupMemberIdSet.add(String(id)));
+        (g.memberJoins || []).forEach(mj => mj?.id && groupMemberIdSet.add(String(mj.id)));
+        (g.attendanceHistory || []).forEach(h => (h.attendeeIds || []).forEach(id => id && groupMemberIdSet.add(String(id))));
+        ((g as any).members || []).forEach((m: any) => {
+            const id = typeof m === 'string' ? m : m?.id || m?.personId;
+            if (id) groupMemberIdSet.add(String(id));
+        });
+    });
+
+    // Pre-process teams to recognize volunteers
+    const teamVolunteerIdSet = new Set<string>();
+    teams.forEach(t => {
+        (t.memberIds || []).forEach(id => id && teamVolunteerIdSet.add(String(id)));
+        (t.leaderPersonIds || []).forEach(id => id && teamVolunteerIdSet.add(String(id)));
+        (t.scheduledMemberIds || []).forEach(id => id && teamVolunteerIdSet.add(String(id)));
+        ((t as any).members || []).forEach((m: any) => {
+            const id = typeof m === 'string' ? m : m?.personId || m?.id;
+            if (id) teamVolunteerIdSet.add(String(id));
+        });
+    });
     
     // Pre-process household relationships to attribute child check-ins to parents
     const householdChildMap = new Map<string, { maxChildCheckIns: number; totalChildCheckIns: number; childCount: number }>();
@@ -139,7 +165,7 @@ export const calculateBulkRisk = (
         if (!person.householdId) return;
         const isChild = person.child === true || (person.age !== undefined && person.age < 18);
         if (isChild) {
-            const checkIns = person.checkInCount || 0;
+            const checkIns = person.checkInCount || person.attendanceStats?.count || (person.attendanceHistory ? (person.attendanceHistory as any[]).length : 0);
             const current = householdChildMap.get(person.householdId) || { maxChildCheckIns: 0, totalChildCheckIns: 0, childCount: 0 };
             current.maxChildCheckIns = Math.max(current.maxChildCheckIns, checkIns);
             current.totalChildCheckIns += checkIns;
@@ -148,12 +174,10 @@ export const calculateBulkRisk = (
         }
     });
 
-    // Determine volunteers based strictly on recent plan scheduling (confirmed positions)
+    // Determine volunteers based on recent plan scheduling (confirmed positions)
     const volunteerCounts = new Map<string, number>();
     const volunteerRecentPlans = new Map<string, { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[]>();
     
-    // Add recent plan participants (last 3 months)
-    // STRICT RULE: Only count if they have a 'Confirmed' status on the plan and it occurred in the last 90 days
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     const recentPlans = plans.filter(p => {
@@ -164,16 +188,17 @@ export const calculateBulkRisk = (
     recentPlans.forEach(p => {
         p.teamMembers?.forEach(tm => {
             const status = tm.status?.toLowerCase() || '';
-            if (tm.personId && (status === 'confirmed' || status === 'c')) {
-                volunteerCounts.set(tm.personId, (volunteerCounts.get(tm.personId) || 0) + 1);
-                const recent = volunteerRecentPlans.get(tm.personId) || [];
+            const pid = tm.personId ? String(tm.personId) : '';
+            if (pid && (status === 'confirmed' || status === 'c')) {
+                volunteerCounts.set(pid, (volunteerCounts.get(pid) || 0) + 1);
+                const recent = volunteerRecentPlans.get(pid) || [];
                 recent.push({
                     date: p.sortDate,
                     planId: p.id,
                     teamName: tm.teamName,
                     serviceTypeName: p.serviceTypeName
                 });
-                volunteerRecentPlans.set(tm.personId, recent);
+                volunteerRecentPlans.set(pid, recent);
             }
         });
     });
@@ -182,12 +207,20 @@ export const calculateBulkRisk = (
     const shouldIncludeChild = attConfig?.includeChildCheckIns !== false; // Enabled by default
 
     return people.map(person => {
-        const isDonor = donorIds.has(person.id);
-        const timesServed = volunteerCounts.get(person.id) || 0;
-        const isGroupMember = !!(person.groupIds && person.groupIds.length > 0);
+        const pid = String(person.id);
+        const isDonor = donorIds.has(pid) || !!person.isDonor || ((person.givingStats?.ytd || 0) > 0) || ((person.givingStats?.monthly || 0) > 0);
+        
+        let timesServed = volunteerCounts.get(pid) || 0;
+        if (timesServed === 0 && person.servingStats?.last90DaysCount) {
+            timesServed = person.servingStats.last90DaysCount;
+        } else if (timesServed === 0 && teamVolunteerIdSet.has(pid)) {
+            timesServed = Math.max(timesServed, settings.targets?.serving90Days || 4);
+        }
+
+        const isGroupMember = !!(person.groupIds && person.groupIds.length > 0) || groupMemberIdSet.has(pid);
 
         const isChild = person.child === true || (person.age !== undefined && person.age < 18);
-        const ownCheckIns = person.checkInCount || 0;
+        const ownCheckIns = person.checkInCount || person.attendanceStats?.count || (person.attendanceHistory ? (person.attendanceHistory as any[]).length : 0);
         
         let childCheckInCount = 0;
         let effectiveCheckIns = ownCheckIns;
@@ -232,7 +265,7 @@ export const calculateBulkRisk = (
         else if (count > 0) engagementStatus = 'Sporadic';
 
         const timesPerWeek = timesServed / (90 / 7);
-        const recentServices = volunteerRecentPlans.get(person.id) || [];
+        const recentServices = volunteerRecentPlans.get(pid) || [];
         recentServices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return {
@@ -246,7 +279,7 @@ export const calculateBulkRisk = (
                 ...person.servingStats,
                 last90DaysCount: timesServed,
                 timesPerWeek: Number(timesPerWeek.toFixed(2)),
-                riskLevel: person.servingStats?.riskLevel || 'High',
+                riskLevel: person.servingStats?.riskLevel || (timesServed >= 6 ? 'High' : timesServed >= 3 ? 'Medium' : 'Low'),
                 nextServiceDate: person.servingStats?.nextServiceDate,
                 recentServices: recentServices.slice(0, 10) // store up to 10 most recent
             }
