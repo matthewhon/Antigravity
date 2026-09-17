@@ -294,20 +294,39 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
         };
     }, [servicesData, checkIns, people.length, cohortPeople.length, selectedCohort]);
 
-    // Per-Capita Weekly Giving:
-    const perCapitaGivingWeekly = useMemo(() => {
-        const divisor = attendanceStats.cohortAvgWeekly > 0 ? attendanceStats.cohortAvgWeekly : (cohortPeople.length || 1);
-        const effectiveAnnual = cohortGivingCurrent > 0 ? cohortGivingCurrent : (totalGivingAllCurrent > 0 ? totalGivingAllCurrent : 260000);
-        const weeklyGiving = effectiveAnnual / 52;
-        return Math.round(weeklyGiving / divisor);
-    }, [cohortGivingCurrent, totalGivingAllCurrent, attendanceStats.cohortAvgWeekly, cohortPeople.length]);
+    // Average Gift Calculations (Cohort vs Church-Wide Baseline):
+    const averageGiftStats = useMemo(() => {
+        const cohortDonations = selectedCohort === 'all'
+            ? currentYearData.donations
+            : currentYearData.donations.filter(d => cohortPersonIds.has(String(d.donorId)));
+        
+        const cohortAvg = cohortDonations.length > 0
+            ? Math.round(cohortGivingCurrent / cohortDonations.length)
+            : 0;
+            
+        const allDonations = currentYearData.donations;
+        const churchWideAvg = allDonations.length > 0
+            ? Math.round(totalGivingAllCurrent / allDonations.length)
+            : (cohortAvg || 125);
 
-    const perCapitaBaseline = useMemo(() => {
-        const divisor = attendanceStats.totalAvgWeekly > 0 ? attendanceStats.totalAvgWeekly : Math.max(people.length, 1);
-        const effectiveAnnual = totalGivingAllCurrent > 0 ? totalGivingAllCurrent : 260000;
-        const weeklyGiving = effectiveAnnual / 52;
-        return Math.round(weeklyGiving / divisor);
-    }, [totalGivingAllCurrent, attendanceStats.totalAvgWeekly, people.length]);
+        const priorCohortDonations = selectedCohort === 'all'
+            ? priorYearData.donations
+            : priorYearData.donations.filter(d => cohortPersonIds.has(String(d.donorId)));
+        const priorCohortAvg = priorCohortDonations.length > 0
+            ? Math.round(cohortGivingPrior / priorCohortDonations.length)
+            : 0;
+
+        const avgGiftYoYChange = priorCohortAvg > 0
+            ? ((cohortAvg - priorCohortAvg) / priorCohortAvg) * 100
+            : 0;
+
+        return {
+            cohortAvg: cohortAvg > 0 ? cohortAvg : churchWideAvg,
+            churchWideAvg,
+            giftCount: cohortDonations.length,
+            avgGiftYoYChange
+        };
+    }, [currentYearData, priorYearData, cohortPersonIds, selectedCohort, cohortGivingCurrent, totalGivingAllCurrent, cohortGivingPrior]);
 
     // Recurring Giving Stats for Cohort
     const recurringGivingStats = useMemo(() => {
@@ -596,9 +615,75 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div id="executive-board-report-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+            <style>{`
+                @media print {
+                    @page {
+                        size: A4 portrait;
+                        margin: 12mm 10mm 12mm 10mm;
+                    }
+                    body {
+                        background: #ffffff !important;
+                        color: #0f172a !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    /* Hide background app & all non-modal content */
+                    body * {
+                        visibility: hidden !important;
+                    }
+                    /* Reveal only the executive board report modal */
+                    #executive-board-report-modal,
+                    #executive-board-report-modal * {
+                        visibility: visible !important;
+                    }
+                    #executive-board-report-modal {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        background: #ffffff !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        z-index: 99999 !important;
+                        display: block !important;
+                    }
+                    #executive-board-report-container {
+                        position: static !important;
+                        display: block !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        border-radius: 0 !important;
+                        background: #ffffff !important;
+                        color: #0f172a !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                    }
+                    #executive-board-report-body {
+                        overflow: visible !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        background: #ffffff !important;
+                        color: #0f172a !important;
+                        padding: 0 !important;
+                    }
+                    .print\\:hidden {
+                        display: none !important;
+                        visibility: hidden !important;
+                    }
+                }
+            `}</style>
             {/* Modal Container */}
-            <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+            <div id="executive-board-report-container" className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
                 
                 {/* Header & Controls Toolbar (Screen Only) */}
                 <div className="px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/95 sticky top-0 z-20 print:hidden">
@@ -673,7 +758,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                 </div>
 
                 {/* Printable Report Body */}
-                <div ref={reportRef} className="p-8 overflow-y-auto space-y-8 bg-slate-900 text-slate-100 print:bg-white print:text-slate-900 print:p-0 print:space-y-6">
+                <div id="executive-board-report-body" ref={reportRef} className="p-8 overflow-y-auto space-y-8 bg-slate-900 text-slate-100 print:bg-white print:text-slate-900 print:p-0 print:space-y-6">
                     
                     {/* Report Title & Cohort Context */}
                     <div className="border-b border-slate-800 pb-6 print:border-slate-300">
@@ -771,19 +856,22 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                 </div>
                             </div>
 
-                            {/* Card 3: Per-Capita Giving */}
+                            {/* Card 3: Average Gift */}
                             <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Giving Per Member (Wk)</span>
+                                    <span className="text-xs text-slate-400 print:text-slate-600 font-medium">Average Gift</span>
                                     <Award className="w-4 h-4 text-amber-400" />
                                 </div>
                                 <div className="mt-2 flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white print:text-slate-900">${perCapitaGivingWeekly}</span>
-                                    <span className="text-[11px] font-bold text-slate-400 print:text-slate-600">/ attender / wk</span>
+                                    <span className="text-2xl font-black text-white print:text-slate-900">${averageGiftStats.cohortAvg.toLocaleString()}</span>
+                                    <span className={`text-[11px] font-bold flex items-center ${averageGiftStats.avgGiftYoYChange >= 0 ? 'text-emerald-400 print:text-emerald-600' : 'text-rose-400 print:text-rose-600'}`}>
+                                        {averageGiftStats.avgGiftYoYChange >= 0 ? <TrendingUp className="w-3 h-3 mr-0.5 inline" /> : <TrendingDown className="w-3 h-3 mr-0.5 inline" />}
+                                        {Math.abs(Math.round(averageGiftStats.avgGiftYoYChange))}% YoY
+                                    </span>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-700/40 print:border-slate-200 text-[10px] text-slate-400 flex justify-between">
-                                    <span>All Profiles Benchmark:</span>
-                                    <span className="font-bold text-amber-400 print:text-amber-700">${perCapitaBaseline}/wk</span>
+                                    <span>Church-Wide Avg:</span>
+                                    <span className="font-bold text-amber-400 print:text-amber-700">${averageGiftStats.churchWideAvg.toLocaleString()} / gift</span>
                                 </div>
                             </div>
 
@@ -1215,7 +1303,7 @@ export const ExecutiveBoardReportModal: React.FC<ExecutiveBoardReportModalProps>
                                         <strong>Discipleship Pipeline:</strong> Small group connection at <strong>{groupStats.cohortRate}%</strong> for this cohort. Serving rate at <strong>{volunteerStats.cohortRate}%</strong>.
                                     </li>
                                     <li>
-                                        <strong>Stewardship:</strong> {stewardshipDepth.participationRate}% giving participation. Per-capita giving is <strong>${perCapitaGivingWeekly}/wk</strong>. 
+                                        <strong>Stewardship:</strong> {stewardshipDepth.participationRate}% giving participation. Average gift size is <strong>${averageGiftStats.cohortAvg.toLocaleString()}</strong> (church-wide avg: ${averageGiftStats.churchWideAvg.toLocaleString()}).
                                         {stewardshipDepth.concentrationPct > 60 ? ` Top 10% of donors drive ${stewardshipDepth.concentrationPct}% of revenue — concentration risk should be noted.` : ''}
                                     </li>
                                 </ul>
