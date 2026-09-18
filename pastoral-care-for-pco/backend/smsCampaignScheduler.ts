@@ -29,13 +29,39 @@ function fmtDate(raw?: string): string {
     return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** Return today's date as a "MM-DD" string (local time). */
-function todayMmDd(offsetDays = 0): string {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+/** Return today's date as a "MM-DD" string in the specified IANA timezone. */
+function todayMmDdInTz(timeZone: string, offsetDays = 0): string {
+    const now = new Date();
+    // Get date string in target timezone
+    const tzStr = now.toLocaleDateString("en-US", { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    // tzStr is "MM/DD/YYYY"
+    const [m, d, y] = tzStr.split('/').map(Number);
+    const dateObj = new Date(Date.UTC(y, m - 1, d));
+    dateObj.setUTCDate(dateObj.getUTCDate() + offsetDays);
+
+    const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getUTCDate()).padStart(2, '0');
     return `${mm}-${dd}`;
+}
+
+/** Calculate the exact UTC epoch timestamp in ms for HH:MM on today in a target timezone. */
+function getTimeInTzMs(timeZone: string, hours: number, minutes: number): number {
+    const now = new Date();
+    const tzDateStr = now.toLocaleDateString("en-US", { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const [m, d, y] = tzDateStr.split('/').map(Number);
+
+    // Format target local time as ISO-like representation for target timezone
+    const targetLocalStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    
+    // Determine offset between target local time and UTC at current time
+    const dateObj = new Date();
+    const dateUTC = new Date(dateObj.toLocaleString("en-US", { timeZone: "UTC" }));
+    const dateTZ = new Date(dateObj.toLocaleString("en-US", { timeZone }));
+    const offsetMs = dateTZ.getTime() - dateUTC.getTime();
+
+    // UTC timestamp = target local wall clock timestamp - timezone offset
+    const localUtcTs = new Date(`${targetLocalStr}Z`).getTime();
+    return localUtcTs - offsetMs;
 }
 
 /** Extract MM-DD from a YYYY-MM-DD date string. */
@@ -396,11 +422,14 @@ export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
             const wfId      = wfDoc.id;
             const churchId  = wf.churchId;
             const offset    = typeof wf.triggerDayOffset === 'number' ? wf.triggerDayOffset : 0;
-            const targetMd  = todayMmDd(-offset); // negative because offset = "days before event"
-
-            if (!wf.steps?.length) continue;
-
             try {
+                // Fetch tenant church data to determine tenant timezone
+                const churchDoc = await db.collection('churches').doc(churchId).get();
+                const churchData = churchDoc.exists ? churchDoc.data() : {};
+                const tenantTz = churchData?.timezone || churchData?.smsSettings?.smsHoursTimeZone || 'America/Chicago';
+
+                const targetMd = todayMmDdInTz(tenantTz, -offset);
+
                 // 2. Load all people for this church
                 const peopleSnap = await db.collection('people')
                     .where('churchId', '==', churchId)
@@ -428,12 +457,12 @@ export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
                     const personPhone: string = (person.phone || '').replace(/\D/g, '');
                     const e164 = personPhone.length === 10 ? `+1${personPhone}` : personPhone.length === 11 ? `+${personPhone}` : '';
 
-                    // 5. Create enrollment — nextSendAt = beginning of today
-                    const today = new Date();
+                    // 5. Create enrollment — nextSendAt calculated in tenant timezone
                     const timeParts = (wf.triggerTime || '09:00').split(':').map(Number);
                     const schedHours = timeParts[0] ?? 9;
                     const schedMinutes = timeParts[1] ?? 0;
-                    today.setHours(schedHours, schedMinutes, 0, 0); // fire at configured local server time
+                    
+                    const nextSendAtMs = getTimeInTzMs(tenantTz, schedHours, schedMinutes);
 
                     const enrollment = {
                         id:           enrollId,
@@ -443,7 +472,7 @@ export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
                         personName:   person.name || null,
                         personId,
                         currentStep:  0,
-                        nextSendAt:   today.getTime(),
+                        nextSendAt:   nextSendAtMs,
                         completed:    false,
                         enrolledAt:   Date.now(),
                         lastStepSentAt: null,

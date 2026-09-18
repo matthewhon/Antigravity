@@ -83,6 +83,8 @@ export interface Church {
     phone?: string;
     website?: string;
     email?: string;
+    /** Default timezone for the organization/tenant, e.g. "America/Chicago" */
+    timezone?: string;
     trialEndsAt?: number;
     primaryContact?: string;
     metricsSharingEnabled?: boolean;

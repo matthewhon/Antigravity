@@ -2087,6 +2087,39 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                             />
                         </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Organization Timezone</label>
+                            <select 
+                                aria-label="Organization Timezone"
+                                value={formData.timezone || 'America/Chicago'}
+                                onChange={e => {
+                                    const newTz = e.target.value;
+                                    handleChange('timezone', newTz);
+                                    if (formData.smsSettings) {
+                                        handleChange('smsSettings', {
+                                            ...formData.smsSettings,
+                                            smsHoursTimeZone: newTz
+                                        });
+                                    }
+                                }}
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                            >
+                                {[
+                                    'America/New_York',
+                                    'America/Chicago',
+                                    'America/Denver',
+                                    'America/Los_Angeles',
+                                    'America/Phoenix',
+                                    'America/Anchorage',
+                                    'America/Adak',
+                                    'Pacific/Honolulu',
+                                    'UTC'
+                                ].map(tz => (
+                                    <option key={tz} value={tz}>{tz}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="space-y-6">
@@ -3809,7 +3842,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Time Zone</label>
                                             <select
                                                 title="SMS Time Zone"
-                                                value={smsForm.smsHoursTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                                                value={smsForm.smsHoursTimeZone || church.timezone || 'America/Chicago'}
                                                 onChange={e => handleSmsChange('smsHoursTimeZone', e.target.value)}
                                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                             >
