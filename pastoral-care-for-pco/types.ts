@@ -227,6 +227,33 @@ export interface Church {
             comments: number;
             publishedAt: string;
         };
+        youtubeLivestream?: {
+            isLiveNow?: boolean;
+            title?: string;
+            videoId?: string;
+            thumbnail?: string;
+            concurrentViewers?: number;
+            totalReach?: number;
+            replayViews?: number;
+            liveDate?: string;
+        };
+        youtubeTopVideos?: Array<{
+            id: string;
+            title: string;
+            thumbnail: string;
+            views: number;
+            likes: number;
+            comments: number;
+            publishedAt: string;
+            engagementScore: number;
+        }>;
+        youtubeVelocity?: {
+            subscribers7dDelta?: number;
+            subscribers30dDelta?: number;
+            views7dDelta?: number;
+            views30dDelta?: number;
+            avgViewsPerVideo?: number;
+        };
     };
     address?: string;
     city?: string;

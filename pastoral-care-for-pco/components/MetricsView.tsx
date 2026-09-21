@@ -12,6 +12,8 @@ import {
 } from 'recharts';
 import { ExecutiveBoardReportModal } from './ExecutiveBoardReportModal';
 import { FileText, ShieldCheck } from 'lucide-react';
+import { YoutubeLivestreamWidget } from './widgets/YoutubeLivestreamWidget';
+import { YoutubeLeaderboardWidget } from './widgets/YoutubeLeaderboardWidget';
 
 interface MetricsViewProps {
     churchId: string;
@@ -272,7 +274,10 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
         const showYoutube = church?.metricsSettings?.showYoutubeWidgets || false;
         if (showYoutube && church?.metricsSettings?.youtubeChannelId) {
             list.push({ id: 'youtube_channel', label: 'YouTube Channel Stats', icon: '▶️' });
+            list.push({ id: 'youtube_livestream', label: 'Sunday Livestream & Online Reach', icon: '📹' });
+            list.push({ id: 'youtube_leaderboard', label: 'Sermon Video Leaderboard', icon: '🏆' });
             list.push({ id: 'youtube_latest_video', label: 'YouTube Latest Video', icon: '🎬' });
+            list.push({ id: 'youtube_velocity', label: 'Subscriber & View Velocity', icon: '🚀' });
         }
 
         ministries.forEach(m => {
@@ -900,6 +905,74 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 </p>
                                 <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-tight mt-0.5">Engagement</p>
                             </div>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
+        }
+
+        if (id === 'youtube_livestream') {
+            const ytSettings = church?.metricsSettings;
+            return (
+                <WidgetWrapper title="Sunday Livestream & Online Reach" onRemove={() => {}} source="YouTube Live API">
+                    <YoutubeLivestreamWidget 
+                        livestream={ytSettings?.youtubeLivestream} 
+                        channelName={ytSettings?.youtubeChannelName}
+                    />
+                </WidgetWrapper>
+            );
+        }
+
+        if (id === 'youtube_leaderboard') {
+            const ytSettings = church?.metricsSettings;
+            return (
+                <WidgetWrapper title="Sermon Video Leaderboard" onRemove={() => {}} source="YouTube Content API">
+                    <YoutubeLeaderboardWidget 
+                        videos={ytSettings?.youtubeTopVideos}
+                        channelName={ytSettings?.youtubeChannelName}
+                    />
+                </WidgetWrapper>
+            );
+        }
+
+        if (id === 'youtube_velocity') {
+            const ytSettings = church?.metricsSettings;
+            const velocity = ytSettings?.youtubeVelocity;
+            if (!velocity) return null;
+
+            return (
+                <WidgetWrapper title="Growth Velocity & Audience Benchmarks" onRemove={() => {}} source="YouTube Analytics">
+                    <div className="flex flex-col h-full justify-between p-5 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-850 dark:to-slate-900 rounded-[2rem] gap-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl">🚀</span>
+                                <div>
+                                    <h4 className="text-xs font-black uppercase text-slate-900 dark:text-white tracking-wider">Subscriber & View Acceleration</h4>
+                                    <p className="text-[10px] text-slate-400">7-Day and 30-Day performance velocity</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Active Growth</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <p className="text-[10px] font-bold uppercase text-slate-400">Subscribers (7d Net)</p>
+                                <p className="text-xl font-black text-emerald-500 mt-0.5">+{velocity.subscribers7dDelta.toLocaleString()}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">30d: +{velocity.subscribers30dDelta.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <p className="text-[10px] font-bold uppercase text-slate-400">View Velocity (7d Net)</p>
+                                <p className="text-xl font-black text-indigo-500 mt-0.5">+{velocity.views7dDelta.toLocaleString()}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">30d: +{velocity.views30dDelta.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-indigo-50/50 dark:bg-indigo-950/30 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-black uppercase text-indigo-400">Avg Views Per Video</p>
+                                <p className="text-base font-black text-slate-900 dark:text-white mt-0.5">{velocity.avgViewsPerVideo.toLocaleString()}</p>
+                            </div>
+                            <span className="text-xs font-bold text-indigo-400 bg-indigo-100 dark:bg-indigo-900/60 px-2.5 py-1 rounded-xl">Healthy Channel</span>
                         </div>
                     </div>
                 </WidgetWrapper>
