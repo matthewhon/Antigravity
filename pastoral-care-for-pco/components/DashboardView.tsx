@@ -55,6 +55,8 @@ interface DashboardViewProps {
     teams: ServicesTeam[];
     recentRiskChanges?: RiskChangeRecord[];
     recentStatusChanges?: StatusChangeRecord[];
+    pastoralNotes?: PastoralNote[];
+    prayerRequests?: PrayerRequest[];
 
     pcoConnected: boolean;
     onConnectPco: () => void;
@@ -98,6 +100,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     teams,
     recentRiskChanges,
     recentStatusChanges,
+    pastoralNotes,
+    prayerRequests,
     pcoConnected,
     onConnectPco,
     globalInsights,
@@ -343,6 +347,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         teams={teams}
                         recentRiskChanges={recentRiskChanges}
                         recentStatusChanges={recentStatusChanges}
+                        pastoralNotes={pastoralNotes}
+                        prayerRequests={prayerRequests}
                     />
                 </div>
             )}

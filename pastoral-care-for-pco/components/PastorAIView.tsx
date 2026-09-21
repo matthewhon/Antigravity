@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
     PcoPerson, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     ServicesDashboardData, AttendanceData, CensusStats, DetailedDonation, 
-    PcoFund, BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord 
+    PcoFund, BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord,
+    PastoralNote, PrayerRequest 
 } from '../types';
 import { askPastorAI } from '../services/geminiService';
 import { 
@@ -25,6 +26,8 @@ interface PastorAIViewProps {
     teams?: ServicesTeam[];
     recentRiskChanges?: RiskChangeRecord[];
     recentStatusChanges?: StatusChangeRecord[];
+    pastoralNotes?: PastoralNote[];
+    prayerRequests?: PrayerRequest[];
 }
 
 interface Message {
@@ -89,7 +92,9 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
     budgets,
     teams,
     recentRiskChanges,
-    recentStatusChanges
+    recentStatusChanges,
+    pastoralNotes,
+    prayerRequests
 }) => {
     const [viewMode, setViewMode] = useState<'chat' | 'briefing'>('chat');
     const [selectedPersona, setSelectedPersona] = useState<CoachingPersona>('coach');
@@ -99,7 +104,7 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
         {
             id: 'welcome',
             role: 'assistant',
-            text: `Hello! I'm **Pastor AI** (powered by the **Barnabas AI** Intelligence Engine). \n\nI have access to your live Planning Center data for **${churchName}** across attendance frequency, giving, small group attachment, visitor funnels, and volunteer burnout. \n\nHow can I serve you today?`,
+            text: `Hello! I'm **Pastor AI** (powered by the **Barnabas AI** Intelligence Engine). \n\nI have access to your live Planning Center data for **${churchName}** across attendance frequency, giving, small group attachment, visitor funnels, volunteer burnout, pastoral notes, and prayer requests. \n\nHow can I serve you today?`,
             timestamp: new Date()
         }
     ]);
@@ -152,7 +157,9 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
                 budgets,
                 teams,
                 recentRiskChanges,
-                recentStatusChanges
+                recentStatusChanges,
+                pastoralNotes,
+                prayerRequests
             });
 
             const aiMsg: Message = {
@@ -201,7 +208,9 @@ Include the following sections with clear markdown headers and bullet points:
                 budgets,
                 teams,
                 recentRiskChanges,
-                recentStatusChanges
+                recentStatusChanges,
+                pastoralNotes,
+                prayerRequests
             });
 
             setBriefingText(response);

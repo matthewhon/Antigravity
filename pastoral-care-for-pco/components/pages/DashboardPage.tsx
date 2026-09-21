@@ -36,7 +36,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         funds, budgets, teams, recentRiskChanges, recentStatusChanges, servicesData,
         campuses, selectedCampusId,
         smsConversations, smsUsage, emailCampaigns, emailUnsubscribes,
-        outreachSessions, outreachSlots, groupCareSessions, groupCareSlots
+        outreachSessions, outreachSlots, groupCareSessions, groupCareSlots,
+        pastoralNotes, prayerRequests
     } = useTenantData();
 
     // Local state so the widget updates immediately after computation without
@@ -131,6 +132,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             teams={teams}
             recentRiskChanges={recentRiskChanges}
             recentStatusChanges={recentStatusChanges}
+            pastoralNotes={pastoralNotes}
+            prayerRequests={prayerRequests}
             pcoConnected={church.pcoConnected}
             onConnectPco={onConnectPco}
             globalInsights={globalInsights}

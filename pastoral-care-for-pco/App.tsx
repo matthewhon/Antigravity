@@ -178,6 +178,8 @@ const App: React.FC = () => {
   const [teams, setTeams] = useState<ServicesTeam[]>([]);
   const [recentRiskChanges, setRecentRiskChanges] = useState<RiskChangeRecord[]>([]);
   const [recentStatusChanges, setRecentStatusChanges] = useState<StatusChangeRecord[]>([]);
+  const [pastoralNotes, setPastoralNotes] = useState<PastoralNote[]>([]);
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [checkIns, setCheckIns] = useState<PcoCheckInRecord[]>([]);
   const [campuses, setCampuses] = useState<PcoCampus[]>([]);
 
@@ -528,7 +530,7 @@ const App: React.FC = () => {
   }, [church?.city, church?.state, church?.communityLocations]);
 
   const loadTenantData = async (churchId: string) => {
-      const [p, g, a, d, f, b, t, rc, sc, ci, camp] = await Promise.all([
+      const [p, g, a, d, f, b, t, rc, sc, notes, prayers, ci, camp] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getGroups(churchId),
           firestore.getAttendance(churchId),
@@ -538,6 +540,8 @@ const App: React.FC = () => {
           firestore.getServicesTeams(churchId),
           firestore.getRecentRiskChanges(churchId),
           firestore.getRecentStatusChanges(churchId),
+          firestore.getPastoralNotes(churchId),
+          firestore.getPrayerRequests(churchId),
           firestore.getCheckIns(churchId),
           firestore.getCampuses(churchId)
       ]);
@@ -550,6 +554,8 @@ const App: React.FC = () => {
       setTeams(t);
       setRecentRiskChanges(rc);
       setRecentStatusChanges(sc);
+      setPastoralNotes(notes);
+      setPrayerRequests(prayers);
       setCheckIns(ci);
       setCampuses(camp);
 
@@ -1156,6 +1162,7 @@ const App: React.FC = () => {
             campuses, selectedCampusId, setSelectedCampusId: handleSelectCampus,
             smsConversations, smsUsage, emailCampaigns, emailUnsubscribes,
             outreachSessions, outreachSlots, groupCareSessions, groupCareSlots,
+            pastoralNotes, prayerRequests,
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData, setCheckIns
         }}>
@@ -1341,6 +1348,8 @@ const App: React.FC = () => {
                                 teams={teams}
                                 recentRiskChanges={recentRiskChanges}
                                 recentStatusChanges={recentStatusChanges}
+                                pastoralNotes={pastoralNotes}
+                                prayerRequests={prayerRequests}
                             />
                         </div>
                     ) : <Navigate to="/" replace />

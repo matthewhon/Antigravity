@@ -4,7 +4,8 @@ import {
   BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord, ServicesDashboardData,
   User, Church, SystemSettings, PcoCheckInRecord, PcoCampus,
   SmsConversation, SmsUsageRecord, EmailCampaign, EmailUnsubscribe,
-  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot
+  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot,
+  PastoralNote, PrayerRequest
 } from '../types';
 
 interface TenantDataState {
@@ -43,7 +44,8 @@ interface TenantDataState {
   outreachSessions: OutreachSession[];
   outreachSlots: OutreachSlot[];
   groupCareSessions: GroupCareSession[];
-  groupCareSlots: GroupCareSlot[];
+  pastoralNotes: PastoralNote[];
+  prayerRequests: PrayerRequest[];
   
   // Also pass the setters if components need to update raw data locally before a sync
   setPeople: (data: PcoPerson[]) => void;

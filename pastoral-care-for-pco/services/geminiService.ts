@@ -639,6 +639,8 @@ export const askPastorAI = async (
         teams?: ServicesTeam[],
         recentRiskChanges?: RiskChangeRecord[],
         recentStatusChanges?: StatusChangeRecord[],
+        pastoralNotes?: PastoralNote[],
+        prayerRequests?: PrayerRequest[],
         lastWeekGivingSummary?: string,
         givingByFundByYearSummary?: string,
         targetClassAbsenteeSummary?: string
@@ -684,6 +686,17 @@ export const askPastorAI = async (
     ATTENDANCE:
     - Last 7 entries: ${JSON.stringify(context.attendance.slice(-7))}
     ` : 'ATTENDANCE: No data available.';
+
+    const notesSummary = context.pastoralNotes && context.pastoralNotes.length > 0 ? `
+    PASTORAL CARE NOTES (Recent Entries):
+    ${context.pastoralNotes.slice(0, 15).map(n => `- [${n.date}] ${n.personName} (${n.type}): ${n.content}${n.followUpNeeded ? ` [Follow-up needed: ${n.followUpDate || 'Yes'}]` : ''}`).join('\n')}
+    ` : 'PASTORAL CARE NOTES: No recent pastoral notes available.';
+
+    const prayerRequestsSummary = context.prayerRequests && context.prayerRequests.length > 0 ? `
+    PRAYER REQUESTS:
+    ${context.prayerRequests.slice(0, 15).map(p => `- [${p.status}] ${p.personName || 'Anonymous'} (${p.category}): ${p.request}${p.isConfidential ? ' [Confidential]' : ''}`).join('\n')}
+    ` : 'PRAYER REQUESTS: No prayer requests available.';
+
     // Build rich per-fund analytics from raw donation records
     let fundDetailsSummary = 'FUND DETAILS: No individual donation records available.';
     if (context.donations && context.donations.length > 0) {
@@ -700,23 +713,19 @@ export const askPastorAI = async (
         const lastYearH2Months = ['07','08','09','10','11','12'].map(m => `${lastYearStr}-${m}`);
 
         // Per-fund structures
-        type FundData = {
-            totalAllTime: number;
-            thisYearTotal: number;
-            lastYearTotal: number;
-            lastYearH2Total: number;
-            lastYearSamePeriodTotal: number; // Jan–currentMonth of last year
-            donorsThisYear: Set<string>;
-            donorsLastYear: Set<string>;
-            byMonth: Record<string, number>;
-            donorNames: Record<string, string>; // donorId->name
-        };
-        const byFund: Record<string, FundData> = {};
+        const byFund: Record<string, {
+            thisYearTotal: number, lastYearTotal: number,
+            lastYearH2Total: number, lastYearSamePeriodTotal: number,
+            donorsThisYear: Set<string>, donorsLastYear: Set<string>,
+            totalAllTime: number,
+            byMonth: Record<string, number>,
+            donorNames: Record<string, string>
+        }> = {};
 
         for (const d of context.donations) {
             const fund = d.fundName || 'General';
             if (!byFund[fund]) byFund[fund] = {
-                totalAllTime: 0, thisYearTotal: 0, lastYearTotal: 0,
+                thisYearTotal: 0, lastYearTotal: 0, totalAllTime: 0,
                 lastYearH2Total: 0, lastYearSamePeriodTotal: 0,
                 donorsThisYear: new Set(), donorsLastYear: new Set(),
                 byMonth: {}, donorNames: {}
@@ -831,6 +840,8 @@ export const askPastorAI = async (
     ${teamsSummary}
     ${riskChangesSummary}
     ${statusChangesSummary}
+    ${notesSummary}
+    ${prayerRequestsSummary}
     ${lastWeekGivingText}
     ${givingByFundByYearText}
     ${classAbsenteeText}
@@ -846,6 +857,7 @@ export const askPastorAI = async (
     8. For questions about last week's giving, refer directly to the LAST WEEK GIVING SUMMARY.
     9. For questions about giving in specific years or to specific funds, refer directly to the GIVING BY FUND BY YEAR SUMMARY.
     10. For questions about class or group attendance, regulars, check-ins, or absentees, refer directly to the CLASS/GROUP ATTENDANCE & ABSENTEE SUMMARY.
+    11. For pastoral care questions, refer to the PASTORAL CARE NOTES and PRAYER REQUESTS sections to provide personalized care summaries and prayer context.
     `;
 
     try {
