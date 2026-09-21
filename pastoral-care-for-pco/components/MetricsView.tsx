@@ -103,7 +103,8 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
             const lastSynced = church?.metricsSettings?.youtubeLastSynced || 0;
             const oneHourMs = 60 * 60 * 1000;
-            const shouldSync = Date.now() - lastSynced > oneHourMs;
+            const missingNewFields = !church?.metricsSettings?.youtubeLivestream || !church?.metricsSettings?.youtubeTopVideos;
+            const shouldSync = (Date.now() - lastSynced > oneHourMs) || missingNewFields;
 
             if (shouldSync) {
                 setIsAutoSyncing(true);
