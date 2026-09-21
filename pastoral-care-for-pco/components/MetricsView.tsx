@@ -943,37 +943,37 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
             return (
                 <WidgetWrapper title="Growth Velocity & Audience Benchmarks" onRemove={() => {}} source="YouTube Analytics">
-                    <div className="flex flex-col h-full justify-between p-5 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-850 dark:to-slate-900 rounded-[2rem] gap-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl">🚀</span>
-                                <div>
-                                    <h4 className="text-xs font-black uppercase text-slate-900 dark:text-white tracking-wider">Subscriber & View Acceleration</h4>
-                                    <p className="text-[10px] text-slate-400">7-Day and 30-Day performance velocity</p>
+                    <div className="flex flex-col justify-between h-full space-y-3 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xl shrink-0">🚀</span>
+                                <div className="min-w-0">
+                                    <h5 className="text-xs font-black uppercase text-slate-900 dark:text-white tracking-wider truncate">Subscriber & View Acceleration</h5>
+                                    <p className="text-[11px] text-slate-400 truncate">7-Day and 30-Day performance velocity</p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Active Growth</span>
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">Active Growth</span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                <p className="text-[10px] font-bold uppercase text-slate-400">Subscribers (7d Net)</p>
-                                <p className="text-xl font-black text-emerald-500 mt-0.5">+{velocity.subscribers7dDelta.toLocaleString()}</p>
-                                <p className="text-[9px] text-slate-400 mt-1">30d: +{velocity.subscribers30dDelta.toLocaleString()}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 min-w-0">
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider truncate">Subscribers (7d Net)</p>
+                                <p className="text-lg font-black text-emerald-500 mt-0.5">+{velocity.subscribers7dDelta.toLocaleString()}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5 truncate">30d Net: +{velocity.subscribers30dDelta.toLocaleString()}</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                <p className="text-[10px] font-bold uppercase text-slate-400">View Velocity (7d Net)</p>
-                                <p className="text-xl font-black text-indigo-500 mt-0.5">+{velocity.views7dDelta.toLocaleString()}</p>
-                                <p className="text-[9px] text-slate-400 mt-1">30d: +{velocity.views30dDelta.toLocaleString()}</p>
+                            <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 min-w-0">
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider truncate">View Velocity (7d Net)</p>
+                                <p className="text-lg font-black text-indigo-500 mt-0.5">+{velocity.views7dDelta.toLocaleString()}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5 truncate">30d Net: +{velocity.views30dDelta.toLocaleString()}</p>
                             </div>
                         </div>
 
-                        <div className="bg-indigo-50/50 dark:bg-indigo-950/30 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] font-black uppercase text-indigo-400">Avg Views Per Video</p>
-                                <p className="text-base font-black text-slate-900 dark:text-white mt-0.5">{velocity.avgViewsPerVideo.toLocaleString()}</p>
+                        <div className="bg-indigo-50/60 dark:bg-indigo-950/40 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between gap-2 min-w-0">
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-black uppercase text-indigo-500 dark:text-indigo-400 tracking-wider truncate">Avg Views Per Video</p>
+                                <p className="text-sm font-black text-slate-900 dark:text-white mt-0.5">{velocity.avgViewsPerVideo.toLocaleString()}</p>
                             </div>
-                            <span className="text-xs font-bold text-indigo-400 bg-indigo-100 dark:bg-indigo-900/60 px-2.5 py-1 rounded-xl">Healthy Channel</span>
+                            <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 dark:bg-indigo-900/60 px-2.5 py-1 rounded-xl shrink-0">Healthy Channel</span>
                         </div>
                     </div>
                 </WidgetWrapper>
