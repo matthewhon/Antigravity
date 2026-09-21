@@ -237,45 +237,30 @@ Include the following sections with clear markdown headers and bullet points:
         <div className="h-[calc(100vh-130px)] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-300">
             
             {/* Header Toolbar */}
-            <div className="bg-slate-50 dark:bg-slate-850 p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-xl text-white shadow-md shadow-indigo-500/20 shrink-0">
-                        🤖
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-                            <span>Pastor AI</span>
-                            <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                                Barnabas AI
-                            </span>
-                        </h2>
-                        <p className="text-xs text-slate-400 line-clamp-2">
-                            Executive ministry intelligence & staff briefing coach for {churchName}.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Controls: Mode Switcher & Persona Selector */}
-                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                    
-                    {/* Persona Selector */}
-                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs max-w-full">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">Tone:</span>
-                        <select
-                            value={selectedPersona}
-                            onChange={(e) => setSelectedPersona(e.target.value as CoachingPersona)}
-                            className="bg-transparent border-none text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer max-w-[160px] sm:max-w-none truncate"
-                        >
-                            {COACHING_PERSONAS.map(p => (
-                                <option key={p.id} value={p.id} className="bg-white dark:bg-slate-800">
-                                    {p.icon} {p.label}
-                                </option>
-                            ))}
-                        </select>
+            <div className="bg-slate-50 dark:bg-slate-850 p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-3 shrink-0">
+                {/* Top Row: Icon, Title & View Mode Toggle */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-lg text-white shadow-md shadow-indigo-500/20 shrink-0">
+                            🤖
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h2 className="text-base font-black text-slate-900 dark:text-white leading-none">
+                                    Pastor AI
+                                </h2>
+                                <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                                    Barnabas AI
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1 truncate">
+                                Executive ministry intelligence & briefing assistant
+                            </p>
+                        </div>
                     </div>
 
                     {/* View Mode Toggle */}
-                    <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
+                    <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl shrink-0">
                         <button
                             onClick={() => setViewMode('chat')}
                             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -299,7 +284,22 @@ Include the following sections with clear markdown headers and bullet points:
                             <span>Staff Briefing</span>
                         </button>
                     </div>
+                </div>
 
+                {/* Bottom Row: Tone Selector */}
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">Tone:</span>
+                    <select
+                        value={selectedPersona}
+                        onChange={(e) => setSelectedPersona(e.target.value as CoachingPersona)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer flex-1 min-w-0"
+                    >
+                        {COACHING_PERSONAS.map(p => (
+                            <option key={p.id} value={p.id} className="bg-white dark:bg-slate-800">
+                                {p.icon} {p.label} ({p.desc})
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
