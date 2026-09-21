@@ -794,6 +794,67 @@ export const GivingView: React.FC<GivingViewProps> = ({
 
   const budgetMetrics = calculateBudgetMetrics();
 
+  // --- Budget Graphs Data ---
+  const monthlyBudgetVsActualData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const activeBudgets = budgets.filter(b => b.year === budgetYear && b.isActive);
+
+    return monthNames.map((monthName, idx) => {
+      // Sum monthly budget across all active budgets for this year
+      const budgetAmount = activeBudgets.reduce((sum, b) => sum + (b.monthlyAmounts[idx] || 0), 0);
+
+      // Sum actual donations for this specific month and year
+      const monthStartStr = `${budgetYear}-${pad2(idx + 1)}-01`;
+      const lastDay = new Date(budgetYear, idx + 1, 0).getDate();
+      const monthEndStr = `${budgetYear}-${pad2(idx + 1)}-${pad2(lastDay)}`;
+
+      const actualAmount = donations
+        .filter(d => {
+          const dDateStr = (d.date || '').slice(0, 10);
+          return dDateStr >= monthStartStr && dDateStr <= monthEndStr;
+        })
+        .reduce((sum, d) => sum + d.amount, 0);
+
+      return {
+        month: monthName,
+        Budget: budgetAmount,
+        Actual: actualAmount
+      };
+    });
+  }, [budgets, donations, budgetYear]);
+
+  const fundBudgetComparisonData = useMemo(() => {
+    const now = new Date();
+    const currentMonthIndex = budgetYear === now.getFullYear() 
+      ? now.getMonth() 
+      : (budgetYear < now.getFullYear() ? 11 : -1);
+
+    return funds
+      .map(fund => {
+        const budget = budgets.find(b => b.fundName === fund.name && b.year === budgetYear && b.isActive);
+        const ytdBudget = budget
+          ? budget.monthlyAmounts.slice(0, currentMonthIndex + 1).reduce((a, b) => a + b, 0)
+          : 0;
+
+        const ytdActual = donations
+          .filter(d => {
+            const dateStr = (d.date || '').slice(0, 10);
+            const yearStr = dateStr.slice(0, 4);
+            return d.fundName === fund.name &&
+                   yearStr === String(budgetYear) &&
+                   dateStr <= toDateStr(now);
+          })
+          .reduce((sum, d) => sum + d.amount, 0);
+
+        return {
+          name: fund.name,
+          'YTD Budget': ytdBudget,
+          'YTD Actual': ytdActual
+        };
+      })
+      .filter(item => item['YTD Budget'] > 0 || item['YTD Actual'] > 0);
+  }, [funds, budgets, donations, budgetYear]);
+
   const renderBenchmarkPlaceholder = (title: string, removeId: string) => (
       <div className="col-span-1">
           <WidgetWrapper title={title} onRemove={() => handleRemoveWidget(removeId)} source="Benchmarks">
@@ -2255,6 +2316,62 @@ export const GivingView: React.FC<GivingViewProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Budget Visualizations & Graphs */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Graph 1: Monthly Budget vs Actual Giving */}
+                    <div className="bg-white dark:bg-slate-850 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="font-black text-slate-900 dark:text-white text-lg">Monthly Budget vs. Actual</h3>
+                                <p className="text-xs text-slate-400 font-medium mt-0.5">Monthly breakdown for {budgetYear}</p>
+                            </div>
+                        </div>
+                        <div className="h-72 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={monthlyBudgetVsActualData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.15} />
+                                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: any) => [`$${Number(value).toLocaleString()}`, '']} />
+                                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                                    <Bar dataKey="Budget" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                                    <Bar dataKey="Actual" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Graph 2: YTD Fund Budget Attainment */}
+                    <div className="bg-white dark:bg-slate-850 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="font-black text-slate-900 dark:text-white text-lg">YTD Performance by Fund</h3>
+                                <p className="text-xs text-slate-400 font-medium mt-0.5">Actual vs YTD Target by Fund</p>
+                            </div>
+                        </div>
+                        <div className="h-72 w-full">
+                            {fundBudgetComparisonData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={fundBudgetComparisonData} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" opacity={0.15} />
+                                        <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                        <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={100} />
+                                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: any) => [`$${Number(value).toLocaleString()}`, '']} />
+                                        <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                                        <Bar dataKey="YTD Budget" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={12} />
+                                        <Bar dataKey="YTD Actual" fill="#06b6d4" radius={[0, 4, 4, 0]} barSize={12} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                                    Set annual fund budgets below to view per-fund graphs.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-white dark:bg-slate-850 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                     <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center"><h3 className="font-black text-slate-900 dark:text-white">Fund Budgets</h3></div>
                     <table className="w-full text-left">
