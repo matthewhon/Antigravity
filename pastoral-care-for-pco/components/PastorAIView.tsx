@@ -237,34 +237,34 @@ Include the following sections with clear markdown headers and bullet points:
         <div className="h-[calc(100vh-130px)] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-300">
             
             {/* Header Toolbar */}
-            <div className="bg-slate-50 dark:bg-slate-850 p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-xl text-white shadow-md shadow-indigo-500/20">
+            <div className="bg-slate-50 dark:bg-slate-850 p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-xl text-white shadow-md shadow-indigo-500/20 shrink-0">
                         🤖
                     </div>
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <div className="min-w-0">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
                             <span>Pastor AI</span>
                             <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
                                 Barnabas AI
                             </span>
                         </h2>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-400 truncate">
                             Executive ministry intelligence & staff briefing coach for {churchName}.
                         </p>
                     </div>
                 </div>
 
                 {/* Controls: Mode Switcher & Persona Selector */}
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                     
                     {/* Persona Selector */}
-                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase">Tone:</span>
+                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs max-w-full">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">Tone:</span>
                         <select
                             value={selectedPersona}
                             onChange={(e) => setSelectedPersona(e.target.value as CoachingPersona)}
-                            className="bg-transparent border-none text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer"
+                            className="bg-transparent border-none text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer max-w-[160px] sm:max-w-none truncate"
                         >
                             {COACHING_PERSONAS.map(p => (
                                 <option key={p.id} value={p.id} className="bg-white dark:bg-slate-800">
@@ -321,14 +321,14 @@ Include the following sections with clear markdown headers and bullet points:
                                     {msg.role === 'user' ? '👤' : activePersonaObj.icon}
                                 </div>
                                 <div 
-                                    className={`max-w-[82%] p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm ${
+                                    className={`max-w-[85%] sm:max-w-[80%] p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm break-words ${
                                         msg.role === 'user' 
                                         ? 'bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-tr-none' 
                                         : 'bg-indigo-600 text-white rounded-tl-none shadow-indigo-600/10'
                                     }`}
                                 >
                                     <div 
-                                        className="markdown-content space-y-2 whitespace-pre-wrap"
+                                        className="markdown-content space-y-2 whitespace-pre-wrap break-words"
                                         dangerouslySetInnerHTML={{ 
                                             __html: msg.text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
                                         }} 
