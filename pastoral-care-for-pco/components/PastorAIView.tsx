@@ -249,7 +249,7 @@ Include the following sections with clear markdown headers and bullet points:
                                 Barnabas AI
                             </span>
                         </h2>
-                        <p className="text-xs text-slate-400 truncate">
+                        <p className="text-xs text-slate-400 line-clamp-2">
                             Executive ministry intelligence & staff briefing coach for {churchName}.
                         </p>
                     </div>
