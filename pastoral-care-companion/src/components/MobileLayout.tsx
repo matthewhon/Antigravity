@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Church, User, PcoPerson, PastoralNote } from '../types';
+import { Church, User, PcoPerson, PastoralNote, PcoGroup } from '../types';
 import { auth } from '../services/firebase';
 import { firestore } from '../services/firestoreService';
 import { 
-  Users, Map, PhoneCall, FileText, 
+  Users, Map, PhoneCall, FileText, UsersRound,
   Settings2, LogOut, RefreshCw, X, 
   Sun, Moon, Monitor 
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { PeopleMapView } from './PeopleMapView';
 import { OutreachView } from './OutreachView';
 import { MobileFormsView } from './MobileFormsView';
 import { PersonProfileView } from './PersonProfileView';
+import { GroupsView } from './GroupsView';
 import logoIconTransparent from '../assets/logo-icon-transparent.png';
 
 interface MobileLayoutProps {
@@ -20,7 +21,8 @@ interface MobileLayoutProps {
   onUpdateTheme: (pref: 'light' | 'dark' | 'system') => void;
 }
 
-type CompanionTab = 'directory' | 'map' | 'outreach' | 'forms';
+type CompanionTab = 'directory' | 'map' | 'groups' | 'outreach' | 'forms';
+
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser, onUpdateTheme }) => {
   const [activeTab, setActiveTab] = useState<CompanionTab>('directory');
@@ -29,6 +31,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
   
   // Shared Cached States
   const [people, setPeople] = useState<PcoPerson[]>([]);
+  const [groups, setGroups] = useState<PcoGroup[]>([]);
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPerson, setSelectedPerson] = useState<PcoPerson | null>(null);
@@ -41,10 +44,12 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
   useEffect(() => {
     const peopleCacheKey = `pc_people_cache_${church.id}`;
     const notesCacheKey = `pc_notes_cache_${church.id}`;
+    const groupsCacheKey = `pc_groups_cache_${church.id}`;
 
     // 1. Instantly bootstrap states from cache if available
     const cachedPeople = localStorage.getItem(peopleCacheKey);
     const cachedNotes = localStorage.getItem(notesCacheKey);
+    const cachedGroups = localStorage.getItem(groupsCacheKey);
     
     let hasLoadedFromCache = false;
     if (cachedPeople) {
@@ -62,6 +67,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
         console.warn("Error parsing cached notes:", e);
       }
     }
+    if (cachedGroups) {
+      try {
+        setGroups(JSON.parse(cachedGroups));
+      } catch (e) {
+        console.warn("Error parsing cached groups:", e);
+      }
+    }
 
     if (hasLoadedFromCache) {
       setLoading(false); // Stop loading indicator immediately if cache loaded
@@ -70,15 +82,20 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
     // 2. Fetch fresh dataset from Firestore in the background
     const fetchFreshData = async () => {
       try {
-        const freshPeople = await firestore.getPeople(church.id);
-        const freshNotes = await firestore.getPastoralNotes(church.id);
+        const [freshPeople, freshNotes, freshGroups] = await Promise.all([
+          firestore.getPeople(church.id),
+          firestore.getPastoralNotes(church.id),
+          firestore.getGroups(church.id)
+        ]);
 
         setPeople(freshPeople);
         setNotes(freshNotes);
+        setGroups(freshGroups);
 
         // Update local caches
         localStorage.setItem(peopleCacheKey, JSON.stringify(freshPeople));
         localStorage.setItem(notesCacheKey, JSON.stringify(freshNotes));
+        localStorage.setItem(groupsCacheKey, JSON.stringify(freshGroups));
       } catch (e) {
         console.error("Failed to load fresh data from Firestore:", e);
       } finally {
@@ -88,6 +105,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
 
     fetchFreshData();
   }, [church.id]);
+
 
   const handleSyncPeople = async () => {
     setIsSyncing(true);
@@ -197,6 +215,15 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
             onSelectPerson={setSelectedPerson} 
           />
         )}
+        {activeTab === 'groups' && (
+          <GroupsView
+            groups={groups}
+            people={people}
+            church={church}
+            currentUser={currentUser}
+            onSelectPerson={setSelectedPerson}
+          />
+        )}
         {activeTab === 'outreach' && (
           <OutreachView 
             churchId={church.id} 
@@ -263,6 +290,29 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
               Map
             </span>
           </button>
+
+          {/* Tab 3: Groups */}
+          <button
+            onClick={() => setActiveTab('groups')}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 select-none"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span 
+              className="flex items-center justify-center rounded-2xl transition-all duration-150"
+              style={{
+                width: 44,
+                height: 28,
+                background: activeTab === 'groups' ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                color: activeTab === 'groups' ? 'rgb(99, 102, 241)' : 'rgb(148 163 184)',
+              }}
+            >
+              <UsersRound size={20} strokeWidth={activeTab === 'groups' ? 2.5 : 1.8} />
+            </span>
+            <span className="text-[9px] font-bold tracking-wide uppercase leading-none" style={{ color: activeTab === 'groups' ? 'rgb(99, 102, 241)' : 'rgb(148 163 184)' }}>
+              Groups
+            </span>
+          </button>
+
 
           {/* Tab 3: Outreach */}
           <button

@@ -254,7 +254,23 @@ export interface PcoGroup {
     leaderIds?: string[];
     memberIds?: string[];
     attendanceHistory?: { eventId: string, date: string, count: number, members: number, visitors: number, attendeeIds: string[] }[];
+    description?: string;
+    targetDemographic?: string;
+    meetingFrequency?: string;
+    meetingDay?: string;
+    locationName?: string;
+    tags?: string[];
+    maxCapacity?: number;
 }
+
+export interface GroupRecommendation {
+    personId: string;
+    matchScore: number; // 0 - 100
+    matchReasons: string[];
+    distanceMiles?: number;
+    status: 'suggested' | 'invited' | 'dismissed';
+}
+
 
 export interface ProgressStats {
     thisMonth: number;
