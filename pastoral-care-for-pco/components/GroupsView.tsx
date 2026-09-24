@@ -73,6 +73,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
   onToggleHideArchived,
   churchId
 }) => {
+  const isDark = currentTheme === 'dark';
   const [eventAttendanceFilter, setEventAttendanceFilter] = useState<EventAttendanceFilterType>('Last Month');
   const [groupInfoFilter, setGroupInfoFilter] = useState<GroupInfoFilterType>('Last Month');
   
