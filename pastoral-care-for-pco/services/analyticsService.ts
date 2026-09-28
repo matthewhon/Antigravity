@@ -1,5 +1,6 @@
 
-import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord, MembershipHistoryData, MembershipTimeFilter, MembershipMonthlyPoint, MembershipTransitionItem, MembershipTransitionBreakdown, PcoCheckInRecord, NewEngagementSummary } from '../types';
+import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, LifecycleDonor, GivingFilter, ServicePlanSnapshot, ServicesTeam, AttendanceRecord, ServicesFilter, ServicesDashboardData, SongUsage, AggregatedChurchStats, PcoGroup, GlobalStats, PeopleDashboardData, GroupsDashboardData, RiskChangeRecord, StatusChangeRecord, MembershipHistoryData, MembershipTimeFilter, MembershipMonthlyPoint, MembershipTransitionItem, MembershipTransitionBreakdown, PcoCheckInRecord, NewEngagementSummary, GivingConsistencyAnalytics, DonorConsistencyProfile, DonorConsistencySegment } from '../types';
+
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -1689,3 +1690,249 @@ export const calculateMembershipHistory = (
         transitions: filteredTransitions
     };
 };
+
+// ---------------------------------------------------------------------------
+// Donor Consistency Analytics
+// ---------------------------------------------------------------------------
+
+const DEFAULT_CONSISTENCY_THRESHOLDS = { champion: 85, consistent: 65, sporadic: 40 };
+const DEFAULT_CONSISTENCY_WINDOW_MONTHS = 12;
+
+/** Produce a "YYYY-MM" label for a Date */
+const toYearMonth = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+/** Generate an ordered array of YYYY-MM strings covering [startDate, endDate] inclusive */
+function buildMonthSlots(windowMonths: number, referenceNow: Date): string[] {
+    const slots: string[] = [];
+    for (let i = windowMonths - 1; i >= 0; i--) {
+        const d = new Date(referenceNow.getFullYear(), referenceNow.getMonth() - i, 1);
+        slots.push(toYearMonth(d));
+    }
+    return slots;
+}
+
+/** Compute a consistency score for a single donor given their monthly buckets */
+function scoreDonor(
+    monthlyAmounts: Map<string, number>,
+    slots: string[],
+    daysSinceLastGift: number,
+    lapsedWindowDays: number,
+    thresholds: typeof DEFAULT_CONSISTENCY_THRESHOLDS
+): { score: number; frequencyRatio: number; amountCv: number; segment: DonorConsistencySegment } {
+    const windowMonths = slots.length;
+
+    // --- Frequency ratio ---
+    let filledMonths = 0;
+    const amounts: number[] = [];
+    slots.forEach(slot => {
+        const amt = monthlyAmounts.get(slot) ?? 0;
+        if (amt > 0) {
+            filledMonths++;
+            amounts.push(amt);
+        }
+    });
+    const frequencyRatio = windowMonths > 0 ? filledMonths / windowMonths : 0;
+
+    // --- Amount stability (coefficient of variation, inverted) ---
+    let amountCv = 0;
+    if (amounts.length > 1) {
+        const mean = amounts.reduce((s, v) => s + v, 0) / amounts.length;
+        if (mean > 0) {
+            const variance = amounts.reduce((s, v) => s + (v - mean) ** 2, 0) / amounts.length;
+            amountCv = Math.sqrt(variance) / mean;
+        }
+    }
+    // Clamp CV so extreme outliers don't over-penalise; cap at 2 (200%)
+    const clampedCv = Math.min(amountCv, 2);
+    const stabilityScore = Math.max(0, 1 - clampedCv / 2); // 0–1
+
+    // --- Recency decay ---
+    const recencyScore = daysSinceLastGift >= lapsedWindowDays
+        ? 0
+        : Math.max(0, 1 - daysSinceLastGift / lapsedWindowDays);
+
+    // --- Composite (weights: 50 / 30 / 20) ---
+    const raw = frequencyRatio * 0.50 + stabilityScore * 0.30 + recencyScore * 0.20;
+    const score = Math.round(Math.min(100, Math.max(0, raw * 100)));
+
+    // --- Segment ---
+    let segment: DonorConsistencySegment;
+    if (score === 0 && filledMonths === 0) {
+        segment = 'Inactive';
+    } else if (score >= thresholds.champion) {
+        segment = 'Champion';
+    } else if (score >= thresholds.consistent) {
+        segment = 'Consistent';
+    } else if (score >= thresholds.sporadic) {
+        segment = 'Sporadic';
+    } else {
+        segment = 'Irregular';
+    }
+
+    return { score, frequencyRatio, amountCv, segment };
+}
+
+/**
+ * Compute donor-level consistency scores and a church-level summary.
+ *
+ * All computation is in-memory over already-loaded DetailedDonation[].
+ * No Firestore reads are performed.
+ */
+export const calculateDonorConsistency = (
+    donations: DetailedDonation[],
+    people: PcoPerson[],
+    lifecycleSettings?: DonorLifecycleSettings
+): GivingConsistencyAnalytics => {
+    const now = new Date();
+    const windowMonths = lifecycleSettings?.consistencyWindowMonths ?? DEFAULT_CONSISTENCY_WINDOW_MONTHS;
+    const thresholds = { ...DEFAULT_CONSISTENCY_THRESHOLDS, ...(lifecycleSettings?.consistencyThresholds ?? {}) };
+    const lapsedWindowDays = lifecycleSettings?.lapsedWindowDays ?? 365;
+
+    // Window start = first day of (now - windowMonths) months ago
+    const windowStart = new Date(now.getFullYear(), now.getMonth() - windowMonths, 1);
+    const slots = buildMonthSlots(windowMonths, now);
+
+    // Build people lookup
+    const peopleMap = new Map<string, PcoPerson>();
+    people.forEach(p => peopleMap.set(p.id, p));
+
+    // Bucket donations per donor per month, and track last gift date
+    const perDonor = new Map<string, { monthlyAmounts: Map<string, number>; lastGiftDate: Date; totalGiven: number; giftCount: number }>();
+    const donorNames = new Map<string, string>(); // donorId → name from donation record
+
+    donations.forEach(d => {
+        const dt = new Date(d.date);
+        if (isNaN(dt.getTime())) return;
+        if (dt < windowStart) return; // outside window
+
+        const entry = perDonor.get(d.donorId) ?? { monthlyAmounts: new Map(), lastGiftDate: dt, totalGiven: 0, giftCount: 0 };
+        const slot = toYearMonth(dt);
+        entry.monthlyAmounts.set(slot, (entry.monthlyAmounts.get(slot) ?? 0) + d.amount);
+        if (dt > entry.lastGiftDate) entry.lastGiftDate = dt;
+        entry.totalGiven += d.amount;
+        entry.giftCount++;
+        perDonor.set(d.donorId, entry);
+        if (d.donorName && !donorNames.has(d.donorId)) donorNames.set(d.donorId, d.donorName);
+    });
+
+
+    // Build per-donor profiles
+    const donors: DonorConsistencyProfile[] = [];
+
+    perDonor.forEach((entry, donorId) => {
+        const person = peopleMap.get(donorId);
+        const daysSinceLastGift = Math.floor((now.getTime() - entry.lastGiftDate.getTime()) / ONE_DAY);
+
+        const { score, frequencyRatio, amountCv, segment } = scoreDonor(
+            entry.monthlyAmounts,
+            slots,
+            daysSinceLastGift,
+            lapsedWindowDays,
+            thresholds
+        );
+
+        // Monthly pattern for sparkline (all window slots, 0 if no gift)
+        const monthlyPattern = slots.map(s => ({ month: s, amount: entry.monthlyAmounts.get(s) ?? 0 }));
+
+        // Avg monthly amount (only counting months with gifts)
+        const giftMonths = monthlyPattern.filter(p => p.amount > 0);
+        const avgMonthlyAmount = giftMonths.length > 0
+            ? giftMonths.reduce((s, p) => s + p.amount, 0) / giftMonths.length
+            : 0;
+
+        // Trend: compare first half vs second half average amounts
+        const half = Math.floor(slots.length / 2);
+        const firstHalfAmts = monthlyPattern.slice(0, half).map(p => p.amount);
+        const secondHalfAmts = monthlyPattern.slice(half).map(p => p.amount);
+        const firstAvg = firstHalfAmts.reduce((s, v) => s + v, 0) / (firstHalfAmts.length || 1);
+        const secondAvg = secondHalfAmts.reduce((s, v) => s + v, 0) / (secondHalfAmts.length || 1);
+        const trendDiff = secondAvg - firstAvg;
+        const trend: DonorConsistencyProfile['trend'] =
+            trendDiff > firstAvg * 0.1 ? 'Improving' :
+            trendDiff < -firstAvg * 0.1 ? 'Declining' :
+            'Stable';
+
+        donors.push({
+            donorId,
+            donorName: person?.name ?? donorNames.get(donorId) ?? 'Unknown',
+            avatar: person?.avatar ?? null,
+            consistencyScore: score,
+            segment,
+            frequencyRatio,
+            amountCv,
+            daysSinceLastGift,
+            totalGiven: entry.totalGiven,
+            giftCount: entry.giftCount,
+            avgMonthlyAmount,
+            monthlyPattern,
+            trend,
+        } as DonorConsistencyProfile);
+    });
+
+
+    donors.sort((a, b) => b.consistencyScore - a.consistencyScore);
+
+
+    // Church-level rollup
+    const segmentCounts: Record<DonorConsistencySegment, number> = { Champion: 0, Consistent: 0, Sporadic: 0, Irregular: 0, Inactive: 0 };
+    const segmentAmounts: Record<DonorConsistencySegment, number> = { Champion: 0, Consistent: 0, Sporadic: 0, Irregular: 0, Inactive: 0 };
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+
+    donors.forEach(d => {
+        segmentCounts[d.segment]++;
+        segmentAmounts[d.segment] += d.totalGiven;
+        // Donation-weighted average score
+        totalWeightedScore += d.consistencyScore * d.totalGiven;
+        totalWeight += d.totalGiven;
+    });
+
+    const consistencyIndex = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0;
+
+    // 6-month rolling trend: for each of the past 6 months, compute avg score
+    // using a trailing windowMonths window ending at that month
+    const trend: { month: string; avgScore: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+        const trendEnd = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const trendSlots = buildMonthSlots(windowMonths, trendEnd);
+        const trendWindowStart = new Date(trendEnd.getFullYear(), trendEnd.getMonth() - windowMonths, 1);
+
+        // Re-bucket donations for this window
+        const trendPerDonor = new Map<string, { monthlyAmounts: Map<string, number>; lastGiftDate: Date }>();
+        donations.forEach(d => {
+            const dt = new Date(d.date);
+            if (isNaN(dt.getTime()) || dt < trendWindowStart || dt > trendEnd) return;
+            const entry = trendPerDonor.get(d.donorId) ?? { monthlyAmounts: new Map(), lastGiftDate: dt };
+            const slot = toYearMonth(dt);
+            entry.monthlyAmounts.set(slot, (entry.monthlyAmounts.get(slot) ?? 0) + d.amount);
+            if (dt > entry.lastGiftDate) entry.lastGiftDate = dt;
+            trendPerDonor.set(d.donorId, entry);
+        });
+
+        let sumScores = 0;
+        let donorCount = 0;
+        trendPerDonor.forEach((entry, _) => {
+            const days = Math.floor((trendEnd.getTime() - entry.lastGiftDate.getTime()) / ONE_DAY);
+            const { score } = scoreDonor(entry.monthlyAmounts, trendSlots, days, lapsedWindowDays, thresholds);
+            sumScores += score;
+            donorCount++;
+        });
+
+        trend.push({
+            month: toYearMonth(trendEnd),
+            avgScore: donorCount > 0 ? Math.round(sumScores / donorCount) : 0,
+        });
+    }
+
+    return {
+        windowMonths,
+        asOf: now.toISOString(),
+        consistencyIndex,
+        segmentCounts,
+        segmentAmounts,
+        donors,
+        trend,
+    };
+};
+

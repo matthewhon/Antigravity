@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ChevronDown, X, Search, Filter } from 'lucide-react';
 import { DetailedDonation, PcoPerson } from '../types';
+import { calculateDonorConsistency } from '../services/analyticsService';
+
 import { 
     startOfWeek, startOfYear, endOfYear,
     startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, subYears,
@@ -258,6 +260,14 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
     // Build a stable people map
     const peopleMap = useMemo(() => new Map(people.map(p => [p.id, p])), [people]);
+
+    // Consistency score lookup — computed once over all donations & people
+    const consistencyScoreMap = useMemo(() => {
+        const result = calculateDonorConsistency(donations, people);
+        const map = new Map<string, { score: number; segment: string }>();
+        result.donors.forEach(d => map.set(d.donorId, { score: d.consistencyScore, segment: d.segment }));
+        return map;
+    }, [donations, people]);
 
     // Build all-time donor history map (for status classification)
     const donorAllHistory = useMemo(() => {
@@ -1075,16 +1085,22 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         let filename = "";
 
         if (activeTab === 'donors') {
-            const header = ['Donor Name', 'Primary Email', 'Total Given', 'First Recorded Giving Date', 'Last Gift Date', ...buckets];
-            const rows = aggregatedData.map(d => [
-                escapeCsv(d.name), escapeCsv(d.email),
-                d.totalAmount.toFixed(2),
-                d.firstGiftDate ? (d.firstGiftDate.includes('T') ? d.firstGiftDate.split('T')[0] : d.firstGiftDate) : '',
-                d.lastGiftDate ? (d.lastGiftDate.includes('T') ? d.lastGiftDate.split('T')[0] : d.lastGiftDate) : '',
-                ...buckets.map(b => (d.buckets[b] || 0).toFixed(2)),
-            ].join(','));
+            const header = ['Donor Name', 'Primary Email', 'Total Given', 'First Recorded Giving Date', 'Last Gift Date', 'Consistency Score', 'Consistency Segment', ...buckets];
+            const rows = aggregatedData.map(d => {
+                const consistency = consistencyScoreMap.get(d.id);
+                return [
+                    escapeCsv(d.name), escapeCsv(d.email),
+                    d.totalAmount.toFixed(2),
+                    d.firstGiftDate ? (d.firstGiftDate.includes('T') ? d.firstGiftDate.split('T')[0] : d.firstGiftDate) : '',
+                    d.lastGiftDate ? (d.lastGiftDate.includes('T') ? d.lastGiftDate.split('T')[0] : d.lastGiftDate) : '',
+                    consistency ? consistency.score : '',
+                    consistency ? escapeCsv(consistency.segment) : '',
+                    ...buckets.map(b => (d.buckets[b] || 0).toFixed(2)),
+                ].join(',');
+            });
             csv = [header.join(','), ...rows].join('\n');
             filename = `donor_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+
         } else if (activeTab === 'age_trends') {
             const header = ['Period', 'Under 18', '18-25', '26-35', '36-50', '51-65', '65+', 'Unknown Age'];
             const rows = ageTrendData.map(d => [

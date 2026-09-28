@@ -152,6 +152,63 @@ export interface DonorLifecycleSettings {
     occasionalWindowDays: number;
     lapsedWindowDays: number;
     recoveredGapDays: number;
+    /** How many months to look back for consistency analysis (default: 12) */
+    consistencyWindowMonths?: number;
+    /** Score thresholds mapping to consistency segments */
+    consistencyThresholds?: {
+        /** Minimum score to be a Champion (default: 85) */
+        champion: number;
+        /** Minimum score to be Consistent (default: 65) */
+        consistent: number;
+        /** Minimum score to be Sporadic (default: 40) */
+        sporadic: number;
+    };
+}
+
+/** Consistency segment labels — from highest to lowest commitment */
+export type DonorConsistencySegment = 'Champion' | 'Consistent' | 'Sporadic' | 'Irregular' | 'Inactive';
+
+/** Per-donor consistency breakdown computed over a rolling analysis window */
+export interface DonorConsistencyProfile {
+    donorId: string;
+    donorName: string;
+    avatar?: string | null;
+    /** Composite score 0–100 */
+    consistencyScore: number;
+    segment: DonorConsistencySegment;
+    /** Months with at least one gift divided by total window months (0–1) */
+    frequencyRatio: number;
+    /** Coefficient of variation of monthly giving amounts — lower means more stable */
+    amountCv: number;
+    daysSinceLastGift: number;
+    /** Total amount given within the analysis window */
+    totalGiven: number;
+    /** Number of gifts in the window */
+    giftCount: number;
+    /** Average monthly amount across months that had a gift */
+    avgMonthlyAmount: number;
+    /** Month-by-month giving for sparkline rendering (YYYY-MM → amount) */
+    monthlyPattern: { month: string; amount: number }[];
+    /** Comparing first-half vs second-half of the window */
+    trend: 'Improving' | 'Stable' | 'Declining';
+}
+
+/** Church-level rollup of donor consistency metrics */
+export interface GivingConsistencyAnalytics {
+    /** Length of the analysis window in months */
+    windowMonths: number;
+    /** ISO date string of when this was computed */
+    asOf: string;
+    /** Donation-weighted average consistency score across all donors in the window */
+    consistencyIndex: number;
+    /** Count of donors per segment */
+    segmentCounts: Record<DonorConsistencySegment, number>;
+    /** Total dollars given per segment within the window */
+    segmentAmounts: Record<DonorConsistencySegment, number>;
+    /** Individual donor profiles, sorted by consistencyScore descending */
+    donors: DonorConsistencyProfile[];
+    /** Month-by-month average score trend for the past 6 months */
+    trend: { month: string; avgScore: number }[];
 }
 
 export interface CommunityLocation {

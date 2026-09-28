@@ -12,10 +12,12 @@ import {
 } from 'recharts';
 import { calculateGivingAnalytics } from '../services/analyticsService';
 import { firestore } from '../services/firestoreService';
-
+import { useGivingConsistencyData } from '../hooks/useDashboardData';
+import { GivingConsistencyTab } from './GivingConsistencyTab';
 import { DonationReport } from './DonationReport';
 import { CampaignPledgesManager } from './CampaignPledgesManager';
 import { GivingBatchesView } from './GivingBatchesView';
+
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -24,7 +26,7 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString();
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
-  activePage?: 'overview' | 'donor' | 'budgets' | 'reports' | 'pledges' | 'batches';
+  activePage?: 'overview' | 'donor' | 'consistency' | 'budgets' | 'reports' | 'pledges' | 'batches';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
@@ -1011,22 +1013,21 @@ export const GivingView: React.FC<GivingViewProps> = ({
   }, [donations, people, filter, dateRange]);
 
   // Giving consistency — per-donor cadence over the last 12 months
+  // Full consistency analytics (powers the Consistency tab and the overview widget)
+  const consistencyAnalytics = useGivingConsistencyData(donations, people, church?.donorLifecycleSettings);
+
+  // Backwards-compatible shape for the existing giving_consistency overview widget
   const givingConsistency = useMemo(() => {
-      const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
-      const perDonor = new Map<string, number>();
-      donations.forEach(d => {
-          const t = new Date(d.date).getTime();
-          if (isNaN(t) || t < cutoff) return;
-          perDonor.set(d.donorId, (perDonor.get(d.donorId) || 0) + 1);
-      });
-      const dist = { Weekly: 0, Monthly: 0, Occasional: 0 };
-      perDonor.forEach(count => {
-          if (count >= 40) dist.Weekly++;
-          else if (count >= 10) dist.Monthly++;
-          else dist.Occasional++;
-      });
-      return { dist, total: perDonor.size };
-  }, [donations]);
+      const c = consistencyAnalytics;
+      const dist = {
+          Champion:   c.segmentCounts['Champion'],
+          Consistent: c.segmentCounts['Consistent'],
+          Sporadic:   c.segmentCounts['Sporadic'],
+          Irregular:  c.segmentCounts['Irregular'],
+      };
+      return { dist, total: c.donors.length, index: c.consistencyIndex };
+  }, [consistencyAnalytics]);
+
 
   // Seasonality — giving by calendar month, current year vs prior year
   const givingSeasonality = useMemo(() => {
@@ -1278,12 +1279,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
           case 'giving_consistency': {
               const c = givingConsistency;
               const pie = [
-                  { name: 'Weekly',     value: c.dist.Weekly,     color: '#10b981' },
-                  { name: 'Monthly',    value: c.dist.Monthly,    color: '#6366f1' },
-                  { name: 'Occasional', value: c.dist.Occasional, color: '#f59e0b' },
+                  { name: 'Champion',   value: c.dist.Champion,   color: '#10b981' },
+                  { name: 'Consistent', value: c.dist.Consistent, color: '#6366f1' },
+                  { name: 'Sporadic',   value: c.dist.Sporadic,   color: '#f59e0b' },
+                  { name: 'Irregular',  value: c.dist.Irregular,  color: '#ef4444' },
               ].filter(x => x.value > 0);
               return (
-                  <WidgetWrapper title="Giving Consistency" onRemove={() => handleRemoveWidget(id)} source="Cadence · 12mo">
+                  <WidgetWrapper title="Giving Consistency" onRemove={() => handleRemoveWidget(id)} source={`Score: ${c.index} · 12mo`}>
                       <div className="h-64 relative">
                           {c.total > 0 ? (
                               <>
@@ -1297,8 +1299,8 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                       </PieChart>
                                   </ResponsiveContainer>
                                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
-                                      <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{c.total}</span>
-                                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Donors</span>
+                                      <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{c.index}</span>
+                                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Index</span>
                                   </div>
                               </>
                           ) : (
@@ -1308,6 +1310,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   </WidgetWrapper>
               );
           }
+
           case 'giving_seasonality':
               return (
                   <WidgetWrapper title="Giving Seasonality" onRemove={() => handleRemoveWidget(id)} source="Monthly · YoY">
@@ -2300,7 +2303,14 @@ export const GivingView: React.FC<GivingViewProps> = ({
             </div>
         )}
 
+        {activeTab === 'consistency' && (
+            <div className="animate-in fade-in duration-500 no-print">
+                <GivingConsistencyTab data={consistencyAnalytics} />
+            </div>
+        )}
+
         {activeTab === 'budgets' && (
+
             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in no-print">
                 <div className="bg-slate-900 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-8 opacity-10 text-[12rem] font-black leading-none">{budgetYear}</div>

@@ -3,10 +3,11 @@ import {
     PcoPerson, PcoGroup, DetailedDonation, ServicesTeam, RiskSettings, 
     RiskChangeRecord, StatusChangeRecord, ServicesDashboardData, AttendanceRecord,
     PeopleDashboardData, GroupsDashboardData, AttendanceData, GivingFilter, DonorLifecycleSettings,
-    ServicePlanSnapshot
+    ServicePlanSnapshot, GivingConsistencyAnalytics
 } from '../types';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from '../services/riskService';
-import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS, calculatePeopleDashboardData, calculateGroupsDashboardData } from '../services/analyticsService';
+import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS, calculatePeopleDashboardData, calculateGroupsDashboardData, calculateDonorConsistency } from '../services/analyticsService';
+
 
 export function useRiskEnrichedPeople(
     people: PcoPerson[],
@@ -96,3 +97,14 @@ export function useAttendanceChartData(attendance: AttendanceRecord[]) {
         }));
     }, [attendance]);
 }
+
+export function useGivingConsistencyData(
+    donations: DetailedDonation[],
+    people: PcoPerson[],
+    donorLifecycleSettings?: DonorLifecycleSettings
+): GivingConsistencyAnalytics {
+    return useMemo<GivingConsistencyAnalytics>(() => {
+        return calculateDonorConsistency(donations, people, donorLifecycleSettings);
+    }, [donations, people, donorLifecycleSettings]);
+}
+
