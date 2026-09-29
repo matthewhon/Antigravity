@@ -847,35 +847,70 @@ async function fetchWidgetData(
 
             const EXCLUDED = ['Inactive', 'Archived'];
             const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
             if (widgetId === 'people_birthdays') {
                 const upcoming = people
                     .filter((p: any) => !!p.birthdate && !EXCLUDED.includes(p.status || ''))
                     .map((p: any) => {
-                        const bd = new Date(p.birthdate);
-                        const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
-                        if (thisYear < now) thisYear.setFullYear(now.getFullYear() + 1);
-                        const daysUntil = Math.ceil((thisYear.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-                        return { name: p.name, daysUntil, dateStr: thisYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+                        const parts = String(p.birthdate).trim().split('-');
+                        let birthMonth: number;
+                        let birthDay: number;
+                        if (parts.length >= 3) {
+                            birthMonth = parseInt(parts[1], 10) - 1;
+                            birthDay = parseInt(parts[2], 10);
+                        } else {
+                            const bd = new Date(p.birthdate);
+                            birthMonth = bd.getUTCMonth();
+                            birthDay = bd.getUTCDate();
+                        }
+                        let nextDate = new Date(today.getFullYear(), birthMonth, birthDay);
+                        if (nextDate < today) {
+                            nextDate = new Date(today.getFullYear() + 1, birthMonth, birthDay);
+                        }
+                        const daysUntil = Math.round((nextDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                        return {
+                            name: p.name,
+                            daysUntil,
+                            dateStr: nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        };
                     })
-                    .filter((p: any) => p.daysUntil <= 30)
-                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
-                    .slice(0, 15);
+                    .filter((p: any) => p.daysUntil >= 0 && p.daysUntil <= 30)
+                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil);
                 return { upcoming, listFilter: config.pcoListName || null };
             } else {
                 const upcoming = people
                     .filter((p: any) => !!p.anniversary && !EXCLUDED.includes(p.status || ''))
                     .map((p: any) => {
-                        const ann = new Date(p.anniversary);
-                        const thisYear = new Date(now.getFullYear(), ann.getMonth(), ann.getDate());
-                        if (thisYear < now) thisYear.setFullYear(now.getFullYear() + 1);
-                        const daysUntil = Math.ceil((thisYear.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-                        const years = now.getFullYear() - ann.getFullYear();
-                        return { name: p.name, daysUntil, dateStr: thisYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), years };
+                        const parts = String(p.anniversary).trim().split('-');
+                        let annMonth: number;
+                        let annDay: number;
+                        let annYear: number = today.getFullYear();
+                        if (parts.length >= 3) {
+                            annYear = parseInt(parts[0], 10);
+                            annMonth = parseInt(parts[1], 10) - 1;
+                            annDay = parseInt(parts[2], 10);
+                        } else {
+                            const ann = new Date(p.anniversary);
+                            annYear = ann.getUTCFullYear();
+                            annMonth = ann.getUTCMonth();
+                            annDay = ann.getUTCDate();
+                        }
+                        let nextDate = new Date(today.getFullYear(), annMonth, annDay);
+                        if (nextDate < today) {
+                            nextDate = new Date(today.getFullYear() + 1, annMonth, annDay);
+                        }
+                        const daysUntil = Math.round((nextDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                        const years = nextDate.getFullYear() - annYear;
+                        return {
+                            name: p.name,
+                            daysUntil,
+                            dateStr: nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            years
+                        };
                     })
-                    .filter((p: any) => p.daysUntil <= 30)
-                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
-                    .slice(0, 15);
+                    .filter((p: any) => p.daysUntil >= 0 && p.daysUntil <= 30)
+                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil);
                 return { upcoming, listFilter: config.pcoListName || null };
             }
         }

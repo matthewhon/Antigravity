@@ -1214,7 +1214,7 @@ function renderAnalyticsBlockHtml(
         }
         case 'people_birthdays': {
             const upcoming: { name: string; daysUntil: number; dateStr: string }[] = data.upcoming || [];
-            const rows = upcoming.slice(0, 8).map(p => {
+            const rows = upcoming.map(p => {
                 const badgeColor = p.daysUntil === 0 ? '#dc2626' : p.daysUntil <= 7 ? '#d97706' : '#6366f1';
                 const badgeBg    = p.daysUntil === 0 ? '#fee2e2' : p.daysUntil <= 7 ? '#fef3c7' : '#eef2ff';
                 const daysLabel  = p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`;
@@ -1243,7 +1243,7 @@ function renderAnalyticsBlockHtml(
         }
         case 'people_anniversaries': {
             const upcoming: { name: string; daysUntil: number; dateStr: string; years?: number }[] = data.upcoming || [];
-            const rows = upcoming.slice(0, 8).map(p => {
+            const rows = upcoming.map(p => {
                 const badgeColor = p.daysUntil === 0 ? '#dc2626' : p.daysUntil <= 7 ? '#d97706' : '#7c3aed';
                 const badgeBg    = p.daysUntil === 0 ? '#fee2e2' : p.daysUntil <= 7 ? '#fef3c7' : '#f5f3ff';
                 const daysLabel  = p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`;
