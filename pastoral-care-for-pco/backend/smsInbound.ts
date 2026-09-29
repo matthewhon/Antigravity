@@ -272,49 +272,71 @@ Write the reply:`;
  * Detection is regex-based (no external API), keeping cost at $0.
  */
 export function detectPrayerRequest(body: string): 'generic' | 'specific' | null {
-    const text = body.trim().toLowerCase();
+    const raw = (body || '').trim();
+    if (!raw) return null;
+    const text = raw.toLowerCase();
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Generic patterns Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    // These match requests that ask for prayer for the sender themselves,
-    // with no additional detail provided in the message.
-    const genericPatterns: RegExp[] = [
-        /^(will|can|could|would) (you|someone|anyone|y'all|yall) (please )?pray for me\??\.?$/i,
-        /^(please )?pray for me\??\.?$/i,
-        /^i need (prayer|your prayers|prayers)\.?$/i,
-        /^i('m| am) (in need of|asking for) (prayer|prayers)\.?$/i,
-        /^(can|could|would) (i|we) (get|have|request) (a )?(prayer|some prayers)\??\.?$/i,
-        /^(i'd|i would) (like|appreciate|love) (a )?(prayer|your prayers|some prayer)\.?$/i,
-        /^(please keep me in your prayers?)\.?$/i,
-        /^(keep me in your prayers?)\.?$/i,
-        /^i need (some )?prayer support\.?$/i,
-    ];
-
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Specific patterns Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    // These match requests that name a person, situation, or topic after the
-    // prayer phrase —â€ enough detail that no clarifying reply is needed.
-    const specificPatterns: RegExp[] = [
-        /\bpray for (my|our|his|her|their|a |the )\w/i,
-        /\bpray for [a-z].{3,}/i,           // "pray for [name/situation]"
-        /\bprayer (request|need) (for|about|regarding)\b/i,
-        /\bplease (pray|keep .+ in prayer|lift up)\b.{5,}/i,
-        /\bi need prayer for\b/i,
-        /\bkeep .+ in (your )?prayers?\b/i,
-        /\blift (up|them|him|her) in prayer\b/i,
-        /\bpraying for\b.{4,}/i,
-        /\b(unspoken )?prayer request\b/i,
-        /\bneed (prayer|prayers) (for|about|with|over|regarding)\b/i,
-        /\bintercede for\b/i,
-        /\bplease cover .+ in prayer\b/i,
-        /\b(stand|agree) in prayer (with|for)\b/i,
-    ];
-
-    // Check generic first (shorter, more specific match before the broad specific check)
-    for (const re of genericPatterns) {
-        if (re.test(text)) return 'generic';
+    // ── 1. Negative exclusions ─────────────────────────────────────────────
+    // If the sender is offering prayer to the church or thanking the church for prayers
+    // (e.g. in reply to an outbound message), this is NOT an incoming prayer request for themselves/others.
+    const offeringPrayerOrThanks = /\b(praying for (you|y'all|yall|the church|your|pastor|staff|team|everyone|all of you|this|the service|sunday|the leadership)|thank(s| you)? (for )?(your |the )?(prayers?|praying)|thank(s| you)? for praying|i('ll| will) (keep you in my prayers|pray for you)|keeping you in (my |our )?prayers?|will be praying for (you|y'all|pastor|the church)|grateful for (your |the )?prayers?|appreciate (your |the )?prayers?)\b/i;
+    if (offeringPrayerOrThanks.test(text)) {
+        return null;
     }
 
+    // Strip common conversational greetings at the start (e.g., 'hey pastor,', 'good morning,')
+    const cleaned = text.replace(/^(hey|hi|hello|good\s+(morning|afternoon|evening))\s*(pastor|church|friends|team|all)?\s*[,.:;!-]*\s*/i, '');
+    // Strip emojis and non-alphanumeric trailing symbols for clean generic matching
+    const cleanedNoEmoji = cleaned.replace(/[^\w\s'?]/g, '').trim();
+
+    // ── 2. Generic patterns ────────────────────────────────────────────────
+    // Asking for prayer for oneself/us with no situation or detail attached
+    // (triggers the clarifying reply: "What would you like prayer for?")
+    const genericPatterns: RegExp[] = [
+        /^(will|can|could|would)\s+(you|someone|anyone|y'all|yall)\s+(please\s+)?pray\s+for\s+(me|us)(\s+please)?\??$/i,
+        /^(please\s+)?pray\s+for\s+(me|us)(\s+please)?\??$/i,
+        /^(i|we)\s+need\s+(some\s+)?(prayer|prayers|prayer support)\??$/i,
+        /^(i'm|i am|we're|we are)\s+(in need of|asking for)\s+(prayer|prayers)\??$/i,
+        /^(can|could|would)\s+(i|we)\s+(get|have|request|ask for)\s+(a\s+)?(prayer|some prayers?)\??$/i,
+        /^(i'd|i would|we'd|we would)\s+(like|appreciate|love)\s+(a\s+)?(prayer|your prayers|some prayers?)\??$/i,
+        /^(please\s+)?(keep|remember)\s+(me|us)\s+in\s+(your\s+)?prayers?\??$/i,
+        /^(need\s+prayers?|in\s+need\s+of\s+prayer)\??$/i,
+        /^(do you (guys |all )?take |can i (submit|share) (a )?|how do i (submit|send) (a )?)?prayer requests?\??$/i,
+        /^prayer\s+request\??$/i,
+        /^(i|we)\s+have\s+a\s+prayer\s+(request|need)\??$/i,
+    ];
+
+    for (const re of genericPatterns) {
+        if (re.test(cleanedNoEmoji) || re.test(cleaned)) {
+            return 'generic';
+        }
+    }
+
+    // ── 3. Specific patterns ────────────────────────────────────────────────
+    // Has person, situation, topic, or prayer list request
+    // (tags "Needs Prayer" immediately, no clarifying reply needed)
+    const specificPatterns: RegExp[] = [
+        /\bpray for (my|our|his|her|their|a|the)\s+\w+/i,
+        /\bpray for [a-z]{3,}/i,
+        /\bprayers? (for|regarding|about|needed for|appreciated for)\b/i,
+        /\bprayer (request|need) (for|about|regarding)\b/i,
+        /\bneed (prayer|prayers) (for|about|with|over|regarding)\b/i,
+        /\b(please )?pray\s*[,.:;]?\s*(my|our|i |we |he |she |they |having |going |in the )\b/i,
+        /\b(having|going into|admitted|hospital|er|surgery|cancer|sick|accident|passed away|struggling|hurting|grief|depressed|lost|pain)\b.*?\bplease pray\b/i,
+        /\bplease pray\b\s*[.!?]*$/i,
+        /\b(pray|praying) that\b/i,
+        /\b(keep|remember|lift|cover)\s+.{2,30}\s+in\s+(your\s+)?prayers?\b/i,
+        /\blift\s+(up\s+)?(them|him|her|my|our|\w+)\s+in\s+prayer\b/i,
+        /\b(add|put)\s+(.+?)\s+(on|to)\s+the\s+prayer\s+(list|chain)\b/i,
+        /\b(stand|agree)\s+(with me\s+)?in\s+prayer\s+(for|with)\b/i,
+        /\bintercede for\b/i,
+        /\bunspoken (prayer )?(request|need)\b/i,
+    ];
+
     for (const re of specificPatterns) {
-        if (re.test(text)) return 'specific';
+        if (re.test(text)) {
+            return 'specific';
+        }
     }
 
     return null;
@@ -460,6 +482,13 @@ export const handleInboundSms = async (req: any, res: any) => {
     try {
         const from = normaliseE164(fromRaw || '');
         const to = normaliseE164(toRaw || '');
+
+        // Guard against loopback (message from our own number to itself)
+        if (from && to && from === to) {
+            log.info(`[Inbound SMS] Ignoring loopback message from ${from} to ${to}`, 'system', { from, to }, '');
+            res.set('Content-Type', 'text/xml');
+            return res.status(200).send('<Response></Response>');
+        }
 
         // 1. Find the church via the twilioNumbers collection (new multi-number routing)
         const numSnap = await db.collection('smsNumbers')

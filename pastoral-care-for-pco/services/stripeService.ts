@@ -134,9 +134,13 @@ class StripeService {
             throw new Error(responseData.message || `Payment server error: ${response.status}`);
         }
 
-        const { sessionId } = responseData;
+        const { sessionId, upgraded } = responseData;
+        if (upgraded) {
+            window.location.search = '?success=true';
+            return;
+        }
         if (!sessionId) {
-            throw new Error('Payment server did not return a session ID. Check server logs.');
+            throw new Error(responseData.message || 'Payment server did not return a session ID. Check server logs.');
         }
 
 

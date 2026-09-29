@@ -482,6 +482,28 @@ export async function sendIndividualInternal(params: {
         if (resolvedPersonAvatar && !existingData.personAvatar) convPatch.personAvatar = resolvedPersonAvatar;
     }
 
+    // Outbound send: if this conversation had the "Needs Prayer" tag, sending an outbound message responds to/resolves it
+    if (Array.isArray(existingData.tags) && existingData.tags.length > 0) {
+        try {
+            const prayerTagSnap = await db.collection('smsTags')
+                .where('churchId', '==', churchId)
+                .where('name', '==', 'Needs Prayer')
+                .limit(1)
+                .get();
+            if (!prayerTagSnap.empty) {
+                const prayerTagId = prayerTagSnap.docs[0].id;
+                if (existingData.tags.includes(prayerTagId)) {
+                    convPatch.tags = FieldValue.arrayRemove(prayerTagId);
+                }
+            }
+        } catch (tagErr: any) {
+            log.warn(`Failed to check prayer tag on outbound send: ${tagErr.message}`, 'system', { churchId }, churchId);
+        }
+    }
+    if (existingData.prayerFollowUpState) {
+        convPatch.prayerFollowUpState = null;
+    }
+
     await convRef.set(convPatch, { merge: true });
 
     const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
@@ -705,6 +727,26 @@ export async function sendBulkInternal(params: {
                     if (pInfo.pcoPersonId && !existingData.personId) convPatch.personId = pInfo.pcoPersonId;
                     if (pInfo.personName && !existingData.personName) convPatch.personName = pInfo.personName;
                     if (pInfo.avatar && !existingData.personAvatar) convPatch.personAvatar = pInfo.avatar;
+                }
+
+                // Outbound send: if this conversation had the "Needs Prayer" tag, sending an outbound message responds to/resolves it
+                if (Array.isArray(existingData.tags) && existingData.tags.length > 0) {
+                    try {
+                        const prayerTagSnap = await db.collection('smsTags')
+                            .where('churchId', '==', churchId)
+                            .where('name', '==', 'Needs Prayer')
+                            .limit(1)
+                            .get();
+                        if (!prayerTagSnap.empty) {
+                            const prayerTagId = prayerTagSnap.docs[0].id;
+                            if (existingData.tags.includes(prayerTagId)) {
+                                convPatch.tags = FieldValue.arrayRemove(prayerTagId);
+                            }
+                        }
+                    } catch { }
+                }
+                if (existingData.prayerFollowUpState) {
+                    convPatch.prayerFollowUpState = null;
                 }
 
                 await convRef.set(convPatch, { merge: true });

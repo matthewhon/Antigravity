@@ -2464,7 +2464,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
     const filtered = allConversations.filter(c => {
         const matchSearch = !search || c.phoneNumber.includes(search) || (c.personName || '').toLowerCase().includes(search.toLowerCase());
-        const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
+        const isPrayerFilter = tags.some(t => t.id === tagFilter && t.name === 'Needs Prayer');
+        const matchTag = !tagFilter || (
+            (c.tags || []).includes(tagFilter) && (!isPrayerFilter || c.lastMessageDirection === 'inbound')
+        );
         const matchUnread = !showUnreadOnly || (c.unreadCount || 0) > 0;
         return matchSearch && matchTag && matchUnread;
     });
@@ -2557,6 +2560,21 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             });
             const data = await safeJson(res);
             if (!data.success) throw new Error(data.error || 'Send failed');
+
+            // Outbound reply: if conversation had "Needs Prayer", resolve it optimistically and in Firestore
+            const prayerTag = tags.find(t => t.name === 'Needs Prayer');
+            if (prayerTag && (activeConv.tags || []).includes(prayerTag.id)) {
+                setActiveConv(prev => prev ? {
+                    ...prev,
+                    tags: (prev.tags || []).filter(id => id !== prayerTag.id),
+                    lastMessageDirection: 'outbound',
+                } : prev);
+                updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), {
+                    tags: arrayRemove(prayerTag.id),
+                    prayerFollowUpState: null,
+                }).catch(() => {});
+            }
+
             setReplyBody('');
             setReplyMediaUrl('');
         } catch (e: any) {
@@ -2671,7 +2689,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     {filtered.map(conv => {
                         const isUnread = (conv.unreadCount || 0) > 0;
                         const isActive = activeConv?.id === conv.id;
-                        const convTags = tags.filter(t => (conv.tags || []).includes(t.id));
+                        const convTags = tags.filter(t => (conv.tags || []).includes(t.id) && (t.name !== 'Needs Prayer' || conv.lastMessageDirection === 'inbound'));
                         return (
                             <button
                                 key={conv.id}

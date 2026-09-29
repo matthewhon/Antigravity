@@ -203,7 +203,23 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 const subscription = await stripe.subscriptions.retrieve(subscriptionId);
                 const planId = session.metadata?.planId || 'growth';
 
-                await db.collection('churches').doc(churchId).update({
+                // Look up church to check if there is an existing/previous subscription to cancel
+                const churchRef = db.collection('churches').doc(churchId);
+                const churchSnap = await churchRef.get();
+                const existingData = churchSnap.exists ? (churchSnap.data() || {}) : {};
+                const oldSubId = session.metadata?.previousSubscriptionId || existingData.subscription?.subscriptionId;
+
+                // Cancel the old subscription immediately if it differs from the new one
+                if (oldSubId && oldSubId !== subscriptionId) {
+                    try {
+                        console.log(`[StripeWebhook] Canceling previous subscription ${oldSubId} for church ${churchId}`);
+                        await stripe.subscriptions.cancel(oldSubId);
+                    } catch (cancelErr: any) {
+                        console.error(`[StripeWebhook] Error canceling previous subscription ${oldSubId}:`, cancelErr.message);
+                    }
+                }
+
+                await churchRef.update({
                     subscription: {
                         status: 'active',
                         planId,
