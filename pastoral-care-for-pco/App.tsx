@@ -125,7 +125,7 @@ const App: React.FC = () => {
      if (path.startsWith('/giving/batches')) return 'giving-batches';
      if (path.startsWith('/giving/pledges')) return 'giving-pledges';
      if (path.startsWith('/giving/donor')) return 'giving-donor';
-     if (path.startsWith('/giving/consistency')) return 'giving-consistency';
+     if (path.startsWith('/giving/consistency') || path.startsWith('/giving/consistancy')) return 'giving-consistency';
      if (path.startsWith('/giving/budgets')) return 'giving-budgets';
      if (path.startsWith('/giving/donations')) return 'giving-donations';
      if (path.startsWith('/giving/reports')) return 'giving-reports';

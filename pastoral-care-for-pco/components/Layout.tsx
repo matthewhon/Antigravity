@@ -212,12 +212,13 @@ const Layout: React.FC<LayoutProps> = ({
       entries.push({
         kind: 'menu', key: 'giving', icon: HandCoins, label: 'Giving', prefix: 'giving',
         items: [
-          { view: 'giving',         icon: BarChart3, label: 'Overview' },
-          { view: 'giving-batches', icon: Landmark,  label: 'Batches & Deposits' },
-          { view: 'giving-pledges', icon: Target,    label: 'Campaign Pledges' },
-          { view: 'giving-donor',   icon: Users,     label: 'Donors'   },
-          { view: 'giving-budgets', icon: Briefcase, label: 'Budgets'  },
-          { view: 'giving-reports', icon: FileText,  label: 'Reports'  },
+          { view: 'giving',             icon: BarChart3,          label: 'Overview' },
+          { view: 'giving-batches',     icon: Landmark,           label: 'Batches & Deposits' },
+          { view: 'giving-pledges',     icon: Target,             label: 'Campaign Pledges' },
+          { view: 'giving-donor',       icon: Users,              label: 'Donors'   },
+          { view: 'giving-consistency', icon: SlidersHorizontal,  label: 'Consistency' },
+          { view: 'giving-budgets',     icon: Briefcase,          label: 'Budgets'  },
+          { view: 'giving-reports',     icon: FileText,           label: 'Reports'  },
         ],
       });
     }

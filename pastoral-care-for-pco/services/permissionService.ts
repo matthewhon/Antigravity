@@ -50,6 +50,7 @@ const MODULE_ROLE_MAP: Record<string, string> = {
     'giving-batches': 'Giving',
     'giving-pledges': 'Giving',
     'giving-donor': 'Giving',
+    'giving-consistency': 'Giving',
     'giving-budgets': 'Giving',
     'giving-donations': 'Giving',
     'giving-reports': 'Giving',

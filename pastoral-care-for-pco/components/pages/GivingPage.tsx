@@ -27,12 +27,12 @@ export const GivingPage: React.FC<GivingPageProps> = ({
     const { '*': subpath } = useParams();
 
     const activePage = 
-        subpath === 'batches'     ? 'batches'     :
-        subpath === 'pledges'     ? 'pledges'     :
-        subpath === 'donor'       ? 'donor'       :
-        subpath === 'consistency' ? 'consistency' :
-        subpath === 'budgets'     ? 'budgets'     :
-        subpath === 'reports'     ? 'reports'     :
+        subpath === 'batches'                                  ? 'batches'     :
+        subpath === 'pledges'                                  ? 'pledges'     :
+        subpath === 'donor'                                    ? 'donor'       :
+        subpath === 'consistency' || subpath === 'consistancy' ? 'consistency' :
+        subpath === 'budgets'                                  ? 'budgets'     :
+        subpath === 'reports'                                  ? 'reports'     :
         'overview';
 
 
