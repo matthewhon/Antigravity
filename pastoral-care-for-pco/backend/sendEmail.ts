@@ -1513,12 +1513,33 @@ export async function executeSend(
         log.info(`Sending test email to ${testEmail}`, 'system', { campaignId, churchId }, churchId);
 
     } else if (campaign.toListId || campaign.toGroupId) {
-        const { resolvePcoRecipients } = await import('./smsCampaignScheduler.js');
-        const resolved = await resolvePcoRecipients(db, churchId, campaign.toListId || undefined, campaign.toGroupId || undefined, 'email');
-        recipients = resolved.destinations;
-        personMap = resolved.personMap;
-        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO ${campaign.toListId ? 'list' : 'group'})`, 'system', { campaignId, churchId }, churchId);
-
+        if (campaign.toListId === 'newsletter_subscribers' || campaign.toGroupId === 'newsletter_subscribers') {
+            const subSnap = await db.collection('newsletter_subscribers')
+                .where('churchId', '==', churchId)
+                .where('status', '==', 'active')
+                .get();
+            const subDocs = subSnap.docs.map((d: any) => d.data());
+            recipients = subDocs.map((s: any) => s.email).filter(Boolean);
+            subDocs.forEach((s: any) => {
+                if (s.email) {
+                    personMap[s.email.toLowerCase()] = {
+                        firstName: s.firstName || '',
+                        lastName: s.lastName || '',
+                        fullName: s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || '',
+                        email: s.email,
+                        phone: s.phone || '',
+                        personId: s.pcoPersonId || ''
+                    };
+                }
+            });
+            log.info(`Sending campaign "${subject}" to ${recipients.length} newsletter subscribers`, 'system', { campaignId, churchId }, churchId);
+        } else {
+            const { resolvePcoRecipients } = await import('./smsCampaignScheduler.js');
+            const resolved = await resolvePcoRecipients(db, churchId, campaign.toListId || undefined, campaign.toGroupId || undefined, 'email');
+            recipients = resolved.destinations;
+            personMap = resolved.personMap;
+            log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO ${campaign.toListId ? 'list' : 'group'})`, 'system', { campaignId, churchId }, churchId);
+        }
     } else {
         throw new Error('No recipients configured. Select a PCO list or group on the campaign.');
     }

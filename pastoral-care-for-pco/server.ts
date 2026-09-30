@@ -56,6 +56,17 @@ import { emailServicePlan } from './backend/servicePlanEmail.js';
 import { startInfoUpdateScheduler } from './backend/infoUpdateScheduler';
 import { createServerLogger } from './services/logService';
 import { quickbooksRouter } from './backend/quickbooksRoutes';
+import {
+  listNewsletterWidgets,
+  saveNewsletterWidget,
+  deleteNewsletterWidget,
+  getPublicNewsletterWidget,
+  subscribeNewsletter,
+  listNewsletterSubscribers,
+  updateNewsletterSubscriberStatus,
+  deleteNewsletterSubscriber
+} from './backend/newsletterService';
+import { serveNewsletterWidgetScript } from './backend/newsletterWidgetScript';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -368,6 +379,21 @@ async function startServer() {
     app.get('/api/pledge-submissions/:churchId/:campaignId', getPledgeSubmissions);
     app.post('/api/pledge-submissions/:churchId/:submissionId/sync-pco', express.json(), syncPledgeSubmissionToPco);
     app.get('/widget.js', serveWidgetScript);
+
+    // ─── Newsletter Widgets & Subscription Endpoints ─────────────────
+    app.get('/api/newsletter-widgets/:churchId', listNewsletterWidgets);
+    app.post('/api/newsletter-widgets/:churchId', express.json(), saveNewsletterWidget);
+    app.delete('/api/newsletter-widgets/:churchId/:widgetId', deleteNewsletterWidget);
+    app.get('/api/public/newsletter-widget/:churchId', getPublicNewsletterWidget);
+    app.get('/api/public/newsletter-widget/:churchId/:widgetId', getPublicNewsletterWidget);
+    app.post('/api/public/newsletter-widget/:churchId/subscribe', express.json(), subscribeNewsletter);
+    app.get('/widget/newsletter.js', serveNewsletterWidgetScript);
+    app.get('/api/public/newsletter-widget.js', serveNewsletterWidgetScript);
+
+    // Newsletter Subscribers Roster
+    app.get('/api/newsletter-subscribers/:churchId', listNewsletterSubscribers);
+    app.patch('/api/newsletter-subscribers/:churchId/:subscriberId', express.json(), updateNewsletterSubscriberStatus);
+    app.delete('/api/newsletter-subscribers/:churchId/:subscriberId', deleteNewsletterSubscriber);
 
     // ─── PCO Web Forms Endpoints ─────────────────────────────────────
     app.get('/api/forms/:churchId', listForms);
@@ -1460,88 +1486,8 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
     });
 
-    // POST /api/public/newsletter/:churchId/subscribe — subscribe to newsletter channels
-    app.post('/api/public/newsletter/:churchId/subscribe', express.json(), async (req: any, res: any) => {
-      const { churchId } = req.params;
-      const { email, firstName, lastName, name, phone, senders, source } = req.body || {};
-
-      if (!email || typeof email !== 'string' || !email.includes('@')) {
-        return res.status(400).json({ error: 'Please provide a valid email address.' });
-      }
-
-      const cleanEmail = email.toLowerCase().trim();
-      const cleanFirstName = (firstName || '').trim();
-      const cleanLastName = (lastName || '').trim();
-      const cleanFullName = (name || [cleanFirstName, cleanLastName].filter(Boolean).join(' ') || '').trim();
-      const cleanPhone = (phone || '').trim();
-      const chosenSenders: string[] = Array.isArray(senders) && senders.length > 0
-        ? senders.map(s => String(s).toLowerCase().trim())
-        : ['*'];
-
-      try {
-        const db = getDb();
-        const docId = `${churchId}_${Buffer.from(cleanEmail).toString('base64url')}`;
-
-        const subscriberData = {
-          id: docId,
-          churchId,
-          email: cleanEmail,
-          firstName: cleanFirstName || null,
-          lastName: cleanLastName || null,
-          name: cleanFullName || null,
-          phone: cleanPhone || null,
-          senders: chosenSenders,
-          subscribedAt: Date.now(),
-          status: 'active',
-          source: source || 'landing_page'
-        };
-
-        // 1. Save subscriber
-        await db.collection('newsletter_subscribers').doc(docId).set(subscriberData, { merge: true });
-
-        // 2. Clear unsubscriptions in email_unsubscribes for subscribed senders
-        const unsubSnap = await db.collection('email_unsubscribes')
-          .where('churchId', '==', churchId)
-          .where('email', '==', cleanEmail)
-          .get();
-
-        const batch = db.batch();
-        unsubSnap.docs.forEach((d: any) => {
-          const unsubData = d.data();
-          const unsubSender = (unsubData.senderEmail || '').toLowerCase().trim();
-          // If subscribed to all ('*') or matching specific sender
-          if (chosenSenders.includes('*') || chosenSenders.includes(unsubSender) || !unsubSender || unsubSender === '*') {
-            batch.delete(d.ref);
-          }
-        });
-
-        // Also delete legacy/direct docs if present
-        chosenSenders.forEach(s => {
-          const sDocId = `${churchId}_${Buffer.from(s).toString('base64url')}_${Buffer.from(cleanEmail).toString('base64url')}`;
-          batch.delete(db.collection('email_unsubscribes').doc(sDocId));
-        });
-        const allDocId = `${churchId}_all_${Buffer.from(cleanEmail).toString('base64url')}`;
-        const legacyDocId = `${churchId}_${Buffer.from(cleanEmail).toString('base64url')}`;
-        batch.delete(db.collection('email_unsubscribes').doc(allDocId));
-        batch.delete(db.collection('email_unsubscribes').doc(legacyDocId));
-
-        await batch.commit();
-
-        return res.status(200).json({
-          success: true,
-          message: 'Successfully subscribed to the newsletter.',
-          subscriber: {
-            id: docId,
-            email: cleanEmail,
-            name: cleanFullName,
-            senders: chosenSenders
-          }
-        });
-      } catch (e: any) {
-        console.error('[PublicNewsletter] Subscribe Error:', e);
-        return res.status(500).json({ error: e.message || 'Failed to process subscription' });
-      }
-    });
+    // POST /api/public/newsletter/:churchId/subscribe — subscribe to newsletter (with PCO deduplication & actions)
+    app.post('/api/public/newsletter/:churchId/subscribe', express.json(), subscribeNewsletter);
 
 
     // GET /polls/:pollId — returns poll config for the public page

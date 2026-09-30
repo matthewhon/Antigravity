@@ -1195,16 +1195,29 @@ export interface EmailUnsubscribe {
 export interface NewsletterSubscriber {
     id: string;
     churchId: string;
+    widgetId?: string;
+    widgetName?: string;
     email: string;
     firstName?: string;
     lastName?: string;
     name?: string;
     phone?: string;
+    pcoPersonId?: string | null;
+    isNewPcoPerson?: boolean;
     subscribedAt: number;
+    unsubscribedAt?: number | null;
     senders?: string[];   // Array of sender email addresses subscribed to
     status: 'active' | 'unsubscribed';
-    source?: 'landing_page' | 'widget' | 'manual' | 'qr_code' | 'pco';
+    source?: 'landing_page' | 'widget' | 'manual' | 'qr_code' | 'pco' | string;
     notes?: string;
+    submittedData?: Record<string, any>;
+    actionsExecuted?: {
+        pcoSynced?: boolean;
+        workflowEnrolled?: boolean;
+        welcomeEmailSent?: boolean;
+        staffNotified?: boolean;
+        error?: string | null;
+    };
 }
 
 export interface PcoList {
@@ -2929,4 +2942,76 @@ export interface InfoSession {
     children?: ChildSessionData[];
     conversationHistory: { role: string; text: string; channel: string; ts: number }[];
     pcoWriteResult?: { success: boolean; errors: string[] } | null;
+}
+
+// ─── Newsletter Widget & Subscription Types ─────────────────────────────────
+
+export type NewsletterFieldType = 'text' | 'email' | 'phone' | 'select' | 'checkbox' | 'date';
+export type NewsletterPcoMapping = 'email' | 'firstName' | 'lastName' | 'phone' | 'birthday' | 'customField' | 'note' | 'none';
+
+export interface NewsletterFieldConfig {
+    id: string;
+    label: string;
+    type: NewsletterFieldType;
+    required: boolean;
+    placeholder?: string;
+    options?: string[];
+    mapToPco: NewsletterPcoMapping;
+    pcoCustomFieldId?: string;
+    pcoCustomFieldName?: string;
+}
+
+export interface NewsletterActionConfig {
+    syncToPco: boolean;
+    pcoWorkflowId?: string;
+    pcoWorkflowName?: string;
+    pcoWorkflowStepId?: string;
+    pcoWorkflowStepName?: string;
+    pcoGroupId?: string;
+    pcoGroupName?: string;
+    pcoCustomFieldValues?: Record<string, string>;
+    sendWelcomeEmail: boolean;
+    welcomeEmailCampaignId?: string;
+    welcomeEmailSubject?: string;
+    welcomeEmailBody?: string;
+    notifyStaff: boolean;
+    staffNotificationEmails?: string[];
+    staffNotificationPhones?: string[];
+}
+
+export interface NewsletterThemeConfig {
+    primaryColor: string;
+    backgroundColor: string;
+    textColor: string;
+    borderRadius: number;
+    fontFamily: string;
+    headline: string;
+    description: string;
+    buttonText: string;
+    successMessage: string;
+    redirectUrl?: string;
+}
+
+export interface NewsletterBubbleConfig {
+    enabled: boolean;
+    buttonText: string;
+    buttonIcon?: string;
+    position: 'right' | 'left';
+    triggerMode: 'button_only' | 'timed' | 'scroll';
+    delaySeconds?: number;
+    scrollPercent?: number;
+}
+
+export interface NewsletterWidgetConfig {
+    id: string;
+    churchId: string;
+    name: string;
+    displayType: 'inline' | 'popup_bubble' | 'both';
+    theme: NewsletterThemeConfig;
+    bubbleConfig?: NewsletterBubbleConfig;
+    fields: NewsletterFieldConfig[];
+    actions: NewsletterActionConfig;
+    isActive: boolean;
+    createdAt: number;
+    updatedAt: number;
 }

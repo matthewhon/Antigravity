@@ -20,10 +20,11 @@ import { FileManager } from './FileManager';
 import { FormsManager } from './FormsManager';
 import { BulletinManager } from './BulletinManager';
 import { ChurchHelperView } from './ChurchHelperView';
+import { NewsletterWidgetManager } from './NewsletterWidgetManager';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess, TenantFile } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
-  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Folder
+  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Folder, Sparkles
 } from 'lucide-react';
 
 
@@ -624,9 +625,17 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [openSection, setOpenSection] = useState<string | null>('to');
   const [pcoLists, setPcoLists] = useState<PcoList[]>([]);
   const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
-  const [toTab, setToTab] = useState<'lists' | 'groups'>(initialCampaign.toGroupId ? 'groups' : 'lists');
+  const [toTab, setToTab] = useState<'lists' | 'groups' | 'subscribers'>(
+    initialCampaign.toListId === 'newsletter_subscribers'
+      ? 'subscribers'
+      : initialCampaign.toGroupId
+        ? 'groups'
+        : 'lists'
+  );
   const [loadingLists, setLoadingLists] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const [loadingSubscribers, setLoadingSubscribers] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
 
   const [emailStats, setEmailStats] = useState<any>(null);
@@ -726,17 +735,27 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         setPcoGroups(mapped);
         setLoadingGroups(false);
       }).catch(() => setLoadingGroups(false));
+    } else if (openSection === 'to' && toTab === 'subscribers') {
+      setLoadingSubscribers(true);
+      firestore.getNewsletterSubscribers(churchId).then(subs => {
+        const active = subs.filter(s => s.status === 'active');
+        setSubscriberCount(active.length);
+        setLoadingSubscribers(false);
+      }).catch(() => setLoadingSubscribers(false));
     }
   }, [openSection, toTab, churchId]);
 
   const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
 
+  const isNewsletterSubscribers = localCampaign.toListId === 'newsletter_subscribers';
   const isToComplete = !!(localCampaign.toListId || localCampaign.toGroupId);
-  const toRecipientLabel = localCampaign.toGroupId && localCampaign.toGroupName
-    ? `Group: ${localCampaign.toGroupName}`
-    : localCampaign.toListId && localCampaign.toListName
-      ? `List: ${localCampaign.toListName}`
-      : localCampaign.toListId || localCampaign.toGroupId || '';
+  const toRecipientLabel = isNewsletterSubscribers
+    ? (subscriberCount !== null ? `Newsletter Subscribers (${subscriberCount} active)` : 'Newsletter Subscribers (All Active)')
+    : localCampaign.toGroupId && localCampaign.toGroupName
+      ? `Group: ${localCampaign.toGroupName}`
+      : localCampaign.toListId && localCampaign.toListName
+        ? `List: ${localCampaign.toListName}`
+        : localCampaign.toListId || localCampaign.toGroupId || '';
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
   const isSubjectComplete = !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
@@ -859,19 +878,29 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 subtitle={isToComplete ? toRecipientLabel : 'No recipients selected'}
                 isComplete={isToComplete} isOpen={openSection === 'to'} onToggle={() => toggleSection('to')}
               >
-                {/* Lists / Groups tabs */}
+                {/* Lists / Groups / Subscribers tabs */}
                 <div className="flex rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 mb-3">
-                  {(['lists', 'groups'] as const).map(tab => (
+                  {(['lists', 'groups', 'subscribers'] as const).map(tab => (
                     <button
                       key={tab}
-                      onClick={() => setToTab(tab)}
+                      onClick={() => {
+                        setToTab(tab);
+                        if (tab === 'subscribers') {
+                          update({
+                            toListId: 'newsletter_subscribers',
+                            toListName: 'Newsletter Subscribers',
+                            toGroupId: null,
+                            toGroupName: null,
+                          });
+                        }
+                      }}
                       className={`flex-1 py-1.5 text-xs font-semibold capitalize transition ${
                         toTab === tab
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
                       }`}
                     >
-                      PCO {tab === 'lists' ? 'Lists' : 'Groups'}
+                      {tab === 'lists' ? 'PCO Lists' : tab === 'groups' ? 'PCO Groups' : 'Subscribers'}
                     </button>
                   ))}
                 </div>
@@ -942,6 +971,30 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                       </select>
                     )}
                   </>
+                )}
+
+                {toTab === 'subscribers' && (
+                  <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 rounded-xl p-4 mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400" />
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Website Newsletter Subscribers</h4>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      This campaign will be delivered to all active subscribers captured from your embedded website widgets. Unsubscribed contacts are automatically excluded.
+                    </p>
+                    {loadingSubscribers ? (
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Loader2 size={13} className="animate-spin" /> Loading subscriber count…
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <span>Active Audience:</span>
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                          {subscriberCount !== null ? `${subscriberCount} active subscribers` : 'All active subscribers'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {isToComplete && (
@@ -1541,7 +1594,7 @@ export const QuickSendModal: React.FC<{
   onClose: () => void;
   onSendQuickEmail: (campaign: EmailCampaign) => Promise<void>;
 }> = ({ churchId, church, currentUser, onClose, onSendQuickEmail }) => {
-  const [targetType, setTargetType] = useState<'group' | 'list'>('group');
+  const [targetType, setTargetType] = useState<'group' | 'list' | 'subscribers'>('group');
   const [targetId, setTargetId] = useState('');
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
@@ -1618,29 +1671,40 @@ export const QuickSendModal: React.FC<{
 
   // Reset target ID when switching types
   useEffect(() => {
-    setTargetId('');
+    if (targetType === 'subscribers') {
+      setTargetId('newsletter_subscribers');
+    } else {
+      setTargetId('');
+    }
   }, [targetType]);
 
   const handleSend = async () => {
-    if (!targetId || !subject.trim() || !content.trim()) return alert('Please fill all fields');
+    if (targetType !== 'subscribers' && !targetId) return alert('Please select a target group or list');
+    if (!subject.trim() || !content.trim()) return alert('Please fill all fields');
     if (!church?.emailSettings?.fromEmail) {
       return alert('You must configure a From Address in Mail Settings first.');
     }
     
     setIsSending(true);
     try {
-      const targetName = targetType === 'group'
-        ? pcoGroups.find(g => g.id === targetId)?.name
-        : pcoLists.find(l => l.id === targetId)?.name;
+      let targetName = 'Website Newsletter Subscribers';
+      if (targetType === 'group') {
+        targetName = pcoGroups.find(g => g.id === targetId)?.name || 'PCO Group';
+      } else if (targetType === 'list') {
+        targetName = pcoLists.find(l => l.id === targetId)?.name || 'PCO List';
+      }
 
       const c = newCampaign(churchId, `Quick Email: ${subject}`, church?.name);
       
       if (targetType === 'group') {
         c.toGroupId = targetId;
         c.toGroupName = targetName;
-      } else {
+      } else if (targetType === 'list') {
         c.toListId = targetId;
         c.toListName = targetName;
+      } else {
+        c.toListId = 'newsletter_subscribers';
+        c.toListName = 'Website Newsletter Subscribers';
       }
       
       c.subject = subject;
@@ -1671,11 +1735,11 @@ export const QuickSendModal: React.FC<{
         <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
           <Send size={20} className="text-emerald-500" /> Quick Email
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Send a simple email message directly to a Planning Center group or list.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Send an email message directly to a group, list, or newsletter subscribers.</p>
         
         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input 
                 type="radio" 
@@ -1698,35 +1762,53 @@ export const QuickSendModal: React.FC<{
               />
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PCO List</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                name="targetType" 
+                value="subscribers" 
+                checked={targetType === 'subscribers'} 
+                onChange={() => setTargetType('subscribers')} 
+                className="text-emerald-500 focus:ring-emerald-500" 
+              />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Newsletter Subscribers</span>
+            </label>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-              Select {targetType === 'group' ? 'Group' : 'List'} <span className="text-red-500">*</span>
-            </label>
-            {targetType === 'group' && loadingGroups ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading groups...</div>
-            ) : targetType === 'list' && loadingLists ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading lists...</div>
-            ) : (
-              <select
-                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                value={targetId}
-                title="Select Group or List"
-                onChange={e => setTargetId(e.target.value)}
-              >
-                <option value="">— Select a Planning Center {targetType === 'group' ? 'Group' : 'List'} —</option>
-                {targetType === 'group' 
-                  ? pcoGroups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name} ({g.memberCount} members)</option>
-                    ))
-                  : pcoLists.map(l => (
-                      <option key={l.id} value={l.id}>{l.name} ({l.memberCount} people)</option>
-                    ))
-                }
-              </select>
-            )}
-          </div>
+          {targetType === 'subscribers' ? (
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
+              <Mail size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>Will be sent to all active website newsletter subscribers. Unsubscribers are automatically excluded.</span>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                Select {targetType === 'group' ? 'Group' : 'List'} <span className="text-red-500">*</span>
+              </label>
+              {targetType === 'group' && loadingGroups ? (
+                <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading groups...</div>
+              ) : targetType === 'list' && loadingLists ? (
+                <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading lists...</div>
+              ) : (
+                <select
+                  className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={targetId}
+                  title="Select Group or List"
+                  onChange={e => setTargetId(e.target.value)}
+                >
+                  <option value="">— Select a Planning Center {targetType === 'group' ? 'Group' : 'List'} —</option>
+                  {targetType === 'group' 
+                    ? pcoGroups.map(g => (
+                        <option key={g.id} value={g.id}>{g.name} ({g.memberCount} members)</option>
+                      ))
+                    : pcoLists.map(l => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.memberCount} people)</option>
+                      ))
+                  }
+                </select>
+              )}
+            </div>
+          )}
           
           {senders.length > 0 && (
             <div>
@@ -1814,6 +1896,7 @@ onActiveNumberIdChange?: (id: string | null) => void;
 currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, onActiveNumberIdChange }) => {
   const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper'>('emails');
   const effectiveTab = activePage ?? activeTab;
+  const [emailSection, setEmailSection] = useState<'campaigns' | 'newsletter'>('campaigns');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -2678,46 +2761,82 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
             </>
           ) : (
             <div className="flex-1 overflow-y-auto flex flex-col">
-              {church?.emailSettings && (
-                <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${
-                  church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                    : church.emailSettings.mode === 'custom'
-                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
-                    : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
-                }`}>
-                  <Mail size={13} className="shrink-0" />
-                  <span>
-                    {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
-                      ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
-                      : church.emailSettings.mode === 'custom'
-                      ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
-                      : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
-                    }
-                  </span>
+              {/* Emails Sub-Section Tab Switcher */}
+              <div className="shrink-0 flex items-center justify-between px-6 pt-3 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setEmailSection('campaigns')}
+                    className={`flex items-center gap-2 px-4 py-2.5 -mb-px text-xs font-bold border-b-2 transition ${
+                      emailSection === 'campaigns'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    <Send size={13} /> Campaigns &amp; Broadcasts
+                  </button>
+                  <button
+                    onClick={() => setEmailSection('newsletter')}
+                    className={`flex items-center gap-2 px-4 py-2.5 -mb-px text-xs font-bold border-b-2 transition ${
+                      emailSection === 'newsletter'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    <Mail size={13} /> Newsletter &amp; Website Widgets
+                  </button>
                 </div>
+              </div>
+
+              {emailSection === 'newsletter' ? (
+                <NewsletterWidgetManager 
+                  churchId={churchId} 
+                  church={church} 
+                  currentUser={currentUser} 
+                />
+              ) : (
+                <>
+                  {church?.emailSettings && (
+                    <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${
+                      church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                        : church.emailSettings.mode === 'custom'
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                        : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
+                    }`}>
+                      <Mail size={13} className="shrink-0" />
+                      <span>
+                        {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+                          ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
+                          : church.emailSettings.mode === 'custom'
+                          ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
+                          : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
+                        }
+                      </span>
+                    </div>
+                  )}
+                  {!church?.emailSettings && (
+                    <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                        <Mail size={13} className="shrink-0" />
+                        <span className="font-semibold">Email not configured.</span>
+                        <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
+                      </div>
+                    </div>
+                  )}
+                  <CampaignListView
+                    churchId={churchId}
+                    church={church}
+                    campaigns={campaigns}
+                    isLoading={isLoading}
+                    onOpen={c => setActiveCampaign(c)}
+                    onPreview={c => setPreviewCampaign(c)}
+                    onDelete={handleDelete}
+                    onDuplicate={handleDuplicate}
+                    onCreate={() => setShowNewModal(true)}
+                    setIsQuickSendOpen={setShowQuickSendModal}
+                  />
+                </>
               )}
-              {!church?.emailSettings && (
-                <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                    <Mail size={13} className="shrink-0" />
-                    <span className="font-semibold">Email not configured.</span>
-                    <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
-                  </div>
-                </div>
-              )}
-              <CampaignListView
-                churchId={churchId}
-                church={church}
-                campaigns={campaigns}
-                isLoading={isLoading}
-                onOpen={c => setActiveCampaign(c)}
-                onPreview={c => setPreviewCampaign(c)}
-                onDelete={handleDelete}
-                onDuplicate={handleDuplicate}
-                onCreate={() => setShowNewModal(true)}
-                setIsQuickSendOpen={setShowQuickSendModal}
-              />
             </div>
           )}
         </>

@@ -29,7 +29,8 @@ import {
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot, DigitalBulletin,
     GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse,
-    DiscTestResponse, GivingBatch, QuickbooksMappingConfig
+    DiscTestResponse, GivingBatch, QuickbooksMappingConfig,
+    NewsletterWidgetConfig, NewsletterSubscriber
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1250,6 +1251,19 @@ class FirestoreService {
       try {
           await deleteDoc(doc(db, 'newsletter_subscribers', id));
       } catch (e) { this.handleFirestoreError(e); }
+  }
+
+  async updateNewsletterSubscriberStatus(subscriberId: string, status: 'active' | 'unsubscribed'): Promise<void> {
+      try {
+          await updateDoc(doc(db, 'newsletter_subscribers', subscriberId), {
+              status,
+              unsubscribedAt: status === 'unsubscribed' ? Date.now() : null
+          });
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
+  async deleteNewsletterSubscriber(id: string): Promise<void> {
+      return this.removeNewsletterSubscriber(id);
   }
 
   // --- SMS usage & conversations (dashboard roll-ups) ---
@@ -2752,6 +2766,35 @@ class FirestoreService {
   async deleteDiscResponse(responseId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'disc_test_responses', responseId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // ─── Newsletter Widgets & Subscribers ───────────────────────────────────────
+
+  async getNewsletterWidgets(churchId: string): Promise<NewsletterWidgetConfig[]> {
+    try {
+      const q = query(collection(db, 'newsletter_widgets'), where('churchId', '==', churchId));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as NewsletterWidgetConfig));
+    } catch (e) {
+      console.warn('[FirestoreService] getNewsletterWidgets failed:', e);
+      return [];
+    }
+  }
+
+  async saveNewsletterWidget(widget: NewsletterWidgetConfig): Promise<void> {
+    try {
+      await setDoc(doc(db, 'newsletter_widgets', widget.id), widget, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteNewsletterWidget(widgetId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'newsletter_widgets', widgetId));
     } catch (e) {
       this.handleFirestoreError(e);
     }
