@@ -47,6 +47,7 @@ const MODULE_ROLE_MAP: Record<string, string> = {
     'services-plans': 'Services',
     'services-reminders': 'Services',
     'giving': 'Giving',
+    'giving-period': 'Giving',
     'giving-batches': 'Giving',
     'giving-pledges': 'Giving',
     'giving-donor': 'Giving',

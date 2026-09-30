@@ -213,6 +213,7 @@ const Layout: React.FC<LayoutProps> = ({
         kind: 'menu', key: 'giving', icon: HandCoins, label: 'Giving', prefix: 'giving',
         items: [
           { view: 'giving',             icon: BarChart3,          label: 'Overview' },
+          { view: 'giving-period',      icon: Calendar,           label: 'Giving Period' },
           { view: 'giving-batches',     icon: Landmark,           label: 'Batches & Deposits' },
           { view: 'giving-pledges',     icon: Target,             label: 'Campaign Pledges' },
           { view: 'giving-donor',       icon: Users,              label: 'Donors'   },

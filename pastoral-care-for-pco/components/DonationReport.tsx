@@ -13,15 +13,18 @@ import {
     ResponsiveContainer, Legend, LineChart, Line
 } from 'recharts';
 
+import { GivingPeriodReport } from './GivingPeriodReport';
+
 interface DonationReportProps {
     donations: DetailedDonation[];
     people: PcoPerson[];
+    initialTab?: ReportTab;
 }
 
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate' | 'firstGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label' | 'fund_label_pivot' | 'lapsed_donors';
+type ReportTab = 'donors' | 'giving_period' | 'lapsed_donors' | 'giving_by_fund' | 'fund_label_pivot' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label';
 type LapsedSortField = 'priorTotal' | 'name' | 'giftCount' | 'lastGiftDate' | 'lifetimeTotal';
 
 interface FilterState {
@@ -129,8 +132,8 @@ function getBucketLabel(key: string, interval: IntervalType): string {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export const DonationReport: React.FC<DonationReportProps> = ({ donations, people }) => {
-    const [activeTab, setActiveTab] = useState<ReportTab>('donors');
+export const DonationReport: React.FC<DonationReportProps> = ({ donations, people, initialTab }) => {
+    const [activeTab, setActiveTab] = useState<ReportTab>(initialTab || 'donors');
     const [pivotPrimary, setPivotPrimary] = useState<'fund' | 'label'>('fund');
     const [pivotViewMode, setPivotViewMode] = useState<'nested' | 'matrix'>('nested');
     const [filters, setFilters] = useState<FilterState>({
@@ -1258,7 +1261,8 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         <div className="space-y-6">
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
+            {activeTab !== 'giving_period' && (
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
                 {activeTab === 'lapsed_donors' ? (
                     <>
                         <div>
@@ -1685,11 +1689,13 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </button>
                 </div>
             </div>
+            )}
 
             {/* ── Tab Bar ────────────────────────────────────────────────────── */}
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl w-fit border border-slate-200 dark:border-slate-700">
                 {([
                     { id: 'donors',          label: '👤 Donor Report' },
+                    { id: 'giving_period',   label: '📅 Giving Period' },
                     { id: 'lapsed_donors',   label: '📉 Lapsed Donors' },
                     { id: 'giving_by_fund',  label: '🏛️ Giving by Fund' },
                     { id: 'fund_label_pivot', label: '🔄 Fund & Label Pivot' },
@@ -1711,6 +1717,15 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </button>
                 ))}
             </div>
+
+            {/* ── Giving Period Comparison Report ────────────────────────────── */}
+            {activeTab === 'giving_period' && (
+                <GivingPeriodReport
+                    donations={donations}
+                    people={people}
+                    onOpenPersonProfile={handleOpenPersonProfile}
+                />
+            )}
 
             {/* ── Donor Concentration & Risk Planning Panel ──────────────────── */}
             {activeTab === 'donors' && (

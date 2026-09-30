@@ -26,7 +26,7 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString();
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
-  activePage?: 'overview' | 'donor' | 'consistency' | 'budgets' | 'reports' | 'pledges' | 'batches';
+  activePage?: 'overview' | 'donor' | 'consistency' | 'budgets' | 'reports' | 'pledges' | 'batches' | 'period';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
@@ -2454,9 +2454,9 @@ export const GivingView: React.FC<GivingViewProps> = ({
 
 
 
-        {activeTab === 'reports' && (
+        {(activeTab === 'reports' || activeTab === 'period') && (
             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in no-print">
-                <DonationReport donations={donations} people={people} />
+                <DonationReport initialTab={activeTab === 'period' ? 'giving_period' : undefined} donations={donations} people={people} />
             </div>
         )}
 

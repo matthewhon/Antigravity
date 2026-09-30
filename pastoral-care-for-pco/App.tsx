@@ -122,6 +122,7 @@ const App: React.FC = () => {
      if (path.startsWith('/services/reminders')) return 'services-reminders';
      if (path.startsWith('/services/plans')) return 'services-plans';
      if (path.startsWith('/services')) return 'services';
+     if (path.startsWith('/giving/period') || path.startsWith('/giving/giving-period')) return 'giving-period';
      if (path.startsWith('/giving/batches')) return 'giving-batches';
      if (path.startsWith('/giving/pledges')) return 'giving-pledges';
      if (path.startsWith('/giving/donor')) return 'giving-donor';
@@ -673,6 +674,7 @@ const App: React.FC = () => {
               'services-plans': '/services/plans',
               'services-reports': '/services/reports',
               'giving': '/giving',
+              'giving-period': '/giving/period',
               'giving-batches': '/giving/batches',
               'giving-pledges': '/giving/pledges',
               'giving-donor': '/giving/donor',
