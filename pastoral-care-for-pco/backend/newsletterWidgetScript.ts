@@ -49,12 +49,31 @@ export function serveNewsletterWidgetScript(req: any, res: any) {
     var displayType = config.displayType || 'both';
     var bubble = config.bubbleConfig || { enabled: true, buttonText: '💌 Subscribe', position: 'right' };
 
+    // New Image & Styling customizations
+    var imageUrl = theme.imageUrl || '';
+    var imagePos = theme.imagePosition || 'top_banner'; // 'top_banner', 'header_logo', 'left_side'
+    var imageAlt = theme.imageAlt || 'Newsletter';
+    var badgeText = theme.badgeText || '';
+    var textAlign = theme.textAlign || 'center';
+    var cardMaxWidth = (theme.cardMaxWidth || 480) + 'px';
+    var btnRadius = theme.buttonStyle === 'pill' ? '999px' : theme.buttonStyle === 'square' ? '4px' : '8px';
+    var btnTextColor = theme.buttonTextColor || '#FFFFFF';
+    var btnIcon = theme.buttonIcon || '';
+    var footerNote = theme.footerNote || '';
+    var cardBorder = theme.borderColor ? ('1px solid ' + theme.borderColor) : '1px solid rgba(0,0,0,0.07)';
+    var cardShadow = theme.shadowStyle === 'none' ? 'none' : theme.shadowStyle === 'elevated' ? '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)' : theme.shadowStyle === 'glow' ? ('0 0 25px ' + primaryColor + '33') : '0 4px 20px -2px rgba(0,0,0,0.08), 0 2px 6px -1px rgba(0,0,0,0.04)';
+
     // Shared CSS styles for inside the Shadow DOM
     var css = [
       ':host { display: block; font-family: ' + fontFamily + '; color: ' + textColor + '; }',
       '* { box-sizing: border-box; margin: 0; padding: 0; }',
-      '.pco-card { background: ' + bgColor + '; border-radius: ' + radius + '; padding: 28px 24px; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.08), 0 2px 6px -1px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.06); max-width: 480px; margin: 0 auto; }',
-      '.pco-header { margin-bottom: 20px; text-align: center; }',
+      '.pco-card { background: ' + bgColor + '; border-radius: ' + radius + '; padding: 28px 24px; box-shadow: ' + cardShadow + '; border: ' + cardBorder + '; max-width: ' + cardMaxWidth + '; margin: 0 auto; overflow: hidden; position: relative; }',
+      '.pco-image-banner { margin: -28px -24px 22px -24px; width: calc(100% + 48px); max-height: 200px; height: 160px; overflow: hidden; background: #E2E8F0; }',
+      '.pco-image-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }',
+      '.pco-image-logo { margin: 0 auto 16px auto; width: 68px; height: 68px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.1); border: 2px solid #FFFFFF; background: #F8FAFC; }',
+      '.pco-image-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }',
+      '.pco-badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 999px; background: rgba(79, 70, 229, 0.1); color: ' + primaryColor + '; margin-bottom: 10px; }',
+      '.pco-header { margin-bottom: 20px; text-align: ' + textAlign + '; }',
       '.pco-title { font-size: 20px; font-weight: 700; line-height: 1.3; color: ' + textColor + '; margin-bottom: 8px; }',
       '.pco-desc { font-size: 14px; line-height: 1.5; color: #64748B; }',
       '.pco-form-group { margin-bottom: 14px; text-align: left; }',
@@ -62,10 +81,11 @@ export function serveNewsletterWidgetScript(req: any, res: any) {
       '.pco-required { color: #EF4444; margin-left: 2px; }',
       '.pco-input, .pco-select { width: 100%; padding: 10px 14px; font-size: 14px; border: 1.5px solid #CBD5E1; border-radius: 8px; background: #FFF; color: #1E293B; outline: none; transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit; }',
       '.pco-input:focus, .pco-select:focus { border-color: ' + primaryColor + '; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }',
-      '.pco-btn { width: 100%; padding: 12px 20px; background: ' + primaryColor + '; color: #FFF; font-weight: 600; font-size: 15px; border: none; border-radius: 8px; cursor: pointer; transition: filter 0.2s, transform 0.1s; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; }',
+      '.pco-btn { width: 100%; padding: 12px 20px; background: ' + primaryColor + '; color: ' + btnTextColor + '; font-weight: 600; font-size: 15px; border: none; border-radius: ' + btnRadius + '; cursor: pointer; transition: filter 0.2s, transform 0.1s; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; }',
       '.pco-btn:hover { filter: brightness(1.08); }',
       '.pco-btn:active { transform: scale(0.99); }',
       '.pco-btn:disabled { opacity: 0.65; cursor: not-allowed; }',
+      '.pco-footer-note { font-size: 11.5px; color: #94A3B8; text-align: center; margin-top: 12px; line-height: 1.4; }',
       '.pco-error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: none; }',
       '.pco-success { text-align: center; padding: 24px 12px; }',
       '.pco-success-icon { width: 52px; height: 52px; background: #ECFDF5; color: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }',
@@ -98,8 +118,21 @@ export function serveNewsletterWidgetScript(req: any, res: any) {
                '</div>';
       }).join('');
 
+      var imageHtml = '';
+      if (imageUrl && imagePos === 'top_banner') {
+        imageHtml = '<div class="pco-image-banner"><img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(imageAlt) + '" loading="lazy" /></div>';
+      } else if (imageUrl && imagePos === 'header_logo') {
+        imageHtml = '<div class="pco-image-logo"><img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(imageAlt) + '" loading="lazy" /></div>';
+      }
+
+      var badgeHtml = badgeText ? '<div class="pco-badge">' + escapeHtml(badgeText) + '</div>' : '';
+      var footerHtml = footerNote ? '<p class="pco-footer-note">' + escapeHtml(footerNote) + '</p>' : '';
+      var btnContent = (btnIcon ? '<span>' + escapeHtml(btnIcon) + '</span> ' : '') + '<span>' + escapeHtml(buttonText) + '</span>';
+
       return '<div class="pco-card">' +
+        imageHtml +
         '<div class="pco-header">' +
+          badgeHtml +
           '<h3 class="pco-title">' + escapeHtml(headline) + '</h3>' +
           '<p class="pco-desc">' + escapeHtml(description) + '</p>' +
         '</div>' +
@@ -107,8 +140,9 @@ export function serveNewsletterWidgetScript(req: any, res: any) {
         '<form class="pco-form">' +
           '<div style="display:none !important;"><input type="text" name="honeypot" tabindex="-1" autocomplete="off" /></div>' +
           inputsHtml +
-          '<button type="submit" class="pco-btn"><span>' + escapeHtml(buttonText) + '</span></button>' +
+          '<button type="submit" class="pco-btn">' + btnContent + '</button>' +
         '</form>' +
+        footerHtml +
         '<div class="pco-success" style="display:none;">' +
           '<div class="pco-success-icon">✓</div>' +
           '<h4 class="pco-success-title">Subscribed!</h4>' +
@@ -215,8 +249,11 @@ export function serveNewsletterWidgetScript(req: any, res: any) {
       var shadow = host.attachShadow({ mode: 'open' });
 
       var bubblePos = (bubble.position === 'left') ? 'left: 24px;' : 'right: 24px;';
+      var bubbleBg = bubble.bubbleBgColor || primaryColor;
+      var bubbleTextColor = bubble.bubbleTextColor || '#FFFFFF';
+      var pulseAnim = bubble.pulseAnimation ? 'animation: pcoPulse 2s infinite;' : '';
       var bubbleCss = css + [
-        '.pco-bubble-trigger { position: fixed; bottom: 24px; ' + bubblePos + ' background: ' + primaryColor + '; color: white; border: none; border-radius: 999px; padding: 13px 22px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 25px -4px rgba(0,0,0,0.25); cursor: pointer; z-index: 999998; display: flex; align-items: center; gap: 8px; font-family: ' + fontFamily + '; transition: transform 0.2s, box-shadow 0.2s; }',
+        '.pco-bubble-trigger { position: fixed; bottom: 24px; ' + bubblePos + ' background: ' + bubbleBg + '; color: ' + bubbleTextColor + '; border: none; border-radius: 999px; padding: 13px 22px; font-size: 15px; font-weight: 700; box-shadow: 0 10px 25px -4px rgba(0,0,0,0.25); cursor: pointer; z-index: 999998; display: flex; align-items: center; gap: 8px; font-family: ' + fontFamily + '; transition: transform 0.2s, box-shadow 0.2s; ' + pulseAnim + ' }',
         '.pco-bubble-trigger:hover { transform: scale(1.05); box-shadow: 0 16px 30px -4px rgba(0,0,0,0.3); }',
         '.pco-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }',
         '.pco-modal-backdrop.pco-active { opacity: 1; pointer-events: auto; }',

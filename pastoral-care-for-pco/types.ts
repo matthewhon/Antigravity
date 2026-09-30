@@ -2990,6 +2990,30 @@ export interface NewsletterThemeConfig {
     buttonText: string;
     successMessage: string;
     redirectUrl?: string;
+
+    // Image & Media customization
+    imageUrl?: string;
+    imagePosition?: 'top_banner' | 'header_logo' | 'left_side';
+    imageAlt?: string;
+    imageHeight?: number;
+
+    // Header & Content styling
+    badgeText?: string;
+    textAlign?: 'left' | 'center' | 'right';
+    cardMaxWidth?: number;
+
+    // Button & Form styling
+    buttonTextColor?: string;
+    buttonStyle?: 'rounded' | 'pill' | 'square';
+    buttonIcon?: string;
+
+    // Trust & Social Proof
+    footerNote?: string;
+    showSubscriberCount?: boolean;
+
+    // Card Appearance
+    borderColor?: string;
+    shadowStyle?: 'none' | 'subtle' | 'elevated' | 'glow';
 }
 
 export interface NewsletterBubbleConfig {
@@ -3000,6 +3024,9 @@ export interface NewsletterBubbleConfig {
     triggerMode: 'button_only' | 'timed' | 'scroll';
     delaySeconds?: number;
     scrollPercent?: number;
+    bubbleBgColor?: string;
+    bubbleTextColor?: string;
+    pulseAnimation?: boolean;
 }
 
 export interface NewsletterWidgetConfig {
