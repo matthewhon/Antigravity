@@ -141,8 +141,19 @@ function ConsistencyIndexCard({ data }: { data: GivingConsistencyAnalytics }) {
 // Section: Segment donut
 // ---------------------------------------------------------------------------
 
-function SegmentDonut({ data, view }: { data: GivingConsistencyAnalytics; view: 'count' | 'amount' }) {
+function SegmentDonut({
+    data,
+    view,
+    onViewChange,
+}: {
+    data: GivingConsistencyAnalytics;
+    view: 'count' | 'amount';
+    onViewChange?: (view: 'count' | 'amount') => void;
+}) {
     const SEGMENTS: DonorConsistencySegment[] = ['Champion', 'Consistent', 'Sporadic', 'Irregular', 'Inactive'];
+    const totalDonors = data.donors.length;
+    const totalGiving = Object.values(data.segmentAmounts).reduce((s, x) => s + x, 0);
+
     const pieData = SEGMENTS
         .map(s => ({
             name: s,
@@ -151,37 +162,118 @@ function SegmentDonut({ data, view }: { data: GivingConsistencyAnalytics; view: 
         }))
         .filter(x => x.value > 0);
 
-    const total = pieData.reduce((s, x) => s + x.value, 0);
-
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
-            <div className="flex justify-between items-start mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Segments by {view === 'count' ? 'Donors' : 'Giving'}</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Segments By Donors & Giving</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        <span className="font-bold text-slate-800 dark:text-white">{totalDonors}</span> donors · <span className="font-bold text-slate-800 dark:text-white">{money(totalGiving)}</span> total given
+                    </p>
                 </div>
+                {onViewChange && (
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl self-start sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => onViewChange('count')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                                view === 'count'
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            By Donors
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onViewChange('amount')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                                view === 'amount'
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            By Giving $
+                        </button>
+                    </div>
+                )}
             </div>
-            <div className="h-56 relative">
-                {total > 0 ? (
+            <div className="h-60 relative">
+                {totalDonors > 0 ? (
                     <>
                         <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                             <PieChart>
-                                <Pie data={pieData} innerRadius={55} outerRadius={78} paddingAngle={4} dataKey="value">
+                                <Pie
+                                    data={pieData}
+                                    cx="38%"
+                                    cy="50%"
+                                    innerRadius={58}
+                                    outerRadius={80}
+                                    paddingAngle={4}
+                                    dataKey="value"
+                                >
                                     {pieData.map((x, i) => <Cell key={i} fill={x.color} />)}
                                 </Pie>
                                 <Tooltip
-                                    contentStyle={TOOLTIP_STYLE}
-                                    itemStyle={{ color: '#fff' }}
-                                    formatter={(v: number) => view === 'count' ? [`${v} donors`] : [money(v)]}
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload || !payload.length) return null;
+                                        const item = payload[0].payload;
+                                        const seg = item.name as DonorConsistencySegment;
+                                        const count = data.segmentCounts[seg] || 0;
+                                        const amt = data.segmentAmounts[seg] || 0;
+                                        const countPct = totalDonors > 0 ? Math.round((count / totalDonors) * 100) : 0;
+                                        const amtPct = totalGiving > 0 ? Math.round((amt / totalGiving) * 100) : 0;
+                                        return (
+                                            <div style={TOOLTIP_STYLE} className="p-3 text-xs space-y-1.5 min-w-[160px]">
+                                                <div className="flex items-center gap-2 font-black">
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                                                    <span>{seg}</span>
+                                                </div>
+                                                <div className="text-slate-200 space-y-0.5">
+                                                    <div className="flex justify-between gap-4 font-semibold">
+                                                        <span className="text-slate-400">Donors:</span>
+                                                        <span>{count} ({countPct}%)</span>
+                                                    </div>
+                                                    <div className="flex justify-between gap-4 font-semibold">
+                                                        <span className="text-slate-400">Giving Total:</span>
+                                                        <span>{money(amt)} ({amtPct}%)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-700">
+                                                    {SEGMENT_META[seg]?.description}
+                                                </div>
+                                            </div>
+                                        );
+                                    }}
                                 />
-                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                                <Legend
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    iconType="circle"
+                                    wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                                    formatter={(value) => {
+                                        const seg = value as DonorConsistencySegment;
+                                        const count = data.segmentCounts[seg] || 0;
+                                        const amt = data.segmentAmounts[seg] || 0;
+                                        return (
+                                            <span className="text-slate-700 dark:text-slate-300">
+                                                {value}: <span className="text-slate-900 dark:text-white font-black">{view === 'count' ? `${count}` : money(amt)}</span>
+                                            </span>
+                                        );
+                                    }}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-20">
-                            <span className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
-                                {view === 'count' ? total : money(total)}
+                        <div className="absolute top-0 bottom-0 left-0 w-[76%] flex flex-col items-center justify-center pointer-events-none text-center">
+                            <span className="text-2xl font-black text-slate-900 dark:text-white tabular-nums leading-none mb-1">
+                                {view === 'count' ? totalDonors : money(totalGiving)}
                             </span>
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                                {view === 'count' ? 'Donors' : 'Total'}
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                {view === 'count' ? 'Donors' : 'Total Given'}
+                            </span>
+                            <span className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400 tabular-nums mt-1">
+                                {view === 'count' ? money(totalGiving) : `${totalDonors} donors`}
                             </span>
                         </div>
                     </>
@@ -254,7 +346,7 @@ function SegmentSummaryCards({ data }: { data: GivingConsistencyAnalytics }) {
 // Section: Donor table
 // ---------------------------------------------------------------------------
 
-type SortKey = 'consistencyScore' | 'donorName' | 'totalGiven' | 'daysSinceLastGift' | 'trend';
+type SortKey = 'consistencyScore' | 'donorName' | 'totalGiven' | 'daysSinceLastGift' | 'trend' | 'avgMonthlyAmount' | 'frequencyRatio';
 
 function DonorConsistencyTable({ donors }: { donors: DonorConsistencyProfile[] }) {
     const [search, setSearch] = useState('');
@@ -275,9 +367,11 @@ function DonorConsistencyTable({ donors }: { donors: DonorConsistencyProfile[] }
             let av: string | number;
             let bv: string | number;
             switch (sortKey) {
-                case 'donorName': av = a.donorName; bv = b.donorName; break;
-                case 'trend':     av = a.trend;     bv = b.trend;     break;
-                default:          av = a[sortKey];  bv = b[sortKey];  break;
+                case 'donorName':        av = a.donorName;        bv = b.donorName; break;
+                case 'trend':            av = a.trend;            bv = b.trend; break;
+                case 'avgMonthlyAmount': av = a.avgMonthlyAmount; bv = b.avgMonthlyAmount; break;
+                case 'frequencyRatio':   av = a.frequencyRatio;   bv = b.frequencyRatio; break;
+                default:                 av = a[sortKey];         bv = b[sortKey]; break;
             }
             if (typeof av === 'string' && typeof bv === 'string') {
                 return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -372,8 +466,8 @@ function DonorConsistencyTable({ donors }: { donors: DonorConsistencyProfile[] }
                             <SortHeader label="Donor" k="donorName" />
                             <SortHeader label="Score" k="consistencyScore" />
                             <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Segment</th>
-                            <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Frequency</th>
-                            <SortHeader label="Avg/Mo" k="consistencyScore" />
+                            <SortHeader label="Frequency" k="frequencyRatio" />
+                            <SortHeader label="Avg/Mo" k="avgMonthlyAmount" />
                             <SortHeader label="Total Given" k="totalGiven" />
                             <SortHeader label="Last Gift" k="daysSinceLastGift" />
                             <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Pattern</th>
@@ -485,22 +579,7 @@ export const GivingConsistencyTab: React.FC<GivingConsistencyTabProps> = ({ data
 
                 {/* Segment donut — spans 2 cols */}
                 <div className="col-span-1 md:col-span-2">
-                    <div className="flex gap-2 mb-3">
-                        {(['count', 'amount'] as const).map(v => (
-                            <button
-                                key={v}
-                                onClick={() => setDonutView(v)}
-                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide transition-colors ${
-                                    donutView === v
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                            >
-                                By {v === 'count' ? 'Donors' : 'Giving $'}
-                            </button>
-                        ))}
-                    </div>
-                    <SegmentDonut data={data} view={donutView} />
+                    <SegmentDonut data={data} view={donutView} onViewChange={setDonutView} />
                 </div>
             </div>
 

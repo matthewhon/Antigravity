@@ -1291,15 +1291,15 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <>
                                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                                       <PieChart>
-                                          <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                          <Pie data={pie} cx="38%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                                               {pie.map((x, i) => <Cell key={`gc-${i}`} fill={x.color} />)}
                                           </Pie>
                                           <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} donors`]} />
                                           <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
                                       </PieChart>
                                   </ResponsiveContainer>
-                                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
-                                      <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{c.index}</span>
+                                  <div className="absolute top-0 bottom-0 left-0 w-[76%] flex flex-col items-center justify-center pointer-events-none text-center">
+                                      <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums leading-tight">{c.index}</span>
                                       <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Index</span>
                                   </div>
                               </>

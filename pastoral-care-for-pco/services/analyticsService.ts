@@ -1789,8 +1789,8 @@ export const calculateDonorConsistency = (
     const thresholds = { ...DEFAULT_CONSISTENCY_THRESHOLDS, ...(lifecycleSettings?.consistencyThresholds ?? {}) };
     const lapsedWindowDays = lifecycleSettings?.lapsedWindowDays ?? 365;
 
-    // Window start = first day of (now - windowMonths) months ago
-    const windowStart = new Date(now.getFullYear(), now.getMonth() - windowMonths, 1);
+    // Window start = first day of (now - (windowMonths - 1)) months ago to cover windowMonths months
+    const windowStart = new Date(now.getFullYear(), now.getMonth() - (windowMonths - 1), 1);
     const slots = buildMonthSlots(windowMonths, now);
 
     // Build people lookup
@@ -1896,7 +1896,7 @@ export const calculateDonorConsistency = (
     for (let i = 5; i >= 0; i--) {
         const trendEnd = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const trendSlots = buildMonthSlots(windowMonths, trendEnd);
-        const trendWindowStart = new Date(trendEnd.getFullYear(), trendEnd.getMonth() - windowMonths, 1);
+        const trendWindowStart = new Date(trendEnd.getFullYear(), trendEnd.getMonth() - (windowMonths - 1), 1);
 
         // Re-bucket donations for this window
         const trendPerDonor = new Map<string, { monthlyAmounts: Map<string, number>; lastGiftDate: Date }>();
