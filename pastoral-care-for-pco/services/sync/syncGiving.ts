@@ -338,6 +338,28 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         const existingBatchMap = new Map<string, GivingBatch>();
         existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
 
+        // Build a secondary lookup: stripePayoutId → synced batch.
+        // This lets us detect when the same payout was deposited to QBO under
+        // a different batch key (e.g. a custom "stripe_dep_..." batch created
+        // by the Smart Payout Matcher, while PCO regenerates the same donations
+        // under the numeric PCO batch ID).
+        const syncedByPayoutId = new Map<string, GivingBatch>();
+        const syncedByName = new Map<string, GivingBatch>();
+        existingBatches.forEach(eb => {
+            if ((eb.status === 'synced_to_qbo' || eb.quickbooksDepositId)) {
+                if (eb.stripePayoutId) {
+                    syncedByPayoutId.set(eb.stripePayoutId, eb);
+                }
+                // Also index by name to match PCO batches that share the same
+                // display name with a custom/smart-matched batch (common for
+                // Tithely deposits where the PCO batch description equals the
+                // custom batch name).
+                if (eb.name) {
+                    syncedByName.set(eb.name, eb);
+                }
+            }
+        });
+
         const payoutCadence = qboMapping?.stripePayoutCadence || 'manual';
         const payoutDayOfWeek = typeof qboMapping?.stripePayoutDayOfWeek === 'number'
             ? qboMapping.stripePayoutDayOfWeek
@@ -528,13 +550,26 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const stripePayoutId = batchPayoutIdMap.get(batchKey) || existing?.stripePayoutId;
             const paidOutDate = batchPaidOutDateMap.get(batchKey) || existing?.paidOutDate;
 
+            // Resolve QBO sync state: prefer the direct existing batch, but also
+            // check if a different batch (e.g. custom "stripe_dep_..." batch) was
+            // already deposited to QBO for the same stripePayoutId or batch name.
+            // This prevents PCO-sourced batches from reverting to 'committed'
+            // after re-sync when the deposit was recorded under a different batch key.
+            const batchName = batchNameMap.get(batchKey) || `Batch ${batchKey}`;
+            const alreadySyncedBatch =
+                (existing?.status === 'synced_to_qbo' || existing?.quickbooksDepositId) ? existing :
+                (stripePayoutId ? syncedByPayoutId.get(stripePayoutId) : undefined) ||
+                syncedByName.get(batchName);
+
+            const resolvedStatus = alreadySyncedBatch ? 'synced_to_qbo' : 'committed';
+
             batchesToSave.push({
                 id: batchKey,
                 churchId,
-                name: batchNameMap.get(batchKey) || `Batch ${batchKey}`,
+                name: batchName,
                 date: batchDateMap.get(batchKey) || new Date().toISOString(),
                 batchType: isTithely ? 'tithely' : (isOnlineBatch ? 'stripe' : 'manual'),
-                status: existing?.status === 'synced_to_qbo' ? 'synced_to_qbo' : 'committed',
+                status: resolvedStatus,
                 totalGross: gross,
                 totalFees: fees,
                 totalNet: net,
@@ -542,21 +577,21 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 fundsBreakdown,
                 stripePayoutId,
                 paidOutDate,
-                quickbooksDepositId: existing?.quickbooksDepositId,
-                quickbooksDepositDocNumber: existing?.quickbooksDepositDocNumber,
-                quickbooksDepositBankAccountId: existing?.quickbooksDepositBankAccountId,
-                quickbooksDepositBankAccountName: existing?.quickbooksDepositBankAccountName,
-                syncedAt: existing?.syncedAt,
-                syncedBy: existing?.syncedBy,
-                readyNotifiedAt: existing?.readyNotifiedAt,
-                syncedNotifiedAt: existing?.syncedNotifiedAt
+                quickbooksDepositId: existing?.quickbooksDepositId || alreadySyncedBatch?.quickbooksDepositId,
+                quickbooksDepositDocNumber: existing?.quickbooksDepositDocNumber || alreadySyncedBatch?.quickbooksDepositDocNumber,
+                quickbooksDepositBankAccountId: existing?.quickbooksDepositBankAccountId || alreadySyncedBatch?.quickbooksDepositBankAccountId,
+                quickbooksDepositBankAccountName: existing?.quickbooksDepositBankAccountName || alreadySyncedBatch?.quickbooksDepositBankAccountName,
+                syncedAt: existing?.syncedAt || alreadySyncedBatch?.syncedAt,
+                syncedBy: existing?.syncedBy || alreadySyncedBatch?.syncedBy,
+                readyNotifiedAt: existing?.readyNotifiedAt || alreadySyncedBatch?.readyNotifiedAt,
+                syncedNotifiedAt: existing?.syncedNotifiedAt || alreadySyncedBatch?.syncedNotifiedAt
             });
         });
 
         // Prune stale / duplicate un-synced batches that are no longer generated (e.g. from cadence changes or deleted PCO batches)
         const activeBatchIds = new Set(batchesToSave.map(b => b.id));
         const staleBatchIdsToDelete = existingBatches
-            .filter(eb => eb.status !== 'synced_to_qbo' && !activeBatchIds.has(eb.id))
+            .filter(eb => eb.status !== 'synced_to_qbo' && !eb.quickbooksDepositId && !activeBatchIds.has(eb.id))
             .map(eb => eb.id);
 
         if (staleBatchIdsToDelete.length > 0) {

@@ -120,7 +120,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     };
 
     const handleUnbundleBatch = async (batch: GivingBatch) => {
-        if (batch.status === 'synced_to_qbo') {
+        if (batch.status === 'synced_to_qbo' || batch.quickbooksDepositId) {
             alert('Cannot unbundle a batch that has already been synced and deposited to QuickBooks Online.');
             return;
         }
@@ -156,7 +156,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     };
 
     const handleDeleteBatch = async (batch: GivingBatch) => {
-        if (batch.status === 'synced_to_qbo') {
+        if (batch.status === 'synced_to_qbo' || batch.quickbooksDepositId) {
             alert('Cannot delete a batch that has already been synced and deposited to QuickBooks Online.');
             return;
         }
@@ -200,7 +200,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
             count++;
             gross += b.totalGross || 0;
             fees += b.totalFees || 0;
-            if (b.status === 'synced_to_qbo') syncedCount++;
+            if (b.status === 'synced_to_qbo' || b.quickbooksDepositId) syncedCount++;
             else pendingCount++;
         });
 
@@ -222,8 +222,9 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 return false;
             }
 
-            if (statusFilter === 'pending' && b.status === 'synced_to_qbo') return false;
-            if (statusFilter === 'synced' && b.status !== 'synced_to_qbo') return false;
+            const isBatchSynced = b.status === 'synced_to_qbo' || !!b.quickbooksDepositId;
+            if (statusFilter === 'pending' && isBatchSynced) return false;
+            if (statusFilter === 'synced' && !isBatchSynced) return false;
             if (statusFilter === 'stripe' && b.batchType !== 'stripe') return false;
             if (statusFilter === 'manual' && b.batchType !== 'manual') return false;
 
@@ -545,7 +546,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                                 {filteredBatches.map(batch => {
-                                    const isSynced = batch.status === 'synced_to_qbo';
+                                    const isSynced = batch.status === 'synced_to_qbo' || !!batch.quickbooksDepositId;
                                     const hasFees = (batch.totalFees || 0) > 0;
                                     const isTithely = (batch.name || '').toLowerCase().includes('tithely') || (batch.name || '').toLowerCase().includes('tithe.ly') || batch.batchType === 'tithely';
 
