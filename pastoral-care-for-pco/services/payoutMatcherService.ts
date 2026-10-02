@@ -195,11 +195,13 @@ export function getCandidateGiftsForPayout(
 
     const parents: ParentDonationGroup[] = Array.from(parentMap.entries()).map(([rootId, desigs]) => {
         const gross = desigs.reduce((s, d) => s + (d.amount || 0), 0);
-        // For split-fund donations (e.g. id=400338830_0, _1), the Stripe fee may be stored
-        // on every designation row. Taking the max avoids multiplying the fee by split count.
+        // In PCO sync, split-fund donations have their fees split proportionally across designations.
+        // Sum them, but fall back to max if the full fee was duplicated identically on every designation.
+        const sumDesigFees = desigs.reduce((s, d) => s + Math.abs(d.fee || 0), 0);
+        const maxDesigFee = Math.max(...desigs.map(d => Math.abs(d.fee || 0)));
         const fee = desigs.length === 1
             ? Math.abs(desigs[0].fee || 0)
-            : Math.max(...desigs.map(d => Math.abs(d.fee || 0)));
+            : (sumDesigFees <= (gross * 0.15 + 0.5) ? sumDesigFees : maxDesigFee);
         // Match Tithe funds broadly: Tithe, Tithes, General, Operating, Budget, Offering, Ministry, Kingdom, Unrestricted
         const tithe = desigs
             .filter(d => /tithe|general|operating|budget|tithes|offering|ministry|kingdom|unrestricted/i.test(d.fundName || ''))

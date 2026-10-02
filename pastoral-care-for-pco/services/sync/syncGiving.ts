@@ -239,6 +239,22 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 }
             });
 
+            // For multi-designation gifts, adjust rounding difference so sum(desig.fee) === donationFee exactly
+            if (results.length > 1 && donationFee > 0) {
+                const totalAllocated = results.reduce((sum, item) => sum + (item.fee || 0), 0);
+                const feeRemainder = Math.round((donationFee - totalAllocated) * 100) / 100;
+                if (Math.abs(feeRemainder) > 0.0001) {
+                    // Find designation with the largest gross amount to absorb the penny discrepancy
+                    let largestIdx = 0;
+                    for (let i = 1; i < results.length; i++) {
+                        if (results[i].amount > results[largestIdx].amount) {
+                            largestIdx = i;
+                        }
+                    }
+                    results[largestIdx].fee = Math.round((results[largestIdx].fee + feeRemainder) * 100) / 100;
+                }
+            }
+
             return results;
         },
         100,

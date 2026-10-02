@@ -304,10 +304,33 @@ export function parseStripePayoutCsv(
                 warningMessages.push(`Donation #${rootId} (${row.name}) was already assigned to batch "${matched[0].batchName || matched[0].batchId}". It will be included in this payout batch.`);
             }
 
+            // In CSV import, row.fee from the Stripe CSV is the single source of truth.
+            // Ensure matched designations are rebalanced so their fee sum equals row.fee to the exact cent.
+            const targetFee = (row.fee !== undefined && !isNaN(row.fee)) ? row.fee : (matched.reduce((s, d) => s + Math.abs(d.fee || 0), 0));
+            const pGross = matched.reduce((s, d) => s + (d.amount || 0), 0);
+
+            if (matched.length === 1) {
+                matched[0].fee = targetFee;
+            } else if (matched.length > 1 && targetFee > 0) {
+                let allocated = 0;
+                let largestIdx = 0;
+                matched.forEach((d, i) => {
+                    const f = Math.round((targetFee * ((d.amount || 0) / (pGross || 1))) * 100) / 100;
+                    d.fee = f;
+                    allocated += f;
+                    if ((d.amount || 0) > (matched[largestIdx].amount || 0)) {
+                        largestIdx = i;
+                    }
+                });
+                const rem = Math.round((targetFee - allocated) * 100) / 100;
+                if (Math.abs(rem) > 0.0001) {
+                    matched[largestIdx].fee = Math.round((matched[largestIdx].fee + rem) * 100) / 100;
+                }
+            }
+
             matched.forEach(d => allDonations.push(d));
 
-            const pGross = matched.reduce((s, d) => s + (d.amount || 0), 0);
-            const pFee = matched.reduce((s, d) => s + Math.abs(d.fee || 0), 0) || row.fee;
+            const pFee = targetFee;
             const pTithe = matched
                 .filter(d => /tithe|general|operating|budget|tithes|offering|ministry|kingdom|unrestricted/i.test(d.fundName || ''))
                 .reduce((s, d) => s + (d.amount || 0), 0);
@@ -334,6 +357,22 @@ export function parseStripePayoutCsv(
             const synthesizedDesigs: DetailedDonation[] = [];
 
             if (row.parsedFunds && row.parsedFunds.length > 0) {
+                const totalParsedGross = row.parsedFunds.reduce((s, pf) => s + (pf.amount || 0), 0) || row.gross;
+                let allocatedFee = 0;
+                let largestIdx = 0;
+                const computedFees = row.parsedFunds.map((pf, pfi) => {
+                    const f = Math.round((row.fee * (pf.amount / (totalParsedGross || 1))) * 100) / 100;
+                    allocatedFee += f;
+                    if (pf.amount > row.parsedFunds![largestIdx].amount) {
+                        largestIdx = pfi;
+                    }
+                    return f;
+                });
+                const remFee = Math.round((row.fee - allocatedFee) * 100) / 100;
+                if (Math.abs(remFee) > 0.0001) {
+                    computedFees[largestIdx] = Math.round((computedFees[largestIdx] + remFee) * 100) / 100;
+                }
+
                 row.parsedFunds.forEach((pf, pfi) => {
                     const d: DetailedDonation = {
                         id: `${rootId}_${pfi}`,
@@ -346,7 +385,7 @@ export function parseStripePayoutCsv(
                         isRecurring: false,
                         paymentMethod: row.paymentMethod,
                         paymentSource: 'Stripe CSV',
-                        fee: pfi === 0 ? row.fee : 0
+                        fee: computedFees[pfi]
                     };
                     synthesizedDesigs.push(d);
                     allDonations.push(d);
