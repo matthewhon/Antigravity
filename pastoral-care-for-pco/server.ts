@@ -1696,7 +1696,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
     // Creates a Firebase Auth user + Firestore profile without signing out the admin.
     // POST /user/create { churchId, name, email, password, roles[] }
     app.post('/user/create', express.json(), async (req: any, res: any) => {
-      const { churchId, name, email, password, roles } = req.body || {};
+      const { churchId, name, email, password, roles, allowedCampuses, mustChangePassword } = req.body || {};
       if (!churchId || !name || !email || !password) {
         return res.status(400).json({ error: 'Missing required fields: churchId, name, email, password' });
       }
@@ -1715,24 +1715,46 @@ Return ONLY the JSON object, no markdown, no explanation:`;
         });
 
         // 2. Write the Firestore user profile with the real UID
-        const userDoc = {
+        const userDoc: any = {
           id: authUser.uid,
           churchId,
           name,
           email: email.toLowerCase().trim(),
           roles: roles || ['Pastoral Care'],
           theme: 'traditional',
+          mustChangePassword: mustChangePassword !== undefined ? Boolean(mustChangePassword) : true,
           createdAt: Date.now(),
         };
+        if (Array.isArray(allowedCampuses)) {
+          userDoc.allowedCampuses = allowedCampuses;
+        }
         await db.collection('users').doc(authUser.uid).set(userDoc, { merge: true });
 
-        console.log(`[UserCreate] Created auth+profile for ${email} (uid=${authUser.uid}) in church ${churchId}`);
+        console.log(`[UserCreate] Created auth+profile for ${email} (uid=${authUser.uid}, mustChangePassword=${userDoc.mustChangePassword}) in church ${churchId}`);
         res.json({ success: true, uid: authUser.uid });
       } catch (e: any) {
         // Surface Firebase Auth error codes clearly
         const code = e.code || 'unknown';
         console.error(`[UserCreate] Failed for ${email}:`, e.message);
         res.status(400).json({ error: e.message, code });
+      }
+    });
+
+    // Sets or clears the mustChangePassword requirement for a user.
+    // POST /user/set-password-change-flag { userId, mustChangePassword }
+    app.post('/user/set-password-change-flag', express.json(), async (req: any, res: any) => {
+      const { userId, mustChangePassword } = req.body || {};
+      if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+      }
+      try {
+        const db = getDb();
+        await db.collection('users').doc(userId).update({
+          mustChangePassword: Boolean(mustChangePassword)
+        });
+        res.json({ success: true, userId, mustChangePassword: Boolean(mustChangePassword) });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
       }
     });
 

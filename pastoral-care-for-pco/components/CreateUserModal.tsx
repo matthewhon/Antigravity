@@ -39,6 +39,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(true);
 
   const handleToggleRole = (role: UserRole) => {
     if (roles.includes(role)) {
@@ -65,7 +66,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
             email,
             password,
             roles,
-            allowedCampuses: roles.includes('Church Admin') ? [] : allowedCampuses
+            allowedCampuses: roles.includes('Church Admin') ? [] : allowedCampuses,
+            mustChangePassword,
         });
         onSuccess();
     } catch (e: any) {
@@ -153,6 +155,18 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                 </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={mustChangePassword}
+                        onChange={e => setMustChangePassword(e.target.checked)}
+                        className="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4 accent-indigo-600"
+                    />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Require user to change password on first login</span>
+                </label>
             </div>
 
             <div>

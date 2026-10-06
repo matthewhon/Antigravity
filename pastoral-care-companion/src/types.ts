@@ -10,6 +10,8 @@ export interface User {
     lastLogin?: number;
     widgetPreferences?: Record<string, string[]>;
     theme?: 'traditional' | 'dark';
+    mustChangePassword?: boolean;
+    passwordChangedAt?: number;
 }
 
 export interface RiskSettings {

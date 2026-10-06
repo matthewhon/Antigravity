@@ -29,6 +29,7 @@ import { PastorAIView } from './components/PastorAIView';
 import { MetricsView } from './components/MetricsView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import GuidedTour, { TourStep } from './components/GuidedTour';
+import { ForceChangePasswordModal } from './components/ForceChangePasswordModal';
 
 // Steps for the first-run guided tour, shown once on the dashboard after a new
 // user accepts their suggested layout. Targets are `data-tour` anchors; steps
@@ -1094,6 +1095,17 @@ const App: React.FC = () => {
             window.history.pushState({}, '', '/register');
             setIsRegistering(true);
           }} />;
+  }
+
+  if (user.mustChangePassword) {
+    return (
+      <ForceChangePasswordModal
+        user={user}
+        onSuccess={() => {
+          setUser({ ...user, mustChangePassword: false, passwordChangedAt: Date.now() });
+        }}
+      />
+    );
   }
 
   if (!church) {

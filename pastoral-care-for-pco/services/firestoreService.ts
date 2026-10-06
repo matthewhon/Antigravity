@@ -363,10 +363,12 @@ class FirestoreService {
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
               churchId,
-              name:     userData.name,
-              email:    userData.email,
-              password: userData.password,
-              roles:    userData.roles,
+              name:               userData.name,
+              email:              userData.email,
+              password:           userData.password,
+              roles:              userData.roles,
+              allowedCampuses:    userData.allowedCampuses,
+              mustChangePassword: userData.mustChangePassword ?? true,
           }),
       });
       const text = await res.text();
@@ -377,6 +379,27 @@ class FirestoreService {
           const err: any = new Error(json.error || `Failed to create user (${res.status})`);
           err.code = json.code;
           throw err;
+      }
+  }
+
+  async setUserMustChangePassword(uid: string, mustChange: boolean): Promise<void> {
+      try {
+          await updateDoc(doc(db, 'users', uid), { mustChangePassword: mustChange });
+      } catch (e) {
+          this.handleFirestoreError(e);
+          throw e;
+      }
+  }
+
+  async completeUserPasswordChange(uid: string): Promise<void> {
+      try {
+          await updateDoc(doc(db, 'users', uid), {
+              mustChangePassword: false,
+              passwordChangedAt: Date.now(),
+          });
+      } catch (e) {
+          this.handleFirestoreError(e);
+          throw e;
       }
   }
 

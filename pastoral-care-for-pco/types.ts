@@ -21,6 +21,10 @@ export interface User {
     primaryCampusId?: string | null;
     /** Timestamp the user completed (or skipped) the first-run guided tour. */
     onboardingTourCompletedAt?: number;
+    /** If true, user must update password on next login before accessing the application */
+    mustChangePassword?: boolean;
+    /** Epoch timestamp of the last password change */
+    passwordChangedAt?: number;
 }
 
 /**
