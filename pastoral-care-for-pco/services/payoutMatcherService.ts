@@ -103,8 +103,8 @@ export function getCandidateGiftsForPayout(
 
     // Filter online donations within window
     const candidates = allDonations.filter(d => {
-        // Exclude donations already in a Planning Center batch or custom batch unless explicitly requested
-        if (!includeBatched && d.batchId) {
+        // Exclude donations already in a Planning Center batch or custom batch
+        if (d.batchId) {
             excludedBatchedPCO++;
             return false;
         }

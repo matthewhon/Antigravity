@@ -301,7 +301,8 @@ export function parseStripePayoutCsv(
             const isAlreadyBatched = matched.some(d => !!d.batchId);
             if (isAlreadyBatched) {
                 alreadyBatchedCount++;
-                warningMessages.push(`Donation #${rootId} (${row.name}) was already assigned to batch "${matched[0].batchName || matched[0].batchId}". It will be included in this payout batch.`);
+                warningMessages.push(`Donation #${rootId} (${row.name}) was already used in Giving Batch "${matched[0].batchName || matched[0].batchId}" and was excluded.`);
+                return;
             }
 
             // In CSV import, row.fee from the Stripe CSV is the single source of truth.
@@ -463,15 +464,19 @@ export function parseStripePayoutCsv(
     // Sort parent groups descending by date
     parentGroups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    const activeGross = Math.round(parentGroups.reduce((s, p) => s + p.gross, 0) * 100) / 100;
+    const activeFees = Math.round(parentGroups.reduce((s, p) => s + p.fee, 0) * 100) / 100;
+    const activeNet = Math.round((activeGross - activeFees) * 100) / 100;
+
     const pDateClean = (maxDate !== '0000-00-00' ? maxDate : new Date().toISOString().slice(0, 10));
     const suggestedPayoutId = `payout_${pDateClean.replace(/-/g, '')}`;
-    const suggestedBatchName = `${pDateClean} Stripe Payout ($${totalNet.toFixed(2)} Net)`;
+    const suggestedBatchName = `${pDateClean} Stripe Payout ($${activeNet.toFixed(2)} Net)`;
 
     return {
         rows,
-        totalGross,
-        totalFees,
-        totalNet,
+        totalGross: activeGross,
+        totalFees: activeFees,
+        totalNet: activeNet,
         totalTithe: Math.round(totalTithe * 100) / 100,
         transactionCount: parentGroups.length,
         minDate: minDate !== '9999-99-99' ? minDate : pDateClean,

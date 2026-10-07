@@ -33,7 +33,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
     onSyncRecent,
     isSyncing = false
 }) => {
-    const { campuses } = useTenantData();
+    const { campuses, setDonations } = useTenantData();
     const [batches, setBatches] = useState<GivingBatch[]>([]);
     const [loadingBatches, setLoadingBatches] = useState(true);
     const [qboStatus, setQboStatus] = useState<QuickbooksStatusResponse | null>(null);
@@ -141,6 +141,7 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                         d.paid_out_date = undefined;
                     }
                 });
+                if (setDonations) setDonations([...donations]);
             }
             setActionMessage({
                 type: 'success',
@@ -166,6 +167,19 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
         try {
             await firestore.unbundleGivingBatch(churchId, batch.id);
             setBatches(prev => prev.filter(b => b.id !== batch.id));
+            if (donations) {
+                donations.forEach(d => {
+                    if (d.batchId === batch.id) {
+                        d.batchId = undefined;
+                        d.batchName = undefined;
+                        d.stripePayoutId = undefined;
+                        d.stripe_payout_id = undefined;
+                        d.paidOutDate = undefined;
+                        d.paid_out_date = undefined;
+                    }
+                });
+                if (setDonations) setDonations([...donations]);
+            }
             setActionMessage({
                 type: 'success',
                 text: `Batch "${batch.name}" was removed successfully.`
@@ -738,8 +752,26 @@ export const GivingBatchesView: React.FC<GivingBatchesViewProps> = ({
                 churchId={churchId}
                 donations={donations}
                 initialMode={matcherInitialMode}
-                onBatchCreated={(newBatch, andSendToQbo) => {
-                    setBatches(prev => [newBatch, ...prev.filter(b => b.id !== newBatch.id)]);
+                onBatchCreated={async (newBatch, andSendToQbo, batchedDonationIds = []) => {
+                    if (donations && batchedDonationIds && batchedDonationIds.length > 0) {
+                        const idSet = new Set(batchedDonationIds);
+                        donations.forEach(d => {
+                            if (idSet.has(d.id)) {
+                                d.batchId = newBatch.id;
+                                d.batchName = newBatch.name;
+                                d.stripePayoutId = newBatch.stripePayoutId;
+                                d.paidOutDate = newBatch.paidOutDate;
+                            }
+                        });
+                        if (setDonations) {
+                            setDonations([...donations]);
+                        }
+                    }
+
+                    // Reload batches from Firestore so any other batches whose transactions were used
+                    // are immediately recalculated or removed from All Batches!
+                    await loadBatches();
+
                     if (andSendToQbo) {
                         setPreviewBatch(newBatch);
                     } else {

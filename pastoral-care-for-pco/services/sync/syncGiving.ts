@@ -274,6 +274,33 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
     }
 
     if (donations.length > 0) {
+        // Pre-fetch existing batches, detailed donations, and QBO mapping to preserve custom/matched batch assignments & QBO sync state
+        const [existingBatches, existingDonations, qboMapping] = await Promise.all([
+            firestore.getGivingBatches(churchId),
+            firestore.getDetailedDonations(churchId).catch(() => []),
+            firestore.getQuickbooksMapping(churchId).catch(() => null)
+        ]);
+        const existingBatchMap = new Map<string, GivingBatch>();
+        existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
+
+        const existingDonationMap = new Map<string, DetailedDonation>();
+        existingDonations.forEach(ed => existingDonationMap.set(ed.id, ed));
+
+        // Preserve existing custom/matched batch assignments on incoming donations
+        donations.forEach(d => {
+            if (!d.batchId) {
+                const existing = existingDonationMap.get(d.id);
+                if (existing?.batchId && existingBatchMap.has(existing.batchId)) {
+                    d.batchId = existing.batchId;
+                    d.batchName = existing.batchName || existingBatchMap.get(existing.batchId)?.name || d.batchName;
+                    d.stripePayoutId = existing.stripePayoutId || (existing as any).stripe_payout_id || existingBatchMap.get(existing.batchId)?.stripePayoutId;
+                    d.stripe_payout_id = d.stripePayoutId;
+                    d.paidOutDate = existing.paidOutDate || (existing as any).paid_out_date || existingBatchMap.get(existing.batchId)?.paidOutDate;
+                    d.paid_out_date = d.paidOutDate;
+                }
+            }
+        });
+
         await firestore.upsertDetailedDonations(donations);
 
         // Calculate and Update Giving Stats for People
@@ -346,13 +373,7 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             logger.warn('Error fetching batches from PCO Giving (non-fatal)', 'sync', { churchId, error: err.message }, churchId);
         }
 
-        // Fetch existing batches and mapping from Firestore to preserve QBO sync state & apply cadence
-        const [existingBatches, qboMapping] = await Promise.all([
-            firestore.getGivingBatches(churchId),
-            firestore.getQuickbooksMapping(churchId).catch(() => null)
-        ]);
-        const existingBatchMap = new Map<string, GivingBatch>();
-        existingBatches.forEach(eb => existingBatchMap.set(eb.id, eb));
+        // existingBatches, existingDonations, and qboMapping were fetched above
 
         // Build a secondary lookup: stripePayoutId → synced batch.
         // This lets us detect when the same payout was deposited to QBO under
@@ -434,6 +455,15 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             if (!batchDonationMap.has(pb.id)) batchDonationMap.set(pb.id, []);
         });
 
+        // Pre-seed existing batches from Firestore so custom/payout batches are preserved
+        existingBatches.forEach(eb => {
+            if (!batchNameMap.has(eb.id)) batchNameMap.set(eb.id, eb.name);
+            if (!batchDateMap.has(eb.id)) batchDateMap.set(eb.id, eb.date);
+            if (eb.stripePayoutId && !batchPayoutIdMap.has(eb.id)) batchPayoutIdMap.set(eb.id, eb.stripePayoutId);
+            if (eb.paidOutDate && !batchPaidOutDateMap.has(eb.id)) batchPaidOutDateMap.set(eb.id, eb.paidOutDate);
+            if (!batchDonationMap.has(eb.id)) batchDonationMap.set(eb.id, []);
+        });
+
         donations.forEach(d => {
             let key = d.batchId;
             if (!key) {
@@ -498,6 +528,17 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         const batchesToSave: GivingBatch[] = [];
 
         batchDonationMap.forEach((batchDonations, batchKey) => {
+            // If existing batch had donations outside the current sync window, include them
+            const existing = existingBatchMap.get(batchKey);
+            if (existing && existingDonations.length > 0) {
+                const presentIds = new Set(batchDonations.map(d => d.id));
+                existingDonations.forEach(ed => {
+                    if (ed.batchId === batchKey && !presentIds.has(ed.id)) {
+                        batchDonations.push(ed);
+                    }
+                });
+            }
+
             if (batchDonations.length === 0) return;
 
             // Calculate fund breakdown (by Fund and optionally Campus)
@@ -556,7 +597,6 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const fees = round2(Math.abs(batchTotalFee));
             const net = round2(gross - fees);
 
-            const existing = existingBatchMap.get(batchKey);
             const isTithely = (batchNameMap.get(batchKey) || '').toLowerCase().includes('tithely') ||
                 (existing?.batchType === 'tithely');
             const isOnlineBatch = isTithely || fees > 0 || batchKey.startsWith('online_') || batchKey.startsWith('stripe_') || batchDonations.some(d =>
@@ -604,10 +644,21 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             });
         });
 
-        // Prune stale / duplicate un-synced batches that are no longer generated (e.g. from cadence changes or deleted PCO batches)
+        // Prune stale / duplicate un-synced synthetic batches that are no longer generated (e.g. from cadence changes or deleted PCO batches)
         const activeBatchIds = new Set(batchesToSave.map(b => b.id));
         const staleBatchIdsToDelete = existingBatches
-            .filter(eb => eb.status !== 'synced_to_qbo' && !eb.quickbooksDepositId && !activeBatchIds.has(eb.id))
+            .filter(eb => {
+                // NEVER delete batches that are synced to QuickBooks
+                if (eb.status === 'synced_to_qbo' || eb.quickbooksDepositId) return false;
+                // If it is in activeBatchIds, it is retained and updated
+                if (activeBatchIds.has(eb.id)) return false;
+                // NEVER delete custom payout batches or user-matched stripe batches
+                if (eb.stripePayoutId || eb.id.startsWith('stripe_')) return false;
+                // Only prune synthetic auto-generated batches (online_weekly_*, manual_unbatched_*) or deleted PCO batches
+                const isSynthetic = eb.id.startsWith('online_') || eb.id.startsWith('manual_unbatched_');
+                const isPcoBatch = /^\d+$/.test(eb.id);
+                return isSynthetic || isPcoBatch;
+            })
             .map(eb => eb.id);
 
         if (staleBatchIdsToDelete.length > 0) {

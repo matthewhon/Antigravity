@@ -38,7 +38,7 @@ interface SmartPayoutMatcherModalProps {
     churchId: string;
     isOpen: boolean;
     onClose: () => void;
-    onBatchCreated: (batch: GivingBatch, andSendToQbo?: boolean) => void;
+    onBatchCreated: (batch: GivingBatch, andSendToQbo?: boolean, batchedDonationIds?: string[]) => void;
     donations?: DetailedDonation[];
     initialMode?: 'ai' | 'csv';
 }
@@ -78,9 +78,8 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     const [stripePayoutId, setStripePayoutId] = useState<string>('');
     const [searchWindowDays, setSearchWindowDays] = useState<number>(14);
 
-    // Filter controls: default to 'all' methods and exclude already-batched Planning Center gifts
+    // Filter controls: default to 'all' methods
     const [paymentMethodFilter, setPaymentMethodFilter] = useState<'card' | 'ach' | 'all'>('all');
-    const [includeBatched, setIncludeBatched] = useState<boolean>(false);
     const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
 
     // Matching state & Diagnostics
@@ -116,13 +115,14 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     sinceDate = p.toISOString().slice(0, 10);
                 }
 
-                const fromDb = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, includeBatched);
+                const fromDb = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, false);
                 if (isMounted) {
-                    // Merge DB donations with in-memory donations (deduplicating by ID)
-                    const mergedMap = new Map<string, DetailedDonation>();
-                    (inMemoryDonations || []).forEach(d => mergedMap.set(d.id, d));
-                    fromDb.forEach(d => mergedMap.set(d.id, d));
-                    setFetchedDonations(Array.from(mergedMap.values()));
+                    const batchedIds = new Set<string>();
+                    (inMemoryDonations || []).forEach(d => {
+                        if (d.batchId) batchedIds.add(d.id);
+                    });
+                    const unbatched = fromDb.filter(d => !d.batchId && !batchedIds.has(d.id));
+                    setFetchedDonations(unbatched);
                 }
             } catch (err) {
                 console.error('Failed to load candidate donations:', err);
@@ -133,7 +133,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
         loadDonations();
         return () => { isMounted = false; };
-    }, [isOpen, churchId, startDate, payoutDate, searchWindowDays, includeBatched, inMemoryDonations]);
+    }, [isOpen, churchId, startDate, payoutDate, searchWindowDays, inMemoryDonations]);
 
     // When modal opens or initialMode changes, reset state
     useEffect(() => {
@@ -170,17 +170,18 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
             let combined = [...(inMemoryDonations || []), ...fetchedDonations];
             let result = parseStripePayoutCsv(text, churchId, combined);
 
-            // If minDate is available, attempt to load all database donations back to that date
+            // If minDate is available, attempt to load unbatched database donations back to that date
             if (result.minDate && churchId) {
                 try {
-                    const moreFromDb = await firestore.getUnbatchedOnlineDonations(churchId, result.minDate, true);
-                    const mergedMap = new Map<string, DetailedDonation>();
-                    combined.forEach(d => mergedMap.set(d.id, d));
-                    moreFromDb.forEach(d => mergedMap.set(d.id, d));
-                    combined = Array.from(mergedMap.values());
-                    setFetchedDonations(combined);
-                    // Re-parse with enriched database donations
-                    result = parseStripePayoutCsv(text, churchId, combined);
+                    const moreFromDb = await firestore.getUnbatchedOnlineDonations(churchId, result.minDate, false);
+                    const batchedIds = new Set<string>();
+                    (inMemoryDonations || []).forEach(d => {
+                        if (d.batchId) batchedIds.add(d.id);
+                    });
+                    const unbatchedMore = moreFromDb.filter(d => !d.batchId && !batchedIds.has(d.id));
+                    setFetchedDonations(unbatchedMore);
+                    // Re-parse with enriched unbatched database donations
+                    result = parseStripePayoutCsv(text, churchId, unbatchedMore);
                 } catch (e) {
                     console.warn('Could not fetch additional donations from DB for CSV matching:', e);
                 }
@@ -202,10 +203,10 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
         }
     };
 
-    // Active pool of candidate donations (combining fetched with in-memory)
+    // Active pool of candidate donations (strictly unbatched)
     const activeCandidatePool = useMemo(() => {
-        if (fetchedDonations.length > 0) return fetchedDonations;
-        return inMemoryDonations || [];
+        if (fetchedDonations.length > 0) return fetchedDonations.filter(d => !d.batchId);
+        return (inMemoryDonations || []).filter(d => !d.batchId);
     }, [fetchedDonations, inMemoryDonations]);
 
     // Candidate parent donation groups in current date window & filters
@@ -221,10 +222,10 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
             startDate: startDate.trim() || undefined,
             endDate: endDate.trim() || undefined,
             paymentMethodFilter,
-            includeBatched,
+            includeBatched: false,
             searchWindowDays
         });
-    }, [isOpen, activeTab, csvResult, activeCandidatePool, payoutDate, startDate, endDate, paymentMethodFilter, includeBatched, searchWindowDays]);
+    }, [isOpen, activeTab, csvResult, activeCandidatePool, payoutDate, startDate, endDate, paymentMethodFilter, searchWindowDays]);
 
     // Filtered candidate groups based on candidate search box
     const visibleCandidateGroups = useMemo(() => {
@@ -325,7 +326,10 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                     minDate.setDate(minDate.getDate() - (searchWindowDays + 5));
                     sinceDate = minDate.toISOString().slice(0, 10);
                 }
-                candidateDonations = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, includeBatched);
+                const fromDb = await firestore.getUnbatchedOnlineDonations(churchId, sinceDate, false);
+                candidateDonations = fromDb.filter(d => !d.batchId);
+            } else {
+                candidateDonations = candidateDonations.filter(d => !d.batchId);
             }
 
             const numFees = targetFees ? Math.abs(parseFloat(targetFees)) : undefined;
@@ -344,7 +348,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 stripePayoutId: stripePayoutId.trim() || undefined,
                 searchWindowDays,
                 paymentMethodFilter,
-                includeBatched
+                includeBatched: false
             });
 
             if (res && res.matchLogs) {
@@ -470,13 +474,27 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                 paidOutDate: pDateStr
             };
 
+            const batchedIds = activeDonations.map(d => d.id);
             await firestore.createCustomPayoutBatch(
                 churchId, 
                 newBatch, 
-                activeDonations.map(d => d.id)
+                batchedIds
             );
 
-            onBatchCreated(newBatch, andSendToQbo);
+            // Update inMemoryDonations directly to immediately mark them as batched
+            if (inMemoryDonations) {
+                const idSet = new Set(batchedIds);
+                inMemoryDonations.forEach(d => {
+                    if (idSet.has(d.id)) {
+                        d.batchId = batchId;
+                        d.batchName = batchName;
+                        d.stripePayoutId = payoutId;
+                        d.paidOutDate = pDateStr;
+                    }
+                });
+            }
+
+            onBatchCreated(newBatch, andSendToQbo, batchedIds);
             onClose();
         } catch (err: any) {
             console.error('Error creating payout batch:', err);
@@ -728,8 +746,8 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                 </div>
                             )}
 
-                            {/* Candidate Pool Batched Tip */}
-                            {!includeBatched && candidateGroups.length > 0 && targetGrossVal > 0 && (
+                            {/* Candidate Pool Volume Tip */}
+                            {candidateGroups.length > 0 && targetGrossVal > 0 && (
                                 (() => {
                                     const totalAvailableGross = candidateGroups.reduce((acc, p) => acc + p.gross, 0);
                                     if (totalAvailableGross < targetGrossVal) {
@@ -738,16 +756,9 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                                 <div className="flex items-center gap-2">
                                                     <Info className="w-4 h-4 text-amber-600 shrink-0" />
                                                     <span>
-                                                        Available gifts in window (<strong>${totalAvailableGross.toFixed(2)}</strong>) are less than target (<strong>${targetGrossVal.toFixed(2)}</strong>). Some gifts may already be marked with a Planning Center batch ID.
+                                                        Available unbatched gifts in window (<strong>${totalAvailableGross.toFixed(2)}</strong>) are less than target (<strong>${targetGrossVal.toFixed(2)}</strong>). Transactions already in a Giving Batch are excluded.
                                                     </span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIncludeBatched(true)}
-                                                    className="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shrink-0"
-                                                >
-                                                    Include Batched Gifts
-                                                </button>
                                             </div>
                                         );
                                     }
@@ -1308,11 +1319,6 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
                                                                 <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase">
                                                                     {p.paymentMethod || p.paymentSource || 'Online'}
                                                                 </span>
-                                                                {p.batchId && (
-                                                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                                                        Batch #{p.batchId}
-                                                                    </span>
-                                                                )}
                                                             </div>
                                                             <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                                                                 <span>{p.date ? p.date.slice(0, 10) : ''}</span>

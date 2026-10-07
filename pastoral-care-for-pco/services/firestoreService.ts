@@ -29,7 +29,7 @@ import {
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot, DigitalBulletin,
     GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse,
-    DiscTestResponse, GivingBatch, QuickbooksMappingConfig,
+    DiscTestResponse, GivingBatch, GivingBatchFundBreakdown, QuickbooksMappingConfig,
     NewsletterWidgetConfig, NewsletterSubscriber
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
@@ -914,11 +914,23 @@ class FirestoreService {
 
   async createCustomPayoutBatch(churchId: string, batch: GivingBatch, donationIds: string[]): Promise<GivingBatch> {
     try {
-      // 1. Save Batch to giving_batches
+      const donationIdSet = new Set(donationIds);
+
+      // 1. Identify which other batches currently hold any of these donations
+      const allChurchDonations = await this.getDetailedDonations(churchId);
+      const affectedOldBatchIds = new Set<string>();
+
+      allChurchDonations.forEach(d => {
+        if (donationIdSet.has(d.id) && d.batchId && d.batchId !== batch.id) {
+          affectedOldBatchIds.add(d.batchId);
+        }
+      });
+
+      // 2. Save Batch to giving_batches
       const batchRef = doc(db, 'giving_batches', batch.id);
       await setDoc(batchRef, this.deepSanitize(batch), { merge: true });
 
-      // 2. Update donations to assign batchId, batchName, stripePayoutId, paid_out_date
+      // 3. Update donations to assign batchId, batchName, stripePayoutId, paid_out_date
       const CHUNK = 400;
       for (let i = 0; i < donationIds.length; i += CHUNK) {
         const chunk = donationIds.slice(i, i + CHUNK);
@@ -935,6 +947,90 @@ class FirestoreService {
           });
         });
         await wBatch.commit();
+      }
+
+      // 4. Update or prune any un-synced batches that previously contained these donations
+      if (affectedOldBatchIds.size > 0) {
+        const existingBatches = await this.getGivingBatches(churchId);
+        const batchMap = new Map<string, GivingBatch>();
+        existingBatches.forEach(b => batchMap.set(b.id, b));
+
+        for (const oldBatchId of Array.from(affectedOldBatchIds)) {
+          const oldBatch = batchMap.get(oldBatchId);
+          // Never modify batches that have already been deposited to QuickBooks Online
+          if (!oldBatch || oldBatch.status === 'synced_to_qbo' || oldBatch.quickbooksDepositId) {
+            continue;
+          }
+
+          const remaining = allChurchDonations.filter(d => d.batchId === oldBatchId && !donationIdSet.has(d.id));
+
+          if (remaining.length === 0) {
+            await deleteDoc(doc(db, 'giving_batches', oldBatchId));
+          } else {
+            const fundGroups = new Map<string, {
+              fundId: string;
+              fundName: string;
+              campusId?: string | null;
+              campusName?: string | null;
+              gross: number;
+              fee: number;
+              count: number;
+            }>();
+            let totalGross = 0;
+            let totalFee = 0;
+
+            remaining.forEach(d => {
+              const fId = d.fundId || 'unassigned';
+              const fName = d.fundName || 'Unassigned';
+              const cId = d.campusId || null;
+              const cName = d.campusName || null;
+              const groupKey = cId ? `${cId}_${fId}` : fId;
+
+              const cur = fundGroups.get(groupKey) || {
+                fundId: fId,
+                fundName: fName,
+                campusId: cId,
+                campusName: cName,
+                gross: 0,
+                fee: 0,
+                count: 0
+              };
+              const dFee = Math.abs(d.fee || 0);
+              cur.gross += d.amount || 0;
+              cur.fee += dFee;
+              cur.count += 1;
+              fundGroups.set(groupKey, cur);
+
+              totalGross += d.amount || 0;
+              totalFee += dFee;
+            });
+
+            const round2 = (n: number) => Math.round(n * 100) / 100;
+            const gross = round2(totalGross);
+            const fees = round2(totalFee);
+            const net = round2(gross - fees);
+
+            const fundsBreakdown: GivingBatchFundBreakdown[] = Array.from(fundGroups.values()).map(data => ({
+              fundId: data.fundId,
+              fundName: data.fundName,
+              campusId: data.campusId,
+              campusName: data.campusName,
+              grossAmount: round2(data.gross),
+              feeAmount: round2(data.fee),
+              netAmount: round2(data.gross - data.fee),
+              donationCount: data.count
+            })).sort((a, b) => b.grossAmount - a.grossAmount);
+
+            const oldBatchRef = doc(db, 'giving_batches', oldBatchId);
+            await updateDoc(oldBatchRef, {
+              totalGross: gross,
+              totalFees: fees,
+              totalNet: net,
+              donationCount: remaining.length,
+              fundsBreakdown
+            });
+          }
+        }
       }
 
       return batch;
