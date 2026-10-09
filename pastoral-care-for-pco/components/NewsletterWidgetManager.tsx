@@ -12,6 +12,7 @@ import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   NewsletterWidgetConfig, 
+  NewsletterThemeConfig,
   NewsletterSubscriber, 
   NewsletterFieldConfig, 
   NewsletterFieldType, 
@@ -367,7 +368,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
 
   // Helper to render the live widget card component
   const renderLiveWidgetCard = (w: NewsletterWidgetConfig) => {
-    const theme = w.theme || {};
+    const theme: Partial<NewsletterThemeConfig> = w.theme || {};
     const primaryColor = theme.primaryColor || '#4F46E5';
     const bgColor = theme.backgroundColor || '#FFFFFF';
     const textColor = theme.textColor || '#1E293B';

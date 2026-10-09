@@ -59,12 +59,13 @@ export function getPersonEmail(person?: PcoPerson | null): string | null {
   if (person.email && typeof person.email === 'string' && person.email.trim().length > 0) {
     return person.email.trim();
   }
-  if (Array.isArray(person.emails) && person.emails.length > 0) {
-    const primaryObj = person.emails.find((e: any) => e?.primary && e?.address);
+  const rawEmails = (person as any).emails;
+  if (Array.isArray(rawEmails) && rawEmails.length > 0) {
+    const primaryObj = rawEmails.find((e: any) => e?.primary && e?.address);
     if (primaryObj?.address) return primaryObj.address.trim();
-    const firstObj = person.emails.find((e: any) => e?.address);
+    const firstObj = rawEmails.find((e: any) => e?.address);
     if (firstObj?.address) return firstObj.address.trim();
-    const firstStr = person.emails.find((e: any) => typeof e === 'string' && e.trim().length > 0);
+    const firstStr = rawEmails.find((e: any) => typeof e === 'string' && e.trim().length > 0);
     if (firstStr) return (firstStr as string).trim();
   }
   return null;
@@ -78,10 +79,11 @@ export function getPersonPhone(person?: PcoPerson | null): string | null {
   if (person.e164Phone && typeof person.e164Phone === 'string' && person.e164Phone.trim().length > 0) {
     return person.e164Phone.trim();
   }
-  if (Array.isArray(person.phoneNumbers) && person.phoneNumbers.length > 0) {
-    const primaryObj = person.phoneNumbers.find((p: any) => p?.primary && p?.number);
+  const rawPhoneNumbers = (person as any).phoneNumbers;
+  if (Array.isArray(rawPhoneNumbers) && rawPhoneNumbers.length > 0) {
+    const primaryObj = rawPhoneNumbers.find((p: any) => p?.primary && p?.number);
     if (primaryObj?.number) return primaryObj.number.trim();
-    const firstObj = person.phoneNumbers.find((p: any) => p?.number);
+    const firstObj = rawPhoneNumbers.find((p: any) => p?.number);
     if (firstObj?.number) return firstObj.number.trim();
   }
   return null;

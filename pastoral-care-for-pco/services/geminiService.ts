@@ -1,8 +1,7 @@
-
 import { 
     AttendanceData, GivingData, PeopleDashboardData, GivingAnalytics, 
     GeoInsight, GroupsDashboardData, ServicesDashboardData, CensusStats, 
-    BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PcoPerson,
+    BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PrayerRequest, PcoPerson,
     UserRole, WidgetDefinition, DetailedDonation, ServicesTeam, RiskChangeRecord, StatusChangeRecord
 } from "../types";
 import { getRoleBasedDefaults, ALL_WIDGETS } from "../constants/widgetRegistry";

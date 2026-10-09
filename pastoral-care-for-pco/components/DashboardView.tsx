@@ -4,7 +4,7 @@ import {
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData,
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord,
     PcoFund, DetailedDonation, ServicesTeam, RiskChangeRecord, StatusChangeRecord,
-    OutreachSession, OutreachSlot
+    OutreachSession, OutreachSlot, PastoralNote, PrayerRequest
 } from '../types';
 import { DashboardOverview } from '../services/dashboardService';
 import { DashboardPreferences } from '../types';

@@ -80,6 +80,7 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
     // Filter controls: default to 'all' methods
     const [paymentMethodFilter, setPaymentMethodFilter] = useState<'card' | 'ach' | 'all'>('all');
+    const [includeBatched, setIncludeBatched] = useState<boolean>(false);
     const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
 
     // Matching state & Diagnostics

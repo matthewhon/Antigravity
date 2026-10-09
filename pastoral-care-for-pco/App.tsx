@@ -89,7 +89,8 @@ import {
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
   PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord, PcoCampus,
   SmsConversation, SmsUsageRecord, EmailCampaign, EmailUnsubscribe,
-  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot
+  OutreachSession, OutreachSlot, GroupCareSession, GroupCareSlot,
+  PastoralNote, PrayerRequest
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';

@@ -44,6 +44,7 @@ interface TenantDataState {
   outreachSessions: OutreachSession[];
   outreachSlots: OutreachSlot[];
   groupCareSessions: GroupCareSession[];
+  groupCareSlots: GroupCareSlot[];
   pastoralNotes: PastoralNote[];
   prayerRequests: PrayerRequest[];
   

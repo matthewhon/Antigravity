@@ -183,7 +183,7 @@ export const MbtiTestManager: React.FC<MbtiTestManagerProps> = ({ church, user, 
   }, [responses]);
 
   const topType = useMemo(() => {
-    const entries = Object.entries(typeCounts);
+    const entries = Object.entries(typeCounts) as [string, number][];
     if (!entries.length) return null;
     entries.sort((a, b) => b[1] - a[1]);
     return { type: entries[0][0], count: entries[0][1] };

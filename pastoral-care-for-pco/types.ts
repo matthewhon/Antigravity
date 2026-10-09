@@ -457,12 +457,19 @@ export interface PcoPerson {
     id: string;
     churchId: string;
     name: string;
+    firstName?: string;
+    lastName?: string;
     email?: string;
+    primary_email?: string;
     phone?: string;
+    primary_phone?: string;
     e164Phone?: string | null;
     avatar?: string | null;
     membership?: string | null;
+    membershipStatus?: string | null;
+    membership_status?: string | null;
     status?: string | null;
+    risk_level?: string;
     gender?: string | null;
     birthdate?: string | null;
     anniversary?: string | null;
@@ -475,6 +482,8 @@ export interface PcoPerson {
     checkInCount?: number;
     effectiveCheckInCount?: number;
     childCheckInCount?: number;
+    attendanceStats?: { count?: number; lastAttended?: string };
+    attendanceHistory?: { date: string; [key: string]: any }[];
     householdId?: string;
     householdName?: string;
     groupIds?: string[];
@@ -1394,6 +1403,7 @@ export interface PastoralNote {
     type: 'Visit' | 'Call' | 'Meeting' | 'Note' | 'Crisis' | 'Hospital';
     content: string;
     followUpDate?: string;
+    followUpNeeded?: boolean;
     isCompleted: boolean;
     tags?: string[];
     isOutreach?: boolean;
@@ -1408,6 +1418,7 @@ export interface PrayerRequest {
     date: string;
     status: 'Active' | 'Answered' | 'Archived';
     isPublic: boolean;
+    isConfidential?: boolean;
     category?: string;
 }
 

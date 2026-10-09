@@ -419,7 +419,7 @@ export const computeAssessmentAggregates = (
           personName: p.name,
           email: p.primary_email,
           phone: p.primary_phone,
-          riskLevel,
+          riskLevel: (['Healthy', 'At Risk', 'Disconnected'].includes(riskLevel) ? riskLevel : 'Unknown') as 'Healthy' | 'At Risk' | 'Disconnected' | 'Unknown',
           primaryGift: giftResp?.primaryGift,
           discStyle: discResp?.styleCode,
           mbtiType: mbtiResp?.mbtiType,

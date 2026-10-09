@@ -2692,7 +2692,7 @@ class FirestoreService {
         );
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+      return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as GiftsTestResponse);
     } catch (e) {
       console.warn('[FirestoreService] getGiftsTestResponses query with orderBy failed, retrying without order:', e);
       try {
@@ -2710,7 +2710,7 @@ class FirestoreService {
           );
         }
         const snapshot = await getDocs(qFallback);
-        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as GiftsTestResponse);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as GiftsTestResponse);
         list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         return list;
       } catch (err) {
@@ -2766,7 +2766,7 @@ class FirestoreService {
         );
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+      return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as MbtiTestResponse);
     } catch (e) {
       console.warn('[FirestoreService] getMbtiResponses query with orderBy failed, retrying without order:', e);
       try {
@@ -2784,7 +2784,7 @@ class FirestoreService {
           );
         }
         const snapshot = await getDocs(qFallback);
-        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as MbtiTestResponse);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as MbtiTestResponse);
         list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         return list;
       } catch (err) {
@@ -2844,7 +2844,7 @@ class FirestoreService {
         );
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+      return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as DiscTestResponse);
     } catch (e) {
       console.warn('[FirestoreService] getDiscResponses ordered query failed, trying unindexed fallback:', e);
       try {
@@ -2862,7 +2862,7 @@ class FirestoreService {
           );
         }
         const snapshot = await getDocs(qFallback);
-        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as DiscTestResponse);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as DiscTestResponse);
         list.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         return list;
       } catch (err) {

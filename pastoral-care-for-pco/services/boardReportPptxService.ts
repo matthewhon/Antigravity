@@ -438,7 +438,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
                 lineDataSymbol: 'circle',
                 lineDataSymbolSize: 5,
                 fill: 'FFFFFF',
-                line: { color: 'CBD5E1', width: 1 },
+                dataBorder: { color: 'CBD5E1', pt: 1 },
                 title: '12-Month Giving Trajectory vs Prior Year',
                 titleFontSize: 12,
                 titleColor: TEXT_DARK
@@ -473,7 +473,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             holeSize: 55,
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Stewardship Sustainability (Recurring vs One-Time)',
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -592,7 +592,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             barDir: 'col',
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Weekly Attendance Composition',
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -666,7 +666,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             holeSize: 50,
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Pastoral Coverage on Vulnerable Members',
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -743,7 +743,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             barDir: 'col',
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Roster Fill Rate vs Benchmark (%)',
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -814,7 +814,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
                 barDir: 'col',
                 showValue: true,
                 fill: 'FFFFFF',
-                line: { color: 'CBD5E1', width: 1 },
+                dataBorder: { color: 'CBD5E1', pt: 1 },
                 title: 'Congregational Spiritual Gifts Distribution',
                 titleFontSize: 12,
                 titleColor: TEXT_DARK
@@ -857,7 +857,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             holeSize: 50,
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Congregational Risk Breakdown',
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -888,7 +888,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             barDir: 'col',
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: `Visitor Funnel (Conversion: ${data.visitorFunnel.conversionRate}%)`,
             titleFontSize: 12,
             titleColor: TEXT_DARK
@@ -964,7 +964,7 @@ export const generateBoardReportPresentation = async (data: BoardReportExportDat
             barDir: 'col',
             showValue: true,
             fill: 'FFFFFF',
-            line: { color: 'CBD5E1', width: 1 },
+            dataBorder: { color: 'CBD5E1', pt: 1 },
             title: 'Attendance Frequency Breakdown (%)',
             titleFontSize: 12,
             titleColor: TEXT_DARK
