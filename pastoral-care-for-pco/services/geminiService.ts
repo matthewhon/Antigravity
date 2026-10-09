@@ -1027,3 +1027,118 @@ Start writing immediately with the content — no preamble like "Here is your em
     }
 };
 
+
+// ---------------------------------------------------------------------------
+// Campaign Writer — structured email / SMS / bulletin drafting
+// (subject variants, tone/length controls, readability + quality checks)
+// ---------------------------------------------------------------------------
+
+export interface CampaignWriterItem {
+    label: string;
+    description?: string;
+    url?: string;
+    date?: string;
+}
+
+export interface CampaignWriterRequest {
+    channel: 'email' | 'sms' | 'bulletin';
+    churchId?: string;
+    churchName?: string;
+    senderName?: string;
+    topic?: string;
+    goal?: 'inform' | 'invite' | 'remind' | 'thank';
+    audience?: string;
+    tone?: string;
+    length?: 'short' | 'medium' | 'long';
+    targetGrade?: number;
+    subjectCount?: number;
+    items?: CampaignWriterItem[];
+    existingText?: string;
+    simplify?: boolean;
+}
+
+export interface CampaignWriterResult {
+    channel: 'email' | 'sms' | 'bulletin';
+    subjectVariants: { id: string; text: string; style: 'curiosity' | 'direct' | 'urgent' | 'benefit' }[];
+    previewText: string;
+    body: string;
+    readability: {
+        grade: number; wordCount: number; sentenceCount: number; avgSentenceLength: number;
+        smsSegments: number; smsEncoding: 'GSM-7' | 'UCS-2'; characters: number;
+    };
+    warnings: string[];
+}
+
+export const generateCampaignContent = async (req: CampaignWriterRequest): Promise<CampaignWriterResult> => {
+    const res = await fetch('/ai/campaign-writer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+        let msg = 'The AI writing assistant is temporarily unavailable. Please try again.';
+        try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+        throw new Error(msg);
+    }
+    return res.json();
+};
+
+export interface ChurchVoiceProposal {
+    adjectives: string[];
+    wordsToUse: string[];
+    wordsToAvoid: string[];
+    signOffs: string[];
+    sampleMessages: string[];
+    targetGrade: number;
+    allowEmoji: boolean;
+}
+
+/** Ask the AI to propose a voice profile from past messages (nothing is saved). */
+export const learnChurchVoice = async (samples: string[]): Promise<ChurchVoiceProposal> => {
+    const res = await fetch('/ai/church-voice/learn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ samples }),
+    });
+    if (!res.ok) {
+        let msg = 'Could not analyse past messages. Please try again.';
+        try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+        throw new Error(msg);
+    }
+    return res.json();
+};
+
+// ─── Content Recommender (Suggest what to include) ─────────────────────────
+
+export interface RecommendedContentItem {
+    id: string;
+    type: 'registration' | 'calendar' | 'group' | 'announcement' | 'service';
+    label: string;
+    description?: string;
+    date?: string;
+    startsAt?: string;
+    url?: string;
+    urgencyReason: string;
+    score: number;
+    tags: string[];
+    featuredRecently?: boolean;
+}
+
+export interface ContentRecommendationsResult {
+    recommendations: RecommendedContentItem[];
+    windowDays: number;
+    sourcesCount: Record<string, number>;
+}
+
+export const fetchContentRecommendations = async (
+    churchId: string,
+    daysAhead = 14
+): Promise<ContentRecommendationsResult> => {
+    const res = await fetch(`/ai/content-recommendations?churchId=${encodeURIComponent(churchId)}&daysAhead=${daysAhead}`);
+    if (!res.ok) {
+        let msg = 'Could not load content recommendations.';
+        try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+        throw new Error(msg);
+    }
+    return res.json();
+};

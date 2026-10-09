@@ -40,6 +40,8 @@ export interface SendOptions {
     churchId?: string;
     /** Campaign ID — echoed in Postmark Metadata for bounce analytics. */
     campaignId?: string;
+    /** A/B test variant ID ('variant_a', 'variant_b', etc.) */
+    variantId?: string;
 }
 
 

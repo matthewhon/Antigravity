@@ -1280,6 +1280,9 @@ function renderAnalyticsBlockHtml(
 
 interface PersonInfo {
     personName?: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
     email?:      string;
     phone?:      string;
     birthday?:   string;
@@ -1288,6 +1291,7 @@ interface PersonInfo {
     state?:      string;
     /** PCO People person ID — used to write notes back to Planning Center after send. */
     pcoPersonId?: string | null;
+    personId?: string | null;
 }
 
 function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
@@ -1512,6 +1516,10 @@ export async function executeSend(
         recipients = [testEmail];
         log.info(`Sending test email to ${testEmail}`, 'system', { campaignId, churchId }, churchId);
 
+    } else if (campaign.abTest?.status === 'testing' || campaign.abTest?.status === 'winner_selected') {
+        recipients = campaign.abTest.remainingRecipientEmails || [];
+        log.info(`Sending Phase 2 of A/B test campaign to ${recipients.length} remaining recipients`, 'system', { campaignId, churchId }, churchId);
+
     } else if (campaign.toListId || campaign.toGroupId) {
         if (campaign.toListId === 'newsletter_subscribers' || campaign.toGroupId === 'newsletter_subscribers') {
             const subSnap = await db.collection('newsletter_subscribers')
@@ -1578,6 +1586,116 @@ export async function executeSend(
         }
     }
 
+    // 6.5 A/B Subject-Line Testing check
+    const isAbTestPhase1 = !testEmail && campaign.abTest?.enabled && (!campaign.abTest.status || campaign.abTest.status === 'pending');
+    const isAbTestPhase2 = !testEmail && (campaign.abTest?.status === 'testing' || campaign.abTest?.status === 'winner_selected');
+
+    if (isAbTestPhase1) {
+        if (recipients.length < 200) {
+            log.warn(
+                `[ABTest] Campaign ${campaignId} recipient count (${recipients.length}) is below 200 recipients required for A/B testing. Disabling test and sending as single campaign.`,
+                'system', { campaignId }, churchId
+            );
+        } else {
+            const rawVariants = campaign.abTest.variants || [];
+            if (rawVariants.length >= 2) {
+                const variants = rawVariants.map((v: any) => ({ ...v, sentCount: 0, openCount: 0, clickCount: 0, uniqueClickCount: 0, clickRate: 0 }));
+                const testPercent = campaign.abTest.testPercent || 20;
+                const testCount = Math.max(20, Math.floor(recipients.length * (testPercent / 100)));
+                const testSlice = recipients.slice(0, testCount);
+                const remainder = recipients.slice(testCount);
+
+                log.info(`[ABTest] Starting Phase 1 test for ${campaignId}: ${testSlice.length} recipients across ${variants.length} variants (${remainder.length} reserved for winner)`, 'system', { campaignId }, churchId);
+
+                // Send to test slice, alternating variants
+                for (let idx = 0; idx < testSlice.length; idx++) {
+                    const recipientEmail = testSlice[idx];
+                    const variant = variants[idx % variants.length];
+                    const variantSubject = variant.subject || subject;
+
+                    const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl, emailProvider, resolvedFromEmail);
+                    const personInfo = personMap[recipientEmail] || { personName: 'Friend', email: recipientEmail };
+                    const resolvedSubject = resolveMergeTags(variantSubject, personInfo, churchData);
+                    const resolvedBlocks = JSON.parse(resolveMergeTags(JSON.stringify(blocks), personInfo, churchData));
+                    const resolvedContent = campaign.content ? resolveMergeTags(campaign.content, personInfo, churchData) : campaign.content;
+                    const personalizedHtml = renderBlocksToHtml(resolvedBlocks, campaign.templateSettings || {}, unsubHtml, campaign.contentType, resolvedContent);
+
+                    if (churchId === 'c1') {
+                        log.info(`[Simulation] Simulated A/B (${variant.id}) email to ${recipientEmail} with subject: ${resolvedSubject}`, 'system', { campaignId, churchId, variantId: variant.id }, churchId);
+                    } else {
+                        const provider = await resolveEmailProvider(db);
+                        await provider.send(
+                            [{ to: recipientEmail, from: { email: resolvedFromEmail, name: resolvedFromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
+                            { apiKey: globalApiKey, tenantToken: subuserId, tag: campaignId, stream: 'broadcast', churchId, campaignId, variantId: variant.id }
+                        );
+                    }
+                    variant.sentCount = (variant.sentCount || 0) + 1;
+
+                    const pInfo = personMap[recipientEmail];
+                    if (pInfo?.pcoPersonId) {
+                        fireAndForgetEmailNote({
+                            db,
+                            churchId,
+                            personId: pInfo.pcoPersonId,
+                            recipientName: pInfo.personName || undefined,
+                            recipientEmail,
+                            subject: resolvedSubject,
+                            htmlBody: personalizedHtml,
+                        });
+                    }
+                }
+
+                const waitMinutes = campaign.abTest.waitMinutes || 240;
+                const nextCheckEpoch = Date.now() + (waitMinutes * 60 * 1000);
+
+                await db.collection(collectionName).doc(campaignId).update({
+                    status: 'scheduled',
+                    scheduledAt: nextCheckEpoch,
+                    'abTest.status': 'testing',
+                    'abTest.phase1SentAt': Date.now(),
+                    'abTest.variants': variants,
+                    'abTest.totalRecipients': recipients.length,
+                    'abTest.testRecipientCount': testSlice.length,
+                    'abTest.remainingRecipientCount': remainder.length,
+                    'abTest.remainingRecipientEmails': remainder,
+                    updatedAt: Date.now(),
+                });
+
+                const emailUsage = churchData.emailUsage || {};
+                emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + testSlice.length;
+                await db.collection('churches').doc(churchId).update({ emailUsage });
+
+                return {
+                    recipientCount: testSlice.length,
+                    message: `A/B test Phase 1 started: ${testSlice.length} emails sent across ${variants.length} subject variants. Winner will be evaluated by click rate after ${waitMinutes} minutes.`,
+                };
+            }
+        }
+    }
+
+    let activeSubject = subject;
+    let activeVariantId: string | undefined = undefined;
+
+    if (isAbTestPhase2) {
+        const variants = campaign.abTest.variants || [];
+        let winner = variants[0];
+        if (campaign.abTest.winnerVariantId) {
+            winner = variants.find((v: any) => v.id === campaign.abTest.winnerVariantId) || winner;
+        } else {
+            let bestRate = -1;
+            for (const v of variants) {
+                const rate = v.clickRate ?? ((v.uniqueClickCount || v.clickCount || 0) / Math.max(1, v.sentCount || 1));
+                if (rate > bestRate) {
+                    bestRate = rate;
+                    winner = v;
+                }
+            }
+        }
+        activeSubject = winner?.subject || subject;
+        activeVariantId = winner?.id;
+        log.info(`[ABTest] Phase 2 sending winner "${activeSubject}" (variant ${activeVariantId}) to ${recipients.length} remaining recipients`, 'system', { campaignId }, churchId);
+    }
+
     // 7. Send — each recipient gets a personalised unsubscribe link,
     //    so we build per-recipient HTML and send in batches of individual messages.
     const BATCH = 50; // smaller batches since each message has unique HTML
@@ -1604,7 +1722,7 @@ export async function executeSend(
             };
 
             // Resolve merge tags on subject, blocks, and content!
-            const resolvedSubject = resolveMergeTags(subject, personInfo, churchData);
+            const resolvedSubject = resolveMergeTags(activeSubject, personInfo, churchData);
             const resolvedBlocks = JSON.parse(
                 resolveMergeTags(JSON.stringify(blocks), personInfo, churchData)
             );
@@ -1625,7 +1743,7 @@ export async function executeSend(
                 const provider = await resolveEmailProvider(db);
                 await provider.send(
                     [{ to: recipientEmail, from: { email: resolvedFromEmail, name: resolvedFromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
-                    { apiKey: globalApiKey, tenantToken: subuserId, tag: campaignId, stream: 'broadcast' }
+                    { apiKey: globalApiKey, tenantToken: subuserId, tag: campaignId, stream: 'broadcast', churchId, campaignId, variantId: activeVariantId }
                 );
             }
 
@@ -1647,14 +1765,21 @@ export async function executeSend(
 
     // 8. Mark sent (skip for test or when scheduler is managing recurring dates)
     if (!testEmail && !skipStatusUpdate) {
-        await db.collection(collectionName).doc(campaignId).update({
+        const campUpdates: any = {
             status: 'sent',
             sentAt: Date.now(),
             updatedAt: Date.now(),
-            recipientCount: recipients.length,
+            recipientCount: isAbTestPhase2 ? (campaign.abTest?.testRecipientCount || 0) + recipients.length : recipients.length,
             retryCount: 0,
             lastError: null,
-        });
+        };
+        if (isAbTestPhase2) {
+            campUpdates.subject = activeSubject;
+            campUpdates['abTest.status'] = 'completed';
+            campUpdates['abTest.winnerVariantId'] = activeVariantId;
+            campUpdates['abTest.phase2SentAt'] = Date.now();
+        }
+        await db.collection(collectionName).doc(campaignId).update(campUpdates);
     }
 
     // 9. Update usage count
@@ -1666,10 +1791,55 @@ export async function executeSend(
 
     const msg = testEmail
         ? `Test email sent to ${testEmail}`
-        : `Campaign "${subject}" sent to ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}.`;
+        : isAbTestPhase2
+            ? `A/B test Phase 2 complete! Winner subject "${activeSubject}" sent to remaining ${recipients.length} recipients.`
+            : `Campaign "${subject}" sent to ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}.`;
     log.info(msg, 'system', { campaignId, churchId, recipientCount: recipients.length }, churchId);
 
     return { recipientCount: recipients.length, message: msg };
+}
+
+export async function pickWinnerAndSendRemainder(
+    db: any,
+    campaignId: string,
+    churchId: string,
+    manualWinnerVariantId?: string
+): Promise<{ recipientCount: number; message: string; winnerVariantId: string }> {
+    const campRef = db.collection('email_campaigns').doc(campaignId);
+    const campSnap = await campRef.get();
+    if (!campSnap.exists) throw new Error('Campaign not found');
+    const campaign = campSnap.data();
+    if (!campaign.abTest || (campaign.abTest.status !== 'testing' && campaign.abTest.status !== 'winner_selected')) {
+        throw new Error('Campaign is not currently in A/B testing phase');
+    }
+    const variants = campaign.abTest.variants || [];
+    let winner = variants[0];
+    if (manualWinnerVariantId) {
+        winner = variants.find((v: any) => v.id === manualWinnerVariantId) || winner;
+    } else {
+        let bestRate = -1;
+        for (const v of variants) {
+            const rate = v.clickRate ?? ((v.uniqueClickCount || v.clickCount || 0) / Math.max(1, v.sentCount || 1));
+            if (rate > bestRate) {
+                bestRate = rate;
+                winner = v;
+            }
+        }
+    }
+
+    await campRef.update({
+        'abTest.winnerVariantId': winner?.id || 'variant_a',
+        'abTest.status': 'winner_selected',
+        subject: winner?.subject || campaign.subject,
+        updatedAt: Date.now(),
+    });
+
+    const result = await executeSend(db, campaignId, churchId, undefined, false, 'email_campaigns', false);
+    return {
+        recipientCount: result.recipientCount,
+        message: `Winner variant "${winner?.subject}" selected. Sent to remaining ${result.recipientCount} recipients.`,
+        winnerVariantId: winner?.id || 'variant_a',
+    };
 }
 
 // ─── HTTP Handlers ─────────────────────────────────────────────────────────

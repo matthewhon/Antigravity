@@ -6,9 +6,10 @@ import { EmailPreview } from './EmailPreview';
 import { TemplateSettingsEditor } from './TemplateSettingsEditor';
 import { DataChartSelector } from './DataChartSelector';
 import { PcoImportModal } from './PcoImportModal';
+import { fetchContentRecommendations, generateCampaignContent } from '../services/geminiService';
 import {
   Plus, ArrowLeft, Trash2, Globe, Lock, Clock, Loader2, Link, Copy,
-  Eye, Monitor, Smartphone, Pencil, CheckCircle, X, Mail,
+  Eye, Monitor, Smartphone, Pencil, CheckCircle, X, Mail, Sparkles, Send,
 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +239,8 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draftingAi, setDraftingAi] = useState(false);
+  const [convertingEmail, setConvertingEmail] = useState(false);
 
   const canManage = canManageBulletins(currentUser);
 
@@ -335,6 +338,112 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
       showToast('Bulletin created from email campaign.', 'success');
     } catch {
       showToast('Failed to import campaign.', 'error');
+    }
+  };
+
+  // ─── Draft This Week's Bulletin with AI ─────────────────────────────────────
+
+  const handleDraftWeeklyBulletin = async () => {
+    if (!currentUser || draftingAi) return;
+    setDraftingAi(true);
+    try {
+      // Find upcoming Sunday date
+      const d = new Date();
+      const day = d.getDay();
+      const diffToSunday = (7 - day) % 7;
+      const targetDate = new Date(d);
+      targetDate.setDate(d.getDate() + (diffToSunday === 0 ? 0 : diffToSunday));
+      const sundayStr = targetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const title = `Sunday Bulletin – ${sundayStr}`;
+
+      // Fetch top recommendations for the upcoming week
+      const recResult = await fetchContentRecommendations(churchId, 10).catch(() => null);
+      const topRecs = (recResult?.recommendations || []).slice(0, 6);
+
+      // Call Campaign Writer with bulletin channel
+      const writerRes = await generateCampaignContent({
+        churchId,
+        channel: 'bulletin',
+        goal: 'invite',
+        length: 'medium',
+        topic: `Draft this week's digital bulletin for ${church?.name || 'our church'} for Sunday, ${sundayStr}. Include a warm welcome message, details on upcoming events and registrations, small groups, and general announcements.`,
+        items: topRecs.map(r => ({
+          label: r.label,
+          description: r.description,
+          date: r.date,
+          url: r.url,
+        })),
+      });
+
+      const generatedBlocks: EmailBlock[] = [
+        {
+          id: `block_${Date.now()}_hdr`,
+          type: 'header',
+          content: { text: `Welcome to ${church?.name || 'Worship'} – ${sundayStr}` },
+        },
+        {
+          id: `block_${Date.now()}_txt`,
+          type: 'text',
+          content: {
+            text: writerRes.body || `<p>We're so glad you're joining us this Sunday, ${sundayStr}! Below you'll find everything happening in the life of our church this week.</p>`,
+            html: writerRes.body,
+          },
+        },
+      ];
+
+      const bulletin: DigitalBulletin = {
+        id: newBulletinId(),
+        churchId,
+        title,
+        status: 'draft',
+        blocks: generatedBlocks,
+        templateSettings: DEFAULT_TEMPLATE,
+        sourceCampaignId: null,
+        publishedAt: null,
+        createdBy: currentUser.id,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      await firestore.saveBulletin(bulletin);
+      setBulletins(prev => [bulletin, ...prev]);
+      setActiveBulletin(bulletin);
+      showToast(`Drafted bulletin for ${sundayStr}!`, 'success');
+    } catch (err: any) {
+      console.error('[BulletinManager] AI bulletin draft failed:', err);
+      showToast('Could not draft bulletin with AI. Please try again.', 'error');
+    } finally {
+      setDraftingAi(false);
+    }
+  };
+
+  // ─── Convert Bulletin to Email Campaign ───────────────────────────────────
+
+  const handleConvertToEmail = async () => {
+    if (!activeBulletin || !currentUser || convertingEmail) return;
+    setConvertingEmail(true);
+    try {
+      const emailCampaignId = `camp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const campaign: EmailCampaign = {
+        id: emailCampaignId,
+        churchId,
+        name: activeBulletin.title,
+        subject: activeBulletin.title,
+        status: 'draft',
+        contentType: 'blocks',
+        blocks: activeBulletin.blocks || [],
+        templateSettings: activeBulletin.templateSettings || DEFAULT_TEMPLATE,
+        fromName: church?.name || 'Church',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await firestore.saveEmailCampaign(campaign);
+      showToast('Converted to Email Campaign draft! View it under Campaigns.', 'success');
+    } catch (err: any) {
+      console.error('[BulletinManager] Convert to email failed:', err);
+      showToast('Failed to convert bulletin to email.', 'error');
+    } finally {
+      setConvertingEmail(false);
     }
   };
 
@@ -516,6 +625,17 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
             {isPublished ? 'Published' : 'Draft'}
           </span>
 
+          {/* Convert to Email */}
+          <button
+            onClick={handleConvertToEmail}
+            disabled={convertingEmail}
+            title="Export blocks into an Email Campaign draft"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition disabled:opacity-50"
+          >
+            {convertingEmail ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+            Convert to Email
+          </button>
+
           {/* Publish / Unpublish */}
           <button
             onClick={handleTogglePublish}
@@ -674,6 +794,15 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
           </p>
         </div>
         <button
+          onClick={handleDraftWeeklyBulletin}
+          disabled={draftingAi}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold shadow-sm transition disabled:opacity-50"
+          title="Draft this coming Sunday's digital bulletin with AI recommendations"
+        >
+          {draftingAi ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          Draft This Week's Bulletin
+        </button>
+        <button
           onClick={() => setShowImportModal(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
         >
@@ -700,12 +829,22 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
             <p className="text-sm text-center max-w-xs mb-6">
               Create your first digital bulletin to share with your congregation as a web page.
             </p>
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition"
-            >
-              <Plus size={16} /> Create First Bulletin
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDraftWeeklyBulletin}
+                disabled={draftingAi}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold shadow-sm transition disabled:opacity-50"
+              >
+                {draftingAi ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                Draft This Week's Bulletin with AI
+              </button>
+              <button
+                onClick={() => setShowNewModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <Plus size={16} /> Blank Bulletin
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

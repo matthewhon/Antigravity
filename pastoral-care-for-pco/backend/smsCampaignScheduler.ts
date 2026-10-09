@@ -44,6 +44,24 @@ function todayMmDdInTz(timeZone: string, offsetDays = 0): string {
     return `${mm}-${dd}`;
 }
 
+/** Return the timezone offset in milliseconds for the target timezone at a specific point in time. */
+function getTimeZoneOffsetMs(timeZone: string, date = new Date()): number {
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hourCycle: 'h23'
+        }).formatToParts(date);
+        const p: Record<string, string> = {};
+        for (const part of parts) p[part.type] = part.value;
+        const tzAsUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+        return tzAsUtc - (Math.floor(date.getTime() / 1000) * 1000);
+    } catch {
+        return 0;
+    }
+}
+
 /** Calculate the exact UTC epoch timestamp in ms for HH:MM on today in a target timezone. */
 function getTimeInTzMs(timeZone: string, hours: number, minutes: number): number {
     const now = new Date();
@@ -54,10 +72,7 @@ function getTimeInTzMs(timeZone: string, hours: number, minutes: number): number
     const targetLocalStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
     
     // Determine offset between target local time and UTC at current time
-    const dateObj = new Date();
-    const dateUTC = new Date(dateObj.toLocaleString("en-US", { timeZone: "UTC" }));
-    const dateTZ = new Date(dateObj.toLocaleString("en-US", { timeZone }));
-    const offsetMs = dateTZ.getTime() - dateUTC.getTime();
+    const offsetMs = getTimeZoneOffsetMs(timeZone, now);
 
     // UTC timestamp = target local wall clock timestamp - timezone offset
     const localUtcTs = new Date(`${targetLocalStr}Z`).getTime();
@@ -83,11 +98,8 @@ export function getNextAllowedSmsTime(
     startHourStr: string, // e.g. "09:00"
     endHourStr: string    // e.g. "21:00"
 ): { allowed: boolean; nextAllowedTime: number } {
-    // Determine offset in ms by comparing local string formatting
-    const dateObj = new Date(now);
-    const dateUTC = new Date(dateObj.toLocaleString("en-US", { timeZone: "UTC" }));
-    const dateTZ = new Date(dateObj.toLocaleString("en-US", { timeZone }));
-    const offsetMs = dateTZ.getTime() - dateUTC.getTime();
+    // Determine offset in ms for target timezone
+    const offsetMs = getTimeZoneOffsetMs(timeZone, new Date(now));
 
     // Local time in milliseconds
     const localTimeMs = now + offsetMs;

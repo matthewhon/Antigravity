@@ -12,12 +12,12 @@ import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 
 import { PcoImportModal } from './PcoImportModal';
-import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe, NewsletterSubscriber } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe, NewsletterSubscriber, DigitalBulletin, EmailAbTestVariant } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy,
-  UserCheck, ExternalLink, Download, Filter, Sparkles
+  UserCheck, ExternalLink, Download, Filter, Sparkles, Split, Trophy, AlertTriangle
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   scheduled: { label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
   sent:      { label: 'Sent',      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
   failed:    { label: 'Failed',    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  testing:   { label: 'A/B Testing', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
 };
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
@@ -325,6 +326,11 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
                     {c.toListName && <span>To: {c.toListName}</span>}
                     <span>· {(c.blocks?.length || 0)} block{(c.blocks?.length || 0) !== 1 ? 's' : ''}</span>
+                    {c.abTest?.enabled && (
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold inline-flex items-center gap-1">
+                        <Split size={11} /> A/B Test ({c.abTest.status || 'pending'})
+                      </span>
+                    )}
                     {c.status === 'sent' && c.sentAt && (
                       <span className="text-emerald-600 dark:text-emerald-400">
                         · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -520,6 +526,142 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
     }
   }, [openSection, toTab, churchId, pcoGroups.length]);
 
+  const [convertingToBulletin, setConvertingToBulletin] = useState(false);
+  const [bulletinNotice, setBulletinNotice] = useState<string | null>(null);
+  const [pickingWinnerId, setPickingWinnerId] = useState<string | null>(null);
+  const [winnerNotice, setWinnerNotice] = useState<string | null>(null);
+
+  const selectedListCount = localCampaign.toListId
+    ? pcoLists.find(l => l.id === localCampaign.toListId)?.totalPeople
+    : undefined;
+  const selectedGroupCount = localCampaign.toGroupId
+    ? pcoGroups.find(g => g.id === localCampaign.toGroupId)?.memberCount
+    : undefined;
+  const estimatedRecipients = selectedListCount ?? selectedGroupCount ?? localCampaign.recipientCount;
+
+  const handleConvertToBulletin = async () => {
+    if (!churchId) return;
+    setConvertingToBulletin(true);
+    try {
+      const newBulletin: DigitalBulletin = {
+        id: `bulletin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        churchId,
+        title: localCampaign.subject || localCampaign.name || 'New Bulletin',
+        status: 'draft',
+        blocks: localCampaign.blocks || [],
+        templateSettings: localCampaign.templateSettings || DEFAULT_TEMPLATE,
+        sourceCampaignId: localCampaign.id,
+        publishedAt: null,
+        createdBy: 'email_campaign',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await firestore.saveBulletin(newBulletin);
+      setBulletinNotice('Converted to Digital Bulletin draft! View it under Digital Bulletin.');
+      setTimeout(() => setBulletinNotice(null), 5000);
+    } catch (err) {
+      console.error('Failed to convert campaign to bulletin:', err);
+      alert('Failed to convert campaign to Digital Bulletin.');
+    } finally {
+      setConvertingToBulletin(false);
+    }
+  };
+
+  const handleToggleAbTest = (enabled: boolean) => {
+    if (!enabled) {
+      update({
+        abTest: {
+          ...(localCampaign.abTest || {
+            testPercent: 20,
+            waitMinutes: 240,
+            winnerMetric: 'click_rate',
+            status: 'pending',
+          }),
+          enabled: false,
+        },
+      });
+      return;
+    }
+    const currentVariants = localCampaign.abTest?.variants || [];
+    const varA = currentVariants[0]?.subject || localCampaign.subject || '';
+    const varB = currentVariants[1]?.subject || '';
+    update({
+      abTest: {
+        enabled: true,
+        variants: [
+          { id: 'variant_a', subject: varA, style: currentVariants[0]?.style },
+          { id: 'variant_b', subject: varB, style: currentVariants[1]?.style },
+        ],
+        testPercent: localCampaign.abTest?.testPercent ?? 20,
+        waitMinutes: localCampaign.abTest?.waitMinutes ?? 240,
+        winnerMetric: 'click_rate',
+        status: localCampaign.abTest?.status || 'pending',
+      },
+    });
+  };
+
+  const handleUpdateVariant = (index: number, newSubject: string) => {
+    const currentVariants = [...(localCampaign.abTest?.variants || [
+      { id: 'variant_a', subject: localCampaign.subject || '' },
+      { id: 'variant_b', subject: '' }
+    ])];
+    while (currentVariants.length <= index) {
+      currentVariants.push({ id: index === 0 ? 'variant_a' : 'variant_b', subject: '' });
+    }
+    currentVariants[index] = { ...currentVariants[index], subject: newSubject };
+    const patch: Partial<EmailCampaign> = {
+      abTest: {
+        ...(localCampaign.abTest || {
+          enabled: true,
+          testPercent: 20,
+          waitMinutes: 240,
+          winnerMetric: 'click_rate',
+          status: 'pending',
+        }),
+        variants: currentVariants,
+      },
+    };
+    if (index === 0) {
+      patch.subject = newSubject;
+    }
+    update(patch);
+  };
+
+  const handlePickWinner = async (manualVariantId?: string) => {
+    if (!churchId || !localCampaign.id) return;
+    setPickingWinnerId(manualVariantId || 'auto');
+    try {
+      const res = await fetch('/api/campaigns/pick-winner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: localCampaign.id,
+          churchId,
+          ...(manualVariantId ? { variantId: manualVariantId } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to pick winner');
+      setWinnerNotice(data.message || 'Winner chosen and remainder sent!');
+      const winnerId = data.winnerVariantId || manualVariantId;
+      update({
+        status: 'sent',
+        abTest: {
+          ...(localCampaign.abTest as any),
+          status: 'winner_selected',
+          winnerVariantId: winnerId,
+          phase2SentAt: Date.now(),
+        },
+      });
+      setTimeout(() => setWinnerNotice(null), 6000);
+    } catch (err: any) {
+      console.error('Failed to pick winner:', err);
+      alert(err.message || 'Failed to pick winner');
+    } finally {
+      setPickingWinnerId(null);
+    }
+  };
+
   const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
 
   const isToComplete = !!(localCampaign.toListId || localCampaign.toGroupId);
@@ -529,7 +671,9 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
       ? `List: ${localCampaign.toListName}`
       : localCampaign.toListId || localCampaign.toGroupId || '';
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
-  const isSubjectComplete = !!(localCampaign.subject?.trim());
+  const isSubjectComplete = localCampaign.abTest?.enabled
+    ? !!(localCampaign.abTest.variants?.[0]?.subject?.trim() && localCampaign.abTest.variants?.[1]?.subject?.trim())
+    : !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
   const isContentComplete = (localCampaign.blocks?.length || 0) > 0;
   const canSend = isFromComplete && isSubjectComplete;
@@ -593,6 +737,17 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               </button>
             ))}
           </div>
+          {/* Convert to Digital Bulletin button */}
+          <button
+            type="button"
+            onClick={handleConvertToBulletin}
+            disabled={convertingToBulletin || (localCampaign.blocks?.length || 0) === 0}
+            title="Export blocks into a Digital Bulletin draft"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition font-medium disabled:opacity-50"
+          >
+            {convertingToBulletin ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+            Convert to Bulletin
+          </button>
           <button
             className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition font-medium"
             onClick={onSendTest}
@@ -633,6 +788,26 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Notices */}
+      {bulletinNotice && (
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 px-6 py-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={14} className="text-emerald-600" />
+            <span>{bulletinNotice}</span>
+          </div>
+          <button onClick={() => setBulletinNotice(null)} className="text-emerald-600 hover:text-emerald-900 text-base leading-none">&times;</button>
+        </div>
+      )}
+      {winnerNotice && (
+        <div className="bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-200 dark:border-indigo-800 px-6 py-2.5 text-xs font-semibold text-indigo-800 dark:text-indigo-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy size={14} className="text-indigo-600" />
+            <span>{winnerNotice}</span>
+          </div>
+          <button onClick={() => setWinnerNotice(null)} className="text-indigo-600 hover:text-indigo-900 text-base leading-none">&times;</button>
+        </div>
+      )}
 
       {/* ─── Body ─── */}
       <div className="flex flex-1 overflow-hidden">
@@ -812,16 +987,237 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               {/* Subject */}
               <AccordionSection
                 id="subject" title="Subject" icon={<FileText size={16} />}
-                subtitle={isSubjectComplete ? localCampaign.subject! : 'No subject line'}
+                subtitle={
+                  localCampaign.abTest?.enabled
+                    ? (localCampaign.abTest.variants?.map(v => v.subject).filter(Boolean).join(' vs. ') || 'A/B Test Enabled')
+                    : (isSubjectComplete ? localCampaign.subject! : 'No subject line')
+                }
                 isComplete={isSubjectComplete} isOpen={openSection === 'subject'} onToggle={() => toggleSection('subject')}
               >
-                <input
-                  type="text"
-                  className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter email subject…"
-                  value={localCampaign.subject || ''}
-                  onChange={e => update({ subject: e.target.value })}
-                />
+                {/* Live A/B Test Results */}
+                {localCampaign.abTest && ['testing', 'winner_selected', 'completed'].includes(localCampaign.abTest.status) ? (
+                  <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-indigo-900 dark:text-indigo-200">
+                          <Split size={14} className="text-indigo-600" />
+                          <span>A/B Subject Line Test</span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          localCampaign.abTest.status === 'testing'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        }`}>
+                          {localCampaign.abTest.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                        Winner evaluated by <strong>Click Rate</strong> (unique clicks / sends).
+                        {localCampaign.abTest.status === 'testing' && localCampaign.abTest.phase1SentAt && (
+                          <span> Testing started {new Date(localCampaign.abTest.phase1SentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Variant comparison cards */}
+                    <div className="space-y-2.5">
+                      {(localCampaign.abTest.variants || []).map((v, i) => {
+                        const isWinner = localCampaign.abTest?.winnerVariantId === v.id;
+                        const sent = v.sentCount || 0;
+                        const uniqueClicks = v.uniqueClickCount ?? (v.clickCount || 0);
+                        const rate = v.clickRate !== undefined ? v.clickRate : (sent > 0 ? uniqueClicks / sent : 0);
+                        const ratePercent = (rate * 100).toFixed(1);
+
+                        return (
+                          <div
+                            key={v.id || i}
+                            className={`p-3 rounded-xl border transition ${
+                              isWinner
+                                ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                    i === 0
+                                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                                      : 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                                  }`}>
+                                    {v.id === 'variant_a' || i === 0 ? 'Variant A' : 'Variant B'}
+                                  </span>
+                                  {v.style && (
+                                    <span className="text-[10px] text-slate-400">({v.style})</span>
+                                  )}
+                                  {isWinner && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                                      <Trophy size={11} /> WINNER
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{v.subject}</p>
+                              </div>
+
+                              {/* Manual Pick Winner button during testing */}
+                              {localCampaign.abTest?.status === 'testing' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePickWinner(v.id)}
+                                  disabled={!!pickingWinnerId}
+                                  title="Pick this variant as the winner now and send to remaining recipients"
+                                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition disabled:opacity-50"
+                                >
+                                  {pickingWinnerId === v.id ? <Loader2 size={12} className="animate-spin" /> : <Trophy size={12} />}
+                                  Pick Winner
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Metrics grid */}
+                            <div className="grid grid-cols-4 gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700/60 text-center">
+                              <div>
+                                <div className="text-[10px] text-slate-400">Sent</div>
+                                <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{sent}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-slate-400">Unique Clicks</div>
+                                <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{uniqueClicks}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-slate-400">Click Rate</div>
+                                <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">{ratePercent}%</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] text-slate-400">Opens</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400">{v.openCount ?? 0}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {localCampaign.abTest.status === 'testing' && (
+                      <button
+                        type="button"
+                        onClick={() => handlePickWinner()}
+                        disabled={!!pickingWinnerId}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm disabled:opacity-50"
+                      >
+                        {pickingWinnerId === 'auto' ? <Loader2 size={13} className="animate-spin" /> : <Trophy size={13} />}
+                        Pick Highest Click Rate Winner Now
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* Standard / Pending A/B Test Editor */
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        {localCampaign.abTest?.enabled ? 'Primary Subject (Default)' : 'Subject Line'}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Enter email subject…"
+                        value={localCampaign.subject || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (localCampaign.abTest?.enabled) {
+                            handleUpdateVariant(0, val);
+                          } else {
+                            update({ subject: val });
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* A/B Test Toggle */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                            <Split size={15} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">A/B Test Subject Lines</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">Test 2 variants on 20% of your list; auto-pick winner</div>
+                          </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!localCampaign.abTest?.enabled}
+                            onChange={e => handleToggleAbTest(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+
+                      {localCampaign.abTest?.enabled && (
+                        <div className="mt-3 space-y-3">
+                          {/* 200 recipient threshold banner */}
+                          {estimatedRecipients !== undefined && estimatedRecipients < 200 && (
+                            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+                              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                              <div>
+                                <span className="font-semibold">Minimum 200 recipients required.</span> Audience has ~{estimatedRecipients} recipients. If sent below 200 recipients, A/B test will be bypassed and Variant A sent to all.
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Variant A */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-[10px] font-bold">Variant A</span>
+                                {localCampaign.abTest.variants?.[0]?.style && (
+                                  <span className="text-[10px] text-slate-400 font-normal">({localCampaign.abTest.variants[0].style})</span>
+                                )}
+                              </label>
+                            </div>
+                            <input
+                              type="text"
+                              value={localCampaign.abTest.variants?.[0]?.subject ?? (localCampaign.subject || '')}
+                              onChange={e => handleUpdateVariant(0, e.target.value)}
+                              placeholder="Variant A subject line…"
+                              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+
+                          {/* Variant B */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 text-[10px] font-bold">Variant B</span>
+                                {localCampaign.abTest.variants?.[1]?.style && (
+                                  <span className="text-[10px] text-slate-400 font-normal">({localCampaign.abTest.variants[1].style})</span>
+                                )}
+                              </label>
+                            </div>
+                            <input
+                              type="text"
+                              value={localCampaign.abTest.variants?.[1]?.subject ?? ''}
+                              onChange={e => handleUpdateVariant(1, e.target.value)}
+                              placeholder="Variant B subject line…"
+                              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+
+                          {/* Info card */}
+                          <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                            <p className="font-semibold text-slate-700 dark:text-slate-300">A/B Testing Rules:</p>
+                            <p>• <strong>Split:</strong> 20% test group (10% Variant A, 10% Variant B).</p>
+                            <p>• <strong>Winner Metric:</strong> Highest Click Rate (unique clicks / sent) after 4 hours.</p>
+                            <p>• <strong>Delivery:</strong> Remaining 80% automatically gets the winner.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </AccordionSection>
 
               {/* Send Time */}
@@ -924,6 +1320,31 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 campaignSubject={localCampaign.subject || localCampaign.name}
                 churchName={church?.name}
                 senderName={localCampaign.fromName}
+                onSubjectSelect={subject => {
+                  update({ subject });
+                  if (localCampaign.abTest?.enabled) {
+                    handleUpdateVariant(0, subject);
+                  }
+                }}
+                onAbVariantsSelect={variants => {
+                  const currentAb = localCampaign.abTest;
+                  const newVariants: EmailAbTestVariant[] = variants.map((v, idx) => ({
+                    id: idx === 0 ? 'variant_a' : 'variant_b',
+                    subject: v.text,
+                    style: v.style,
+                  }));
+                  update({
+                    subject: variants[0]?.text || localCampaign.subject,
+                    abTest: {
+                      enabled: true,
+                      variants: newVariants,
+                      testPercent: currentAb?.testPercent ?? 20,
+                      waitMinutes: currentAb?.waitMinutes ?? 240,
+                      winnerMetric: 'click_rate',
+                      status: 'pending',
+                    },
+                  });
+                }}
                 onImportPco={() => setIsPcoDrawerOpen(true)}
                 onOpenPastoralCare={() => setIsPastoralCareDrawerOpen(true)}
                 onOpenDataChart={() => setIsDataChartDrawerOpen(true)}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { db as firebaseDb } from '../services/firebase';
+import { generateCampaignContent } from '../services/geminiService';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
+import { SmsEventPickerModal } from './SmsEventPickerModal';
 
 // --- Constants --------------------------------------------------------------
 
@@ -160,24 +162,21 @@ function countSegments(body: string): number {
     }
 }
 
-/** Call the Gemini AI proxy to suggest a shorter SMS message. */
-async function getSmsAiSuggestion(messageBody: string): Promise<string> {
-    const res = await fetch('/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: 'gemini-2.5-flash',
-            prompt: `You are an SMS copywriting expert for a church. 
-Rewrite the following SMS message to be shorter (ideally under 160 characters ... 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
-Return ONLY the rewritten message text, no explanation or quotes.
-
-Original message:
-${messageBody}`,
-        }),
+/** Shorten an SMS to ~1 segment in the church's voice via the campaign writer. */
+async function shortenSms(messageBody: string, churchId?: string): Promise<string> {
+    const result = await generateCampaignContent({
+        channel: 'sms',
+        churchId,
+        existingText: messageBody,
+        topic: 'Shorten this text message to under 160 characters (one SMS segment) while keeping its full meaning and warmth. Keep merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as written, and keep any link.',
+        length: 'short',
     });
-    if (!res.ok) throw new Error('AI request failed');
-    const data = await res.json();
-    return (data.text || '').trim();
+    return result.body.trim();
+}
+
+/** Call the campaign writer to suggest a shorter SMS message. */
+async function getSmsAiSuggestion(messageBody: string, churchId?: string): Promise<string> {
+    return shortenSms(messageBody, churchId);
 }
 
 /** Shape the AI returns for a generated workflow. */
@@ -586,6 +585,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const [showEmojis, setShowEmojis] = useState(false);
     const [showLinkDlg, setShowLinkDlg] = useState(false);
     const [showFilePicker, setShowFilePicker] = useState(false);
+    const [showEventPicker, setShowEventPicker] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
     const [imageUrl, setImageUrl] = useState((local.mediaUrls && local.mediaUrls[0]) || '');
     const [aiSuggestion, setAiSuggestion] = useState('');
@@ -624,7 +624,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         setShowAiPanel(true);
         setAiSuggestion('');
         try {
-            const suggestion = await getSmsAiSuggestion(local.body);
+            const suggestion = await getSmsAiSuggestion(local.body, churchId);
             setAiSuggestion(suggestion);
         } catch {
             setAiSuggestion('Unable to get AI suggestion. Please try again.');
@@ -1036,6 +1036,16 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             <Contact size={13} /> {local.attachVcard ? 'Contact Card ✓' : 'Contact Card'}
                                         </button>
                                         <div className="flex-1" />
+                                        {/* AI Event Recommender */}
+                                        <button
+                                            type="button"
+                                            title="Suggest message from upcoming event or registration"
+                                            onClick={() => setShowEventPicker(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+                                        >
+                                            <Calendar size={13} />
+                                            Suggest from Events
+                                        </button>
                                         {/* AI Helper */}
                                         <button
                                             type="button"
@@ -1182,6 +1192,18 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     churchId={churchId}
                     onSelect={(url) => { insertAtCursor(' ' + url); setShowFilePicker(false); }}
                     onClose={() => setShowFilePicker(false)}
+                />
+            )}
+
+            {/* Event Recommender Modal */}
+            {showEventPicker && (
+                <SmsEventPickerModal
+                    churchId={churchId}
+                    onSelect={(suggestedBody) => {
+                        update({ body: suggestedBody });
+                        setShowEventPicker(false);
+                    }}
+                    onClose={() => setShowEventPicker(false)}
                 />
             )}
         </div>
@@ -1344,6 +1366,7 @@ const NewMessageComposer: React.FC<{
     const [showEmojisNM, setShowEmojisNM] = useState(false);
     const [showLinkDlgNM, setShowLinkDlgNM] = useState(false);
     const [showFilePickerNM, setShowFilePickerNM] = useState(false);
+    const [showEventPickerNM, setShowEventPickerNM] = useState(false);
     const [linkUrlNM, setLinkUrlNM] = useState('');
     const [imageUrlNM, setImageUrlNM] = useState(''); // final publicly-accessible URL (MMS)
     const [attachVcardNM, setAttachVcardNM] = useState(false);
@@ -1382,7 +1405,7 @@ const NewMessageComposer: React.FC<{
         setShowAiPanelNM(true);
         setAiSuggestionNM('');
         try {
-            const suggestion = await getSmsAiSuggestion(body);
+            const suggestion = await getSmsAiSuggestion(body, churchId);
             setAiSuggestionNM(suggestion);
         } catch {
             setAiSuggestionNM('Unable to get AI suggestion. Please try again.');
@@ -1946,6 +1969,11 @@ const NewMessageComposer: React.FC<{
                                 className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${attachVcardNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
                             ><Contact size={12} /> {attachVcardNM ? 'Contact Card ✓' : 'Contact Card'}</button>
                             <div className="flex-1" />
+                            {/* AI Event Recommender */}
+                            <button type="button" title="Suggest message from upcoming event or registration"
+                                onClick={() => setShowEventPickerNM(true)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+                            ><Calendar size={12} /> Suggest from Events</button>
                             {/* AI Helper */}
                             <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
                                 disabled={!body.trim() || aiLoadingNM}
@@ -2065,6 +2093,18 @@ const NewMessageComposer: React.FC<{
                     </button>
                 </div>
             </div>
+
+            {/* Event Recommender Modal */}
+            {showEventPickerNM && (
+                <SmsEventPickerModal
+                    churchId={churchId}
+                    onSelect={(suggestedBody) => {
+                        setBody(suggestedBody);
+                        setShowEventPickerNM(false);
+                    }}
+                    onClose={() => setShowEventPickerNM(false)}
+                />
+            )}
         </div>
     );
 };
@@ -2535,16 +2575,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         if (!replyBody.trim() || aiGenerating) return;
         setAiGenerating(true);
         try {
-            const res = await fetch('/ai/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: `Shorten this SMS reply to under 160 characters while keeping the same meaning, warmth, and tone. Return ONLY the shortened text ... no explanation:\n\n${replyBody}`,
-                    model: 'gemini-2.5-flash',
-                }),
-            });
-            const data = await res.json();
-            if (data.text) setReplyBody(data.text.trim());
+            const shortened = await shortenSms(replyBody, churchId);
+            if (shortened) setReplyBody(shortened);
         } catch {
             // Silent fail
         } finally {

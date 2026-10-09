@@ -35,18 +35,58 @@ export const handleStatusCallback = async (req: any, res: any) => {
 
     try {
         // Find the SmsMessage by messageSid across all conversations.
-        const msgSnap = await db.collectionGroup('messages')
-            .where('messageSid', '==', sid)
-            .limit(1)
-            .get();
+        let msgDoc: any = null;
+        let msgData: any = null;
 
-        if (msgSnap.empty) {
-            // Could be a keyword auto-reply or a message outside our system — ignore
-            return res.status(200).send('OK');
+        try {
+            const msgSnap = await db.collectionGroup('messages')
+                .where('messageSid', '==', sid)
+                .limit(1)
+                .get();
+
+            if (!msgSnap.empty) {
+                msgDoc = msgSnap.docs[0];
+                msgData = msgDoc.data();
+            }
+        } catch (cgError: any) {
+            log.warn(
+                `[StatusCallback] collectionGroup query failed (index may be required): ${cgError.message}`,
+                'system', { sid, error: cgError.message }, ''
+            );
         }
 
-        const msgDoc  = msgSnap.docs[0];
-        const msgData = msgDoc.data();
+        // Fallback: If collectionGroup query failed or had no hit, look up conversationId from smsUsageRecords
+        if (!msgDoc) {
+            try {
+                const usageSnap = await db.collection('smsUsageRecords')
+                    .where('messageSid', '==', sid)
+                    .limit(1)
+                    .get();
+
+                if (!usageSnap.empty) {
+                    const uData = usageSnap.docs[0].data();
+                    if (uData.conversationId) {
+                        const directMsgSnap = await db.collection('smsConversations')
+                            .doc(uData.conversationId)
+                            .collection('messages')
+                            .where('messageSid', '==', sid)
+                            .limit(1)
+                            .get();
+                        if (!directMsgSnap.empty) {
+                            msgDoc = directMsgSnap.docs[0];
+                            msgData = msgDoc.data();
+                        }
+                    }
+                }
+            } catch (fallbackErr: any) {
+                log.warn(`[StatusCallback] Fallback usage lookup failed: ${fallbackErr.message}`, 'system', { sid }, '');
+            }
+        }
+
+        if (!msgDoc) {
+            // Could be a keyword auto-reply, non-tracked message, or outside system
+            return res.status(200).send('OK');
+        }
 
         // ── Build the update payload ─────────────────────────────────────
         const updateData: Record<string, any> = { status: messageStatus };

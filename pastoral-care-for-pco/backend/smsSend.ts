@@ -44,7 +44,7 @@ async function checkSmsQuota(
     const now = new Date();
     const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     const monthStart = new Date(`${monthKey}-01T00:00:00.000Z`).getTime();
-    const monthEnd   = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1).getTime();
+    const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).getTime();
 
     // Sum all outbound segments for this month
     const usageSnap = await db.collection('smsUsageRecords')
@@ -309,7 +309,7 @@ async function recordUsage(db: any, params: {
     });
 
     const d = new Date();
-    const currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
     await db.collection('churches').doc(params.churchId).set({
         smsUsage: {
             [currentMonth]: FieldValue.increment(params.segments)
@@ -655,8 +655,9 @@ export async function sendBulkInternal(params: {
             if (await isOptedOut(db, churchId, to)) { optedOut++; return; }
 
             // ── Workflow step dedup check ─────────────────────────────────────
-            // Defense-in-depth: if another Cloud Run instance already sent this
-            // workflow step to this phone in the last 10 minutes, skip the send.
+            // Defense-in-depth: if another Cloud Run instance already claimed or sent
+            // this workflow step to this phone in the last 10 minutes, skip the send.
+            let dedupLockRef: any = null;
             if (campaignId && campaignId.startsWith('wf_')) {
                 const dedupeConvId = numberId
                     ? `${churchId}_${numberId}_${to.replace(/\+/g, '')}`
@@ -679,6 +680,20 @@ export async function sendBulkInternal(params: {
                         skipped++;
                         return;
                     }
+
+                    // Atomic in-flight lock to prevent race conditions across parallel instances
+                    const lockId = `lock_${campaignId}_${to.replace(/\+/g, '')}`;
+                    dedupLockRef = db.collection('smsDedupLocks').doc(lockId);
+                    const lockSnap = await dedupLockRef.get();
+                    if (lockSnap.exists && (lockSnap.data()?.lockedAt || 0) >= tenMinutesAgo) {
+                        log.warn(
+                            `[BulkSend] Dedup: ${campaignId} to ${to} currently claimed by another process — skipping duplicate.`,
+                            'system', { campaignId, to }, churchId
+                        );
+                        skipped++;
+                        return;
+                    }
+                    await dedupLockRef.set({ lockedAt: Date.now(), campaignId, toPhone: to });
                 } catch (_: any) {
                     // Dedup check failed — proceed with sending to avoid silent drop
                 }
@@ -777,6 +792,9 @@ export async function sendBulkInternal(params: {
                 }
 
             } catch (e: any) {
+                if (dedupLockRef) {
+                    await dedupLockRef.delete().catch(() => {});
+                }
                 failed++;
                 const errorCode = e.code || e.errorCode || null;
                 errors.push({ phone: to, error: e.message, ...(errorCode ? { errorCode } : {}) } as any);

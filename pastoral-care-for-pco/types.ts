@@ -833,6 +833,7 @@ export interface DetailedDonation {
     campusName?: string | null;
     /** Date the donation was paid out by Stripe / processor (YYYY-MM-DD or ISO string) */
     paid_out_date?: string;
+    paidOutDate?: string;
     payoutDate?: string;
     /** Stripe Payout / Transfer ID (e.g. po_xxx or dep_xxx) */
     stripe_payout_id?: string;
@@ -1233,6 +1234,33 @@ export interface PcoList {
 
 export type EmailCampaignStatus = 'draft' | 'scheduled' | 'sent' | 'failed';
 
+export interface EmailAbTestVariant {
+    id: string; // 'variant_a', 'variant_b', etc.
+    subject: string;
+    style?: string; // 'curiosity' | 'direct' | 'urgent' | 'benefit' | string
+    sentCount?: number;
+    openCount?: number;
+    clickCount?: number;
+    uniqueClickCount?: number;
+    clickRate?: number; // uniqueClickCount / (sentCount || 1)
+}
+
+export interface EmailAbTestConfig {
+    enabled: boolean;
+    variants: EmailAbTestVariant[];
+    testPercent: number; // default 20
+    waitMinutes: number; // default 240 (4 hours)
+    winnerMetric: 'click_rate';
+    status: 'pending' | 'testing' | 'winner_selected' | 'completed' | 'cancelled';
+    winnerVariantId?: string;
+    phase1SentAt?: number | null;
+    phase2SentAt?: number | null;
+    totalRecipients?: number;
+    testRecipientCount?: number;
+    remainingRecipientCount?: number;
+    remainingRecipientEmails?: string[];
+}
+
 export interface EmailCampaign {
     id: string;
     churchId: string;
@@ -1253,6 +1281,8 @@ export interface EmailCampaign {
     contentType?: 'blocks' | 'text' | 'html';
     content?: string;
     templateSettings?: TemplateSettings;
+    // A/B Subject-Line Testing
+    abTest?: EmailAbTestConfig;
     // Scheduling
     sendAt?: string | null;         // ISO string display value set by UI
     scheduledAt?: number | null;    // Epoch ms  authoritative trigger for the scheduler
@@ -3045,4 +3075,28 @@ export interface NewsletterWidgetConfig {
     isActive: boolean;
     createdAt: number;
     updatedAt: number;
+}
+
+// ─── Church Voice Profile (AI writer) ───────────────────────────────────────
+
+/** Per-church writing style used by the AI campaign writer. Stored at churchVoice/{churchId}. */
+export interface ChurchVoice {
+    id: string;                 // churchId
+    churchId: string;
+    /** Style adjectives, e.g. ["warm", "direct", "playful"] */
+    adjectives: string[];
+    wordsToUse: string[];
+    wordsToAvoid: string[];
+    /** Example sign-offs, e.g. "Grace & peace, Pastor Dan" */
+    signOffs: string[];
+    /** Short sample messages the church likes (max 5) */
+    sampleMessages: string[];
+    /** Target US reading grade (default 8) */
+    targetGrade?: number;
+    /** Allow emoji in SMS drafts */
+    allowEmoji?: boolean;
+    /** Free-form extra guidance */
+    notes?: string;
+    updatedAt: number;
+    updatedBy?: string;
 }

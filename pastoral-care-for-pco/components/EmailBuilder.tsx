@@ -6,10 +6,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { storage, db, auth } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { ChurchVoiceEditor } from './ChurchVoiceEditor';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
-import { generateEmailContent } from '../services/geminiService';
+import { generateCampaignContent, CampaignWriterResult, fetchContentRecommendations, RecommendedContentItem, CampaignWriterItem } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CanvaPickerModal } from './CanvaPickerModal';
 import { Poll, ChurchNote } from '../types';
@@ -19,7 +20,7 @@ import {
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
   Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone, DollarSign,
-  ArrowUpToLine, Folder, FolderClosed, FolderOpen
+  ArrowUpToLine, Folder, FolderClosed, FolderOpen, CheckSquare, Square, ExternalLink, Filter
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -62,6 +63,10 @@ interface EmailBuilderProps {
   senderName?: string;
   /** 'email' (default) hides the embedded_note/poll/form palette; 'bulletin' shows them */
   context?: 'email' | 'bulletin';
+  /** Called when the user picks an AI-suggested subject line */
+  onSubjectSelect?: (subject: string) => void;
+  /** Called when the user selects AI-suggested subjects for A/B testing */
+  onAbVariantsSelect?: (variants: { text: string; style: string }[]) => void;
 }
 
 // ─── Block definitions for palette ───────────────────────────────────────────
@@ -2491,30 +2496,100 @@ export const extractEmailBlocksSummary = (blocks: EmailBlock[]): string => {
 
 // ─── AI Writing Panel ────────────────────────────────────────────────────────
 
-type AiMessage = { role: 'user' | 'model'; text: string; html?: string };
+type AiMessage = {
+  role: 'user' | 'model';
+  text: string;
+  html?: string;
+  subjects?: CampaignWriterResult['subjectVariants'];
+  previewText?: string;
+  report?: CampaignWriterResult['readability'];
+  warnings?: string[];
+};
 const AI_TONES = ['Warm & Pastoral', 'Formal', 'Friendly', 'Inspirational', 'Urgent'] as const;
 type AiTone = typeof AI_TONES[number];
+const AI_LENGTHS = ['short', 'medium', 'long'] as const;
+type AiLength = typeof AI_LENGTHS[number];
+const AI_GOALS = ['inform', 'invite', 'remind', 'thank'] as const;
+type AiGoal = typeof AI_GOALS[number];
 
 const EmailAIPanel: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   selectedBlock: EmailBlock | null;
   campaignSubject?: string;
+  churchId?: string;
   churchName?: string;
   senderName?: string;
+  channel?: 'email' | 'bulletin';
   allBlocks?: EmailBlock[];
   onInsert: (html: string, replaceSelectedBlock: boolean) => void;
   onInsertAtTop?: (html: string) => void;
-}> = ({ isOpen, onClose, selectedBlock, campaignSubject, churchName, senderName, allBlocks = [], onInsert, onInsertAtTop }) => {
+  onPickSubject?: (subject: string) => void;
+  onAbVariantsSelect?: (variants: { text: string; style: string }[]) => void;
+}> = ({ isOpen, onClose, selectedBlock, campaignSubject, churchId, churchName, senderName, channel = 'email', allBlocks = [], onInsert, onInsertAtTop, onPickSubject, onAbVariantsSelect }) => {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [input, setInput] = useState('');
   const [tone, setTone] = useState<AiTone>('Warm & Pastoral');
+  const [length, setLength] = useState<AiLength>('medium');
+  const [goal, setGoal] = useState<AiGoal>('inform');
+  const [targetGrade, setTargetGrade] = useState(8);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastHtml, setLastHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'suggest'>('chat');
+  const [recommendations, setRecommendations] = useState<RecommendedContentItem[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [selectedRecIds, setSelectedRecIds] = useState<Set<string>>(new Set());
+  const [recFilter, setRecFilter] = useState<'all' | 'registration' | 'calendar' | 'group' | 'announcement'>('all');
+  const [daysAhead, setDaysAhead] = useState(14);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const loadRecommendations = async (overrideDays?: number) => {
+    if (!churchId) return;
+    setLoadingRecs(true);
+    setRecError(null);
+    try {
+      const res = await fetchContentRecommendations(churchId, overrideDays || daysAhead);
+      setRecommendations(res.recommendations || []);
+      if (selectedRecIds.size === 0 && res.recommendations?.length > 0) {
+        setSelectedRecIds(new Set(res.recommendations.slice(0, 3).map(r => r.id)));
+      }
+    } catch (e: any) {
+      setRecError(e?.message || 'Failed to load recommendations.');
+    } finally {
+      setLoadingRecs(false);
+    }
+  };
+
+  const toggleRec = (id: string) => {
+    setSelectedRecIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDraftFromSelectedRecs = async () => {
+    const chosen = recommendations.filter(r => selectedRecIds.has(r.id));
+    if (chosen.length === 0) return;
+    const items: CampaignWriterItem[] = chosen.map(c => ({
+      label: c.label,
+      description: c.description,
+      url: c.url,
+      date: c.date,
+    }));
+    setActiveTab('chat');
+    const promptSummary = `Feature ${chosen.length} selected item${chosen.length === 1 ? '' : 's'}: ${chosen.map(c => c.label).join(', ')}`;
+    await runWriter(promptSummary, {
+      topic: `Write an engaging church announcement covering these ${chosen.length} items. Introduce them warmly and include all links and dates.`,
+      items,
+    });
+  };
 
   // Strip HTML tags for display
   const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -2525,6 +2600,19 @@ const EmailAIPanel: React.FC<{
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  // Default the reading-grade slider to the church's saved voice profile
+  useEffect(() => {
+    if (!isOpen || !churchId) return;
+    let cancelled = false;
+    getDoc(doc(db, 'churchVoice', churchId))
+      .then(snap => {
+        const g = snap.exists() ? Number((snap.data() as any).targetGrade) : NaN;
+        if (!cancelled && Number.isFinite(g)) setTargetGrade(Math.min(12, Math.max(5, g)));
+      })
+      .catch(() => { /* optional profile — ignore */ });
+    return () => { cancelled = true; };
+  }, [isOpen, churchId]);
 
   // Focus input when panel opens
   useEffect(() => {
@@ -2538,36 +2626,71 @@ const EmailAIPanel: React.FC<{
   const blocksSummary = extractEmailBlocksSummary(allBlocks);
   const nonEmptyBlockCount = allBlocks.length;
 
-  const handleSend = async (customPrompt?: string, isPastorMode = false) => {
-    const trimmed = (customPrompt !== undefined ? customPrompt : input).trim();
-    if (!trimmed || loading) return;
+  const runWriter = async (
+    userText: string,
+    req: { topic?: string; existingText?: string; simplify?: boolean; items?: CampaignWriterItem[] },
+  ) => {
     setError(null);
-    const userMsg: AiMessage = { role: 'user', text: trimmed };
-    const newHistory = [...messages, userMsg];
-    setMessages(newHistory);
-    if (customPrompt === undefined) setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userText }]);
     setLoading(true);
     try {
-      const { html } = await generateEmailContent(
-        newHistory.map(m => ({ role: m.role, text: m.text })),
-        {
-          tone,
-          selectedBlockText,
-          campaignSubject,
-          churchName,
-          senderName,
-          allBlocksSummary: blocksSummary,
-          isPastorSummaryMode: isPastorMode || trimmed.toLowerCase().includes('pastor'),
-        }
-      );
-      const modelMsg: AiMessage = { role: 'model', text: stripHtml(html), html };
-      setMessages(prev => [...prev, modelMsg]);
+      const result = await generateCampaignContent({
+        channel: channel === 'bulletin' ? 'bulletin' : 'email',
+        churchId,
+        churchName,
+        senderName,
+        tone,
+        length,
+        goal,
+        targetGrade,
+        subjectCount: 3,
+        ...req,
+      });
+      const html = result.body;
+      setMessages(prev => [...prev, {
+        role: 'model',
+        text: stripHtml(html),
+        html,
+        subjects: result.subjectVariants,
+        previewText: result.previewText,
+        report: result.readability,
+        warnings: result.warnings,
+      }]);
       setLastHtml(html);
     } catch (e: any) {
       setError(e?.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSend = async (customPrompt?: string, isPastorMode = false) => {
+    const trimmed = (customPrompt !== undefined ? customPrompt : input).trim();
+    if (!trimmed || loading) return;
+    if (customPrompt === undefined) setInput('');
+
+    const asPastor = isPastorMode || trimmed.toLowerCase().includes('pastor');
+    const context: string[] = [];
+    if (campaignSubject) context.push(`Campaign subject: "${campaignSubject}".`);
+    if (asPastor) {
+      context.push(`Write as a personal, inspiring letter from the pastor to the congregation. Weave the following email content together naturally rather than listing it.`);
+    }
+    if (blocksSummary && (asPastor || !selectedBlockText)) {
+      context.push(`Email content already in this campaign:\n${blocksSummary}`);
+    }
+    const topic = [trimmed, ...context].join('\n');
+
+    // Follow-up turns refine the previous draft; a selected block is rewritten in place.
+    const base = selectedBlockText || (lastHtml ? stripHtml(lastHtml) : undefined);
+    await runWriter(trimmed, base ? { topic, existingText: base } : { topic });
+  };
+
+  const handleSimplify = async (html: string) => {
+    if (loading) return;
+    await runWriter(`Simplify to grade ${targetGrade}`, {
+      existingText: stripHtml(html),
+      simplify: true,
+    });
   };
 
   const handleDraftPastorEmail = () => {
@@ -2634,6 +2757,22 @@ const EmailAIPanel: React.FC<{
               <span className="text-sm font-bold text-white">AI Writing Assistant</span>
             </div>
             <div className="flex items-center gap-1">
+              {churchId && (
+                <button
+                  onClick={() => setVoiceOpen(true)}
+                  title="Set your church's writing voice"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white hover:bg-white/25 transition"
+                >
+                  Voice
+                </button>
+              )}
+              {voiceOpen && churchId && (
+                <ChurchVoiceEditor
+                  churchId={churchId}
+                  onClose={() => setVoiceOpen(false)}
+                  onSaved={v => setTargetGrade(v.targetGrade || 8)}
+                />
+              )}
               {messages.length > 0 && (
                 <button
                   onClick={handleClear}
@@ -2652,6 +2791,42 @@ const EmailAIPanel: React.FC<{
               </button>
             </div>
           </div>
+
+          {/* ── Sub-navigation: Write vs Suggest Content ── */}
+          <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 shrink-0">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition ${
+                activeTab === 'chat'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              Write & Refine
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('suggest');
+                if (recommendations.length === 0 && !loadingRecs) loadRecommendations();
+              }}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition flex items-center justify-center gap-1.5 ${
+                activeTab === 'suggest'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <Sparkles size={12} className="text-indigo-500" />
+              Suggest Content
+              {recommendations.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold">
+                  {recommendations.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'chat' && (
+            <>
 
           {/* ── Context badge (selected block) ── */}
           {selectedBlock && (
@@ -2680,6 +2855,56 @@ const EmailAIPanel: React.FC<{
                   {t}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* ── Length / Goal / Reading level ── */}
+          <div className="px-3 pb-2 shrink-0 space-y-2">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Length</p>
+              <div className="flex gap-1">
+                {AI_LENGTHS.map(l => (
+                  <button
+                    key={l}
+                    onClick={() => setLength(l)}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize transition ${
+                      length === l
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Goal</p>
+              <div className="flex flex-wrap gap-1">
+                {AI_GOALS.map(g => (
+                  <button
+                    key={g}
+                    onClick={() => setGoal(g)}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize transition ${
+                      goal === g
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="ai-target-grade" className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Reading grade</label>
+              <input
+                id="ai-target-grade"
+                type="range" min={5} max={12} value={targetGrade}
+                onChange={e => setTargetGrade(Number(e.target.value))}
+                className="flex-1 accent-indigo-600"
+              />
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 w-4 text-right">{targetGrade}</span>
             </div>
           </div>
 
@@ -2781,6 +3006,67 @@ const EmailAIPanel: React.FC<{
                         </button>
                       </div>
                     )}
+                    {/* Subject variants + quality checks for latest message */}
+                    {idx === messages.length - 1 && msg.report && (
+                      <div className="space-y-1.5 px-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            msg.report.grade <= targetGrade + 1
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                          }`}>
+                            Grade {msg.report.grade} · target {targetGrade}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{msg.report.wordCount} words</span>
+                          {msg.report.grade > targetGrade + 1 && msg.html && (
+                            <button
+                              onClick={() => handleSimplify(msg.html!)}
+                              disabled={loading}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-300 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+                            >
+                              Simplify
+                            </button>
+                          )}
+                        </div>
+                        {msg.subjects && msg.subjects.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Subject ideas</p>
+                              {onAbVariantsSelect && msg.subjects.length >= 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => onAbVariantsSelect(msg.subjects!.slice(0, 2).map(s => ({ text: s.text, style: s.style })))}
+                                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                  title="Populate Variant A and Variant B in Campaign settings"
+                                >
+                                  Use top 2 as A/B Test →
+                                </button>
+                              )}
+                            </div>
+                            {msg.subjects.map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => onPickSubject?.(s.text)}
+                                disabled={!onPickSubject}
+                                title={onPickSubject ? 'Use as subject' : 'Subject can be set in the campaign settings'}
+                                className="w-full text-left text-[11px] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-indigo-300 transition"
+                              >
+                                <span className="block">{s.text}</span>
+                                <span className="text-[9px] uppercase tracking-wide text-slate-400">{s.style}</span>
+                              </button>
+                            ))}
+                            {msg.previewText && (
+                              <p className="text-[10px] text-slate-400">Preview: {msg.previewText}</p>
+                            )}
+                          </div>
+                        )}
+                        {msg.warnings && msg.warnings.length > 0 && (
+                          <ul className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-2 py-1.5 list-disc list-inside space-y-0.5">
+                            {msg.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2835,6 +3121,183 @@ const EmailAIPanel: React.FC<{
             </div>
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 text-center">Enter to send · Shift+Enter for new line</p>
           </div>
+            </>
+          )}
+
+          {/* ── Tab: Suggest Content ── */}
+          {activeTab === 'suggest' && (
+            <div className="flex flex-col flex-1 overflow-hidden">
+              {/* Header with window selector, reload, and filter pills */}
+              <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/50 dark:bg-slate-800/30">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Upcoming Opportunities</p>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={daysAhead}
+                      onChange={e => {
+                        const d = Number(e.target.value);
+                        setDaysAhead(d);
+                        loadRecommendations(d);
+                      }}
+                      className="text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-0.5 text-slate-600 dark:text-slate-300 outline-none"
+                    >
+                      <option value={7}>Next 7 days</option>
+                      <option value={14}>Next 14 days</option>
+                      <option value={30}>Next 30 days</option>
+                    </select>
+                    <button
+                      onClick={() => loadRecommendations()}
+                      disabled={loadingRecs}
+                      title="Refresh recommendations"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                    >
+                      <RotateCcw size={12} className={loadingRecs ? 'animate-spin' : ''} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter pills */}
+                <div className="flex flex-wrap gap-1">
+                  {(['all', 'registration', 'calendar', 'group', 'announcement'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setRecFilter(f)}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize transition ${
+                        recFilter === f
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
+                      }`}
+                    >
+                      {f === 'all' ? 'All' : f === 'registration' ? 'Registrations' : f === 'calendar' ? 'Calendar' : f === 'group' ? 'Groups' : 'Announcements'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scrollable list of recommendations */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {loadingRecs && (
+                  <div className="py-12 flex flex-col items-center justify-center text-center">
+                    <Loader2 size={20} className="animate-spin text-indigo-500 mb-2" />
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Scanning events and groups…</p>
+                    <p className="text-[10px] text-slate-400">Finding upcoming deadlines & open spots</p>
+                  </div>
+                )}
+
+                {recError && !loadingRecs && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-xs rounded-xl border border-red-200 dark:border-red-800">
+                    {recError}
+                  </div>
+                )}
+
+                {!loadingRecs && !recError && recommendations.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    No upcoming events or open groups found for this window.
+                  </div>
+                )}
+
+                {!loadingRecs && recommendations
+                  .filter(r => recFilter === 'all' || r.type === recFilter)
+                  .map(r => {
+                    const isSelected = selectedRecIds.has(r.id);
+                    const typeColor =
+                      r.type === 'registration' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' :
+                      r.type === 'calendar' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                      r.type === 'group' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                      r.type === 'service' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' :
+                      'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => toggleRec(r.id)}
+                        className={`p-2.5 rounded-xl border transition cursor-pointer text-left ${
+                          isSelected
+                            ? 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700'
+                            : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleRec(r.id); }}
+                            className="mt-0.5 text-indigo-600 dark:text-indigo-400 shrink-0"
+                          >
+                            {isSelected ? <CheckSquare size={14} /> : <Square size={14} className="text-slate-300 dark:text-slate-600" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md uppercase tracking-wider ${typeColor}`}>
+                                {r.type}
+                              </span>
+                              <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.2 rounded-md">
+                                {r.urgencyReason}
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{r.label}</p>
+                            {r.date && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Calendar size={11} className="shrink-0 text-slate-400" />
+                                {r.date}
+                              </p>
+                            )}
+                            {r.description && (
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-1 leading-snug">
+                                {r.description}
+                              </p>
+                            )}
+                            {r.url && (
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-0.5 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline mt-1"
+                              >
+                                Church Center link <ExternalLink size={9} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Bottom action bar */}
+              <div className="p-3 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>{selectedRecIds.size} selected</span>
+                  <div className="space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRecIds(new Set(recommendations.map(r => r.id)))}
+                      className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Select all
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRecIds(new Set())}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDraftFromSelectedRecs}
+                  disabled={selectedRecIds.size === 0 || loading}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
+                >
+                  <Sparkles size={13} />
+                  Draft with Selected ({selectedRecIds.size})
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -2845,7 +3308,7 @@ const EmailAIPanel: React.FC<{
 
 export const EmailBuilder: React.FC<EmailBuilderProps> = ({
   blocks = [], setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
-  campaignSubject, churchName, senderName, context = 'email',
+  campaignSubject, churchName, senderName, context = 'email', onSubjectSelect, onAbVariantsSelect,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -3276,11 +3739,15 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
         onClose={() => setAiPanelOpen(false)}
         selectedBlock={selectedIsTextBlock ? selectedBlock : null}
         campaignSubject={campaignSubject}
+        churchId={churchId}
         churchName={churchName}
         senderName={senderName}
+        channel={context}
         allBlocks={blocks}
         onInsert={handleAiInsert}
         onInsertAtTop={handleAiInsertAtTop}
+        onPickSubject={onSubjectSelect}
+        onAbVariantsSelect={onAbVariantsSelect}
       />
     </div>
   );

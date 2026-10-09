@@ -186,6 +186,7 @@ export class PostmarkProvider implements EmailProvider {
                 Metadata: {
                     ...(churchId   ? { churchId }   : {}),
                     ...(campaignId ? { campaignId } : {}),
+                    ...(options.variantId ? { variantId: options.variantId } : {}),
                 },
             }));
 

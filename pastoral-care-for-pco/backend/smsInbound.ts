@@ -716,7 +716,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             ? `usage_inbound_sid_${resolvedSid.replace(/-/g, '')}`
             : `usage_inbound_${now}_${Math.random().toString(36).slice(2, 8)}`;
         const d = new Date();
-        const currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
         
         await db.collection('smsUsageRecords').doc(usageId).set({
             id: usageId,

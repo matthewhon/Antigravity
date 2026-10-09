@@ -1,5 +1,5 @@
 import { getDb } from './firebase.js';
-import type { DocumentData } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentData } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService.js';
 import { sendIndividualInternal } from './smsSend.js';
 import { pcoRequest } from './pcoApi.js';

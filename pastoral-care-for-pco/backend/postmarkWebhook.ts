@@ -296,7 +296,64 @@ export const handlePostmarkWebhook = async (req: any, res: any): Promise<void> =
             }
         }
 
-        // All other record types (Open, Click, Delivery) — ignore silently
+        // ── Open and Click tracking (A/B testing & campaign metrics) ──────────
+        if ((payload as any).RecordType === 'Open' || (payload as any).RecordType === 'Click') {
+            const isClick = (payload as any).RecordType === 'Click';
+            const raw = payload as any;
+            const campaignId = raw.Metadata?.campaignId;
+            const variantId = raw.Metadata?.variantId;
+            const recipient = (raw.Recipient || raw.Email || '').toLowerCase().trim();
+
+            if (campaignId) {
+                try {
+                    const campRef = db.collection('email_campaigns').doc(campaignId);
+                    const campSnap = await campRef.get();
+                    if (campSnap.exists) {
+                        const camp = campSnap.data() || {};
+                        const updates: any = { updatedAt: Date.now() };
+
+                        if (isClick) {
+                            updates.clickCount = (camp.clickCount || 0) + 1;
+                        } else {
+                            updates.openCount = (camp.openCount || 0) + 1;
+                        }
+
+                        // Handle A/B Test variant metrics
+                        if (camp.abTest && Array.isArray(camp.abTest.variants)) {
+                            const variants = [...camp.abTest.variants];
+                            const varIdx = variantId ? variants.findIndex((v: any) => v.id === variantId) : 0;
+                            if (varIdx !== -1) {
+                                const targetVar = { ...variants[varIdx] };
+                                if (isClick) {
+                                    targetVar.clickCount = (targetVar.clickCount || 0) + 1;
+                                    // Check if this recipient already clicked this variant
+                                    const clickDocId = `${targetVar.id}_${recipient.replace(/[^a-z0-9]/gi, '_')}`;
+                                    const clickRef = campRef.collection('ab_clicks').doc(clickDocId);
+                                    const clickDoc = await clickRef.get();
+                                    if (!clickDoc.exists) {
+                                        await clickRef.set({ recipient, variantId: targetVar.id, clickedAt: Date.now() });
+                                        targetVar.uniqueClickCount = (targetVar.uniqueClickCount || 0) + 1;
+                                    }
+                                    const sent = targetVar.sentCount || 1;
+                                    targetVar.clickRate = Number(((targetVar.uniqueClickCount || targetVar.clickCount) / sent).toFixed(4));
+                                } else {
+                                    targetVar.openCount = (targetVar.openCount || 0) + 1;
+                                }
+                                variants[varIdx] = targetVar;
+                                updates['abTest.variants'] = variants;
+                            }
+                        }
+
+                        await campRef.update(updates);
+                    }
+                } catch (metricErr: any) {
+                    log.warn(`[PostmarkWebhook] Failed to record ${raw.RecordType} metric for campaign ${campaignId}: ${metricErr?.message}`, 'system', {}, '');
+                }
+            }
+            return;
+        }
+
+        // All other record types (Delivery, etc.) — ignore silently
     } catch (e: any) {
         log.error(
             `[PostmarkWebhook] Unhandled error processing ${payload.RecordType}: ${e.message}`,

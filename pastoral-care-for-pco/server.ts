@@ -13,13 +13,16 @@ import { addSmsAddon, removeSmsAddon } from './backend/smsAddon';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
-import { sendEmail, getEmailStats } from './backend/sendEmail';
+import { sendEmail, getEmailStats, pickWinnerAndSendRemainder } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
 import { startBillingScheduler } from './backend/billingScheduler';
 import { getDb } from './backend/firebase';
 import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
+import { handleCampaignWriter } from './backend/campaignWriter';
+import { handleChurchVoiceLearn } from './backend/churchVoice';
+import { handleContentRecommendations } from './backend/contentRecommender';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { handlePostmarkWebhook } from './backend/postmarkWebhook';
 import { 
@@ -333,6 +336,13 @@ async function startServer() {
 
         // Gemini AI Proxy (key stays server-side)
     app.post('/ai/generate', express.json(), handleGeminiProxy);
+    // Structured email/SMS/bulletin writer (subject variants, readability checks)
+    app.post('/ai/campaign-writer', express.json({ limit: '1mb' }), handleCampaignWriter);
+    // Proposes a church voice profile from past messages (stateless; browser saves it)
+    app.post('/ai/church-voice/learn', express.json({ limit: '1mb' }), handleChurchVoiceLearn);
+    // Suggests what events, groups, and registrations to include in campaigns
+    app.post('/ai/content-recommendations', express.json(), handleContentRecommendations);
+    app.get('/ai/content-recommendations', handleContentRecommendations);
 
     // Email (SendGrid)
     app.post('/email/send', express.json(), sendEmail);
@@ -1934,6 +1944,19 @@ Return ONLY the JSON object, no markdown, no explanation:`;
         res.json({ success: true, message: 'Schedule cancelled.' });
       } catch (e: any) {
         res.status(500).json({ error: e.message || 'Failed to cancel schedule' });
+      }
+    });
+
+    // Pick winner and send remainder for A/B testing
+    app.post(['/email/pick-winner', '/api/campaigns/pick-winner'], express.json(), async (req: any, res: any) => {
+      const { campaignId, churchId, variantId } = req.body || {};
+      if (!campaignId || !churchId) return res.status(400).json({ error: 'Missing campaignId or churchId' });
+      try {
+        const db = getDb();
+        const result = await pickWinnerAndSendRemainder(db, campaignId, churchId, variantId);
+        res.json({ success: true, ...result });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Failed to pick winner and send remainder' });
       }
     });
 
