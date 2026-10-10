@@ -479,13 +479,30 @@ const ScheduleModal: React.FC<{
 
 // --- File Picker Modal ------------------------------------------------------
 
+const formatFileSize = (bytes?: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 const FilePickerDialog: React.FC<{
     churchId: string;
+    currentUser?: User;
     onSelect: (url: string) => void;
+    onSelectAsMms?: (url: string) => void;
     onClose: () => void;
-}> = ({ churchId, onSelect, onClose }) => {
+}> = ({ churchId, currentUser, onSelect, onSelectAsMms, onClose }) => {
     const [files, setFiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<'upload' | 'library'>('upload');
+    const [search, setSearch] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadError, setUploadError] = useState('');
+    const [uploadedFile, setUploadedFile] = useState<any | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         firestore.getTenantFiles(churchId).then(f => {
@@ -494,39 +511,247 @@ const FilePickerDialog: React.FC<{
         }).catch(() => setLoading(false));
     }, [churchId]);
 
+    const handleFileUpload = async (file: File) => {
+        if (!file) return;
+        setIsUploading(true);
+        setUploadProgress(0);
+        setUploadError('');
+        setUploadedFile(null);
+
+        try {
+            const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const gcsPath = `tenants/${churchId}/uploads/${fileId}_${cleanName}`;
+            const sRef = storageRef(storage, gcsPath);
+
+            const task = uploadBytesResumable(sRef, file);
+
+            await new Promise<void>((resolve, reject) => {
+                task.on('state_changed',
+                    snap => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+                    reject,
+                    () => resolve()
+                );
+            });
+
+            const publicUrl = await getDownloadURL(sRef);
+            const tenantFile = {
+                id: fileId,
+                churchId,
+                uploaderUid: currentUser?.id || 'system',
+                originalName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                sizeBytes: file.size,
+                publicUrl,
+                gcsPath,
+                createdAt: Date.now(),
+            };
+
+            await firestore.saveTenantFile(tenantFile);
+            setFiles(prev => [tenantFile, ...prev]);
+            setUploadedFile(tenantFile);
+            setUploadProgress(null);
+        } catch (err: any) {
+            console.error('File upload failed', err);
+            setUploadError(err.message || 'File upload failed. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const filteredFiles = files.filter(f =>
+        !search.trim() || f.originalName?.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-lg mx-auto flex flex-col max-h-[85vh] border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FileText size={16} className="text-violet-500" /> Select a File to Attach
+                        <FileText size={18} className="text-violet-500" /> Attach File or Document
                     </h3>
-                    <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                    <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition"><X size={16} /></button>
                 </div>
-                {loading ? (
-                    <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
-                ) : files.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">No files found.</p>
-                        <p className="text-xs text-slate-400">Upload files in the "Files" tool first.</p>
+
+                {/* Tab Switcher */}
+                <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+                    <button
+                        type="button"
+                        onClick={() => setTab('upload')}
+                        className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
+                            tab === 'upload'
+                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
+                        }`}
+                    >
+                        <Upload size={14} /> Upload New File
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTab('library')}
+                        className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
+                            tab === 'library'
+                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
+                        }`}
+                    >
+                        <FileText size={14} /> Church Library ({files.length})
+                    </button>
+                </div>
+
+                {tab === 'upload' ? (
+                    <div className="space-y-4 flex-1 flex flex-col justify-center">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            onChange={e => {
+                                const f = e.target.files?.[0];
+                                if (f) handleFileUpload(f);
+                            }}
+                        />
+
+                        {!uploadedFile ? (
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={e => e.preventDefault()}
+                                onDrop={e => {
+                                    e.preventDefault();
+                                    const f = e.dataTransfer.files?.[0];
+                                    if (f) handleFileUpload(f);
+                                }}
+                                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-violet-500 dark:hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition"
+                            >
+                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 flex items-center justify-center mb-3">
+                                    <Upload size={22} />
+                                </div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                    {isUploading ? 'Uploading file...' : 'Click to select or drag & drop'}
+                                </p>
+                                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                    PDF, flyer, bulletin, document, audio, or image to share via link
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                        <CheckCircle size={20} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100 truncate">{uploadedFile.originalName}</p>
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-400">{formatFileSize(uploadedFile.sizeBytes)} • Ready to attach</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelect(`${window.location.origin}/f/${uploadedFile.id}`)}
+                                        className="flex-1 py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                    >
+                                        <Link size={13} /> Insert Link in Message
+                                    </button>
+                                    {uploadedFile.mimeType?.startsWith('image/') && onSelectAsMms && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onSelectAsMms(uploadedFile.publicUrl || `${window.location.origin}/f/${uploadedFile.id}`)}
+                                            className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                        >
+                                            <ImageIcon size={13} /> Send as MMS
+                                        </button>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setUploadedFile(null)}
+                                    className="text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-center w-full pt-1"
+                                >
+                                    Upload a different file
+                                </button>
+                            </div>
+                        )}
+
+                        {uploadProgress !== null && (
+                            <div className="space-y-1">
+                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                                </div>
+                                <p className="text-[11px] text-slate-400 text-right">{uploadProgress}%</p>
+                            </div>
+                        )}
+
+                        {uploadError && (
+                            <div className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-xl border border-red-200 dark:border-red-800">
+                                {uploadError}
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                        {files.map(f => (
-                            <button
-                                key={f.id}
-                                onClick={() => onSelect(`${window.location.origin}/f/${f.id}`)}
-                                className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
-                            >
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                                    <FileText size={18} className="text-slate-500" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate">{f.originalName}</div>
-                                    <div className="text-[10px] text-slate-500">{f.mimeType} ... {new Date(f.createdAt).toLocaleDateString()}</div>
-                                </div>
-                            </button>
-                        ))}
+                    <div className="flex-1 flex flex-col min-h-0">
+                        <div className="relative mb-3">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Search existing files..."
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            />
+                        </div>
+
+                        {loading ? (
+                            <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
+                        ) : filteredFiles.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">No files match your search.</p>
+                                <p className="text-xs text-slate-400">Switch to the upload tab to add a new file.</p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {filteredFiles.map(f => {
+                                    const isImg = f.mimeType?.startsWith('image/');
+                                    return (
+                                        <div
+                                            key={f.id}
+                                            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                                        >
+                                            <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                                                {isImg ? (
+                                                    <ImageIcon size={18} className="text-emerald-500" />
+                                                ) : (
+                                                    <FileText size={18} className="text-violet-500" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{f.originalName}</div>
+                                                <div className="text-[10px] text-slate-400">{formatFileSize(f.sizeBytes)} • {new Date(f.createdAt).toLocaleDateString()}</div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                {isImg && onSelectAsMms && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onSelectAsMms(f.publicUrl || `${window.location.origin}/f/${f.id}`)}
+                                                        className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition"
+                                                        title="Attach as MMS Image"
+                                                    >
+                                                        MMS
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSelect(`${window.location.origin}/f/${f.id}`)}
+                                                    className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition"
+                                                >
+                                                    Insert Link
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -588,18 +813,92 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const [showEventPicker, setShowEventPicker] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
     const [imageUrl, setImageUrl] = useState((local.mediaUrls && local.mediaUrls[0]) || '');
+    const [sendAsMms, setSendAsMms] = useState<boolean>(
+        Boolean((local.mediaUrls && local.mediaUrls.length > 0) || (local.mediaUrls && local.mediaUrls[0]))
+    );
+    const [showImagePanel, setShowImagePanel] = useState(false);
+    const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
+    const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
+    const [imageUploadError, setImageUploadError] = useState('');
+    const [urlInput, setUrlInput] = useState('');
+    const imageFileInputRef = useRef<HTMLInputElement>(null);
     const [aiSuggestion, setAiSuggestion] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
     const [showAiPanel, setShowAiPanel] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const segments = countSegments(local.body || '');
+    // Sync external campaign media changes
+    useEffect(() => {
+        const m = (local.mediaUrls && local.mediaUrls[0]) || '';
+        if (m) {
+            setImageUrl(m);
+            setSendAsMms(true);
+        }
+    }, [local.mediaUrls]);
+
+    const isMmsActive = Boolean(imageUrl && sendAsMms && local.channelType !== 'email');
+    const segments = isMmsActive ? 1 : countSegments(local.body || '');
     const canSend = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId) && (local.channelType === 'email' ? !!(local.emailSubject?.trim()) : true);
 
     const update = useCallback((patch: Partial<SmsCampaign>) => {
         setLocal(prev => ({ ...prev, ...patch }));
         onSave(patch).then(() => setLastSaved(Date.now()));
     }, [onSave]);
+
+    const handleToggleMms = (enabled: boolean) => {
+        setSendAsMms(enabled);
+        if (imageUrl) {
+            update({ mediaUrls: enabled ? [imageUrl] : [] });
+        }
+    };
+
+    const handleSetImage = (url: string, asMms: boolean = true) => {
+        setImageUrl(url);
+        setSendAsMms(asMms);
+        update({ mediaUrls: asMms ? [url] : [] });
+        setShowImagePanel(false);
+    };
+
+    const handleRemoveImage = () => {
+        setImageUrl('');
+        setSendAsMms(false);
+        update({ mediaUrls: [] });
+        setShowImagePanel(false);
+    };
+
+    const handleInsertImageLink = () => {
+        if (!imageUrl) return;
+        insertAtCursor(' ' + imageUrl);
+    };
+
+    const handleImageFileUpload = async (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            setImageUploadError('Please select an image file (JPG, PNG, GIF, WebP).');
+            return;
+        }
+        setImageUploadError('');
+        setImageUploadProgress(0);
+        let compressedFile = file;
+        try {
+            compressedFile = await compressSmsImage(file) as File;
+        } catch (err) {
+            console.warn('[ImageCompress] Compression failed, uploading original', err);
+        }
+        const cleanName = compressedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `sms-media/${churchId}/broadcast/${Date.now()}_${cleanName}`;
+        const sRef = storageRef(storage, path);
+        const task = uploadBytesResumable(sRef, compressedFile);
+        task.on(
+            'state_changed',
+            snap => setImageUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            err => { setImageUploadError('Upload failed: ' + err.message); setImageUploadProgress(null); },
+            async () => {
+                const url = await getDownloadURL(task.snapshot.ref);
+                setImageUploadProgress(null);
+                handleSetImage(url, sendAsMms);
+            }
+        );
+    };
 
     /** Insert text at cursor position in the textarea */
     const insertAtCursor = (text: string) => {
@@ -923,8 +1222,11 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 <>
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Message</label>
-                                        <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                            {local.body?.length ?? 0} chars • {segments} segment{segments !== 1 ? 's' : ''}
+                                        <span className={`text-xs font-bold ${isMmsActive ? 'text-violet-600 dark:text-violet-400' : segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                            {isMmsActive
+                                                ? `${local.body?.length ?? 0} chars • MMS (1 media message)`
+                                                : `${local.body?.length ?? 0} chars • ${segments} segment${segments !== 1 ? 's' : ''}`
+                                            }
                                         </span>
                                     </div>
                                     <textarea
@@ -964,7 +1266,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             <button
                                                 type="button"
                                                 title="Insert link"
-                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); setShowFilePicker(false); }}
+                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); setShowFilePicker(false); setShowImagePanel(false); }}
                                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                             >
                                                 <Link size={13} /> Link
@@ -991,31 +1293,39 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         {/* File inserter */}
                                         <button
                                             type="button"
-                                            title="Attach a file link"
-                                            onClick={() => { setShowFilePicker(v => !v); setShowEmojis(false); setShowLinkDlg(false); }}
+                                            title="Attach a file or document link"
+                                            onClick={() => { setShowFilePicker(v => !v); setShowEmojis(false); setShowLinkDlg(false); setShowImagePanel(false); }}
                                             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                         >
                                             <FileText size={13} /> File
                                         </button>
-                                                                       {/* Image URL */}
+                                        {/* Image button */}
                                         <button
                                             type="button"
-                                            title="Attach image (MMS)"
+                                            title="Attach or upload image (MMS / Link options)"
                                             onClick={() => {
-                                                const url = window.prompt('Enter image URL (MMS ... may incur additional carrier fees):');
-                                                if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
+                                                setShowImagePanel(v => !v);
+                                                setShowFilePicker(false);
+                                                setShowEmojis(false);
+                                                setShowLinkDlg(false);
                                             }}
-                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                                                }`}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
+                                                imageUrl
+                                                    ? sendAsMms
+                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                        : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
+                                                    : showImagePanel
+                                                        ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                            }`}
                                         >
-                                            <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
+                                            <ImageIcon size={13} /> {imageUrl ? (sendAsMms ? 'Image (MMS) ✓' : 'Image (Link) ✓') : 'Image'}
                                         </button>
                                         {imageUrl && (
                                             <button
                                                 type="button"
                                                 title="Remove image"
-                                                onClick={() => { setImageUrl(''); update({ mediaUrls: [] }); }}
+                                                onClick={handleRemoveImage}
                                                 className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                                             >
                                                 <X size={13} />
@@ -1058,10 +1368,193 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             AI Shorten
                                         </button>
                                     </div>
-                                    {/* Image preview */}
+
+                                    {/* Image upload & MMS delivery options panel */}
+                                    {showImagePanel && (
+                                        <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-md">
+                                            <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                                {(['upload', 'url'] as const).map(t => (
+                                                    <button
+                                                        key={t}
+                                                        type="button"
+                                                        onClick={() => setImageTab(t)}
+                                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${
+                                                            imageTab === t
+                                                                ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500 bg-white dark:bg-slate-900'
+                                                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                                                        }`}
+                                                    >
+                                                        {t === 'upload' ? '📁 Upload Image File' : '🔗 Paste Image URL'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                {imageTab === 'upload' ? (
+                                                    <>
+                                                        <input
+                                                            ref={imageFileInputRef}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={e => {
+                                                                const f = e.target.files?.[0];
+                                                                if (f) handleImageFileUpload(f);
+                                                            }}
+                                                        />
+                                                        <div
+                                                            onClick={() => imageFileInputRef.current?.click()}
+                                                            onDragOver={e => e.preventDefault()}
+                                                            onDrop={e => {
+                                                                e.preventDefault();
+                                                                const f = e.dataTransfer.files?.[0];
+                                                                if (f) handleImageFileUpload(f);
+                                                            }}
+                                                            className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition text-center"
+                                                        >
+                                                            <Upload size={22} className="text-slate-400" />
+                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                                Click or drag &amp; drop image here
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — up to 5 MB</p>
+                                                        </div>
+                                                        {imageUploadProgress !== null && (
+                                                            <div className="space-y-1">
+                                                                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${imageUploadProgress}%` }} />
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p>
+                                                            </div>
+                                                        )}
+                                                        {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
+                                                    </>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Public Image URL</p>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="url"
+                                                                value={urlInput}
+                                                                onChange={e => setUrlInput(e.target.value)}
+                                                                placeholder="https://example.com/photo.jpg"
+                                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (urlInput.trim()) {
+                                                                        handleSetImage(urlInput.trim(), sendAsMms);
+                                                                        setUrlInput('');
+                                                                    }
+                                                                }}
+                                                                disabled={!urlInput.trim()}
+                                                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition"
+                                                            >
+                                                                Use URL
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Delivery mode radio options */}
+                                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Delivery Options</p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <label
+                                                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                                                sendAsMms
+                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700'
+                                                                    : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="deliveryMode"
+                                                                checked={sendAsMms}
+                                                                onChange={() => handleToggleMms(true)}
+                                                                className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                                                            />
+                                                            <div className="text-left">
+                                                                <span className="block text-xs font-bold text-slate-900 dark:text-white">Send as MMS Attachment</span>
+                                                                <span className="block text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                                                                    Displays directly as an inline photo in the recipient's SMS app.
+                                                                </span>
+                                                            </div>
+                                                        </label>
+
+                                                        <label
+                                                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                                                !sendAsMms
+                                                                    ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-300 dark:border-indigo-700'
+                                                                    : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="deliveryMode"
+                                                                checked={!sendAsMms}
+                                                                onChange={() => handleToggleMms(false)}
+                                                                className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                                            />
+                                                            <div className="text-left">
+                                                                <span className="block text-xs font-bold text-slate-900 dark:text-white">Send as Link in Text (SMS)</span>
+                                                                <span className="block text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                                                                    Sends standard SMS text with link to avoid carrier MMS fees.
+                                                                </span>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Image attachment status card */}
                                     {imageUrl && (
-                                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
-                                            <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
+                                        <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                            <div className="relative group w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 border border-slate-200 dark:border-slate-600">
+                                                <img src={imageUrl} alt="MMS attachment" className="w-full h-full object-cover" onError={() => setImageUrl('')} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                        sendAsMms
+                                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                                            : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
+                                                    }`}>
+                                                        {sendAsMms ? '📷 MMS Picture Attachment' : '🔗 Link in Message'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                    {sendAsMms
+                                                        ? 'Delivered natively as a photo message to recipients (MMS carrier rates apply).'
+                                                        : 'Delivered as standard SMS. Click "Insert Link" if you wish to include the URL in your text.'}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleMms(!sendAsMms)}
+                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition"
+                                                >
+                                                    {sendAsMms ? 'Switch to Link Only' : 'Send as MMS'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleInsertImageLink}
+                                                    title="Insert link into text body"
+                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 transition flex items-center gap-1"
+                                                >
+                                                    <Link size={11} /> Insert Link
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveImage}
+                                                    title="Remove image"
+                                                    className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                     {/* Contact Card preview */}
@@ -1140,9 +1633,12 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         <div>
                             <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3">Preview</label>
                             <div className="bg-slate-100 dark:bg-slate-800 rounded-3xl p-4 max-w-[260px] shadow-inner">
-                                {imageUrl && (
-                                    <div className="mb-2 rounded-xl overflow-hidden max-w-[220px]">
+                                {imageUrl && sendAsMms && (
+                                    <div className="mb-2 rounded-xl overflow-hidden max-w-[220px] border border-slate-200 dark:border-slate-700 shadow-sm relative group">
                                         <img src={imageUrl} alt="MMS preview" className="w-full h-auto object-cover" />
+                                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/60 backdrop-blur-xs rounded text-[9px] font-bold text-white uppercase tracking-wider">
+                                            MMS
+                                        </div>
                                     </div>
                                 )}
                                 {local.attachVcard && (
@@ -1190,7 +1686,12 @@ const CampaignComposer: React.FC<ComposerProps> = ({
             {showFilePicker && (
                 <FilePickerDialog
                     churchId={churchId}
+                    currentUser={currentUser}
                     onSelect={(url) => { insertAtCursor(' ' + url); setShowFilePicker(false); }}
+                    onSelectAsMms={(url) => {
+                        handleSetImage(url, true);
+                        setShowFilePicker(false);
+                    }}
                     onClose={() => setShowFilePicker(false)}
                 />
             )}
@@ -2103,6 +2604,22 @@ const NewMessageComposer: React.FC<{
                         setShowEventPickerNM(false);
                     }}
                     onClose={() => setShowEventPickerNM(false)}
+                />
+            )}
+            {/* File Picker Modal */}
+            {showFilePickerNM && (
+                <FilePickerDialog
+                    churchId={churchId}
+                    currentUser={currentUser}
+                    onSelect={(url) => {
+                        insertAtCursorNM(' ' + url);
+                        setShowFilePickerNM(false);
+                    }}
+                    onSelectAsMms={(url) => {
+                        setImageUrlNM(url);
+                        setShowFilePickerNM(false);
+                    }}
+                    onClose={() => setShowFilePickerNM(false)}
                 />
             )}
         </div>
@@ -11628,6 +12145,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         resolveFromList: campaignToSend.toListId || null,
                         resolveFromGroup: campaignToSend.toGroupId || null,
                         smsNumberId: campaignToSend.twilioNumberId || null,
+                        attachVcard: campaignToSend.attachVcard || false,
                     }),
                 });
                 const data = await res.json();
