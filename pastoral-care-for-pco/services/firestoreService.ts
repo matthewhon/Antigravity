@@ -930,10 +930,13 @@ class FirestoreService {
       const batchRef = doc(db, 'giving_batches', batch.id);
       await setDoc(batchRef, this.deepSanitize(batch), { merge: true });
 
-      // 3. Update donations to assign batchId, batchName, stripePayoutId, paid_out_date
+      // 3. Update existing church donations to assign batchId, batchName, stripePayoutId, paid_out_date
+      const existingDonationIdSet = new Set(allChurchDonations.map(d => d.id));
+      const validExistingUniqueIds = Array.from(new Set(donationIds)).filter(id => existingDonationIdSet.has(id));
+
       const CHUNK = 400;
-      for (let i = 0; i < donationIds.length; i += CHUNK) {
-        const chunk = donationIds.slice(i, i + CHUNK);
+      for (let i = 0; i < validExistingUniqueIds.length; i += CHUNK) {
+        const chunk = validExistingUniqueIds.slice(i, i + CHUNK);
         const wBatch = writeBatch(db);
         chunk.forEach(id => {
           const dRef = doc(db, 'detailed_donations', id);

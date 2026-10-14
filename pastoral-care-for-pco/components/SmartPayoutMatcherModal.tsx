@@ -274,10 +274,11 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
     const activeFundsBreakdown: GivingBatchFundBreakdown[] = useMemo(() => {
         const fundMap = new Map<string, GivingBatchFundBreakdown>();
         activeDonations.forEach(d => {
-            const fKey = `${d.fundId || d.fundName}_${d.campusId || 'main'}`;
+            const fundIdentifier = d.fundId || (d.fundName || 'General Giving').toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const fKey = `${fundIdentifier}_${d.campusId || 'main'}`;
             if (!fundMap.has(fKey)) {
                 fundMap.set(fKey, {
-                    fundId: d.fundId || 'unknown',
+                    fundId: fundIdentifier,
                     fundName: d.fundName || 'General Giving',
                     campusId: d.campusId || null,
                     campusName: d.campusName || null,
@@ -537,6 +538,17 @@ export const SmartPayoutMatcherModal: React.FC<SmartPayoutMatcherModalProps> = (
 
                 {/* Body Content */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                    {/* General Error Banner */}
+                    {error && (
+                        <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2 shadow-xs">
+                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <div className="flex-1">
+                                <span className="font-semibold">Notice: </span>
+                                {error}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Mode Selector Tabs: CSV Import vs AI Heuristic Search */}
                     <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60">
                         <button
