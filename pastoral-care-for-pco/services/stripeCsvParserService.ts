@@ -269,15 +269,18 @@ export function parseStripePayoutCsv(
     const matchedRootIds = new Set<string>();
 
     rows.forEach((row, idx) => {
+        const isRefund = row.type.toLowerCase().includes('refund') || row.gross < 0;
         let matched: DetailedDonation[] | null = null;
 
-        // 1. Try match by Donation ID
+        // 1. Try match by Donation ID (only if not already matched as another charge; refunds can match the original charge to copy its fund split)
         if (row.donationId && existingById.has(row.donationId)) {
-            matched = existingById.get(row.donationId)!;
+            if (isRefund || !matchedRootIds.has(row.donationId)) {
+                matched = existingById.get(row.donationId)!;
+            }
         }
 
         // 2. Fallback: match by donor name + gross amount + approximate date
-        if (!matched) {
+        if (!matched && !isRefund) {
             for (const [rId, desigs] of Array.from(existingById.entries())) {
                 if (matchedRootIds.has(rId)) continue;
                 const dGross = desigs.reduce((s, d) => s + (d.amount || 0), 0);
@@ -295,44 +298,62 @@ export function parseStripePayoutCsv(
 
         if (matched && matched.length > 0) {
             matchedExistingCount++;
-            const rootId = matched[0].id.includes('_') ? matched[0].id.split('_')[0] : matched[0].id;
-            matchedRootIds.add(rootId);
+            const baseRootId = matched[0].id.includes('_') ? matched[0].id.split('_')[0] : matched[0].id;
+            const rootId = isRefund ? `refund_${baseRootId}_${idx}` : baseRootId;
+            if (!isRefund) {
+                matchedRootIds.add(baseRootId);
+            }
 
-            const isAlreadyBatched = matched.some(d => !!d.batchId);
+            const isAlreadyBatched = !isRefund && matched.some(d => !!d.batchId);
             if (isAlreadyBatched) {
                 alreadyBatchedCount++;
-                warningMessages.push(`Donation #${rootId} (${row.name}) was already used in Giving Batch "${matched[0].batchName || matched[0].batchId}" and was excluded.`);
+                warningMessages.push(`Donation #${baseRootId} (${row.name}) was already used in Giving Batch "${matched[0].batchName || matched[0].batchId}" and was excluded.`);
                 return;
             }
 
             // In CSV import, row.fee from the Stripe CSV is the single source of truth.
-            // Ensure matched designations are rebalanced so their fee sum equals row.fee to the exact cent.
-            const targetFee = (row.fee !== undefined && !isNaN(row.fee)) ? row.fee : (matched.reduce((s, d) => s + Math.abs(d.fee || 0), 0));
-            const pGross = matched.reduce((s, d) => s + (d.amount || 0), 0);
+            // For refunds, Stripe does not refund processing fees (fee is typically 0.00).
+            const targetFee = isRefund ? (row.fee || 0) : ((row.fee !== undefined && !isNaN(row.fee)) ? row.fee : (matched.reduce((s, d) => s + Math.abs(d.fee || 0), 0)));
+            const pGross = isRefund ? -Math.abs(row.gross) : matched.reduce((s, d) => s + (d.amount || 0), 0);
 
-            if (matched.length === 1) {
-                matched[0].fee = targetFee;
-            } else if (matched.length > 1 && targetFee > 0) {
-                let allocated = 0;
-                let largestIdx = 0;
-                matched.forEach((d, i) => {
-                    const f = Math.round((targetFee * ((d.amount || 0) / (pGross || 1))) * 100) / 100;
-                    d.fee = f;
-                    allocated += f;
-                    if ((d.amount || 0) > (matched[largestIdx].amount || 0)) {
-                        largestIdx = i;
+            // Clone designations so mutations or refunds do not corrupt original charge objects
+            const effectiveDesigs: DetailedDonation[] = matched.map((d, dIdx) => ({
+                ...d,
+                id: isRefund ? `refund_${d.id}_${idx}` : d.id,
+                amount: isRefund ? -Math.abs(d.amount || 0) : (d.amount || 0),
+                fee: isRefund ? 0 : (d.fee || 0)
+            }));
+
+            if (!isRefund) {
+                if (effectiveDesigs.length === 1) {
+                    effectiveDesigs[0].fee = targetFee;
+                } else if (effectiveDesigs.length > 1 && targetFee > 0) {
+                    let allocated = 0;
+                    let largestIdx = 0;
+                    effectiveDesigs.forEach((d, i) => {
+                        const f = Math.round((targetFee * ((d.amount || 0) / (pGross || 1))) * 100) / 100;
+                        d.fee = f;
+                        allocated += f;
+                        if ((d.amount || 0) > (effectiveDesigs[largestIdx].amount || 0)) {
+                            largestIdx = i;
+                        }
+                    });
+                    const rem = Math.round((targetFee - allocated) * 100) / 100;
+                    if (Math.abs(rem) > 0.0001) {
+                        effectiveDesigs[largestIdx].fee = Math.round((effectiveDesigs[largestIdx].fee + rem) * 100) / 100;
                     }
-                });
-                const rem = Math.round((targetFee - allocated) * 100) / 100;
-                if (Math.abs(rem) > 0.0001) {
-                    matched[largestIdx].fee = Math.round((matched[largestIdx].fee + rem) * 100) / 100;
+                }
+            } else {
+                // If refund has a fee (rare), allocate it
+                if (effectiveDesigs.length > 0) {
+                    effectiveDesigs[0].fee = targetFee;
                 }
             }
 
-            matched.forEach(d => allDonations.push(d));
+            effectiveDesigs.forEach(d => allDonations.push(d));
 
             const pFee = targetFee;
-            const pTithe = matched
+            const pTithe = effectiveDesigs
                 .filter(d => /tithe|general|operating|budget|tithes|offering|ministry|kingdom|unrestricted/i.test(d.fundName || ''))
                 .reduce((s, d) => s + (d.amount || 0), 0);
 
@@ -344,27 +365,28 @@ export function parseStripePayoutCsv(
                 fee: Math.round(pFee * 100) / 100,
                 net: Math.round((pGross - pFee) * 100) / 100,
                 tithe: Math.round(pTithe * 100) / 100,
-                date: matched[0].date || row.date,
+                date: row.date || matched[0].date,
                 donorName: matched[0].donorName || row.name,
                 paymentMethod: row.paymentMethod,
                 paymentSource: 'Stripe CSV',
-                batchId: matched[0].batchId || null,
-                designations: matched
+                batchId: isRefund ? null : (matched[0].batchId || null),
+                designations: effectiveDesigs
             });
         } else {
             // Synthesize from CSV row if not found in database
             synthesizedCount++;
-            const rootId = row.donationId || `csv_${row.date.replace(/-/g, '')}_${idx + 1}`;
+            const baseRootId = row.donationId || `csv_${row.date.replace(/-/g, '')}_${idx + 1}`;
+            const rootId = isRefund ? `refund_${baseRootId}_${idx}` : baseRootId;
             const synthesizedDesigs: DetailedDonation[] = [];
 
             if (row.parsedFunds && row.parsedFunds.length > 0) {
-                const totalParsedGross = row.parsedFunds.reduce((s, pf) => s + (pf.amount || 0), 0) || row.gross;
+                const totalParsedGross = row.parsedFunds.reduce((s, pf) => s + Math.abs(pf.amount || 0), 0) || Math.abs(row.gross);
                 let allocatedFee = 0;
                 let largestIdx = 0;
                 const computedFees = row.parsedFunds.map((pf, pfi) => {
-                    const f = Math.round((row.fee * (pf.amount / (totalParsedGross || 1))) * 100) / 100;
+                    const f = Math.round((row.fee * (Math.abs(pf.amount) / (totalParsedGross || 1))) * 100) / 100;
                     allocatedFee += f;
-                    if (pf.amount > row.parsedFunds![largestIdx].amount) {
+                    if (Math.abs(pf.amount) > Math.abs(row.parsedFunds![largestIdx].amount)) {
                         largestIdx = pfi;
                     }
                     return f;
@@ -375,10 +397,11 @@ export function parseStripePayoutCsv(
                 }
 
                 row.parsedFunds.forEach((pf, pfi) => {
+                    const amt = isRefund ? -Math.abs(pf.amount) : pf.amount;
                     const d: DetailedDonation = {
                         id: `${rootId}_${pfi}`,
                         churchId,
-                        amount: pf.amount,
+                        amount: amt,
                         date: new Date(row.date || maxDate).toISOString(),
                         fundName: pf.fundName,
                         donorId: `csv_donor_${idx}`,
@@ -395,7 +418,7 @@ export function parseStripePayoutCsv(
                 const d: DetailedDonation = {
                     id: rootId,
                     churchId,
-                    amount: row.gross,
+                    amount: isRefund ? -Math.abs(row.gross) : row.gross,
                     date: new Date(row.date || maxDate).toISOString(),
                     fundName: row.fundOrSignup,
                     donorId: `csv_donor_${idx}`,
@@ -417,9 +440,9 @@ export function parseStripePayoutCsv(
 
             parentGroups.push({
                 rootId,
-                gross: row.gross,
-                fee: row.fee,
-                net: row.net,
+                gross: Math.round((isRefund ? -Math.abs(row.gross) : row.gross) * 100) / 100,
+                fee: Math.round(row.fee * 100) / 100,
+                net: Math.round((row.gross - row.fee) * 100) / 100,
                 tithe: Math.round(pTithe * 100) / 100,
                 date: row.date,
                 donorName: row.name,
