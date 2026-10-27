@@ -11,6 +11,20 @@ const processingEnrollments = new Set<string>();
 // Prevents overlapping workflow executor ticks on the same instance.
 let workflowTickRunning = false;
 
+/** Minimal fake Express response for internal service calls to prevent TypeError: res.set is not a function */
+function createWorkflowFakeRes() {
+    const res: any = {
+        set: () => res,
+        header: () => res,
+        setHeader: () => res,
+        status: () => res,
+        json: () => res,
+        send: () => res,
+        end: () => res,
+    };
+    return res;
+}
+
 // ─── SMS Campaign Scheduler ───────────────────────────────────────────────────
 // Polls Firestore every 60 seconds for SmsCampaigns with status='scheduled'
 // and scheduledAt <= now. Resolves PCO List/Group members, then fires sendBulk.
@@ -828,10 +842,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                                 personData:  { [personInfo.email]: personInfo },
                             }
                         } as any;
-                        const fakeRes = {
-                            json: () => {},
-                            status: () => ({ json: () => {} }),
-                        } as any;
+                        const fakeRes = createWorkflowFakeRes();
                         await sendEmail(fakeReq, fakeRes);
                     }
                     messageSent = true;
@@ -851,14 +862,21 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                             }
                         }
                     } else if ((staffTargetType === 'list' && step.staffListId) || (staffTargetType === 'group' && step.staffGroupId)) {
-                        const churchSnap = await db.collection('churches').doc(churchId).get();
-                        const token = churchSnap.data()?.pcoAccessToken || '';
+                        const { getFreshPcoToken } = await import('./pcoApi.js');
+                        let token = '';
+                        try {
+                            token = await getFreshPcoToken(churchId);
+                        } catch {
+                            const churchSnap = await db.collection('churches').doc(churchId).get();
+                            token = churchSnap.data()?.pcoAccessToken || '';
+                        }
                         if (token) {
                             const { resolvePcoPersons } = await import('./workflowEnrollEndpoint.js');
                             const persons = await resolvePcoPersons(
                                 token,
                                 staffTargetType === 'list' ? step.staffListId : null,
-                                staffTargetType === 'group' ? step.staffGroupId : null
+                                staffTargetType === 'group' ? step.staffGroupId : null,
+                                churchId
                             );
                             for (const p of persons) {
                                 if (p.e164) staffPhonesSet.add(p.e164);
@@ -918,14 +936,21 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                             }
                         }
                     } else if ((staffTargetType === 'list' && step.staffListId) || (staffTargetType === 'group' && step.staffGroupId)) {
-                        const churchSnap = await db.collection('churches').doc(churchId).get();
-                        const token = churchSnap.data()?.pcoAccessToken || '';
+                        const { getFreshPcoToken } = await import('./pcoApi.js');
+                        let token = '';
+                        try {
+                            token = await getFreshPcoToken(churchId);
+                        } catch {
+                            const churchSnap = await db.collection('churches').doc(churchId).get();
+                            token = churchSnap.data()?.pcoAccessToken || '';
+                        }
                         if (token) {
                             const { resolvePcoPersons } = await import('./workflowEnrollEndpoint.js');
                             const persons = await resolvePcoPersons(
                                 token,
                                 staffTargetType === 'list' ? step.staffListId : null,
-                                staffTargetType === 'group' ? step.staffGroupId : null
+                                staffTargetType === 'group' ? step.staffGroupId : null,
+                                churchId
                             );
                             for (const p of persons) {
                                 if (p.email) {
@@ -962,10 +987,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                                 personData:  pMap,
                             }
                         } as any;
-                        const fakeRes = {
-                            json: () => {},
-                            status: () => ({ json: () => {} }),
-                        } as any;
+                        const fakeRes = createWorkflowFakeRes();
                         await sendEmail(fakeReq, fakeRes);
                         log.info(`[WorkflowExecutor] Sent staff_email to ${staffEmails.length} staff members`, 'system', { enrollId }, churchId);
                     } else {
@@ -1425,10 +1447,12 @@ export function startSmsCampaignScheduler(db: any): void {
     // ── Also run workflow step executor every 60s ──────────────────────────
     const workflowTick = () => runWorkflowStepExecutor(db);
 
-    // ── Birthday / anniversary scanner — once per day ─────────────────────
-    // Run at startup (catches any missed scans from overnight), then every 24h.
+    // ── Birthday / anniversary scanner ─────────────────────────────────────
+    // Scans every 15 minutes. Idempotent: checks `${wfId}_${personId}_${currentYear}`
+    // so running frequently allows catching birthdays right after midnight in each
+    // church's local timezone, scheduling sends for 9:00 AM well in advance.
     let lastBirthdayScan = 0;
-    const BIRTHDAY_SCAN_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    const BIRTHDAY_SCAN_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
     const birthdayTick = async () => {
         const now = Date.now();
@@ -1438,9 +1462,9 @@ export function startSmsCampaignScheduler(db: any): void {
         }
     };
 
-    // ── Event Registration scanner — once per day (shares the birthday interval) ──
+    // ── Event Registration scanner — every 1 hour ─────────────────────────
     let lastEventRegScan = 0;
-    const EVENT_REG_SCAN_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    const EVENT_REG_SCAN_INTERVAL = 60 * 60 * 1000; // 1 hour
 
     const eventRegTick = async () => {
         const now = Date.now();
@@ -1450,10 +1474,10 @@ export function startSmsCampaignScheduler(db: any): void {
         }
     };
 
-    // ── PCO List/Group workflow re-sync — once per day ────────────────────────
+    // ── PCO List/Group workflow re-sync — every 1 hour ────────────────────
     // Re-pulls each active list_add workflow's PCO list and enrolls any new people.
     let lastListReScan = 0;
-    const LIST_RESCAN_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    const LIST_RESCAN_INTERVAL = 60 * 60 * 1000; // 1 hour
 
     const listReSyncTick = async () => {
         const now = Date.now();

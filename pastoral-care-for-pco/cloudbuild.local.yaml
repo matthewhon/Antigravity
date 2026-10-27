@@ -24,6 +24,7 @@ steps:
     - '300s'
     - '--min-instances'
     - '1'
+    - '--no-cpu-throttling'
 
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/511453050214-compute@developer.gserviceaccount.com'
 

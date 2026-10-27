@@ -33,8 +33,10 @@ export async function resolvePcoPersons(
     token: string,
     listId?: string | null,
     groupId?: string | null,
+    churchId?: string,
 ): Promise<PersonInfo[]> {
     const persons: PersonInfo[] = [];
+    let currentToken = token;
 
     if (listId) {
         // PCO People Lists API
@@ -48,9 +50,18 @@ export async function resolvePcoPersons(
             `?per_page=100&include=emails,addresses,phone_numbers`;
 
         while (url) {
-            const res = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            let res = await fetch(url, {
+                headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
             });
+            if (res.status === 401 && churchId) {
+                try {
+                    const { getFreshPcoToken } = await import('./pcoApi.js');
+                    currentToken = await getFreshPcoToken(churchId, true);
+                    res = await fetch(url, {
+                        headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
+                    });
+                } catch {}
+            }
             if (!res.ok) throw new Error(`PCO List API returned ${res.status}: ${await res.text().catch(() => '')}`);
             const data: any = await res.json();
 
@@ -120,9 +131,18 @@ export async function resolvePcoPersons(
             `?include=person&per_page=100`;
 
         while (url) {
-            const res = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            let res = await fetch(url, {
+                headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
             });
+            if (res.status === 401 && churchId) {
+                try {
+                    const { getFreshPcoToken } = await import('./pcoApi.js');
+                    currentToken = await getFreshPcoToken(churchId, true);
+                    res = await fetch(url, {
+                        headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
+                    });
+                } catch {}
+            }
             if (!res.ok) throw new Error(`PCO Group API returned ${res.status}`);
             const data: any = await res.json();
 
@@ -196,7 +216,7 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
         }
 
         // 3. Resolve persons from PCO
-        const persons = await resolvePcoPersons(token, listId || null, groupId || null);
+        const persons = await resolvePcoPersons(token, listId || null, groupId || null, churchId);
 
         // 4. Bulk-create enrollments, skipping any that already exist
         let enrolled = 0;
@@ -478,7 +498,7 @@ export async function reSyncWorkflow(
     if (!token) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'Planning Center is not connected' };
 
     // 4. Resolve current PCO list/group members
-    const persons = await resolvePcoPersons(token, listId, groupId);
+    const persons = await resolvePcoPersons(token, listId, groupId, churchId);
 
     // 5. Enroll new people, skip existing
     let enrolled = 0;
