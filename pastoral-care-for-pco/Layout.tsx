@@ -13,6 +13,12 @@ interface LayoutProps {
   currentView: string;
   onNavigate: (view: any) => void;
   hasPermission: (view: any) => boolean;
+  onRefreshUser?: () => void;
+  isSyncing?: boolean;
+  noPadding?: boolean;
+  subNavItems?: { label: string; view: string; icon: React.ReactNode }[];
+  todayCelebrationsCount?: number;
+  onOpenCelebrations?: () => void;
 }
 
 const AppLogo: React.FC<{ size?: number }> = ({ size = 32 }) => (
@@ -36,7 +42,11 @@ const AppLogo: React.FC<{ size?: number }> = ({ size = 32 }) => (
   </svg>
 );
 
-const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitchChurch, user, onLogout, currentView, onNavigate, hasPermission }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, church, allChurches, onSwitchChurch, user, onLogout, 
+  currentView, onNavigate, hasPermission, onRefreshUser, isSyncing, 
+  noPadding, subNavItems, todayCelebrationsCount, onOpenCelebrations 
+}) => {
   if (!user) return null;
 
   const isSystemAdmin = user.roles.includes('System Administration');
@@ -151,6 +161,25 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
                 ))}
               </select>
             </div>
+          )}
+
+          {/* Celebrations Quick-Access Button */}
+          {onOpenCelebrations && (
+            <button
+              type="button"
+              onClick={onOpenCelebrations}
+              className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 group"
+              title={typeof todayCelebrationsCount === 'number' && todayCelebrationsCount > 0 
+                ? `${todayCelebrationsCount} celebration${todayCelebrationsCount === 1 ? '' : 's'} today! Click to view.` 
+                : "Today's Celebrations"}
+            >
+              <span className="text-base group-hover:scale-110 transition-transform">🎉</span>
+              {typeof todayCelebrationsCount === 'number' && todayCelebrationsCount > 0 && (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-black rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 text-white shadow-sm animate-pulse">
+                  {todayCelebrationsCount}
+                </span>
+              )}
+            </button>
           )}
 
           <div className="flex items-center gap-3 pl-4 border-l border-slate-700">

@@ -30,6 +30,8 @@ import { MetricsView } from './components/MetricsView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import GuidedTour, { TourStep } from './components/GuidedTour';
 import { ForceChangePasswordModal } from './components/ForceChangePasswordModal';
+import { TodayCelebrationsModal } from './components/TodayCelebrationsModal';
+import { getTodayCelebrations, TodayCelebration } from './services/celebrationService';
 
 // Steps for the first-run guided tour, shown once on the dashboard after a new
 // user accepts their suggested layout. Targets are `data-tour` anchors; steps
@@ -245,6 +247,12 @@ const App: React.FC = () => {
   const [showTour, setShowTour] = useState(false);
   const [pendingTour, setPendingTour] = useState(false);
 
+  // Today's Celebrations (Birthdays & Anniversaries) popup state
+  const [showCelebrationsModal, setShowCelebrationsModal] = useState(false);
+  const [dontShowCelebrationsAgainToday, setDontShowCelebrationsAgainToday] = useState(true);
+  const hasCheckedCelebrationsRef = useRef(false);
+  const [isTenantDataLoaded, setIsTenantDataLoaded] = useState(false);
+
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   
   // Global drawer state
@@ -357,6 +365,8 @@ const App: React.FC = () => {
       } else {
         setUser(null);
         setChurch(null);
+        setIsTenantDataLoaded(false);
+        hasCheckedCelebrationsRef.current = false;
       }
       setLoading(false);
     });
@@ -562,6 +572,7 @@ const App: React.FC = () => {
       setPrayerRequests(prayers);
       setCheckIns(ci);
       setCampuses(camp);
+      setIsTenantDataLoaded(true);
 
       // Dashboard-only sources, fetched alongside so every existing call site
       // refreshes them too. Non-fatal — the overview degrades to what it has.
@@ -835,6 +846,8 @@ const App: React.FC = () => {
   const handleSwitchChurch = async (id: string) => {
       const target = allChurches.find(c => c.id === id);
       if (target) {
+          setIsTenantDataLoaded(false);
+          hasCheckedCelebrationsRef.current = false;
           setChurch(target);
           loadTenantData(target.id);
       }
@@ -883,6 +896,49 @@ const App: React.FC = () => {
     }
     return filtered;
   }, [people, church?.pcoSettings?.hideInactiveMembers, church?.multiCampusEnabled, selectedCampusId]);
+
+  // Celebrations occurring on the current day
+  const todayCelebrations = useMemo<TodayCelebration[]>(() => {
+    return getTodayCelebrations(visiblePeople);
+  }, [visiblePeople]);
+
+  // Auto-display celebration popup once per day on login / initial session if there are celebrations today
+  useEffect(() => {
+    if (!user || !church || !isTenantDataLoaded || hasCheckedCelebrationsRef.current) return;
+    if (user.mustChangePassword || layoutSuggestion !== null) return;
+
+    hasCheckedCelebrationsRef.current = true;
+
+    if (todayCelebrations.length > 0) {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const storageKey = `celebrations_seen_${user.id}_${todayKey}`;
+      const alreadySeen = localStorage.getItem(storageKey) === 'true';
+
+      if (!alreadySeen) {
+        setShowCelebrationsModal(true);
+      }
+    }
+  }, [user, church, isTenantDataLoaded, todayCelebrations.length, layoutSuggestion]);
+
+  const handleCloseCelebrationsModal = () => {
+    if (user && dontShowCelebrationsAgainToday) {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const storageKey = `celebrations_seen_${user.id}_${todayKey}`;
+      try {
+        localStorage.setItem(storageKey, 'true');
+      } catch (e) {
+        console.warn('Could not save celebration seen state:', e);
+      }
+    }
+    setShowCelebrationsModal(false);
+  };
+
+  const handleOpenCelebrationPerson = (personId: string) => {
+    setSelectedPersonId(personId);
+    setShowCelebrationsModal(false);
+  };
 
   const visibleGroups = useMemo(() => {
     let filtered = groups;
@@ -1154,7 +1210,7 @@ const App: React.FC = () => {
 
   const safeEnabledWidgets = (church.enabledWidgets && church.enabledWidgets.length > 0) ? church.enabledWidgets : undefined;
 
-  const isOverlayOpen = selectedPersonId !== null || layoutSuggestion !== null;
+  const isOverlayOpen = selectedPersonId !== null || layoutSuggestion !== null || showCelebrationsModal;
 
   return (
     <>
@@ -1171,6 +1227,17 @@ const App: React.FC = () => {
     {showTour && (
         <GuidedTour onClose={handleFinishTour} steps={FIRST_RUN_TOUR_STEPS} />
     )}
+
+    <TodayCelebrationsModal
+        isOpen={showCelebrationsModal}
+        onClose={handleCloseCelebrationsModal}
+        celebrations={todayCelebrations}
+        church={church}
+        currentUser={user}
+        dontShowAgainToday={dontShowCelebrationsAgainToday}
+        onToggleDontShowAgainToday={setDontShowCelebrationsAgainToday}
+        onOpenProfile={handleOpenCelebrationPerson}
+    />
     
         <TenantDataProvider value={{
             user, church, allChurches, systemSettings, widgets,
@@ -1196,6 +1263,8 @@ const App: React.FC = () => {
                 onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
                 isSyncing={isSyncing}
                 noPadding={view.startsWith('tools')}
+                todayCelebrationsCount={todayCelebrations.length}
+                onOpenCelebrations={() => setShowCelebrationsModal(true)}
                 subNavItems={view.startsWith('tools-sms') ? [
                     { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
                     (user && canUserUseFeature(activeNumber, user, 'broadcastUserIds')) ? { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> } : null,
