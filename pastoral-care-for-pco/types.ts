@@ -3111,3 +3111,125 @@ export interface ChurchVoice {
     updatedAt: number;
     updatedBy?: string;
 }
+
+// ─── Internal Team Chat & Interactive Widget Collaboration ──────────────────
+
+export type TeamChannelType = 'department' | 'custom_channel' | 'direct' | 'widget_thread';
+
+export type TeamChatArea = 'giving' | 'care' | 'people' | 'groups' | 'services' | 'admin';
+
+export interface TeamChannel {
+    id: string;
+    churchId: string;
+    type: TeamChannelType;
+    /** Display name for channels/threads (for 1:1 DMs, dynamically resolves the other participant's name) */
+    name?: string;
+    description?: string;
+    icon?: string;
+    /** If set, ONLY users who pass canReadArea(user, requiredArea) can see or access this channel */
+    requiredArea?: TeamChatArea;
+    /** Explicit participant User IDs (used for DMs and private/invite-only channels) */
+    participantIds: string[];
+    /** If true, anyone who passes requiredArea (or all staff if no requiredArea) can view/join */
+    isAutoJoinedByRole?: boolean;
+    /** Optional multi-campus scoping */
+    campusId?: string | null;
+    /** Widgets pinned to the top of this channel for ongoing team reference */
+    pinnedWidgets?: ChatWidgetAttachment[];
+    createdBy: string;
+    createdAt: number;
+    lastMessageAt: number;
+    lastMessagePreview?: string;
+    lastMessageSenderId?: string;
+    lastMessageSenderName?: string;
+    /** Map of userId -> epoch ms when the user last read this channel */
+    lastReadAt?: Record<string, number>;
+    /** Last ISO week key (e.g. '2026-W45') when an automated weekly briefing was posted */
+    lastBriefingWeekKey?: string;
+}
+
+export interface ChatFileAttachment {
+    id: string;
+    kind: 'image' | 'video' | 'document';
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    url: string;
+    gcsPath: string;
+    /** Optional reference to TenantFile in FileManager */
+    tenantFileId?: string;
+}
+
+export interface ChatWidgetItemClaim {
+    claimedByUserId: string;
+    claimedByUserName: string;
+    claimedAt: number;
+    status?: 'claimed' | 'contacted';
+}
+
+export interface ChatWidgetSnapshotItem {
+    id: string;
+    name: string;
+    avatar?: string | null;
+    primaryStat: string;
+    secondaryStat?: string;
+    riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' | 'Critical';
+    phone?: string;
+    email?: string;
+}
+
+export interface ChatWidgetAttachment {
+    /** Widget ID from constants/widgetRegistry.ts (e.g. 'lifecycleLapsed', 'lapsed_at_risk', 'atRiskList') */
+    widgetId: string;
+    /** Module area used for permission enforcement ('giving' | 'people' | 'groups' | 'services' | 'care') */
+    area: TeamChatArea;
+    title: string;
+    icon?: string;
+    contextFilters?: {
+        campusId?: string;
+        givingFilter?: string;
+        dateRange?: { start: string; end: string };
+    };
+    snapshot: {
+        capturedAt: number;
+        headlineValue?: string;
+        subtitle?: string;
+        summaryMetrics?: { label: string; value: string; tone?: 'emerald' | 'amber' | 'rose' | 'indigo' | 'slate' }[];
+        items?: ChatWidgetSnapshotItem[];
+    };
+    /** Real-time map of item.id (donorId / personId) -> claim state for Idea 1 ("Claim & Care") */
+    claims?: Record<string, ChatWidgetItemClaim>;
+}
+
+export interface ChatPersonMention {
+    id: string;
+    name: string;
+    avatar?: string | null;
+    membership?: string;
+    riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' | 'Critical';
+}
+
+export interface TeamMessage {
+    id: string;
+    channelId: string;
+    churchId: string;
+    senderId: string;
+    senderName: string;
+    senderRoles?: UserRole[];
+    isAiResponse?: boolean;
+    isAutomatedBriefing?: boolean;
+    text: string;
+    createdAt: number;
+    editedAt?: number;
+    replyToMessageId?: string;
+    replyPreview?: { id: string; senderName: string; text: string };
+    attachments?: ChatFileAttachment[];
+    widget?: ChatWidgetAttachment;
+    /** Inline #Person mentions resolved to mini profile cards */
+    mentionedPeople?: ChatPersonMention[];
+    /** @Staff user IDs mentioned */
+    mentionedUserIds?: string[];
+    /** Emoji -> array of userIds */
+    reactions?: Record<string, string[]>;
+}
+

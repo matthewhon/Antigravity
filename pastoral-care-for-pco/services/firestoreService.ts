@@ -30,7 +30,8 @@ import {
     OutreachSession, OutreachSlot, DigitalBulletin,
     GroupCareSession, GroupCareSlot, GiftsTestResponse, MbtiTestResponse,
     DiscTestResponse, GivingBatch, GivingBatchFundBreakdown, QuickbooksMappingConfig,
-    NewsletterWidgetConfig, NewsletterSubscriber
+    NewsletterWidgetConfig, NewsletterSubscriber,
+    TeamChannel, TeamMessage, ChatWidgetAttachment, ChatWidgetItemClaim
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -2917,6 +2918,293 @@ class FirestoreService {
   async deleteNewsletterWidget(widgetId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'newsletter_widgets', widgetId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // ─── Internal Team Chat & Collaboration ─────────────────────────────────────
+
+  async ensureDefaultTeamChannels(churchId: string): Promise<void> {
+    if (!churchId) return;
+    try {
+      const defaults: Array<Omit<TeamChannel, 'createdAt' | 'lastMessageAt'>> = [
+        {
+          id: `dept_${churchId}_general`,
+          churchId,
+          type: 'department',
+          name: 'general',
+          icon: '💬',
+          description: 'Church-wide staff announcements, encouragement, and general collaboration',
+          participantIds: [],
+          isAutoJoinedByRole: true,
+          createdBy: 'system',
+        },
+        {
+          id: `dept_${churchId}_giving`,
+          churchId,
+          type: 'department',
+          name: 'giving-and-finance',
+          icon: '💰',
+          description: 'Role-gated channel for Lapsed Donors, Top Givers, batches, and financial stewardship (Giving / Finance / Pastor / Admin only)',
+          requiredArea: 'giving',
+          participantIds: [],
+          isAutoJoinedByRole: true,
+          createdBy: 'system',
+        },
+        {
+          id: `dept_${churchId}_care`,
+          churchId,
+          type: 'department',
+          name: 'pastoral-care',
+          icon: '🕊️',
+          description: 'Role-gated channel for at-risk members, prayer requests, and pastoral care coordination (Care / Pastor / Admin only)',
+          requiredArea: 'care',
+          participantIds: [],
+          isAutoJoinedByRole: true,
+          createdBy: 'system',
+        },
+        {
+          id: `dept_${churchId}_services`,
+          churchId,
+          type: 'department',
+          name: 'sunday-services',
+          icon: '🎵',
+          description: 'Role-gated channel for weekend service plans, volunteer teams, and staffing needs (Services / Pastor / Admin only)',
+          requiredArea: 'services',
+          participantIds: [],
+          isAutoJoinedByRole: true,
+          createdBy: 'system',
+        },
+        {
+          id: `dept_${churchId}_groups`,
+          churchId,
+          type: 'department',
+          name: 'groups-ministry',
+          icon: '📂',
+          description: 'Role-gated channel for small group health, leader care, and assimilation (Groups / Pastor / Admin only)',
+          requiredArea: 'groups',
+          participantIds: [],
+          isAutoJoinedByRole: true,
+          createdBy: 'system',
+        },
+      ];
+
+      await Promise.all(
+        defaults.map(async (def) => {
+          const ref = doc(db, 'team_channels', def.id);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            const now = Date.now();
+            await setDoc(ref, {
+              ...def,
+              createdAt: now,
+              lastMessageAt: now,
+            });
+          }
+        })
+      );
+    } catch (e) {
+      console.warn('[FirestoreService] ensureDefaultTeamChannels failed:', e);
+    }
+  }
+
+  subscribeToTeamChannels(churchId: string, onUpdate: (channels: TeamChannel[]) => void): Unsubscribe {
+    const q = query(collection(db, 'team_channels'), where('churchId', '==', churchId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const channels = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as TeamChannel);
+        channels.sort((a, b) => (b.lastMessageAt || b.createdAt || 0) - (a.lastMessageAt || a.createdAt || 0));
+        onUpdate(channels);
+      },
+      (err) => {
+        console.warn('[FirestoreService] subscribeToTeamChannels error:', err);
+      }
+    );
+  }
+
+  async saveTeamChannel(channel: TeamChannel): Promise<void> {
+    try {
+      const payload = JSON.parse(JSON.stringify(channel));
+      await setDoc(doc(db, 'team_channels', channel.id), payload, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteTeamChannel(channelId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'team_channels', channelId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async findOrCreateDirectChannel(churchId: string, currentUser: User, targetUsers: User[]): Promise<TeamChannel> {
+    const allIds = Array.from(new Set([currentUser.id, ...targetUsers.map(u => u.id)])).sort();
+    const dmId = `dm_${churchId}_${allIds.join('_')}`;
+    const ref = doc(db, 'team_channels', dmId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      return { id: snap.id, ...(snap.data() as Record<string, any>) } as TeamChannel;
+    }
+    const now = Date.now();
+    const channel: TeamChannel = {
+      id: dmId,
+      churchId,
+      type: 'direct',
+      participantIds: allIds,
+      isAutoJoinedByRole: false,
+      createdBy: currentUser.id,
+      createdAt: now,
+      lastMessageAt: now,
+      lastReadAt: { [currentUser.id]: now },
+    };
+    await this.saveTeamChannel(channel);
+    return channel;
+  }
+
+  async markTeamChannelRead(channelId: string, userId: string): Promise<void> {
+    if (!channelId || !userId) return;
+    try {
+      await updateDoc(doc(db, 'team_channels', channelId), {
+        [`lastReadAt.${userId}`]: Date.now(),
+      });
+    } catch (e) {
+      // Non-fatal if doc doesn't exist yet
+    }
+  }
+
+  async pinWidgetToChannel(channelId: string, widget: ChatWidgetAttachment): Promise<void> {
+    try {
+      const ref = doc(db, 'team_channels', channelId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data() as TeamChannel;
+      const existing = data.pinnedWidgets || [];
+      const filtered = existing.filter(w => w.widgetId !== widget.widgetId);
+      const updated = [JSON.parse(JSON.stringify(widget)), ...filtered];
+      await updateDoc(ref, { pinnedWidgets: updated });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async unpinWidgetFromChannel(channelId: string, widgetId: string): Promise<void> {
+    try {
+      const ref = doc(db, 'team_channels', channelId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data() as TeamChannel;
+      const existing = data.pinnedWidgets || [];
+      const updated = existing.filter(w => w.widgetId !== widgetId);
+      await updateDoc(ref, { pinnedWidgets: updated });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  subscribeToTeamMessages(churchId: string, channelId: string, onUpdate: (messages: TeamMessage[]) => void): Unsubscribe {
+    const q = query(
+      collection(db, 'team_messages'),
+      where('churchId', '==', churchId),
+      where('channelId', '==', channelId)
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as TeamMessage);
+        msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        onUpdate(msgs);
+      },
+      (err) => {
+        console.warn('[FirestoreService] subscribeToTeamMessages error:', err);
+      }
+    );
+  }
+
+  async sendTeamMessage(message: TeamMessage): Promise<void> {
+    try {
+      const payload = JSON.parse(JSON.stringify(message));
+      await setDoc(doc(db, 'team_messages', message.id), payload);
+      const previewText = message.text?.trim()
+        ? message.text.trim().slice(0, 90)
+        : message.widget
+        ? `📊 Shared widget: ${message.widget.title}`
+        : message.attachments && message.attachments.length > 0
+        ? `📎 Shared ${message.attachments.length} attachment${message.attachments.length > 1 ? 's' : ''}`
+        : 'New message';
+
+      await updateDoc(doc(db, 'team_channels', message.channelId), {
+        lastMessageAt: message.createdAt,
+        lastMessagePreview: previewText,
+        lastMessageSenderId: message.senderId,
+        lastMessageSenderName: message.senderName,
+        [`lastReadAt.${message.senderId}`]: message.createdAt,
+      }).catch(() => {});
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async updateTeamMessage(messageId: string, updates: Partial<TeamMessage>): Promise<void> {
+    try {
+      const payload = JSON.parse(JSON.stringify(updates));
+      await updateDoc(doc(db, 'team_messages', messageId), payload);
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteTeamMessage(messageId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'team_messages', messageId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async toggleTeamMessageReaction(messageId: string, emoji: string, userId: string): Promise<void> {
+    try {
+      const ref = doc(db, 'team_messages', messageId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const msg = snap.data() as TeamMessage;
+      const reactions = { ...(msg.reactions || {}) };
+      const currentUsers = reactions[emoji] || [];
+      if (currentUsers.includes(userId)) {
+        const next = currentUsers.filter(id => id !== userId);
+        if (next.length === 0) {
+          delete reactions[emoji];
+        } else {
+          reactions[emoji] = next;
+        }
+      } else {
+        reactions[emoji] = [...currentUsers, userId];
+      }
+      await updateDoc(ref, { reactions });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async claimWidgetItemInMessage(
+    messageId: string,
+    itemId: string,
+    claim: ChatWidgetItemClaim | null
+  ): Promise<void> {
+    try {
+      const ref = doc(db, 'team_messages', messageId);
+      if (claim) {
+        await updateDoc(ref, {
+          [`widget.claims.${itemId}`]: claim,
+        });
+      } else {
+        await updateDoc(ref, {
+          [`widget.claims.${itemId}`]: deleteField(),
+        });
+      }
     } catch (e) {
       this.handleFirestoreError(e);
     }

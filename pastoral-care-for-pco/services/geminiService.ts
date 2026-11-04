@@ -1141,3 +1141,49 @@ export const fetchContentRecommendations = async (
     }
     return res.json();
 };
+
+// ─── Team Chat @PastorAI Assistant ──────────────────────────────────────────
+
+export const generateTeamChatAiReply = async (params: {
+    churchName: string;
+    channelName: string;
+    userQuery: string;
+    senderName: string;
+    recentMessages: Array<{ senderName: string; text: string; widgetTitle?: string }>;
+    activeWidgetsContext?: string;
+    churchSummaryContext?: string;
+}): Promise<string> => {
+    const recentChatTranscript = params.recentMessages
+        .slice(-10)
+        .map(m => `${m.senderName}: ${m.text}${m.widgetTitle ? ` [Attached Widget: ${m.widgetTitle}]` : ''}`)
+        .join('\n');
+
+    const systemInstruction = `You are @PastorAI, an empathetic, strategic, and data-aware ministry assistant embedded inside the internal staff Team Chat for ${params.churchName} (Channel: #${params.channelName}).
+Rules:
+1. Keep your response concise, warm, and actionable for church leaders (under 180 words unless drafting outreach messages).
+2. Reference specific names, metrics, or trends from the attached widgets or church summary context when answering.
+3. When asked to draft outreach texts or emails (e.g., for Lapsed Donors or At-Risk members), keep the tone pastoral, caring, and relationship-first—never transactional or guilt-inducing about money.
+4. Use clean Markdown formatting (bullet points, bold text).`;
+
+    const prompt = `Recent Channel Conversation:
+${recentChatTranscript || '(Start of conversation)'}
+
+${params.activeWidgetsContext ? `Active Widgets in Thread / Channel:\n${params.activeWidgetsContext}\n` : ''}
+${params.churchSummaryContext ? `Church Snapshot Context:\n${params.churchSummaryContext}\n` : ''}
+
+Staff Member (${params.senderName}) asks @PastorAI:
+"${params.userQuery}"`;
+
+    try {
+        const res = await callGemini({
+            model: 'gemini-2.5-flash',
+            prompt,
+            systemInstruction,
+        });
+        return (res.text || '').trim() || 'I analyzed the thread, but could not generate a response right now.';
+    } catch (err: any) {
+        console.warn('[GeminiService] generateTeamChatAiReply fallback:', err);
+        return `🙏 **@PastorAI Note:** I'm having trouble connecting to the AI service right now (${err?.message || 'connection error'}), but based on the widget shared in **#${params.channelName}**, I recommend claiming the highest-priority follow-ups using the **Claim** button on the card so the team can coordinate personal check-ins this week.`;
+    }
+};
+

@@ -10,6 +10,9 @@ import { ServicesPage } from './components/pages/ServicesPage';
 import { GivingPage } from './components/pages/GivingPage';
 import { CarePage } from './components/pages/CarePage';
 import { TenantDataProvider } from './contexts/TenantDataContext';
+import { TeamChatProvider } from './contexts/TeamChatContext';
+import { TeamChatDrawer } from './components/chat/TeamChatDrawer';
+import { TeamChatWorkspace } from './components/chat/TeamChatWorkspace';
 import { useRiskEnrichedPeople, usePeopleDashboardData, useGivingAnalyticsData, useGroupsDashboardData, useAttendanceChartData } from './hooks/useDashboardData';
 import { syncAllData, syncGroupsData, syncServicesData, syncRecentGiving } from './services/pcoSyncService';
 import { initializeWebhooks } from './services/pcoWebhookService';
@@ -150,6 +153,7 @@ const App: React.FC = () => {
      if (path.startsWith('/app-settings')) return 'app-settings';
      if (path.startsWith('/global-admin')) return 'global-admin';
      if (path.startsWith('/library')) return 'library';
+     if (path.startsWith('/tools/team-chat')) return 'tools-team-chat';
      if (path.startsWith('/tools/emails')) return 'tools-emails';
      if (path.startsWith('/tools/forms')) return 'tools-forms';
      if (path.startsWith('/tools/polls')) return 'tools-polls';
@@ -710,6 +714,7 @@ const App: React.FC = () => {
               'app-settings': '/app-settings',
               'global-admin': '/global-admin',
               'library': '/library',
+              'tools-team-chat': '/tools/team-chat',
               'tools-emails': '/tools/emails',
               'tools-sms-inbox': '/tools/sms/inbox',
               'tools-sms-campaigns': '/tools/sms/campaigns',
@@ -1250,6 +1255,7 @@ const App: React.FC = () => {
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData, setCheckIns
         }}>
+            <TeamChatProvider>
             <div inert={isOverlayOpen ? true : undefined} className="flex flex-col min-h-screen">
                 <Layout 
                 user={user} 
@@ -1385,6 +1391,7 @@ const App: React.FC = () => {
                 } />
                 <Route path="/global-admin" element={<GlobalAdminManager />} />
                 
+                <Route path="/tools/team-chat" element={<div className="flex-1 min-h-0 flex flex-col"><TeamChatWorkspace /></div>} />
                 <Route path="/tools/emails" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="emails" />} />
                 <Route path="/tools/polls" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="polls" />} />
                 <Route path="/tools/website" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="website" />} />
@@ -1447,6 +1454,9 @@ const App: React.FC = () => {
             </Layout>
             </div>
             
+            {/* Global Slide-Over Team Chat Drawer */}
+            <TeamChatDrawer />
+
             {/* Global Profile Drawer Overlay */}
             {selectedPersonId && church && (
                 <PersonProfileDrawer 
@@ -1455,6 +1465,7 @@ const App: React.FC = () => {
                     onClose={() => setSelectedPersonId(null)}
                 />
             )}
+            </TeamChatProvider>
         </TenantDataProvider>
     </>
   );

@@ -12,6 +12,7 @@ import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
 import { useTenantData } from '../contexts/TenantDataContext';
+import { useTeamChat } from '../contexts/TeamChatContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -79,6 +80,7 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
 
   const { campuses, selectedCampusId, setSelectedCampusId } = useTenantData();
+  const { isDrawerOpen, setIsDrawerOpen, totalUnreadCount } = useTeamChat();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
@@ -253,6 +255,7 @@ const Layout: React.FC<LayoutProps> = ({
     }
     if (hasPermission('tools')) {
       const toolItems: NavLeaf[] = [
+        { view: 'tools-team-chat',     icon: MessageSquare, label: 'Team Chat'     },
         { view: 'tools-emails',        icon: Mail,          label: 'Emails'        },
         { view: 'tools-sms-inbox',     icon: MessageSquare, label: 'SMS',          activeMatch: v => v.startsWith('tools-sms') },
         { view: 'tools-workflows',     icon: Zap,           label: 'Workflows'     },
@@ -444,6 +447,27 @@ const Layout: React.FC<LayoutProps> = ({
                         </div>
                     );
                 })()}
+
+                {/* Team Chat Slide-Over Drawer Button */}
+                <button
+                    type="button"
+                    onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                    title="Team Chat & Widget Collaboration"
+                    aria-label="Open Team Chat"
+                    className={`relative flex items-center gap-1.5 px-3 h-8 rounded-full border transition-all ${
+                        isDrawerOpen || currentView === 'tools-team-chat'
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
+                >
+                    <MessageSquare size={14} strokeWidth={2.5} />
+                    <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider">Chat</span>
+                    {totalUnreadCount > 0 && (
+                        <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[9px] font-black rounded-full bg-rose-500 text-white animate-pulse">
+                            {totalUnreadCount}
+                        </span>
+                    )}
+                </button>
 
                 {/* Settings Gear Icon */}
                 {hasPermission('settings') && (

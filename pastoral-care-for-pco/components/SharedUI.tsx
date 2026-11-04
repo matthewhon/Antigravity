@@ -67,8 +67,18 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ title, onRemove, c
             </div>
         )}
       </div>
-      <div className="flex items-center gap-3 print:hidden">
+      <div className="flex items-center gap-2.5 print:hidden">
           {headerControl}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('discussWidgetInChat', { detail: { title } }))}
+            title={`Discuss "${title}" in Team Chat`}
+            aria-label={`Discuss ${title} in Team Chat`}
+            className="opacity-0 group-hover:opacity-100 focus:opacity-100 inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 dark:hover:text-white text-[10px] font-bold transition-all"
+          >
+            <span>💬</span>
+            <span className="hidden sm:inline">Discuss</span>
+          </button>
           {onRemove && (
             <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -165,9 +175,21 @@ export const DonorListWidget: React.FC<{ title: string; donors: LifecycleDonor[]
                     <h4 className={EYEBROW}>{title}</h4>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${theme} print:border print:bg-white`}>{donors.length}</span>
                 </div>
-                <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors print:hidden">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
+                <div className="flex items-center gap-2 print:hidden">
+                    <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('discussWidgetInChat', { detail: { title, donors } }))}
+                        title={`Discuss "${title}" in Team Chat`}
+                        aria-label={`Discuss ${title} in Team Chat`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 dark:hover:text-white text-[10px] font-bold transition-all"
+                    >
+                        <span>💬</span>
+                        <span>Discuss</span>
+                    </button>
+                    <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2 max-h-64 print:max-h-none print:overflow-visible">
