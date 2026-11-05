@@ -7,7 +7,7 @@ import {
     Inbox, MessageSquare, Key, BarChart3, Phone, ChevronDown,
     Loader2, Bell, BellOff, Folder,
     Zap, Sparkles, Shield, Mail,
-    Settings2,
+    Settings2, Cake,
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { QuickSendModal } from './QuickSendModal';
@@ -48,6 +48,8 @@ interface MobileSmsLayoutProps {
     churchId: string;
     church: Church;
     currentUser: User;
+    todayCelebrationsCount?: number;
+    onOpenCelebrationsModal?: () => void;
     onUpdateChurch: (updates: Partial<Church>) => Promise<void>;
     onNavigateHome: () => void;
     onLogout?: () => void;
@@ -177,6 +179,8 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     churchId,
     church,
     currentUser,
+    todayCelebrationsCount = 0,
+    onOpenCelebrationsModal,
     onUpdateChurch,
     onNavigateHome,
     onLogout,
@@ -415,6 +419,27 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
                     {/* Right: notifications + share + number selector */}
                     <div className="flex items-center gap-1.5 min-[375px]:gap-2 shrink-0">
+                        {/* Today's Celebrations button */}
+                        {onOpenCelebrationsModal && (
+                            <button
+                                onClick={onOpenCelebrationsModal}
+                                title="Today's Birthdays & Anniversaries"
+                                className="relative w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 transition active:opacity-60"
+                            >
+                                <Cake
+                                    className={`w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px] ${
+                                        todayCelebrationsCount > 0 ? 'text-violet-600 dark:text-violet-400' : ''
+                                    }`}
+                                    strokeWidth={1.9}
+                                />
+                                {todayCelebrationsCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full bg-violet-600 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                                        {todayCelebrationsCount}
+                                    </span>
+                                )}
+                            </button>
+                        )}
+
                         {/* Push notification bell */}
                         {'Notification' in window && (
                             <button

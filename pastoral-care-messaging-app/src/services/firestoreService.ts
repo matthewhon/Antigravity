@@ -329,6 +329,18 @@ class FirestoreService {
   }
 
 
+  async completeUserPasswordChange(uid: string): Promise<void> {
+      try {
+          await updateDoc(doc(db, 'users', uid), {
+              mustChangePassword: false,
+              passwordChangedAt: Date.now(),
+          });
+      } catch (e) {
+          this.handleFirestoreError(e);
+          throw e;
+      }
+  }
+
   async updateUserLastLogin(uid: string) {
       try {
           await updateDoc(doc(db, 'users', uid), { lastLogin: Date.now() });

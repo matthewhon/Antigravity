@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
+        registerPlugin(CelebrationNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

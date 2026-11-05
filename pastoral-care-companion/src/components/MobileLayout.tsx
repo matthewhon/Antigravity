@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Church, User, PcoPerson, PastoralNote, PcoGroup } from '../types';
 import { auth } from '../services/firebase';
 import { firestore } from '../services/firestoreService';
 import { 
   Users, Map, PhoneCall, FileText, UsersRound,
   Settings2, LogOut, RefreshCw, X, 
-  Sun, Moon, Monitor 
+  Sun, Moon, Monitor, Cake, Bell, Clock
 } from 'lucide-react';
 import { PeopleDirectoryView } from './PeopleDirectoryView';
 import { PeopleMapView } from './PeopleMapView';
@@ -13,6 +14,16 @@ import { OutreachView } from './OutreachView';
 import { MobileFormsView } from './MobileFormsView';
 import { PersonProfileView } from './PersonProfileView';
 import { GroupsView } from './GroupsView';
+import { TodaysCelebrationsModal } from './TodaysCelebrationsModal';
+import {
+  CelebrationNotificationsNative,
+  getCelebrationSettings,
+  saveCelebrationSettings,
+  getCelebrationsForDate,
+  syncScheduledCelebrationNotifications,
+  checkAndFireInAppCelebrationToday,
+  showCelebrationInAppBanner,
+} from '../services/celebrationNotifications';
 import logoIconTransparent from '../assets/logo-icon-transparent.png';
 
 interface MobileLayoutProps {
@@ -39,6 +50,63 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>(() => {
     return (localStorage.getItem('mobileAppearance') || 'system') as 'light' | 'dark' | 'system';
   });
+
+  // Daily Birthday & Anniversary Notifications State
+  const [showCelebrationsModal, setShowCelebrationsModal] = useState(false);
+  const [celebrationSettings, setCelebrationSettings] = useState(() => getCelebrationSettings());
+
+  const todayCelebrationsCount = useMemo(() => {
+    return getCelebrationsForDate(people, new Date()).length;
+  }, [people]);
+
+  const handleUpdateCelebrationSettings = (updates: Partial<{ enabled: boolean; time: string }>) => {
+    const next = { ...celebrationSettings, ...updates };
+    setCelebrationSettings(next);
+    saveCelebrationSettings(next);
+    syncScheduledCelebrationNotifications(people);
+  };
+
+  // Register native local notification tap/receive listeners
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const tapPromise = CelebrationNotificationsNative.addListener(
+      'celebrationNotificationTapped',
+      () => {
+        setShowCelebrationsModal(true);
+      }
+    );
+
+    const recvPromise = CelebrationNotificationsNative.addListener(
+      'celebrationNotificationReceived',
+      (data) => {
+        showCelebrationInAppBanner(
+          data.title || "🎉 Today's Celebrations",
+          data.body || 'Tap to view birthdays & anniversaries today!',
+          () => setShowCelebrationsModal(true)
+        );
+      }
+    );
+
+    return () => {
+      tapPromise.then(h => h.remove()).catch(() => {});
+      recvPromise.then(h => h.remove()).catch(() => {});
+    };
+  }, []);
+
+  // Schedule upcoming daily notifications and check if today's notification should fire
+  useEffect(() => {
+    if (people.length === 0) return;
+
+    syncScheduledCelebrationNotifications(people);
+    checkAndFireInAppCelebrationToday(people, () => setShowCelebrationsModal(true));
+
+    const interval = setInterval(() => {
+      checkAndFireInAppCelebrationToday(people, () => setShowCelebrationsModal(true));
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [people, celebrationSettings.enabled, celebrationSettings.time]);
 
   // Local Storage Stale-While-Revalidate Cache Effect
   useEffect(() => {
@@ -175,6 +243,20 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Today's Celebrations Button */}
+            <button
+              onClick={() => setShowCelebrationsModal(true)}
+              title="Today's Birthdays & Anniversaries"
+              className="relative w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-zinc-500 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors active:scale-95"
+            >
+              <Cake size={16} className={todayCelebrationsCount > 0 ? 'text-indigo-600 dark:text-indigo-400' : ''} />
+              {todayCelebrationsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                  {todayCelebrationsCount}
+                </span>
+              )}
+            </button>
+
             {/* Sync Button */}
             <button
               onClick={handleSyncPeople}
@@ -417,6 +499,72 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
                 </div>
               </div>
 
+              {/* Daily Birthday & Anniversary Notifications */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
+                  Daily Celebration Alerts
+                </label>
+                <div className="bg-slate-50 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <Bell size={15} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">
+                          Birthday &amp; Anniversary Notifications
+                        </p>
+                        <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                          Daily summary of who is celebrating today
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={celebrationSettings.enabled}
+                      onClick={() => handleUpdateCelebrationSettings({ enabled: !celebrationSettings.enabled })}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                        celebrationSettings.enabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-zinc-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          celebrationSettings.enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {celebrationSettings.enabled && (
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-200/60 dark:border-zinc-800">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-300">
+                        <Clock size={14} className="text-indigo-500" />
+                        <span>Notification Time</span>
+                      </div>
+                      <input
+                        type="time"
+                        value={celebrationSettings.time}
+                        onChange={(e) => handleUpdateCelebrationSettings({ time: e.target.value || '08:00' })}
+                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSettings(false);
+                      setShowCelebrationsModal(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl transition"
+                  >
+                    <Cake size={14} />
+                    View Today&apos;s Celebrations ({todayCelebrationsCount})
+                  </button>
+                </div>
+              </div>
+
               {/* Data Sync Actions */}
               <div>
                 <label className="block text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Sync Controls</label>
@@ -446,6 +594,17 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
             </div>
           </div>
         </div>
+      )}
+
+      {/* Today's Celebrations Modal */}
+      {showCelebrationsModal && (
+        <TodaysCelebrationsModal
+          people={people}
+          churchName={church.name}
+          currentUserName={currentUser.name}
+          onClose={() => setShowCelebrationsModal(false)}
+          onSelectPerson={(person) => setSelectedPerson(person)}
+        />
       )}
 
       {/* Shared Global Profile Drawer Overlay */}

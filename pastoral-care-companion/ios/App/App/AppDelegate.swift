@@ -1,5 +1,126 @@
 import UIKit
 import Capacitor
+import UserNotifications
+
+@objc(CelebrationNotificationsPlugin)
+public class CelebrationNotificationsPlugin: CAPPlugin, CAPBridgedPlugin, NotificationHandlerProtocol {
+    public let identifier = "CelebrationNotificationsPlugin"
+    public let jsName = "CelebrationNotifications"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "scheduleNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelAll", returnType: CAPPluginReturnPromise)
+    ]
+
+    override public func load() {
+        bridge?.notificationRouter.localNotificationHandler = self
+    }
+
+    @objc func requestPermissions(_ call: CAPPluginCall) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                call.reject(error.localizedDescription)
+                return
+            }
+            call.resolve(["granted": granted])
+        }
+    }
+
+    @objc func scheduleNotifications(_ call: CAPPluginCall) {
+        guard let items = call.getArray("notifications", JSObject.self) else {
+            call.resolve()
+            return
+        }
+
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { existing in
+            let oldIds = existing
+                .map { $0.identifier }
+                .filter { $0.hasPrefix("pc_celebration_") }
+            if !oldIds.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: oldIds)
+            }
+
+            for item in items {
+                guard let title = item["title"] as? String,
+                      let body = item["body"] as? String,
+                      let dateKey = item["dateKey"] as? String,
+                      let triggerAtMs = item["triggerAtMs"] as? Double else {
+                    continue
+                }
+
+                let triggerDate = Date(timeIntervalSince1970: triggerAtMs / 1000.0)
+                if triggerDate <= Date() {
+                    continue
+                }
+
+                let content = UNMutableNotificationContent()
+                content.title = title
+                content.body = body
+                content.sound = .default
+                content.userInfo = [
+                    "celebrationDateKey": dateKey,
+                    "type": "celebrations"
+                ]
+
+                let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: triggerDate)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                let req = UNNotificationRequest(
+                    identifier: "pc_celebration_\(dateKey)",
+                    content: content,
+                    trigger: trigger
+                )
+                center.add(req, withCompletionHandler: nil)
+            }
+
+            call.resolve()
+        }
+    }
+
+    @objc func cancelAll(_ call: CAPPluginCall) {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { existing in
+            let oldIds = existing
+                .map { $0.identifier }
+                .filter { $0.hasPrefix("pc_celebration_") }
+            if !oldIds.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: oldIds)
+            }
+            call.resolve()
+        }
+    }
+
+    public func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
+        let userInfo = notification.request.content.userInfo
+        let dateKey = userInfo["celebrationDateKey"] as? String ?? ""
+        self.notifyListeners("celebrationNotificationReceived", data: [
+            "title": notification.request.content.title,
+            "body": notification.request.content.body,
+            "dateKey": dateKey
+        ])
+        if #available(iOS 14.0, *) {
+            return [.banner, .list, .sound]
+        } else {
+            return [.alert, .sound]
+        }
+    }
+
+    public func didReceive(response: UNNotificationResponse) {
+        let userInfo = response.notification.request.content.userInfo
+        let dateKey = userInfo["celebrationDateKey"] as? String ?? ""
+        self.notifyListeners("celebrationNotificationTapped", data: [
+            "dateKey": dateKey
+        ], retainUntilConsumed: true)
+    }
+}
+
+@objc(MainBridgeViewController)
+class MainBridgeViewController: CAPBridgeViewController {
+    override open func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        bridge?.registerPluginInstance(CelebrationNotificationsPlugin())
+    }
+}
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,42 +128,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
         return true
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 

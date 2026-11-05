@@ -18,11 +18,12 @@ import {
     Calendar, Phone, Search, RefreshCw, Settings, Key, AlertTriangle,
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
-    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
+    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw, Contact,
     Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
+import { SmsEventPickerModal, generateCampaignContent } from './SmsEventPickerModal';
 
 // --- Constants --------------------------------------------------------------
 
@@ -110,6 +111,10 @@ const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
     { tag: '{state}', label: 'State' },
     { tag: '{birthday}', label: 'Birthday' },
     { tag: '{anniversary}', label: 'Anniversary' },
+    { tag: '{church.name}', label: 'Church Name' },
+    { tag: '{church.phone}', label: 'Church Phone' },
+    { tag: '{church.address}', label: 'Church Address' },
+    { tag: '{church.website}', label: 'Church Website' },
 ];
 
 const COMMON_EMOJIS = [
@@ -170,8 +175,20 @@ function countSegments(body: string): number {
     }
 }
 
-/** Call the Gemini AI proxy to suggest a shorter SMS message. */
-async function getSmsAiSuggestion(messageBody: string): Promise<string> {
+/** Shorten an SMS to ~1 segment in the church's voice via the campaign writer, with fallback to /ai/generate. */
+async function shortenSms(messageBody: string, churchId?: string): Promise<string> {
+    try {
+        const result = await generateCampaignContent({
+            channel: 'sms',
+            churchId,
+            existingText: messageBody,
+            topic: 'Shorten this text message to under 160 characters (one SMS segment) while keeping its full meaning and warmth. Keep merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as written, and keep any link.',
+            length: 'short',
+        });
+        if (result?.body?.trim()) return result.body.trim();
+    } catch {
+        // Fallback to direct /ai/generate proxy
+    }
     const res = await fetch(`${API_BASE}/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,6 +205,11 @@ ${messageBody}`,
     if (!res.ok) throw new Error('AI request failed');
     const data = await safeJson(res);
     return (data.text || '').trim();
+}
+
+/** Call the campaign writer / Gemini AI proxy to suggest a shorter SMS message. */
+async function getSmsAiSuggestion(messageBody: string, churchId?: string): Promise<string> {
+    return shortenSms(messageBody, churchId);
 }
 
 /** Shape the AI returns for a generated workflow. */
@@ -351,13 +373,32 @@ const ScheduleModal: React.FC<{
 
 // --- File Picker Modal ------------------------------------------------------
 
+const formatFileSize = (bytes?: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 const FilePickerDialog: React.FC<{
     churchId: string;
+    currentUser?: User;
     onSelect: (url: string) => void;
+    onSelectAsMms?: (url: string) => void;
     onClose: () => void;
-}> = ({ churchId, onSelect, onClose }) => {
+}> = ({ churchId, currentUser, onSelect, onSelectAsMms, onClose }) => {
     const [files, setFiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<'upload' | 'library'>('upload');
+    const [search, setSearch] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadError, setUploadError] = useState('');
+    const [uploadedFile, setUploadedFile] = useState<any | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const base = (API_BASE && API_BASE.startsWith('http')) ? API_BASE : window.location.origin;
 
     useEffect(() => {
         firestore.getTenantFiles(churchId).then(f => {
@@ -366,42 +407,262 @@ const FilePickerDialog: React.FC<{
         }).catch(() => setLoading(false));
     }, [churchId]);
 
+    const handleFileUpload = async (file: File) => {
+        if (!file) return;
+        setIsUploading(true);
+        setUploadProgress(0);
+        setUploadError('');
+        setUploadedFile(null);
+
+        try {
+            const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const gcsPath = `tenants/${churchId}/uploads/${fileId}_${cleanName}`;
+            const sRef = storageRef(storage, gcsPath);
+
+            let uploadData: Blob | File = file;
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as ArrayBuffer);
+                        reader.onerror = reject;
+                        reader.readAsArrayBuffer(file);
+                    });
+                    uploadData = new Blob([buffer], { type: file.type || 'application/octet-stream' });
+                } catch (err) {
+                    console.error('[UploadHelper] Failed to convert file to Blob', err);
+                }
+            }
+
+            const task = uploadBytesResumable(sRef, uploadData);
+
+            await new Promise<void>((resolve, reject) => {
+                task.on('state_changed',
+                    snap => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+                    reject,
+                    () => resolve()
+                );
+            });
+
+            const publicUrl = await getDownloadURL(sRef);
+            const tenantFile = {
+                id: fileId,
+                churchId,
+                uploaderUid: currentUser?.id || 'system',
+                originalName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                sizeBytes: file.size,
+                publicUrl,
+                gcsPath,
+                createdAt: Date.now(),
+            };
+
+            await firestore.saveTenantFile(tenantFile);
+            setFiles(prev => [tenantFile, ...prev]);
+            setUploadedFile(tenantFile);
+            setUploadProgress(null);
+        } catch (err: any) {
+            console.error('File upload failed', err);
+            setUploadError(err.message || 'File upload failed. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const filteredFiles = files.filter(f =>
+        !search.trim() || f.originalName?.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-lg mx-auto flex flex-col max-h-[85vh] border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FileText size={16} className="text-violet-500" /> Select a File to Attach
+                        <FileText size={18} className="text-violet-500" /> Attach File or Document
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                    <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition"><X size={16} /></button>
                 </div>
-                {loading ? (
-                    <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
-                ) : files.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">No files found.</p>
-                        <p className="text-xs text-slate-400">Upload files in the "Files" tool first.</p>
-                    </div>
-                ) : (
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                        {files.map(f => {
-                            const base = (API_BASE && API_BASE.startsWith('http')) ? API_BASE : window.location.origin;
-                            return (
-                                <button
-                                    key={f.id}
-                                    onClick={() => onSelect(`${base}/f/${f.id}`)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
-                                >
-                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                                        <FileText size={18} className="text-slate-500" />
+
+                {/* Tab Switcher */}
+                <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+                    <button
+                        type="button"
+                        onClick={() => setTab('upload')}
+                        className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
+                            tab === 'upload'
+                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
+                        }`}
+                    >
+                        <Upload size={14} /> Upload New File
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTab('library')}
+                        className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
+                            tab === 'library'
+                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
+                        }`}
+                    >
+                        <FileText size={14} /> Church Library ({files.length})
+                    </button>
+                </div>
+
+                {tab === 'upload' ? (
+                    <div className="space-y-4 flex-1 flex flex-col justify-center">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            onChange={e => {
+                                const f = e.target.files?.[0];
+                                if (f) handleFileUpload(f);
+                            }}
+                        />
+
+                        {!uploadedFile ? (
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={e => e.preventDefault()}
+                                onDrop={e => {
+                                    e.preventDefault();
+                                    const f = e.dataTransfer.files?.[0];
+                                    if (f) handleFileUpload(f);
+                                }}
+                                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-violet-500 dark:hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition"
+                            >
+                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 flex items-center justify-center mb-3">
+                                    <Upload size={22} />
+                                </div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                    {isUploading ? 'Uploading file...' : 'Click to select or drag & drop'}
+                                </p>
+                                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                    PDF, flyer, bulletin, document, audio, or image to share via link
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                        <CheckCircle size={20} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-bold text-slate-900 dark:text-white truncate">{f.originalName}</div>
-                                        <div className="text-[10px] text-slate-500">{f.mimeType} ... {new Date(f.createdAt).toLocaleDateString()}</div>
+                                        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100 truncate">{uploadedFile.originalName}</p>
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-400">{formatFileSize(uploadedFile.sizeBytes)} • Ready to attach</p>
                                     </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelect(`${base}/f/${uploadedFile.id}`)}
+                                        className="flex-1 py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                    >
+                                        <Link size={13} /> Insert Link in Message
+                                    </button>
+                                    {uploadedFile.mimeType?.startsWith('image/') && onSelectAsMms && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onSelectAsMms(uploadedFile.publicUrl || `${base}/f/${uploadedFile.id}`)}
+                                            className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                        >
+                                            <ImageIcon size={13} /> Send as MMS
+                                        </button>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setUploadedFile(null)}
+                                    className="text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-center w-full pt-1"
+                                >
+                                    Upload a different file
                                 </button>
-                            );
-                        })}
+                            </div>
+                        )}
+
+                        {uploadProgress !== null && (
+                            <div className="space-y-1">
+                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                                </div>
+                                <p className="text-[11px] text-slate-400 text-right">{uploadProgress}%</p>
+                            </div>
+                        )}
+
+                        {uploadError && (
+                            <div className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-xl border border-red-200 dark:border-red-800">
+                                {uploadError}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col min-h-0">
+                        <div className="relative mb-3">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Search existing files..."
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            />
+                        </div>
+
+                        {loading ? (
+                            <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
+                        ) : filteredFiles.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">No files match your search.</p>
+                                <p className="text-xs text-slate-400">Switch to the upload tab to add a new file.</p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {filteredFiles.map(f => {
+                                    const isImg = f.mimeType?.startsWith('image/');
+                                    return (
+                                        <div
+                                            key={f.id}
+                                            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                                        >
+                                            <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                                                {isImg ? (
+                                                    <ImageIcon size={18} className="text-emerald-500" />
+                                                ) : (
+                                                    <FileText size={18} className="text-violet-500" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{f.originalName}</div>
+                                                <div className="text-[10px] text-slate-400">{formatFileSize(f.sizeBytes)} • {new Date(f.createdAt).toLocaleDateString()}</div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                {isImg && onSelectAsMms && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onSelectAsMms(f.publicUrl || `${base}/f/${f.id}`)}
+                                                        className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition"
+                                                        title="Attach as MMS Image"
+                                                    >
+                                                        MMS
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onSelect(`${base}/f/${f.id}`)}
+                                                    className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition"
+                                                >
+                                                    Insert Link
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -447,20 +708,111 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const [showEmojis, setShowEmojis] = useState(false);
     const [showLinkDlg, setShowLinkDlg] = useState(false);
     const [showFilePicker, setShowFilePicker] = useState(false);
+    const [showEventPicker, setShowEventPicker] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
     const [imageUrl, setImageUrl] = useState((local.mediaUrls && local.mediaUrls[0]) || '');
+    const [sendAsMms, setSendAsMms] = useState<boolean>(
+        Boolean((local.mediaUrls && local.mediaUrls.length > 0) || (local.mediaUrls && local.mediaUrls[0]))
+    );
+    const [showImagePanel, setShowImagePanel] = useState(false);
+    const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
+    const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
+    const [imageUploadError, setImageUploadError] = useState('');
+    const [urlInput, setUrlInput] = useState('');
+    const imageFileInputRef = useRef<HTMLInputElement>(null);
     const [aiSuggestion, setAiSuggestion] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
     const [showAiPanel, setShowAiPanel] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
- 
-    const segments = countSegments(local.body || '');
+
+    // Sync external campaign media changes
+    useEffect(() => {
+        const m = (local.mediaUrls && local.mediaUrls[0]) || '';
+        if (m) {
+            setImageUrl(m);
+            setSendAsMms(true);
+        }
+    }, [local.mediaUrls]);
+
+    const isMmsActive = Boolean(imageUrl && sendAsMms && local.channelType !== 'email');
+    const segments = isMmsActive ? 1 : countSegments(local.body || '');
     const canSend = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId) && (local.channelType === 'email' ? !!(local.emailSubject?.trim()) : true);
  
     const update = useCallback((patch: Partial<SmsCampaign>) => {
         setLocal(prev => ({ ...prev, ...patch }));
         onSave(patch).then(() => setLastSaved(Date.now()));
     }, [onSave]);
+
+    const handleToggleMms = (enabled: boolean) => {
+        setSendAsMms(enabled);
+        if (imageUrl) {
+            update({ mediaUrls: enabled ? [imageUrl] : [] });
+        }
+    };
+
+    const handleSetImage = (url: string, asMms: boolean = true) => {
+        setImageUrl(url);
+        setSendAsMms(asMms);
+        update({ mediaUrls: asMms ? [url] : [] });
+        setShowImagePanel(false);
+    };
+
+    const handleRemoveImage = () => {
+        setImageUrl('');
+        setSendAsMms(false);
+        update({ mediaUrls: [] });
+        setShowImagePanel(false);
+    };
+
+    const handleInsertImageLink = () => {
+        if (!imageUrl) return;
+        insertAtCursor(' ' + imageUrl);
+    };
+
+    const handleImageFileUpload = async (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            setImageUploadError('Please select an image file (JPG, PNG, GIF, WebP).');
+            return;
+        }
+        setImageUploadError('');
+        setImageUploadProgress(0);
+        let compressedFile = file;
+        try {
+            compressedFile = await compressSmsImage(file) as File;
+        } catch (err) {
+            console.warn('[ImageCompress] Compression failed, uploading original', err);
+        }
+        const cleanName = compressedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `sms-media/${churchId}/broadcast/${Date.now()}_${cleanName}`;
+        const sRef = storageRef(storage, path);
+
+        let uploadData: Blob | File = compressedFile;
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as ArrayBuffer);
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(compressedFile);
+                });
+                uploadData = new Blob([buffer], { type: compressedFile.type || 'application/octet-stream' });
+            } catch (err) {
+                console.error('[UploadHelper] Failed to convert file to Blob', err);
+            }
+        }
+
+        const task = uploadBytesResumable(sRef, uploadData);
+        task.on(
+            'state_changed',
+            snap => setImageUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            err => { setImageUploadError('Upload failed: ' + err.message); setImageUploadProgress(null); },
+            async () => {
+                const url = await getDownloadURL(task.snapshot.ref);
+                setImageUploadProgress(null);
+                handleSetImage(url, sendAsMms);
+            }
+        );
+    };
 
     const [step, setStep] = useState<1|2|3|4>(1);
     const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
@@ -500,7 +852,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         setShowAiPanel(true);
         setAiSuggestion('');
         try {
-            const suggestion = await getSmsAiSuggestion(local.body);
+            const suggestion = await getSmsAiSuggestion(local.body, churchId);
             setAiSuggestion(suggestion);
         } catch {
             setAiSuggestion('Unable to get AI suggestion. Please try again.');

@@ -1,25 +1,122 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { firestore } from './services/firestoreService';
-import { User, Church } from './types';
+import { User, Church, PcoPerson } from './types';
 import { Loader2 } from 'lucide-react';
 
 import { LoginView } from './components/LoginView';
 import MobileSmsLayout from './components/MobileSmsLayout';
 import SettingsPage from './components/SettingsPage';
 import { NoChurchAccess } from './components/NoChurchAccess';
+import { TodaysCelebrationsModal } from './components/TodaysCelebrationsModal';
+import { ForceChangePasswordModal } from './components/ForceChangePasswordModal';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import {
+  CelebrationNotificationsNative,
+  getCelebrationsForDate,
+  syncScheduledCelebrationNotifications,
+  checkAndFireInAppCelebrationToday,
+  showCelebrationInAppBanner,
+} from './services/celebrationNotifications';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [church, setChurch] = useState<Church | null>(null);
+  const [people, setPeople] = useState<PcoPerson[]>([]);
+  const [showCelebrationsModal, setShowCelebrationsModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Initialize Push Notifications if logged in and on a native device
   usePushNotifications(user);
+
+  const todayCelebrationsCount = useMemo(() => {
+    return getCelebrationsForDate(people, new Date()).length;
+  }, [people]);
+
+  // Load church people directory (cached + fresh) for daily birthday/anniversary notifications
+  useEffect(() => {
+    if (!church?.id) {
+      setPeople([]);
+      return;
+    }
+    const cacheKey = `pc_people_cache_${church.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setPeople(JSON.parse(cached));
+      } catch {
+        // ignore invalid cache
+      }
+    }
+
+    firestore.getPeople(church.id).then(fresh => {
+      setPeople(fresh);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(fresh));
+      } catch {
+        // ignore quota errors
+      }
+    }).catch(err => console.warn('[Celebrations] Could not load people:', err));
+  }, [church?.id]);
+
+  // Listen for celebration notification taps/events and settings changes
+  useEffect(() => {
+    const handleOpenModal = () => setShowCelebrationsModal(true);
+    window.addEventListener('openCelebrationsModal', handleOpenModal);
+
+    let tapPromise: Promise<{ remove: () => Promise<void> }> | null = null;
+    let recvPromise: Promise<{ remove: () => Promise<void> }> | null = null;
+
+    if (Capacitor.isNativePlatform()) {
+      tapPromise = CelebrationNotificationsNative.addListener(
+        'celebrationNotificationTapped',
+        () => setShowCelebrationsModal(true)
+      );
+      recvPromise = CelebrationNotificationsNative.addListener(
+        'celebrationNotificationReceived',
+        (data) => {
+          showCelebrationInAppBanner(
+            data.title || "🎉 Today's Celebrations",
+            data.body || 'Tap to view birthdays & anniversaries today!',
+            () => setShowCelebrationsModal(true)
+          );
+        }
+      );
+    }
+
+    return () => {
+      window.removeEventListener('openCelebrationsModal', handleOpenModal);
+      if (tapPromise) tapPromise.then(h => h.remove()).catch(() => {});
+      if (recvPromise) recvPromise.then(h => h.remove()).catch(() => {});
+    };
+  }, []);
+
+  // Schedule upcoming notifications & check today's celebration alert
+  useEffect(() => {
+    if (!user || !church || people.length === 0) return;
+
+    syncScheduledCelebrationNotifications(people);
+    checkAndFireInAppCelebrationToday(people, () => setShowCelebrationsModal(true));
+
+    const handleSettingsChanged = () => {
+      syncScheduledCelebrationNotifications(people);
+      checkAndFireInAppCelebrationToday(people, () => setShowCelebrationsModal(true));
+    };
+    window.addEventListener('celebrationSettingsChanged', handleSettingsChanged);
+
+    const interval = setInterval(() => {
+      checkAndFireInAppCelebrationToday(people, () => setShowCelebrationsModal(true));
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('celebrationSettingsChanged', handleSettingsChanged);
+      clearInterval(interval);
+    };
+  }, [user, church, people]);
 
   useEffect(() => {
     import('@capacitor/text-zoom').then(({ TextZoom }) => {
@@ -120,6 +217,13 @@ const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ churchId: church.id }),
       });
+      const fresh = await firestore.getPeople(church.id);
+      setPeople(fresh);
+      try {
+        localStorage.setItem(`pc_people_cache_${church.id}`, JSON.stringify(fresh));
+      } catch {
+        // ignore quota errors
+      }
     } catch (e: any) {
       console.error('PCO sync failed:', e);
     } finally {
@@ -147,6 +251,8 @@ const App: React.FC = () => {
                   churchId={church.id}
                   church={church}
                   currentUser={user}
+                  todayCelebrationsCount={todayCelebrationsCount}
+                  onOpenCelebrationsModal={() => setShowCelebrationsModal(true)}
                   onUpdateChurch={async (updates) => {
                     const updated = { ...church, ...updates };
                     setChurch(updated);
@@ -172,6 +278,8 @@ const App: React.FC = () => {
                 currentUser={user}
                 church={church}
                 isSyncing={isSyncing}
+                todayCelebrationsCount={todayCelebrationsCount}
+                onOpenCelebrationsModal={() => setShowCelebrationsModal(true)}
                 onLogout={() => auth.signOut()}
                 onUpdateTheme={handleUpdateTheme}
                 onSyncPeople={handleSyncPeople}
@@ -184,6 +292,22 @@ const App: React.FC = () => {
 
         <Route path="/login" element={!user ? <LoginView /> : <Navigate to="/" replace />} />
       </Routes>
+
+      {user && user.mustChangePassword && (
+        <ForceChangePasswordModal
+          user={user}
+          onSuccess={() => setUser({ ...user, mustChangePassword: false })}
+        />
+      )}
+
+      {showCelebrationsModal && user && church && (
+        <TodaysCelebrationsModal
+          people={people}
+          church={church}
+          currentUser={user}
+          onClose={() => setShowCelebrationsModal(false)}
+        />
+      )}
     </HashRouter>
   );
 };

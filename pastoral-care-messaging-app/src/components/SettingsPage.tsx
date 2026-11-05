@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Church, User } from '../types';
-import { firestore } from '../services/firestoreService';
 import {
-    ChevronLeft, Settings2, Sun, Moon, Smartphone,
-    RefreshCw, LogOut, Loader2,
+    ChevronLeft, Sun, Moon, Smartphone,
+    RefreshCw, LogOut, Loader2, Cake, Bell, Clock
 } from 'lucide-react';
+import {
+    getCelebrationSettings,
+    saveCelebrationSettings,
+} from '../services/celebrationNotifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,6 +16,8 @@ interface SettingsPageProps {
     currentUser: User;
     church: Church;
     isSyncing: boolean;
+    todayCelebrationsCount?: number;
+    onOpenCelebrationsModal?: () => void;
     onLogout: () => void;
     onUpdateTheme: (pref: 'light' | 'dark' | 'system') => void;
     onSyncPeople: () => Promise<void>;
@@ -33,6 +38,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentUser,
     church,
     isSyncing,
+    todayCelebrationsCount = 0,
+    onOpenCelebrationsModal,
     onLogout,
     onUpdateTheme,
     onSyncPeople,
@@ -41,6 +48,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     const [appearance, setAppearance] = useState<AppearancePref>(getStoredAppearance);
     const [syncing, setSyncing] = useState(false);
     const [syncDone, setSyncDone] = useState(false);
+    const [celebrationSettings, setCelebrationSettings] = useState(() => getCelebrationSettings());
+
+    const handleUpdateCelebrations = (updates: Partial<{ enabled: boolean; time: string }>) => {
+        const next = { ...celebrationSettings, ...updates };
+        setCelebrationSettings(next);
+        saveCelebrationSettings(next);
+    };
 
     const applyAppearance = (pref: AppearancePref) => {
         localStorage.setItem(APPEARANCE_KEY, pref);
@@ -138,6 +152,92 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                                 )}
                             </button>
                         ))}
+                    </div>
+                </section>
+
+                {/* ── Daily Celebration Alerts ───────────────────────────────── */}
+                <section>
+                    <p className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest px-1 mb-2">
+                        Daily Celebration Alerts
+                    </p>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-800">
+                        <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
+                                    <Bell size={18} />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-[16px] font-medium text-slate-900 dark:text-white">
+                                        Birthday &amp; Anniversary Alerts
+                                    </p>
+                                    <p className="text-[13px] text-slate-400">
+                                        Daily summary of who is celebrating today
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={celebrationSettings.enabled}
+                                onClick={() => handleUpdateCelebrations({ enabled: !celebrationSettings.enabled })}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                    celebrationSettings.enabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-700'
+                                }`}
+                            >
+                                <span
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        celebrationSettings.enabled ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+
+                        {celebrationSettings.enabled && (
+                            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+                                <div className="flex items-center gap-3">
+                                    <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                                        <Clock size={18} />
+                                    </span>
+                                    <div>
+                                        <p className="text-[16px] font-medium text-slate-900 dark:text-white">
+                                            Notification Time
+                                        </p>
+                                        <p className="text-[13px] text-slate-400">
+                                            Default 8:00 AM local time
+                                        </p>
+                                    </div>
+                                </div>
+                                <input
+                                    type="time"
+                                    value={celebrationSettings.time}
+                                    onChange={e => handleUpdateCelebrations({ time: e.target.value || '08:00' })}
+                                    className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500"
+                                />
+                            </div>
+                        )}
+
+                        {onOpenCelebrationsModal && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigate('/');
+                                    onOpenCelebrationsModal();
+                                }}
+                                className="w-full flex items-center gap-4 px-4 py-3.5 active:bg-slate-50 dark:active:bg-slate-800 transition text-left"
+                            >
+                                <span className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center text-pink-600 dark:text-pink-400 shrink-0">
+                                    <Cake size={18} />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[16px] font-medium text-slate-900 dark:text-white">
+                                        View Today&apos;s Celebrations ({todayCelebrationsCount})
+                                    </p>
+                                    <p className="text-[13px] text-slate-400">
+                                        Call, text, or view profiles of members celebrating today
+                                    </p>
+                                </div>
+                            </button>
+                        )}
                     </div>
                 </section>
 

@@ -10,6 +10,7 @@ export interface User {
     lastLogin?: number;
     widgetPreferences?: Record<string, string[]>;
     theme?: 'traditional' | 'dark';
+    mustChangePassword?: boolean;
 }
 
 export interface RiskSettings {
@@ -88,6 +89,7 @@ export interface Church {
     metricsSharingEnabled?: boolean;
     allowSignups?: boolean;
     scheduledSyncTime?: string;
+    timezone?: string;
     communityLocations?: CommunityLocation[];
     /** SMS settings for this church (SignalWire) */
     smsSettings?: SmsSettings;
@@ -1153,6 +1155,7 @@ export interface SmsCampaign {
     body: string;
     blocks?: any[];
     mediaUrls?: string[];
+    attachVcard?: boolean;
     // Recipients  one of listId, groupId, or toPhones
     toListId?: string | null;
     toListName?: string | null;
@@ -1179,6 +1182,9 @@ export interface SmsCampaign {
     // Retry
     retryCount?: number;
     lastError?: string | null;
+    // Event Registration options
+    campaignType?: string;
+    pcoSignupId?: string;
     // Metadata
     sentBy?: string | null;
     sentByName?: string | null;
@@ -1228,7 +1234,7 @@ export interface SmsTag {
     createdAt: number;
 }
 
-export type SmsKeywordAction = 'static' | 'registration_events' | 'small_groups' | 'giving_ytd';
+export type SmsKeywordAction = 'static' | 'registration_events' | 'small_groups' | 'giving_ytd' | 'event_registration';
 
 export interface SmsKeyword {
     id: string;
@@ -1239,6 +1245,8 @@ export interface SmsKeyword {
     replyMessage: string;
     /** Action to take when this keyword matches */
     actionType?: SmsKeywordAction;
+    /** Planning Center event registration signup ID for conversational flow */
+    pcoSignupId?: string;
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;
@@ -1261,6 +1269,27 @@ export interface SmsKeyword {
     isActive: boolean;
     matchCount: number;
     createdAt: number;
+}
+
+export interface SmsKeywordSubscription {
+    id: string;                 // `{churchId}_{personId}_{keywordId}`
+    churchId: string;
+    personId: string;           // PCO People person ID
+    personName?: string | null;
+    phoneNumber: string;        // E.164 — the number that originally texted in
+    keyword: string;            // Stored uppercase, e.g. "YOUTH"
+    keywordId: string;          // smsKeywords Firestore doc ID
+    subscribedAt: number;       // epoch ms — first subscription
+    source: 'sms_inbound' | 'manual';
+}
+
+export interface PendingSmsSubscription {
+    id: string;
+    churchId: string;
+    phoneNumber: string;        // E.164
+    keyword: string;
+    keywordId: string;
+    matchedAt: number;          // epoch ms
 }
 
 export interface SmsOptOut {
@@ -1433,17 +1462,21 @@ export interface SmsWorkflowStep {
     order: number;
     /** Days to wait after the previous step (0 = send immediately). Only used when scheduleType = 'relative'. */
     delayDays: number;
+    /** Hours to wait after the previous step. Only used when scheduleType = 'relative'. */
+    delayHours?: number;
     /**
      * Timing mode for this step (default = 'relative').
      * - 'relative'     ? fire delayDays after the previous step completes.
      * - 'day_of_week'  ? fire on the next occurrence of scheduleDayOfWeek after the previous step.
      * - 'day_of_month' ? fire on the next calendar date matching scheduleDayOfMonth.
      */
-    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month' | 'specific_date';
     /** 0 = Sunday  6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
     scheduleDayOfWeek?: number;
     /** 131. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
+    /** YYYY-MM-DD. Used when scheduleType = 'specific_date'. */
+    scheduleDate?: string;
     /** Send time in 'HH:MM' 24-hour format. Used for day_of_week and day_of_month modes. Default '09:00'. */
     scheduleTime?: string;
     /** Channel type for this step. Defaults to 'sms'. */
@@ -1481,9 +1514,14 @@ export interface SmsWorkflow {
     /** When trigger = 'list_add', the PCO list id */
     triggerListId?: string | null;
     triggerListName?: string | null;
+    /** Optional PCO Group id — used by the daily re-sync scanner and manual workflows */
+    triggerGroupId?: string | null;
+    triggerGroupName?: string | null;
     /** When trigger = 'event_registration', the PCO Signup/Event ID (PcoRegistrationEvent.pcoId) */
     triggerEventId?: string | null;
     triggerEventName?: string | null;
+    /** Epoch ms of the last successful PCO list/group re-sync */
+    lastListSyncAt?: number | null;
     /**
      * For 'birthday' and 'anniversary' triggers:
      * Number of days BEFORE the event to send Step 1.
@@ -1507,6 +1545,7 @@ export interface SmsWorkflow {
     completedCount: number;
     createdAt: number;
     updatedAt: number;
+    allowReentry?: boolean;
 }
 
 export interface SmsWorkflowEnrollment {
@@ -1567,12 +1606,16 @@ export interface WorkflowDelayNode {
     order: number;
     /** Days to wait in 'relative' mode. */
     delayDays: number;
-    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    /** Hours to wait in 'relative' mode. */
+    delayHours?: number;
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month' | 'specific_date';
     /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
     /** 1�31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
-    /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
+    /** YYYY-MM-DD. Used when scheduleType = 'specific_date'. */
+    scheduleDate?: string;
+    /** 'HH:MM' 24-hour send time for day_of_week / day_of_month / specific_date modes. */
     scheduleTime?: string;
     // -- Recurrence ---------------------------------------------------------
     /** 'none' = fire once; 'weekly' = repeat on selected days of week; 'monthly' = repeat on selected dates */
