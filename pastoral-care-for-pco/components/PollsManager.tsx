@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart2, Plus, Trash2, Eye, Pencil, Loader2, X, Copy, Check,
   ChevronDown, ChevronUp, CheckCircle, Circle, GripVertical, ToggleLeft,
-  ToggleRight, Link, ArrowLeft, Users, Clock, Star, AlignLeft, List,
-  Tv2, MessageSquare, Smartphone, ExternalLink, Wifi, ThumbsUp, Image as ImageIcon, Upload
+  ToggleRight, Link, ArrowLeft, Users, Clock, Star, AlignLeft,
+  Tv2, MessageSquare, Smartphone, ExternalLink, Wifi, ThumbsUp, Image as ImageIcon, Upload, Vote
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
 import { firestore } from '../services/firestoreService';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -121,7 +122,7 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-        <button onClick={onBack} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+        <button onClick={onBack} className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1">
@@ -133,7 +134,7 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
           href={getPollLiveUrl(poll.id, true)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition"
           title="Open Live Projector View"
         >
           <Tv2 size={12} /> Present Live
@@ -149,8 +150,8 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
               onClick={() => setActiveQ(i)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                 activeQ === i
-                  ? 'bg-violet-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
               Q{i + 1}
@@ -313,9 +314,9 @@ const QuestionEditor: React.FC<{
           {question.text || <span className="text-slate-300 dark:text-slate-600 italic">Untitled question</span>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={onMoveUp} disabled={index === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30 transition"><ChevronUp size={13} /></button>
-          <button onClick={onMoveDown} disabled={index === total - 1} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30 transition"><ChevronDown size={13} /></button>
-          <button onClick={() => setOpen(p => !p)} className="p-1 text-slate-400 hover:text-slate-600 transition">
+          <button onClick={onMoveUp} disabled={index === 0} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-30 transition"><ChevronUp size={13} /></button>
+          <button onClick={onMoveDown} disabled={index === total - 1} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-30 transition"><ChevronDown size={13} /></button>
+          <button onClick={() => setOpen(p => !p)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
             {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
           <button onClick={onRemove} className="p-1 text-slate-400 hover:text-red-500 transition"><Trash2 size={13} /></button>
@@ -507,7 +508,7 @@ const PollEditor: React.FC<{
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <button onClick={onBack} className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
             <ArrowLeft size={16} />
           </button>
           <span className="text-sm font-semibold text-slate-900 dark:text-white">{poll.title || 'Untitled Poll'}</span>
@@ -522,7 +523,7 @@ const PollEditor: React.FC<{
               href={getPollLiveUrl(poll.id, true)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/40 rounded-xl transition"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl transition"
             >
               <Tv2 size={13} /> Present Live
             </a>
@@ -540,7 +541,7 @@ const PollEditor: React.FC<{
           <button
             onClick={() => onSave(poll)}
             disabled={isSaving || !poll.title.trim()}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-500 text-white rounded-xl transition"
           >
             {isSaving ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : 'Save Poll'}
           </button>
@@ -749,7 +750,7 @@ const PollEditor: React.FC<{
                 href={getPollLiveUrl(poll.id, true)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 w-full px-3 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-xl transition"
+                className="flex items-center gap-2 w-full px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition"
               >
                 <Tv2 size={13} /> Open Projector View (Admin)
                 <ExternalLink size={11} className="ml-auto" />
@@ -798,67 +799,49 @@ const PollListView: React.FC<{
   const [tab, setTab] = useState<'all' | 'active' | 'draft' | 'closed'>('all');
   const filtered = tab === 'all' ? polls : polls.filter(p => p.status === tab);
 
+  const count = (t: 'all' | 'active' | 'draft' | 'closed') =>
+    t === 'all' ? polls.length : polls.filter(p => p.status === t).length;
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <List size={24} className="text-violet-500" /> Polls
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Send a link to anyone — no login required
-          </p>
-        </div>
-        <button
-          onClick={onCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-        >
-          <Plus size={15} /> New Poll
-        </button>
-      </div>
+    <ToolPage>
+      <ToolHeader
+        tool="polls"
+        actions={
+          <ToolButton variant="primary" icon={Plus} onClick={onCreate}>
+            New Poll
+          </ToolButton>
+        }
+      />
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-        {(['all', 'active', 'draft', 'closed'] as const).map(t => {
-          const count = t === 'all' ? polls.length : polls.filter(p => p.status === t).length;
-          return (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition capitalize ${
-                tab === t
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              {t}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                tab === t ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-              }`}>{count}</span>
-            </button>
-          );
-        })}
-      </div>
+      <ToolTabs
+        ariaLabel="Filter polls by status"
+        value={tab}
+        onChange={setTab}
+        className="mb-5"
+        tabs={[
+          { value: 'all', label: 'All', count: count('all') },
+          { value: 'active', label: 'Active', count: count('active') },
+          { value: 'draft', label: 'Draft', count: count('draft') },
+          { value: 'closed', label: 'Closed', count: count('closed') },
+        ]}
+      />
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-40 text-slate-400">
-          <Loader2 size={24} className="animate-spin mr-2" /> Loading polls…
+        <div className="flex items-center justify-center h-40 text-slate-400 dark:text-slate-500">
+          <Loader2 size={24} className="animate-spin mr-2" aria-hidden="true" /> Loading polls…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-          <List size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-slate-600 dark:text-slate-400 font-medium">
-            {tab === 'all' ? 'No polls yet' : `No ${tab} polls`}
-          </p>
-          {tab === 'all' && (
-            <>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first poll to start collecting responses</p>
-              <button onClick={onCreate} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition">
-                <span className="flex items-center gap-1.5"><Plus size={14} /> Create Poll</span>
-              </button>
-            </>
+        <ToolEmptyState
+          icon={Vote}
+          title={tab === 'all' ? 'No polls yet' : `No ${tab} polls`}
+          description={tab === 'all' ? 'Create your first poll to start collecting responses' : undefined}
+          action={tab === 'all' && (
+            <ToolButton variant="primary" icon={Plus} onClick={onCreate}>
+              Create Poll
+            </ToolButton>
           )}
-        </div>
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map(p => {
@@ -866,22 +849,22 @@ const PollListView: React.FC<{
             return (
               <div
                 key={p.id}
-                className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-violet-300 dark:hover:border-violet-700 transition cursor-pointer group"
+                className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer group"
                 onClick={() => onEdit(p)}
               >
-                <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-                  <List size={18} className="text-violet-500" />
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center shrink-0">
+                  <Vote size={18} className="text-slate-500 dark:text-slate-400" aria-hidden="true" />
                 </div>
                 <div className="flex-grow min-w-0">
                   <div className="font-semibold text-slate-900 dark:text-white truncate">{p.title || 'Untitled Poll'}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
                     <span>{p.questions.length} question{p.questions.length !== 1 ? 's' : ''}</span>
                     <span>·</span>
-                    <span className="flex items-center gap-1"><Users size={10} /> {p.totalResponses} response{p.totalResponses !== 1 ? 's' : ''}</span>
+                    <span className="flex items-center gap-1"><Users size={10} aria-hidden="true" /> {p.totalResponses} response{p.totalResponses !== 1 ? 's' : ''}</span>
                     <span>·</span>
                     <span>{new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                     {p.smsVotingEnabled && (
-                      <><span>·</span><span className="flex items-center gap-0.5 text-violet-500"><MessageSquare size={10} /> SMS</span></>
+                      <><span>·</span><span className="flex items-center gap-0.5 text-indigo-500 dark:text-indigo-400"><MessageSquare size={10} aria-hidden="true" /> SMS</span></>
                     )}
                   </div>
                 </div>
@@ -893,21 +876,21 @@ const PollListView: React.FC<{
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={e => e.stopPropagation()}
-                    className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                     title="Present Live"
                   >
                     <Tv2 size={14} />
                   </a>
                   <button
                     onClick={e => { e.stopPropagation(); onResults(p); }}
-                    className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                     title="View Results"
                   >
                     <BarChart2 size={14} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); onEdit(p); }}
-                    className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                     title="Edit"
                   >
                     <Pencil size={14} />
@@ -926,7 +909,7 @@ const PollListView: React.FC<{
           })}
         </div>
       )}
-    </div>
+    </ToolPage>
   );
 };
 

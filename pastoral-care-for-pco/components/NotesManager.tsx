@@ -5,12 +5,14 @@ import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { pcoService } from '../services/pcoService';
 import { SimpleRichTextEditor, SimpleRichTextEditorRef } from './SimpleRichTextEditor';
+import { PCO_CARD_STYLE, upgradeLegacyPcoCards } from './notes/pcoCard';
 import {
   Plus, ArrowLeft, Trash2, Pencil, FileText,
   CheckCircle, Globe, Lock, Clock, Loader2, Link, Eye,
   Image, CalendarDays, Users, ClipboardList, Search, X,
-  CheckSquare, Square,
+  CheckSquare, Square, Lightbulb, ChevronRight, CircleAlert,
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -95,20 +97,33 @@ const mapPcoCalendar = (item: any): PcoItem => ({
   raw: item,
 });
 
+/** Escape text/attribute values coming from Planning Center before embedding them in HTML. */
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 /** Convert a selected PCO item into an HTML snippet to inject into the note content */
 function buildPcoHtml(tab: PcoTab, item: PcoItem): string {
   const typeLabel = tab === 'registrations' ? 'Registration' : tab === 'groups' ? 'Group' : 'Event';
-  return `
-<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin:16px 0;font-family:inherit;">
-  ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" style="width:100%;height:auto;display:block;" />` : ''}
-  <div style="padding:16px 20px;">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6366f1;margin-bottom:6px;">${typeLabel}</div>
-    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${item.name}</div>
-    ${item.date ? `<div style="font-size:12px;color:#6366f1;font-weight:600;margin-bottom:6px;">📅 ${item.date}</div>` : ''}
-    ${item.meta ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;">${item.meta}</div>` : ''}
-    ${item.description ? `<div style="font-size:14px;color:#334155;line-height:1.6;">${stripHtml(item.description).slice(0, 200)}${item.description.length > 200 ? '…' : ''}</div>` : ''}
-  </div>
-</div>`;
+  // PCO descriptions are HTML: strip tags and decode basic entities, then re-escape below.
+  const description = item.description
+    ? stripHtml(item.description)
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+        .trim()
+    : '';
+  // Built as a single line: PublicNoteView converts "\n" to <br/>, which would
+  // otherwise inject blank lines inside the card.
+  return [
+    `<div data-pco-card="${tab}" style="${PCO_CARD_STYLE}">`,
+    item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" style="width:100%;height:auto;display:block;" />` : '',
+    `<div style="padding:16px 20px;">`,
+    `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4f46e5;margin-bottom:6px;">${typeLabel}</div>`,
+    `<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${escapeHtml(item.name)}</div>`,
+    item.date ? `<div style="font-size:12px;color:#4f46e5;font-weight:600;margin-bottom:6px;">📅 ${escapeHtml(item.date)}</div>` : '',
+    item.meta ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;">${escapeHtml(item.meta)}</div>` : '',
+    description ? `<div style="font-size:14px;color:#334155;line-height:1.6;">${escapeHtml(description.slice(0, 200))}${description.length > 200 ? '…' : ''}</div>` : '',
+    `</div>`,
+    `</div>`,
+  ].join('');
 }
 
 // ─── PCO Import Modal ─────────────────────────────────────────────────────────
@@ -249,8 +264,8 @@ const PcoNoteModal: React.FC<{
               </button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-              <CalendarDays size={36} className="mb-2 text-slate-300" />
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400 dark:text-slate-500">
+              <CalendarDays size={36} className="mb-2 text-slate-300 dark:text-slate-600" aria-hidden="true" />
               <p className="text-sm">No {TAB_INFO[tab].label.toLowerCase()} found</p>
             </div>
           ) : (
@@ -265,7 +280,7 @@ const PcoNoteModal: React.FC<{
                 }`}
               >
                 {item.imageUrl ? (
-                  <img src={item.imageUrl} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0 bg-slate-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <img src={item.imageUrl} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0 bg-slate-100 dark:bg-slate-700" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                   <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/40 dark:to-indigo-800/40 flex items-center justify-center shrink-0">
                     <CalendarDays size={22} className="text-indigo-400" />
@@ -325,10 +340,10 @@ const NoteCard: React.FC<{
   return (
     <div
       onClick={onEdit}
-      className="nm-card-hover bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-[22px] py-5 cursor-pointer relative overflow-hidden"
+      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-5 cursor-pointer relative overflow-hidden transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-500/10 dark:hover:border-indigo-500/70 dark:hover:shadow-indigo-500/20"
     >
       {/* Coloured left accent */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${isPublished ? 'nm-card-accent-published' : 'nm-card-accent-draft'}`} />
+      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${isPublished ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
 
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -339,10 +354,10 @@ const NoteCard: React.FC<{
                 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
             }`}>
-              {isPublished ? <Globe size={9} /> : <Lock size={9} />}
+              {isPublished ? <Globe size={9} aria-hidden="true" /> : <Lock size={9} aria-hidden="true" />}
               {isPublished ? 'Published' : 'Draft'}
             </span>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="text-xs text-slate-400 dark:text-slate-500">
               {formatRelative(note.updatedAt || note.createdAt)}
             </span>
           </div>
@@ -354,14 +369,14 @@ const NoteCard: React.FC<{
 
           {/* Preview */}
           {preview && (
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-2.5">
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-2.5">
               {preview}
             </p>
           )}
 
           {/* Author */}
           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <div className="nm-avatar w-[18px] h-[18px] rounded-full flex items-center justify-center text-white text-[10px] font-extrabold shrink-0">
+            <div className="bg-indigo-600 dark:bg-indigo-500 w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
             {note.authorName || 'Unknown'}
@@ -390,8 +405,10 @@ const ActionBtn: React.FC<{
   <button
     onClick={onClick}
     title={title}
-    className={`nm-action-btn w-[30px] h-[30px] rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer ${
-      danger ? 'text-red-500 nm-action-btn-danger' : 'text-slate-500 dark:text-slate-400'
+    className={`w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer transition-colors ${
+      danger
+        ? 'text-red-500 dark:text-red-400 hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950/50 dark:hover:border-red-800'
+        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-800 hover:border-indigo-200 dark:hover:bg-slate-600 dark:hover:text-slate-100 dark:hover:border-indigo-500'
     }`}
   >
     {icon}
@@ -435,18 +452,18 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
   return (
     <>
       <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0">
-        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mr-1">Insert</span>
+        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 mr-1">Insert</span>
 
         {/* Image upload */}
         <button
           onClick={() => imgInputRef.current?.click()}
           disabled={isUploading}
           title="Upload and insert image"
-          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 disabled:opacity-60 disabled:cursor-wait cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 disabled:opacity-60 disabled:cursor-wait cursor-pointer transition-colors hover:bg-slate-100 hover:border-indigo-200 hover:text-indigo-700 dark:hover:bg-slate-600 dark:hover:border-indigo-500 dark:hover:text-indigo-300"
         >
           {isUploading
-            ? <Loader2 size={13} className="nm-spin" />
-            : <Image size={13} />
+            ? <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+            : <Image size={13} aria-hidden="true" />
           }
           {isUploading ? 'Uploading…' : 'Image'}
         </button>
@@ -467,13 +484,13 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
         <button
           onClick={() => setShowPco(true)}
           title="Insert Planning Center event, group, or registration"
-          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer transition-colors hover:bg-slate-100 hover:border-indigo-200 hover:text-indigo-700 dark:hover:bg-slate-600 dark:hover:border-indigo-500 dark:hover:text-indigo-300"
         >
-          <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-[13px] h-[13px]" />
+          <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-3.5 h-3.5" />
           Planning Center
         </button>
 
-        <div className="ml-auto text-[11px] text-slate-400 dark:text-slate-500">
+        <div className="ml-auto text-xs text-slate-400 dark:text-slate-500">
           Plain text or HTML · images supported
         </div>
       </div>
@@ -520,12 +537,12 @@ const NoteEditor: React.FC<{
 
   const handleImageInsert = useCallback((url: string) => {
     insertAtCursor(`\n<img src="${url}" alt="Image" style="max-width:100%;border-radius:8px;margin:8px 0;" />\n`);
-    showToast('Image inserted ✓');
+    showToast('Image inserted');
   }, [insertAtCursor, showToast]);
 
   const handlePcoInsert = useCallback((html: string) => {
     insertAtCursor('\n' + html + '\n');
-    showToast('Planning Center content inserted ✓');
+    showToast('Planning Center content inserted');
     setEditorMode('preview');
   }, [insertAtCursor, showToast]);
 
@@ -541,7 +558,7 @@ const NoteEditor: React.FC<{
       setNote(toSave);
       setLastSaved(Date.now());
       onSaved(toSave);
-      showToast(overrideStatus === 'published' ? '🎉 Note published!' : '✓ Saved');
+      showToast(overrideStatus === 'published' ? 'Note published!' : 'Saved');
       return toSave;
     } catch (e: any) {
       showToast(e?.message || 'Save failed', 'error');
@@ -557,7 +574,7 @@ const NoteEditor: React.FC<{
         await navigator.clipboard.writeText(publicUrl(saved.id));
         setCopied(true);
         setTimeout(() => setCopied(false), 3000);
-        showToast('Link copied! Ready to send via SMS ✉️');
+        showToast('Link copied! Ready to send via SMS');
       } catch { /* ignore */ }
     }
   };
@@ -584,28 +601,28 @@ const NoteEditor: React.FC<{
             title="Back to notes"
             className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} aria-hidden="true" />
           </button>
-          <div className="text-[13px] text-slate-500 dark:text-slate-400">
+          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400">
             <span className="cursor-pointer font-medium hover:text-slate-700 dark:hover:text-slate-200 transition" onClick={onBack}>Notes</span>
-            <span className="mx-1.5">›</span>
+            <ChevronRight size={14} className="mx-1 text-slate-400 dark:text-slate-500" aria-hidden="true" />
             <span className="font-bold text-slate-800 dark:text-slate-100">{note.title || 'New Note'}</span>
           </div>
           {lastSaved && (
             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle size={10} /> Saved
+              <CheckCircle size={10} aria-hidden="true" /> Saved
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
           {/* Status pill */}
-          <div className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border ${
+          <div className={`flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full border ${
             isPublished
               ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
               : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
           }`}>
-            {isPublished ? <Globe size={11} /> : <Lock size={11} />}
+            {isPublished ? <Globe size={11} aria-hidden="true" /> : <Lock size={11} aria-hidden="true" />}
             {isPublished ? 'Published' : 'Draft'}
           </div>
 
@@ -613,9 +630,9 @@ const NoteEditor: React.FC<{
             <button
               onClick={handleCopyLink}
               title="Copy public link"
-              className="nm-btn-copy-link flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-semibold cursor-pointer transition-colors"
             >
-              {copied ? <CheckCircle size={13} /> : <Link size={13} />}
+              {copied ? <CheckCircle size={13} aria-hidden="true" /> : <Link size={13} aria-hidden="true" />}
               {copied ? 'Copied!' : 'Copy Link'}
             </button>
           )}
@@ -623,18 +640,18 @@ const NoteEditor: React.FC<{
           <button
             onClick={() => save('draft')}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold cursor-pointer disabled:opacity-70 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold cursor-pointer disabled:opacity-70 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
           >
-            {isSaving ? <Loader2 size={13} className="nm-spin" /> : <Clock size={13} />}
+            {isSaving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Clock size={13} aria-hidden="true" />}
             Save Draft
           </button>
 
           <button
             onClick={handlePublishAndCopy}
             disabled={isSaving}
-            className="nm-btn-publish flex items-center gap-1.5 px-4 py-2 rounded-[10px] border-none text-white text-xs font-bold cursor-pointer disabled:opacity-70"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:hover:bg-indigo-600 shadow-sm text-white text-xs font-bold cursor-pointer disabled:opacity-70 transition-colors"
           >
-            {isSaving ? <Loader2 size={13} className="nm-spin" /> : <Globe size={13} />}
+            {isSaving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Globe size={13} aria-hidden="true" />}
             Publish &amp; Copy Link
           </button>
         </div>
@@ -661,7 +678,7 @@ const NoteEditor: React.FC<{
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
-            <Eye size={11} className="inline mr-1 -mt-0.5" />
+            <Eye size={11} className="inline mr-1 -mt-0.5" aria-hidden="true" />
             Preview
           </button>
         </div>
@@ -679,8 +696,8 @@ const NoteEditor: React.FC<{
         <div className="w-full max-w-[720px]">
 
           {/* Church/author strip */}
-          <div className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-[13px] text-slate-500 dark:text-slate-400">
-            <div className="nm-avatar w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-extrabold shrink-0">
+          <div className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
+            <div className="bg-indigo-600 dark:bg-indigo-500 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1">
@@ -690,9 +707,9 @@ const NoteEditor: React.FC<{
                 onChange={e => update({ authorName: e.target.value })}
                 placeholder="Author name…"
                 title="Author name"
-                className="border-none outline-none text-[13px] font-bold text-slate-800 dark:text-slate-100 bg-transparent w-full"
+                className="border-none outline-none text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-transparent w-full"
               />
-              <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-px">
+              <div className="text-xs text-slate-400 dark:text-slate-500 mt-px">
                 {church?.name || 'Your Church'}
               </div>
             </div>
@@ -701,9 +718,9 @@ const NoteEditor: React.FC<{
               target="_blank"
               rel="noopener noreferrer"
               title="Preview public view"
-              className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold no-underline shrink-0 hover:underline"
+              className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 font-semibold no-underline shrink-0 hover:underline"
             >
-              <Eye size={12} /> Preview
+              <Eye size={12} aria-hidden="true" /> Preview
             </a>
           </div>
 
@@ -718,7 +735,7 @@ const NoteEditor: React.FC<{
           />
 
           {/* Divider */}
-          <div className="nm-title-divider mb-7" />
+          <div className="h-px mb-7 bg-gradient-to-r from-indigo-500/30 via-indigo-500/15 to-transparent dark:from-indigo-400/40 dark:via-indigo-400/15" />
 
           {/* Content — Edit or Preview */}
           {editorMode === 'edit' ? (
@@ -731,17 +748,19 @@ const NoteEditor: React.FC<{
                   minHeight="360px"
               />
             </div>
-          ) : (
+          ) : note.content ? (
             <div
               className="w-full min-h-[360px] text-base leading-[1.8] text-slate-600 dark:text-slate-300"
-              dangerouslySetInnerHTML={{ __html: note.content || '<p style="color:#94a3b8;">Nothing to preview yet.</p>' }}
+              dangerouslySetInnerHTML={{ __html: upgradeLegacyPcoCards(note.content) }}
             />
+          ) : (
+            <p className="w-full min-h-[360px] text-base text-slate-400 dark:text-slate-500">Nothing to preview yet.</p>
           )}
 
           {/* Tip */}
           {editorMode === 'edit' && (
-            <div className="mt-5 px-3.5 py-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-[10px] border border-blue-200 dark:border-blue-800 text-xs text-blue-500 dark:text-blue-400 flex items-start gap-2">
-              <span className="shrink-0">💡</span>
+            <div className="mt-5 px-3.5 py-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+              <Lightbulb size={14} className="shrink-0 mt-px" aria-hidden="true" />
               <span>
                 Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
                 Use the toolbar above to insert images or Planning Center content cards.
@@ -813,7 +832,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     e?.stopPropagation();
     try {
       await navigator.clipboard.writeText(publicUrl(note.id));
-      showToast('Link copied! Ready to send via SMS ✉️');
+      showToast('Link copied! Ready to send via SMS');
     } catch {
       showToast('Could not copy link', 'error');
     }
@@ -848,78 +867,49 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 
   return (
     <>
-      <div className="px-8 py-7 max-w-[900px] mx-auto">
+      <ToolPage>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-[26px] font-extrabold text-slate-900 flex items-center gap-2.5 m-0">
-              <span className="nm-icon-gradient w-[38px] h-[38px] rounded-[10px] inline-flex items-center justify-center">
-                <FileText size={18} color="white" />
-              </span>
-              Notes
-            </h1>
-            <p className="text-[13px] text-slate-500 mt-1 ml-12">
-              Create shareable notes — send public links via SMS
-            </p>
-          </div>
-          <button
-            onClick={handleCreate}
-            className="nm-btn-create flex items-center gap-1.5 px-5 py-2.5 rounded-xl border-none text-white text-[13px] font-bold cursor-pointer transition-opacity hover:opacity-90"
-          >
-            <Plus size={15} /> Create Note
-          </button>
-        </div>
+        <ToolHeader
+          tool="notes"
+          description="Create shareable notes — send public links via SMS"
+          actions={
+            <ToolButton variant="primary" icon={Plus} onClick={handleCreate}>
+              Create Note
+            </ToolButton>
+          }
+        />
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-          {(['all', 'draft', 'published'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex items-center gap-1.5 px-4 py-[7px] rounded-[10px] border-none cursor-pointer text-xs font-semibold transition-all ${
-                tab === t
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                  : 'bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              {t === 'all' && <FileText size={12} />}
-              {t === 'draft' && <Lock size={12} />}
-              {t === 'published' && <Globe size={12} />}
-              {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Published'}
-              <span className={`text-[10px] px-1.5 py-px rounded-full font-bold ${
-                tab === t ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
-              }`}>
-                {counts[t]}
-              </span>
-            </button>
-          ))}
-        </div>
+        <ToolTabs
+          ariaLabel="Filter notes by status"
+          value={tab}
+          onChange={setTab}
+          className="mb-5"
+          tabs={[
+            { value: 'all', label: 'All', icon: FileText, count: counts.all },
+            { value: 'draft', label: 'Drafts', icon: Lock, count: counts.draft },
+            { value: 'published', label: 'Published', icon: Globe, count: counts.published },
+          ]}
+        />
 
         {/* Content */}
         {isLoading ? (
           <div className="text-center py-16 text-slate-400 dark:text-slate-500">
-            <Loader2 size={28} className="nm-spin mx-auto mb-3 block" />
-            <p className="text-[13px]">Loading notes…</p>
+            <Loader2 size={28} className="animate-spin mx-auto mb-3 block" aria-hidden="true" />
+            <p className="text-sm">Loading notes…</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 px-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-            <div className="text-5xl mb-4">📝</div>
-            <p className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
-              {tab === 'published' ? 'No published notes yet' : tab === 'draft' ? 'No drafts' : 'No notes yet'}
-            </p>
-            <p className="text-[13px] text-slate-400 dark:text-slate-500 mb-5">
-              Create your first note to start sharing with your congregation
-            </p>
-            {tab !== 'published' && (
-              <button
-                onClick={handleCreate}
-                className="nm-btn-create inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl border-none text-white text-[13px] font-bold cursor-pointer"
-              >
-                <Plus size={14} /> Create Note
-              </button>
+          <ToolEmptyState
+            icon={FileText}
+            title={tab === 'published' ? 'No published notes yet' : tab === 'draft' ? 'No drafts' : 'No notes yet'}
+            description="Create your first note to start sharing with your congregation"
+            action={tab !== 'published' && (
+              <ToolButton variant="primary" icon={Plus} onClick={handleCreate}>
+                Create Note
+              </ToolButton>
             )}
-          </div>
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {filtered.map(note => (
@@ -933,7 +923,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
             ))}
           </div>
         )}
-      </div>
+      </ToolPage>
 
       {toast && <ToastBar toast={toast} />}
     </>
@@ -943,9 +933,15 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 const ToastBar: React.FC<{ toast: ToastMsg }> = ({ toast }) => (
-  <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] px-[22px] py-3 rounded-2xl text-white text-[13px] font-bold shadow-2xl whitespace-nowrap ${
-    toast.type === 'error' ? 'nm-toast-error' : 'nm-toast-success'
-  }`}>
+  <div
+    role="status"
+    className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-2xl whitespace-nowrap ${
+      toast.type === 'error' ? 'bg-red-600 dark:bg-red-500' : 'bg-emerald-600 dark:bg-emerald-500'
+    }`}
+  >
+    {toast.type === 'error'
+      ? <CircleAlert size={16} aria-hidden="true" />
+      : <CheckCircle size={16} aria-hidden="true" />}
     {toast.msg}
   </div>
 );

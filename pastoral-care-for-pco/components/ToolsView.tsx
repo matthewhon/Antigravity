@@ -23,9 +23,11 @@ import { ChurchHelperView } from './ChurchHelperView';
 import { NewsletterWidgetManager } from './NewsletterWidgetManager';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess, TenantFile } from '../types';
 import { 
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
-  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Folder, Sparkles
+  Trash2, Eye, Pencil, Loader2, X, UserMinus, Search, Copy, BarChart2, MessageSquare, Phone,
+  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Sparkles,
+  Inbox, Megaphone, KeyRound, ChartColumn, ArrowRight, MessageSquareText
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState, TOOL_META } from './tool-shell';
 
 
 // ─── Mobile SMS Banner ─────────────────────────────────────────────────────
@@ -39,16 +41,16 @@ const MobileSmsBanner: React.FC<{ url: string }> = ({ url }) => {
         setTimeout(() => setCopied(false), 2500);
     };
     return (
-        <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800">
-            <Smartphone size={15} className="text-violet-500 shrink-0" />
-            <p className="text-xs text-violet-700 dark:text-violet-300 font-semibold flex-1">
-                📱 <strong>Mobile Staff App</strong> — Share this link for an optimized phone experience:
-                <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-400">{url}</span>
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-200 dark:border-indigo-800">
+            <Smartphone size={15} className="text-indigo-500 dark:text-indigo-400 shrink-0" aria-hidden="true" />
+            <p className="text-xs text-indigo-700 dark:text-indigo-300 font-semibold flex-1">
+                <strong>Mobile Staff App</strong> — Share this link for an optimized phone experience:
+                <span className="ml-1.5 font-mono text-indigo-600 dark:text-indigo-400">{url}</span>
             </p>
             <button
                 onClick={handleCopy}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition ${
-                    copied ? 'bg-emerald-500 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-200 hover:bg-violet-300 dark:hover:bg-violet-700'
+                    copied ? 'bg-emerald-500 text-white' : 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-300 dark:hover:bg-indigo-700'
                 }`}
             >
                 {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
@@ -58,7 +60,7 @@ const MobileSmsBanner: React.FC<{ url: string }> = ({ url }) => {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition"
             >
                 <ExternalLink size={12} /> Open
             </a>
@@ -319,76 +321,52 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
   const usagePercent = isStarter ? Math.min(100, Math.round((currentUsage / 3000) * 100)) : 0;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <Mail size={26} className="text-indigo-500" /> Emails
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Create and send emails to your Planning Center audience
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsQuickSendOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-          >
-            <Send size={16} /> Quick Send Email
-          </button>
-          <button
-            onClick={onCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-          >
-            <Plus size={16} /> Create Campaign
-          </button>
-        </div>
-      </div>
+    <ToolPage>
+      <ToolHeader
+        tool="emails"
+        actions={
+          <>
+            <ToolButton variant="secondary" icon={Send} onClick={() => setIsQuickSendOpen(true)}>
+              Quick Send Email
+            </ToolButton>
+            <ToolButton variant="primary" icon={Plus} onClick={onCreate}>
+              Create Campaign
+            </ToolButton>
+          </>
+        }
+      />
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Main Content Column */}
         <div className="flex-1 w-full min-w-0">
           {/* Tabs */}
-          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-            {(['all', 'draft', 'scheduled', 'sent'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              tab === t
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : t === 'scheduled' ? 'Scheduled' : 'Sent'}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-              tab === t ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-            }`}>{counts[t]}</span>
-          </button>
-        ))}
-      </div>
+          <ToolTabs
+            ariaLabel="Filter campaigns by status"
+            className="mb-5"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { value: 'all', label: 'All', count: counts.all },
+              { value: 'draft', label: 'Drafts', count: counts.draft },
+              { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
+              { value: 'sent', label: 'Sent', count: counts.sent },
+            ]}
+          />
 
       {/* Campaign list */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40 text-slate-400">
+        <div className="flex items-center justify-center h-40 text-slate-400 dark:text-slate-500">
           <Loader2 size={24} className="animate-spin mr-2" /> Loading campaigns…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-          <Mail size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-slate-600 dark:text-slate-400 font-medium">
-            {tab === 'sent' ? 'No sent emails yet' : tab === 'scheduled' ? 'No scheduled emails' : tab === 'draft' ? 'No drafts' : 'No email campaigns yet'}
-          </p>
-          {tab !== 'sent' && (
-            <>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first email to get started</p>
-              <button onClick={onCreate} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition">
-                <span className="flex items-center gap-1.5"><Plus size={14} /> Create New</span>
-              </button>
-            </>
-          )}
-        </div>
+        <ToolEmptyState
+          icon={Mail}
+          title={tab === 'sent' ? 'No sent emails yet' : tab === 'scheduled' ? 'No scheduled emails' : tab === 'draft' ? 'No drafts' : 'No email campaigns yet'}
+          description={tab !== 'sent' ? 'Create your first email to get started' : undefined}
+          action={tab !== 'sent' ? (
+            <ToolButton variant="primary" icon={Plus} onClick={onCreate}>Create New</ToolButton>
+          ) : undefined}
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map(c => {
@@ -525,7 +503,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
         </div>
       </div>
       </div>
-    </div>
+    </ToolPage>
   );
 };
 
@@ -2221,171 +2199,103 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
   return (
     <div className="flex flex-col h-full relative">
       {/* ─── Tab Switcher - only shown in legacy embedded mode ──────────── */}
-      {!activePage && (
+      {!activePage && (() => {
+        const tabClass = (active: boolean) =>
+          `flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
+            active
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`;
+        const countChipClass = 'text-xs px-1.5 py-0.5 rounded-full font-semibold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300';
+        const WebsiteIcon = TOOL_META.website.icon;
+        const EmailsIcon = TOOL_META.emails.icon;
+        const PollsIcon = TOOL_META.polls.icon;
+        const SmsIcon = TOOL_META.sms.icon;
+        const UnsubIcon = TOOL_META.unsubscribers.icon;
+        const QrIcon = TOOL_META.qrcodes.icon;
+        const FilesIcon = TOOL_META.files.icon;
+        const FormsIcon = TOOL_META.forms.icon;
+        const BulletinIcon = TOOL_META.bulletin.icon;
+        const HelperIcon = TOOL_META['church-helper'].icon;
+        return (
       <div className="shrink-0 flex items-center gap-1 px-5 pt-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => setActiveTab('website')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'website'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Globe size={14} /> Website
+        <button onClick={() => setActiveTab('website')} className={tabClass(effectiveTab === 'website')}>
+          <WebsiteIcon size={14} aria-hidden="true" /> Website
         </button>
-        <button
-          onClick={() => setActiveTab('emails')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'emails'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Mail size={14} /> Emails
+        <button onClick={() => setActiveTab('emails')} className={tabClass(effectiveTab === 'emails')}>
+          <EmailsIcon size={14} aria-hidden="true" /> Emails
         </button>
-        <button
-          onClick={() => setActiveTab('polls')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'polls'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <List size={14} /> Polls
+        <button onClick={() => setActiveTab('polls')} className={tabClass(effectiveTab === 'polls')}>
+          <PollsIcon size={14} aria-hidden="true" /> Polls
         </button>
-        <button
-          onClick={() => setActiveTab('messaging')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'messaging'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          💬 SMS
+        <button onClick={() => setActiveTab('messaging')} className={tabClass(effectiveTab === 'messaging')}>
+          <SmsIcon size={14} aria-hidden="true" /> SMS
         </button>
-        <button
-          onClick={() => setActiveTab('unsubscribers')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'unsubscribers'
-              ? 'border-red-500 text-red-600 dark:text-red-400 dark:border-red-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <UserMinus size={14} /> Unsubscribers
+        <button onClick={() => setActiveTab('unsubscribers')} className={tabClass(effectiveTab === 'unsubscribers')}>
+          <UnsubIcon size={14} aria-hidden="true" /> Unsubscribers
           {unsubscribers.length > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+            <span className={countChipClass}>
               {unsubscribers.length}
             </span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('qrcodes')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'qrcodes'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          🔲 QR Codes
+        <button onClick={() => setActiveTab('qrcodes')} className={tabClass(effectiveTab === 'qrcodes')}>
+          <QrIcon size={14} aria-hidden="true" /> QR Codes
         </button>
-        <button
-          onClick={() => setActiveTab('files')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'files'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Folder size={14} /> Files
+        <button onClick={() => setActiveTab('files')} className={tabClass(effectiveTab === 'files')}>
+          <FilesIcon size={14} aria-hidden="true" /> Files
           {files.length > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-violet-105 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center gap-1">
+            <span className={`${countChipClass} flex items-center gap-1`}>
               <span>{files.length}</span>
               <span className="text-[10px] opacity-65 font-medium">({formatSize(files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0))})</span>
             </span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('forms')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'forms'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <FileText size={14} /> Forms
+        <button onClick={() => setActiveTab('forms')} className={tabClass(effectiveTab === 'forms')}>
+          <FormsIcon size={14} aria-hidden="true" /> Forms
         </button>
-        <button
-          onClick={() => setActiveTab('bulletin')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'bulletin'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          📋 Digital Bulletin
+        <button onClick={() => setActiveTab('bulletin')} className={tabClass(effectiveTab === 'bulletin')}>
+          <BulletinIcon size={14} aria-hidden="true" /> Digital Bulletin
         </button>
-        <button
-          onClick={() => setActiveTab('church-helper')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            effectiveTab === 'church-helper'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          ✨ Church Helper
+        <button onClick={() => setActiveTab('church-helper')} className={tabClass(effectiveTab === 'church-helper')}>
+          <HelperIcon size={14} aria-hidden="true" /> Church Helper
         </button>
       </div>
-      )}
+        );
+      })()}
 
       {/* ─── Website Tab ───────────────────────────────────────────────── */}
       {effectiveTab === 'website' && (
-        <div className="flex-1 overflow-hidden p-6 max-w-[1400px] mx-auto w-full h-full">
+        <div className="flex-1 overflow-hidden px-6 lg:px-8 py-6 max-w-6xl mx-auto w-full h-full">
            <WebsiteWidgetsManager churchId={churchId} />
         </div>
       )}
 
       {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
       {effectiveTab === 'unsubscribers' && (
-        <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <UserMinus size={20} className="text-red-500" /> Unsubscribers
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                People who have opted out of your {unsubMode === 'email' ? 'emails' : 'SMS messages'}. They are automatically excluded from future sends.
-              </p>
-            </div>
-            {(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 && (
-              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+        <div className="flex-1 overflow-y-auto">
+        <ToolPage>
+          <ToolHeader
+            tool="unsubscribers"
+            description={`People who have opted out of your ${unsubMode === 'email' ? 'emails' : 'SMS messages'}. They are automatically excluded from future sends.`}
+            badge={(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 ? (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 tabular-nums">
                 {unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length} total
               </span>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           {/* Toggle Switch */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6 w-fit">
-            <button
-              onClick={() => { setUnsubMode('email'); setUnsubSearch(''); }}
-              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg transition ${
-                unsubMode === 'email'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <Mail size={14} /> Email
-            </button>
-            <button
-              onClick={() => { setUnsubMode('sms'); setUnsubSearch(''); }}
-              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg transition ${
-                unsubMode === 'sms'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <MessageSquare size={14} /> SMS
-            </button>
-          </div>
+          <ToolTabs
+            ariaLabel="Unsubscriber channel"
+            className="mb-6"
+            value={unsubMode}
+            onChange={mode => { setUnsubMode(mode); setUnsubSearch(''); }}
+            tabs={[
+              { value: 'email', label: 'Email', icon: Mail },
+              { value: 'sms', label: 'SMS', icon: MessageSquare },
+            ]}
+          />
 
           {/* Search & Filter Bar */}
           {(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 && (
@@ -2397,7 +2307,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                   placeholder={unsubMode === 'email' ? "Search by email…" : "Search by phone number…"}
                   value={unsubSearch}
                   onChange={e => setUnsubSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               {unsubMode === 'email' && (
@@ -2405,7 +2315,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                   <select
                     value={unsubSenderFilter}
                     onChange={e => setUnsubSenderFilter(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="all">All Senders</option>
                     <option value="*">Global Opt-outs (*)</option>
@@ -2422,23 +2332,19 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
 
           {/* Table */}
           {unsubLoading ? (
-            <div className="flex items-center justify-center h-40 text-slate-400">
+            <div className="flex items-center justify-center h-40 text-slate-400 dark:text-slate-500">
               <Loader2 size={22} className="animate-spin mr-2" /> Loading…
             </div>
           ) : (unsubMode === 'email' ? filteredUnsubs.length : filteredSmsUnsubs.length) === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-              {unsubMode === 'email' ? <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" /> : <Phone size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />}
-              <p className="text-slate-500 dark:text-slate-400 font-medium">
-                {unsubSearch || (unsubMode === 'email' && unsubSenderFilter !== 'all') ? 'No results match your search' : `No ${unsubMode === 'email' ? 'email' : 'SMS'} unsubscribers yet`}
-              </p>
-              {!unsubSearch && (
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                  {unsubMode === 'email' 
-                    ? 'When someone clicks "Unsubscribe" in an email, they\'ll appear here.'
-                    : 'When someone replies STOP to an SMS, they\'ll appear here.'}
-                </p>
-              )}
-            </div>
+            <ToolEmptyState
+              icon={unsubMode === 'email' ? UserMinus : Phone}
+              title={unsubSearch || (unsubMode === 'email' && unsubSenderFilter !== 'all') ? 'No results match your search' : `No ${unsubMode === 'email' ? 'email' : 'SMS'} unsubscribers yet`}
+              description={!unsubSearch ? (
+                unsubMode === 'email' 
+                  ? 'When someone clicks "Unsubscribe" in an email, they\'ll appear here.'
+                  : 'When someone replies STOP to an SMS, they\'ll appear here.'
+              ) : undefined}
+            />
           ) : (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
               <table className="w-full text-sm">
@@ -2522,6 +2428,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
               </table>
             </div>
           )}
+        </ToolPage>
         </div>
       )}
 
@@ -2532,8 +2439,8 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
           return (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="max-w-md w-full text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-200 dark:border-violet-800 flex items-center justify-center">
-                  <span className="text-4xl">💬</span>
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center">
+                  <MessageSquareText size={36} className="text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
                 </div>
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">SMS Not Available</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed">
@@ -2541,23 +2448,24 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                 </p>
                 <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-6 text-left space-y-2.5">
                   {[
-                    '📥 Two-way SMS inbox',
-                    '📨 Broadcast campaigns',
-                    '🔑 Keyword auto-responses',
-                    '📊 SMS analytics',
-                    '✨ AI SMS Agent',
-                  ].map(f => (
-                    <div key={f} className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
-                      <span>{f}</span>
+                    { icon: Inbox, label: 'Two-way SMS inbox' },
+                    { icon: Megaphone, label: 'Broadcast campaigns' },
+                    { icon: KeyRound, label: 'Keyword auto-responses' },
+                    { icon: ChartColumn, label: 'SMS analytics' },
+                    { icon: Sparkles, label: 'AI SMS Agent' },
+                  ].map(({ icon: FeatureIcon, label }) => (
+                    <div key={label} className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
+                      <FeatureIcon size={16} className="text-indigo-500 dark:text-indigo-400 shrink-0" aria-hidden="true" />
+                      <span>{label}</span>
                     </div>
                   ))}
                 </div>
                 <a
                   href="/settings"
                   onClick={e => { e.preventDefault(); window.location.href = '/settings?tab=Subscription'; }}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold uppercase tracking-wide rounded-2xl transition-all shadow-lg shadow-indigo-500/25"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-indigo-500/25"
                 >
-                  Upgrade to Growth →
+                  Upgrade to Growth <ArrowRight size={16} aria-hidden="true" />
                 </a>
               </div>
             </div>

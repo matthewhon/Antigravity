@@ -4,8 +4,9 @@ import {
   Users, ExternalLink, ChevronRight, AlertCircle, ArrowLeft, Loader2, 
   Sparkles, Sliders, Check, X, ShieldCheck, UserCheck, Search, Download,
   Layers, MessageSquare, Send, Image as ImageIcon, Upload, Smartphone, Monitor,
-  Palette, FileText, Lock, Globe, RotateCcw
+  Palette, FileText, Lock, Globe, RotateCcw, ClipboardList, Zap, MailPlus
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
 import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
 import { storage } from '../services/firebase';
@@ -497,7 +498,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
           ) : (
             <div className="py-6 text-center space-y-3 animate-fade-in">
               <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
-                ✓
+                <Check size={22} strokeWidth={3} aria-hidden="true" />
               </div>
               <h4 className="text-base font-bold text-slate-900 dark:text-white">Subscribed!</h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto">
@@ -546,69 +547,31 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
         className="hidden"
       />
 
-      {/* Header & Sub-Navigation */}
-      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 max-w-7xl mx-auto">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles size={20} className="text-indigo-600 dark:text-indigo-400" />
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-                Website Newsletter Widgets & PCO Sync
-              </h1>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Embed subscription forms with live preview, header images, and automatic Planning Center deduplication.
-            </p>
-          </div>
+      {/* Header, Sub-Navigation & Main Content */}
+      <ToolPage>
+        <ToolHeader
+          icon={MailPlus}
+          category="communicate"
+          title="Newsletter widgets"
+          description="Embed subscription forms with live preview, header images, and automatic Planning Center deduplication."
+          actions={subTab === 'widgets' ? (
+            <ToolButton icon={Plus} onClick={handleCreateNewWidget}>New Widget</ToolButton>
+          ) : (
+            <ToolButton variant="secondary" icon={Download} onClick={handleExportCsv}>Export CSV</ToolButton>
+          )}
+        />
 
-          <div className="flex items-center gap-2">
-            <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex items-center">
-              <button
-                onClick={() => setSubTab('widgets')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  subTab === 'widgets'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                Embed Widgets ({widgets.length})
-              </button>
-              <button
-                onClick={() => setSubTab('subscribers')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                  subTab === 'subscribers'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                <Users size={13} />
-                Subscribers ({subscribers.length})
-              </button>
-            </div>
+        <ToolTabs
+          ariaLabel="Newsletter sections"
+          className="mb-5"
+          value={subTab}
+          onChange={setSubTab}
+          tabs={[
+            { value: 'widgets', label: 'Embed widgets', icon: Code, count: widgets.length },
+            { value: 'subscribers', label: 'Subscribers', icon: Users, count: subscribers.length },
+          ]}
+        />
 
-            {subTab === 'widgets' && (
-              <button
-                onClick={handleCreateNewWidget}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
-              >
-                <Plus size={14} /> New Widget
-              </button>
-            )}
-
-            {subTab === 'subscribers' && (
-              <button
-                onClick={handleExportCsv}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition"
-              >
-                <Download size={14} /> Export CSV
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
         {/* ─── TAB 1: WIDGETS LIST ────────────────────────────────────────── */}
         {subTab === 'widgets' && (
           <div>
@@ -617,19 +580,12 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                 <Loader2 className="animate-spin mr-2" size={20} /> Loading newsletter widgets...
               </div>
             ) : widgets.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 p-8">
-                <Mail size={40} className="mx-auto text-indigo-400 mb-3" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">No Newsletter Widgets Yet</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
-                  Create an embeddable widget with header images, live preview, and automatic Planning Center sync.
-                </p>
-                <button
-                  onClick={handleCreateNewWidget}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition"
-                >
-                  <Plus size={14} /> Create First Widget
-                </button>
-              </div>
+              <ToolEmptyState
+                icon={Mail}
+                title="No newsletter widgets yet"
+                description="Create an embeddable widget with header images, live preview, and automatic Planning Center sync."
+                action={<ToolButton icon={Plus} onClick={handleCreateNewWidget}>Create First Widget</ToolButton>}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {widgets.map(w => (
@@ -671,14 +627,14 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">PCO Sync:</span>
-                          <span className={`font-semibold ${w.actions?.syncToPco ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                            {w.actions?.syncToPco ? '✓ People Deduplication' : 'Disabled'}
+                          <span className={`inline-flex items-center gap-1 font-semibold ${w.actions?.syncToPco ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                            {w.actions?.syncToPco ? <><Check size={12} aria-hidden="true" /> People Deduplication</> : 'Disabled'}
                           </span>
                         </div>
                         {w.actions?.sendWelcomeEmail && (
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400">Welcome Email:</span>
-                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">✓ Automated</span>
+                            <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400"><Check size={12} aria-hidden="true" /> Automated</span>
                           </div>
                         )}
                       </div>
@@ -771,11 +727,11 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                 <Loader2 className="animate-spin mr-2" size={20} /> Loading subscriber records...
               </div>
             ) : filteredSubscribers.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 p-8">
-                <Users size={36} className="mx-auto text-slate-400 mb-2" />
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white">No subscribers found</h3>
-                <p className="text-xs text-slate-500">Signups through your embedded website widget will appear here.</p>
-              </div>
+              <ToolEmptyState
+                icon={Users}
+                title="No subscribers found"
+                description="Signups through your embedded website widget will appear here."
+              />
             ) : (
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                 <table className="w-full text-left text-xs">
@@ -791,7 +747,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                     {filteredSubscribers.map(sub => (
-                      <tr key={sub.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-750 transition">
+                      <tr key={sub.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-700/40 transition">
                         <td className="px-5 py-3.5">
                           <div className="font-semibold text-slate-900 dark:text-white">
                             {sub.firstName || sub.lastName ? `${sub.firstName || ''} ${sub.lastName || ''}`.trim() : 'Anonymous'}
@@ -867,7 +823,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
             )}
           </div>
         )}
-      </div>
+      </ToolPage>
 
       {/* ─── MODAL: DUAL-PANE WIDGET CUSTOMIZATION STUDIO WITH LIVE PREVIEW ─── */}
       {editingWidget && (
@@ -925,23 +881,24 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
             </div>
 
             {/* Studio Navigation Tabs */}
-            <div className="shrink-0 px-6 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto">
+            <div className="shrink-0 px-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto">
               {[
-                { id: 'style', label: '🎨 Design & Image', desc: 'Colors, photo banner, card radius' },
-                { id: 'content', label: '📝 Content & Copy', desc: 'Headline, badge, button, trust notes' },
-                { id: 'fields', label: '📋 Form Fields', desc: 'Inputs & PCO mapping' },
-                { id: 'actions', label: '⚡ PCO Actions', desc: 'Workflows, groups, emails' },
-                { id: 'bubble', label: '💬 Floating Bubble', desc: 'Corner launcher & modal settings' }
+                { id: 'style', label: 'Design & Image', icon: Palette, desc: 'Colors, photo banner, card radius' },
+                { id: 'content', label: 'Content & Copy', icon: FileText, desc: 'Headline, badge, button, trust notes' },
+                { id: 'fields', label: 'Form Fields', icon: ClipboardList, desc: 'Inputs & PCO mapping' },
+                { id: 'actions', label: 'PCO Actions', icon: Zap, desc: 'Workflows, groups, emails' },
+                { id: 'bubble', label: 'Floating Bubble', icon: MessageSquare, desc: 'Corner launcher & modal settings' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setEditorTab(tab.id as any)}
                   className={`py-3 px-3.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                     editorTab === tab.id
-                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
+                  <tab.icon size={14} aria-hidden="true" />
                   {tab.label}
                 </button>
               ))}
@@ -1116,7 +1073,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 ...editingWidget,
                                 theme: { ...editingWidget.theme, primaryColor: e.target.value }
                               })}
-                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1141,7 +1098,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 ...editingWidget,
                                 theme: { ...editingWidget.theme, backgroundColor: e.target.value }
                               })}
-                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1166,7 +1123,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 ...editingWidget,
                                 theme: { ...editingWidget.theme, textColor: e.target.value }
                               })}
-                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                              className="w-20 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1259,7 +1216,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, badgeText: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
 
@@ -1274,7 +1231,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, headline: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 font-bold"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
                         />
                       </div>
 
@@ -1289,7 +1246,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, description: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
 
@@ -1335,7 +1292,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                               ...editingWidget,
                               theme: { ...editingWidget.theme, buttonText: e.target.value }
                             })}
-                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
                         </div>
 
@@ -1352,8 +1309,8 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 })}
                                 className={`w-8 h-8 rounded-lg border text-sm flex items-center justify-center transition ${
                                   editingWidget.theme?.buttonIcon === icon
-                                    ? 'bg-indigo-100 border-indigo-500'
-                                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                                    ? 'bg-indigo-100 border-indigo-500 dark:bg-indigo-900/40 dark:border-indigo-400'
+                                    : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700'
                                 }`}
                               >
                                 {icon}
@@ -1411,7 +1368,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, footerNote: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
 
@@ -1426,7 +1383,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, successMessage: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
 
@@ -1442,7 +1399,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                             ...editingWidget,
                             theme: { ...editingWidget.theme, redirectUrl: e.target.value }
                           })}
-                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                          className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -1494,7 +1451,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                   updated[idx].label = e.target.value;
                                   setEditingWidget({ ...editingWidget, fields: updated });
                                 }}
-                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"
+                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                               />
                             </div>
 
@@ -1508,7 +1465,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                   updated[idx].type = e.target.value as NewsletterFieldType;
                                   setEditingWidget({ ...editingWidget, fields: updated });
                                 }}
-                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"
+                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                               >
                                 <option value="text">Text</option>
                                 <option value="email">Email Address</option>
@@ -1623,7 +1580,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                   }
                                 });
                               }}
-                              className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900"
+                              className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                             >
                               <option value="">— No Workflow Enrollment —</option>
                               {pcoWorkflows.map(wf => (
@@ -1649,7 +1606,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                   }
                                 });
                               }}
-                              className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900"
+                              className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                             >
                               <option value="">— No Group Membership —</option>
                               {pcoGroups.map(grp => (
@@ -1687,7 +1644,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                               ...editingWidget,
                               actions: { ...editingWidget.actions, welcomeEmailCampaignId: e.target.value }
                             })}
-                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900"
+                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           >
                             <option value="">Default Welcome Template</option>
                             {campaigns.map(c => (
@@ -1731,7 +1688,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 staffNotificationEmails: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                               }
                             })}
-                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900"
+                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           />
                         </div>
                       )}
@@ -1779,7 +1736,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                               ...editingWidget,
                               bubbleConfig: { ...editingWidget.bubbleConfig, buttonText: e.target.value } as any
                             })}
-                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           />
                         </div>
 
@@ -1793,7 +1750,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                               ...editingWidget,
                               bubbleConfig: { ...editingWidget.bubbleConfig, position: e.target.value as any } as any
                             })}
-                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800"
+                            className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                           >
                             <option value="right">Bottom Right Corner</option>
                             <option value="left">Bottom Left Corner</option>
@@ -1822,7 +1779,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 ...editingWidget,
                                 bubbleConfig: { ...editingWidget.bubbleConfig, bubbleBgColor: e.target.value } as any
                               })}
-                              className="w-24 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                              className="w-24 text-[11px] font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1971,7 +1928,7 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                         <div className="flex-1 p-6 space-y-4 overflow-y-auto">
                           <div className="h-6 w-48 bg-slate-200 dark:bg-slate-700 rounded-md" />
                           <div className="h-4 w-72 bg-slate-100 dark:bg-slate-700/60 rounded-md" />
-                          <div className="h-28 w-full bg-slate-100 dark:bg-slate-750 rounded-xl" />
+                          <div className="h-28 w-full bg-slate-100 dark:bg-slate-700/40 rounded-xl" />
                           <div className="h-4 w-60 bg-slate-100 dark:bg-slate-700/60 rounded-md" />
                         </div>
 
@@ -2001,8 +1958,9 @@ export const NewsletterWidgetManager: React.FC<NewsletterWidgetManagerProps> = (
                                 type="button"
                                 onClick={() => setPreviewBubbleOpen(false)}
                                 className="absolute top-2 right-2 z-40 w-7 h-7 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-slate-700 shadow-md text-xs"
+                                aria-label="Close preview"
                               >
-                                ✕
+                                <X size={14} aria-hidden="true" />
                               </button>
                               {renderLiveWidgetCard(editingWidget)}
                             </div>

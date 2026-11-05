@@ -12,6 +12,7 @@ import {
   AlignLeft, CheckSquare, Square, FileUp, ChevronDown, Heading, 
   TextCursorInput, List, X
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from './tool-shell';
 
 interface FormsManagerProps {
   churchId: string;
@@ -835,67 +836,62 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <ToolPage
+      width={isEditing || isSubmissionsView ? 'full' : 'standard'}
+      className={isEditing || isSubmissionsView ? 'max-w-7xl mx-auto' : undefined}
+    >
       {/* HEADER SECTION */}
       {!isEditing && !isSubmissionsView && (
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-wide">
-              <FormInput className="text-indigo-600 dark:text-indigo-400" /> Planning Center Web Forms
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Create visitor cards and connect forms that directly create or overwrite member profiles in PCO.
-            </p>
-          </div>
-          <button
-            onClick={handleCreateClick}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl transition text-sm shadow-md shadow-indigo-600/20"
-          >
-            <Plus size={16} /> Create New Form
-          </button>
-        </div>
+        <ToolHeader
+          tool="forms"
+          description="Create visitor cards and connect forms that directly create or overwrite member profiles in PCO."
+          actions={
+            <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
+              Create New Form
+            </ToolButton>
+          }
+        />
       )}
 
       {/* DASHBOARD LIST VIEW */}
       {!isEditing && !isSubmissionsView && (
         forms.length === 0 ? (
-          <div className="text-center py-20 bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
-            <FormInput size={48} className="mx-auto text-slate-350 dark:text-slate-700 mb-4" />
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">No forms created yet</h3>
-            <p className="text-sm text-slate-450 dark:text-slate-500 mt-1 mb-6">Create custom contact cards for check-ins, visitor collections, and database cleanups.</p>
-            <button
-              onClick={handleCreateClick}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition text-sm"
-            >
-              Get Started
-            </button>
-          </div>
+          <ToolEmptyState
+            icon={FormInput}
+            title="No forms created yet"
+            description="Create custom contact cards for check-ins, visitor collections, and database cleanups."
+            action={
+              <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
+                Get Started
+              </ToolButton>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {forms.map(form => {
               const link = getPublicLink(form.id);
               const embed = getEmbedCode(form.id);
               return (
-                <div key={form.id} className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                <div key={form.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">{form.name}</h3>
-                      <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                         form.isActive !== false 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20' 
-                          : 'bg-slate-100 text-slate-550 dark:bg-slate-800 dark:text-slate-400'
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50' 
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
                         {form.isActive !== false ? 'Active' : 'Draft'}
                       </span>
                     </div>
                     {form.description && (
-                      <p className="text-xs text-slate-555 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">{form.description}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">{form.description}</p>
                     )}
                     
                     {/* Styling Tags Preview */}
                     <div className="flex flex-wrap gap-1.5 mb-5 mt-2">
-                      <span className="text-[10px] bg-slate-50 dark:bg-slate-800 text-slate-650 dark:text-slate-400 font-semibold px-2 py-1 rounded-lg flex items-center gap-1.5 border border-slate-100 dark:border-slate-800">
-                        <span className="w-2.5 h-2.5 rounded-full border border-slate-300" style={{ backgroundColor: form.styles?.primaryColor }} />
+                      <span className="text-[10px] bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold px-2 py-1 rounded-lg flex items-center gap-1.5 border border-slate-100 dark:border-slate-700">
+                        <span className="w-2.5 h-2.5 rounded-full border border-slate-300 dark:border-slate-600" style={{ backgroundColor: form.styles?.primaryColor }} />
                         Theme Color
                       </span>
                       {form.actions?.addToGroupId && (
@@ -915,13 +911,13 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopy(link, 'url')}
-                        className="flex-1 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg transition border border-slate-200 dark:border-slate-700"
+                        className="flex-1 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition border border-slate-200 dark:border-slate-700"
                       >
                         {copiedId === `url-${link}` ? 'Copied!' : 'Copy Link'}
                       </button>
                       <button
                         onClick={() => handleCopy(embed, 'embed')}
-                        className="flex-1 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg transition border border-slate-200 dark:border-slate-700"
+                        className="flex-1 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition border border-slate-200 dark:border-slate-700"
                       >
                         {copiedId === `embed-${embed}` ? 'Copied!' : 'Embed Code'}
                       </button>
@@ -979,14 +975,14 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
         <form onSubmit={handleSave} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-md">
           {/* Editor Sub-Header */}
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={() => { setIsEditing(false); setActiveForm(null); }} className="hover:text-slate-850 dark:hover:text-white transition flex items-center gap-1 text-slate-550 text-xs font-bold uppercase tracking-wider">
+            <button type="button" onClick={() => { setIsEditing(false); setActiveForm(null); }} className="hover:text-slate-850 dark:hover:text-white transition flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
               <ArrowLeft size={16} /> Back to dashboard
             </button>
             <div className="flex items-center gap-3">
               <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
                 isActive 
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20' 
-                  : 'bg-slate-100 text-slate-550 dark:bg-slate-800 dark:text-slate-400'
+                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
               }`}>
                 {isActive ? 'Active' : 'Draft'}
               </span>
@@ -1017,7 +1013,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 <textarea
                   placeholder="Add a description or subtitle for this form..."
                   rows={2}
-                  className="w-full text-xs bg-transparent border-0 border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:ring-0 outline-none text-slate-550 dark:text-slate-400 resize-none transition"
+                  className="w-full text-xs bg-transparent border-0 border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:ring-0 outline-none text-slate-600 dark:text-slate-400 resize-none transition"
                   value={formDesc}
                   onChange={e => setFormDesc(e.target.value)}
                 />
@@ -1084,18 +1080,18 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         <div className="flex-1">
                           
                           {field.type === 'section_heading' ? (
-                            <div className="border-b border-slate-150 dark:border-slate-800 pb-1.5 mb-1">
+                            <div className="border-b border-slate-200 dark:border-slate-800 pb-1.5 mb-1">
                               <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                 {getFieldIcon(field.type)} {field.label || 'Section Heading'}
                               </h3>
                             </div>
                           ) : field.type === 'text_block' ? (
-                            <p className="text-xs text-slate-550 dark:text-slate-400 whitespace-pre-line leading-relaxed italic flex items-start gap-1.5">
+                            <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-line leading-relaxed italic flex items-start gap-1.5">
                               {getFieldIcon(field.type)} {field.label || 'Instructional text goes here.'}
                             </p>
                           ) : (
                             <div className="space-y-1.5 w-full">
-                              <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                              <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1">
                                 {field.label || 'Unnamed Field'} 
                                 {isRequired && <span className="text-red-500 font-black">*</span>}
                                 {field.mapToPco && field.mapToPco !== 'none' && (
@@ -1170,7 +1166,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                               )}
 
                               {field.type === 'file' && (
-                                <div className="w-full py-4 border border-dashed border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl text-center space-y-1">
+                                <div className="w-full py-4 border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl text-center space-y-1">
                                   <FileUp size={16} className="mx-auto text-slate-400" />
                                   <p className="text-[10px] font-bold text-slate-500">Drag & Drop files or browse</p>
                                 </div>
@@ -1277,7 +1273,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           setSelectedFieldId(newField.id);
                           setActiveTab('settings');
                         }}
-                        className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:border-indigo-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition"
+                        className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition"
                       >
                         {getFieldIcon(item.type)}
                         <span>{item.name}</span>
@@ -1311,7 +1307,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                             setActiveTab('settings');
                           }
                         }}
-                        className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:border-indigo-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition"
+                        className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition"
                       >
                         {getFieldIcon(item.type)}
                         <span>{item.label}</span>
@@ -1336,10 +1332,10 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Field Label / Text</label>
+                            <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Field Label / Text</label>
                             <input
                               type="text"
-                              className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                              className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                               value={field.label || ''}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -1350,10 +1346,10 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                           {field.type !== 'section_heading' && field.type !== 'text_block' && field.type !== 'checkboxes' && field.type !== 'checkbox_single' && field.type !== 'file' && (
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Placeholder Text</label>
+                              <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Placeholder Text</label>
                               <input
                                 type="text"
-                                className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                                className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                                 placeholder="e.g. Enter value..."
                                 value={field.placeholder || ''}
                                 onChange={(e) => {
@@ -1384,10 +1380,10 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           {/* PCO Profile Attribute Mapping */}
                           {field.type !== 'section_heading' && field.type !== 'text_block' && (
                             <div className="space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800">
-                              <label className="block text-[10px] font-bold text-slate-650 uppercase">Map to Planning Center Field</label>
+                              <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Map to Planning Center Field</label>
                               <select
                                 disabled={isName}
-                                className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                                 value={field.mapToPco || 'none'}
                                 onChange={(e) => {
                                   const val = e.target.value;
@@ -1405,7 +1401,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           {(field.type === 'select' || field.type === 'checkboxes') && (
                             <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                               <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-slate-650 uppercase">Options List</label>
+                                <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Options List</label>
                                 <button
                                   type="button"
                                   onClick={() => handleAddOption(field.id)}
@@ -1421,7 +1417,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                                       type="text"
                                       value={opt}
                                       onChange={(e) => handleUpdateOption(field.id, optIndex, e.target.value)}
-                                      className="flex-1 text-xs border border-slate-250 dark:border-slate-800 rounded px-2.5 py-1 bg-white dark:bg-slate-900"
+                                      className="flex-1 text-xs border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 bg-white dark:bg-slate-900"
                                     />
                                     <button
                                       type="button"
@@ -1454,48 +1450,48 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 <div className="space-y-6">
                   {/* Styling Colors & Logo */}
                   <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Form Themes & Logo</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-700 pb-1.5">Form Themes & Logo</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Accent Color</label>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Accent Color</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={styles.primaryColor} onChange={e => setStyles({ ...styles, primaryColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
-                          <input type="text" value={styles.primaryColor} onChange={e => setStyles({ ...styles, primaryColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                          <input type="text" value={styles.primaryColor} onChange={e => setStyles({ ...styles, primaryColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-300 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Background</label>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Background</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={styles.backgroundColor} onChange={e => setStyles({ ...styles, backgroundColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
-                          <input type="text" value={styles.backgroundColor} onChange={e => setStyles({ ...styles, backgroundColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                          <input type="text" value={styles.backgroundColor} onChange={e => setStyles({ ...styles, backgroundColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-300 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Text Color</label>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Text Color</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={styles.textColor} onChange={e => setStyles({ ...styles, textColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
-                          <input type="text" value={styles.textColor} onChange={e => setStyles({ ...styles, textColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                          <input type="text" value={styles.textColor} onChange={e => setStyles({ ...styles, textColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-300 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Btn Text</label>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Btn Text</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={styles.buttonTextColor} onChange={e => setStyles({ ...styles, buttonTextColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
-                          <input type="text" value={styles.buttonTextColor} onChange={e => setStyles({ ...styles, buttonTextColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                          <input type="text" value={styles.buttonTextColor} onChange={e => setStyles({ ...styles, buttonTextColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-300 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Text Box</label>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Text Box</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={styles.inputBgColor || '#F8FAFC'} onChange={e => setStyles({ ...styles, inputBgColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
-                          <input type="text" value={styles.inputBgColor || '#F8FAFC'} onChange={e => setStyles({ ...styles, inputBgColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                          <input type="text" value={styles.inputBgColor || '#F8FAFC'} onChange={e => setStyles({ ...styles, inputBgColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-300 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                       <div className="flex items-center justify-between">
-                        <label htmlFor="show-logo-checkbox" className="text-xs font-bold text-slate-650 uppercase cursor-pointer select-none">Show Church Logo?</label>
+                        <label htmlFor="show-logo-checkbox" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase cursor-pointer select-none">Show Church Logo?</label>
                         <input
                           type="checkbox"
                           id="show-logo-checkbox"
@@ -1507,7 +1503,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                       
                       {styles.showLogo && (
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-bold text-slate-650 uppercase">Logo Image</label>
+                          <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Logo Image</label>
                           <div className="flex gap-2">
                             <input
                               type="file"
@@ -1557,7 +1553,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                   {/* General Configuration & Automations */}
                   <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Settings & Actions</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-700 pb-1.5">Settings & Actions</h4>
                     
                     <div className="flex items-center gap-2 pb-1.5">
                       <input
@@ -1567,7 +1563,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         checked={syncToPco}
                         onChange={e => setSyncToPco(e.target.checked)}
                       />
-                      <label htmlFor="sync-pco-editor" className="text-[11px] font-bold text-slate-650 uppercase cursor-pointer select-none">
+                      <label htmlFor="sync-pco-editor" className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase cursor-pointer select-none">
                         Sync to Planning Center
                       </label>
                     </div>
@@ -1580,7 +1576,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         onChange={e => setIsActive(e.target.checked)}
                         className="w-4 h-4 rounded text-indigo-600 cursor-pointer"
                       />
-                      <label htmlFor="form-active-editor" className="text-[11px] font-bold text-slate-650 uppercase cursor-pointer">
+                      <label htmlFor="form-active-editor" className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase cursor-pointer">
                         Form Active (Publicly accessible)
                       </label>
                     </div>
@@ -1588,12 +1584,12 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                     {syncToPco ? (
                       <div className="space-y-4 pt-1.5">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Auto-Add to PCO Group</label>
+                          <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Auto-Add to PCO Group</label>
                           {loadingPcoData ? (
                             <div className="text-xs text-slate-400 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading groups...</div>
                           ) : (
                             <select
-                              className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
+                              className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
                               value={actions.addToGroupId}
                               onChange={e => setActions({ ...actions, addToGroupId: e.target.value })}
                             >
@@ -1606,12 +1602,12 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Auto-Enroll in Workflow</label>
+                          <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Auto-Enroll in Workflow</label>
                           {loadingPcoData ? (
                             <div className="text-xs text-slate-400 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading workflows...</div>
                           ) : (
                             <select
-                              className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
+                              className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
                               value={actions.enrollInWorkflowId}
                               onChange={e => setActions({ ...actions, enrollInWorkflowId: e.target.value })}
                             >
@@ -1624,12 +1620,12 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">PCO Note Category</label>
+                          <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">PCO Note Category</label>
                           {loadingPcoData ? (
                             <div className="text-xs text-slate-400 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading categories...</div>
                           ) : (
                             <select
-                              className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
+                              className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
                               value={actions.noteCategoryId || ''}
                               onChange={e => setActions({ ...actions, noteCategoryId: e.target.value })}
                             >
@@ -1648,11 +1644,11 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                     )}
 
                     <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
-                      <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Send SMS Alert To</label>
+                      <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Send SMS Alert To</label>
                       <input
                         type="tel"
                         placeholder="e.g. +1234567890"
-                        className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
+                        className="w-full text-xs border border-slate-300 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
                         value={actions.sendSmsAlertTo || ''}
                         onChange={e => setActions({ ...actions, sendSmsAlertTo: e.target.value })}
                       />
@@ -1664,7 +1660,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                   {/* Share & Embed Options */}
                   {activeForm && (
                     <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5 flex items-center gap-1">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-700 pb-1.5 flex items-center gap-1">
                         <Globe size={14} className="text-indigo-500" /> Share & Embed
                       </h4>
                       
@@ -1696,7 +1692,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           <div className="bg-white p-1 rounded-lg border border-slate-100 mb-2">
                             <canvas ref={qrCanvasRef} className="w-24 h-24 block" />
                           </div>
-                          <button type="button" onClick={handleDownloadQr} className="w-full py-1 text-[10px] font-bold text-white bg-indigo-650 hover:bg-indigo-700 rounded-lg transition flex items-center justify-center gap-1">
+                          <button type="button" onClick={handleDownloadQr} className="w-full py-1 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center justify-center gap-1">
                             <Download size={10} /> Download QR PNG
                           </button>
                         </div>
@@ -1718,14 +1714,14 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 setIsEditing(false);
                 setActiveForm(null);
               }}
-              className="px-5 py-2.5 text-sm font-bold text-slate-650 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition"
+              className="px-5 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-350 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-600/10"
+              className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-600/10"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Save Form Properties
             </button>
@@ -1749,51 +1745,49 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               {syncAllState.result && (
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
                   syncAllState.result.failed > 0
-                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                    ? 'inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800'
+                    : 'inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800'
                 }`}>
-                  ✓ {syncAllState.result.synced} synced{syncAllState.result.failed > 0 ? `, ${syncAllState.result.failed} failed` : ''}
+                  <CheckCircle size={13} aria-hidden="true" /> {syncAllState.result.synced} synced{syncAllState.result.failed > 0 ? `, ${syncAllState.result.failed} failed` : ''}
                 </span>
               )}
               {syncAllState.error && (
-                <span className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:border-red-800">
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800">
                   {syncAllState.error}
                 </span>
               )}
               {submissions.length > 0 && (
-                <button
+                <ToolButton
+                  variant="secondary"
+                  size="sm"
                   onClick={handleForceSyncAll}
                   disabled={syncAllState.loading}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/35 border border-violet-200 dark:border-violet-900/50 text-violet-700 dark:text-violet-400 text-xs font-bold rounded-xl transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {syncAllState.loading ? (
-                    <><Loader2 size={13} className="animate-spin" /> Syncing…</>
+                    <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Syncing…</>
                   ) : (
                     <><img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-3.5 h-3.5" /> Force Sync to PCO</>
                   )}
-                </button>
+                </ToolButton>
               )}
               {submissions.length > 0 && (
-                <button
-                  onClick={handleDownloadCsv}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-105 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/35 border border-indigo-150 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl transition"
-                >
-                  <FileText size={14} /> Download CSV
-                </button>
+                <ToolButton variant="secondary" size="sm" icon={FileText} onClick={handleDownloadCsv}>
+                  Download CSV
+                </ToolButton>
               )}
-              <span className="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-700">
                 {submissions.length} Total Submissions
               </span>
             </div>
           </div>
 
           {loadingSubmissions ? (
-            <div className="flex h-40 items-center justify-center text-slate-450">
-              <Loader2 className="animate-spin mr-2" /> Fetching form submissions...
+            <div className="flex h-40 items-center justify-center text-slate-400 dark:text-slate-500">
+              <Loader2 className="animate-spin mr-2" aria-hidden="true" /> Fetching form submissions...
             </div>
           ) : submissions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <Eye size={36} className="mx-auto text-slate-300 mb-2" />
+            <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+              <Eye size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" aria-hidden="true" />
               <p className="font-semibold text-sm">No submissions recorded yet.</p>
               <p className="text-xs text-slate-400 mt-1">Once visitors fill out this form, their details will display here.</p>
             </div>
@@ -1811,7 +1805,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {submissions.map((sub: any) => (
                     <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/25 transition">
-                      <td className="px-4 py-3.5 text-slate-550 dark:text-slate-400 font-mono text-xs">
+                      <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400 font-mono text-xs">
                         {new Date(sub.submittedAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3.5 font-bold text-slate-800 dark:text-slate-200">
@@ -1822,7 +1816,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           <div className="text-xs font-medium text-slate-700 dark:text-slate-300">{sub.data.email}</div>
                         )}
                         {sub.data?.phone && (
-                          <div className="text-[11px] text-slate-450 dark:text-slate-450 font-mono">{sub.data.phone}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{sub.data.phone}</div>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
@@ -1840,7 +1834,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           </span>
                         ) : sub.status === 'failed' ? (
                           <div className="space-y-1">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-650 border border-red-100 dark:bg-red-950/20">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 dark:text-red-400 border border-red-100 dark:bg-red-950/20">
                               Failed
                             </span>
                             {sub.errorDetails && (
@@ -1863,6 +1857,6 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
           )}
         </div>
       )}
-    </div>
+    </ToolPage>
   );
 };

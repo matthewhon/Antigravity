@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Loader2, RefreshCw, Copy, CheckCircle, Globe, Code, LayoutGrid, MonitorPlay, Eye, EyeOff } from 'lucide-react';
+import { Loader2, RefreshCw, Copy, CheckCircle, Code, LayoutGrid, MonitorPlay, Eye, EyeOff, TriangleAlert, Info } from 'lucide-react';
+import { ToolHeader, ToolButton } from './tool-shell';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -219,27 +220,23 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Globe className="text-indigo-500" size={24} /> Website Embeds
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Configure beautiful, live-updating widgets for your church website.
-          </p>
-        </div>
-        <button
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition disabled:opacity-50"
-        >
-          {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} 
-          {isSyncing ? 'Syncing...' : 'Sync Now'}
-        </button>
-      </div>
+      <ToolHeader
+        tool="website"
+        className="shrink-0"
+        description="Configure beautiful, live-updating widgets for your church website."
+        actions={
+          <ToolButton variant="secondary" onClick={handleSync} disabled={isSyncing}>
+            {isSyncing
+              ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+              : <RefreshCw size={16} aria-hidden="true" />}
+            {isSyncing ? 'Syncing...' : 'Sync Now'}
+          </ToolButton>
+        }
+      />
 
+      <div className="flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <div className="flex flex-grow overflow-hidden">
         {/* Left Config Panel */}
         <div className="w-80 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-y-auto p-6 space-y-6">
@@ -492,7 +489,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               )}
               <p className="text-[10px] text-slate-400 leading-relaxed">Toggle which forms appear in your embedded widget. Click a form to show or hide it.</p>
               {visibleFormIds.size === 0 && forms.length > 0 && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">⚠ No forms selected — the widget will show nothing.</p>
+                <p className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold"><TriangleAlert size={12} className="shrink-0" aria-hidden="true" /> No forms selected — the widget will show nothing.</p>
               )}
             </div>
           )}
@@ -589,8 +586,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                       const hasUrl = Boolean(sel?.publicUrl || sel?.churchCenterUrl);
                       if (sel && !hasUrl) {
                         return (
-                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
-                            ℹ Note: This event has no public URL in Planning Center. The widget will display "No Registration Required".
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-2 flex items-start gap-1">
+                            <Info size={12} className="shrink-0 mt-px" aria-hidden="true" /> Note: This event has no public URL in Planning Center. The widget will display "No Registration Required".
                           </p>
                         );
                       }
@@ -950,6 +947,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
 
              </div>
         </div>
+      </div>
       </div>
 
       {toast && (

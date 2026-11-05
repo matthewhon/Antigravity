@@ -21,11 +21,16 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw, Contact,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText, UserPlus, Play, Beaker
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText, UserPlus, Play, Beaker,
+    Hand, ClipboardList, Cake, Gem, Ticket, Lightbulb, ScrollText, User as UserIcon,
+    Folder, Link2, Camera, Paperclip, Music, Film, IdCard, CircleCheck, CircleX, Ban, Check,
+    PartyPopper, Rocket, MapPin, Plug, Megaphone, Bell, Target, CalendarDays, Smartphone, Cog,
+    MailOpen, ArrowRight, HandHeart, StickyNote, Timer, CalendarClock, Bot
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
 import { SmsEventPickerModal } from './SmsEventPickerModal';
+import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
 
 // --- Constants --------------------------------------------------------------
 
@@ -452,14 +457,14 @@ const ScheduleModal: React.FC<{
                     min={new Date().toISOString().slice(0, 16)}
                     title="Send date and time"
                     placeholder="Select date and time"
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
                 />
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Repeat</label>
                 <select
                     value={frequency}
                     onChange={e => setFrequency(e.target.value as any)}
                     title="Repeat frequency"
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-6"
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6"
                 >
                     <option value="none">Does not repeat</option>
                     <option value="daily">Daily</option>
@@ -468,7 +473,7 @@ const ScheduleModal: React.FC<{
                 </select>
                 <div className="flex gap-2">
                     <button onClick={onCancel} className="flex-1 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition font-semibold">Cancel</button>
-                    <button onClick={handleConfirm} disabled={isBusy} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition">
+                    <button onClick={handleConfirm} disabled={isBusy} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition">
                         {isBusy ? <><Loader2 size={13} className="animate-spin" />Scheduling...</> : <><Calendar size={13} />Schedule</>}
                     </button>
                 </div>
@@ -568,7 +573,7 @@ const FilePickerDialog: React.FC<{
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-lg mx-auto flex flex-col max-h-[85vh] border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FileText size={18} className="text-violet-500" /> Attach File or Document
+                        <FileText size={18} className="text-indigo-500" /> Attach File or Document
                     </h3>
                     <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition"><X size={16} /></button>
                 </div>
@@ -580,7 +585,7 @@ const FilePickerDialog: React.FC<{
                         onClick={() => setTab('upload')}
                         className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
                             tab === 'upload'
-                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600'
                                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
                         }`}
                     >
@@ -591,7 +596,7 @@ const FilePickerDialog: React.FC<{
                         onClick={() => setTab('library')}
                         className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 border-b-2 ${
                             tab === 'library'
-                                ? 'text-violet-600 dark:text-violet-400 border-violet-600'
+                                ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600'
                                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-transparent'
                         }`}
                     >
@@ -620,9 +625,9 @@ const FilePickerDialog: React.FC<{
                                     const f = e.dataTransfer.files?.[0];
                                     if (f) handleFileUpload(f);
                                 }}
-                                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-violet-500 dark:hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition"
+                                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition"
                             >
-                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 flex items-center justify-center mb-3">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
                                     <Upload size={22} />
                                 </div>
                                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -648,7 +653,7 @@ const FilePickerDialog: React.FC<{
                                     <button
                                         type="button"
                                         onClick={() => onSelect(`${window.location.origin}/f/${uploadedFile.id}`)}
-                                        className="flex-1 py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                        className="flex-1 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
                                     >
                                         <Link size={13} /> Insert Link in Message
                                     </button>
@@ -676,7 +681,7 @@ const FilePickerDialog: React.FC<{
                         {uploadProgress !== null && (
                             <div className="space-y-1">
                                 <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                                    <div className="h-full bg-indigo-600 transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
                                 </div>
                                 <p className="text-[11px] text-slate-400 text-right">{uploadProgress}%</p>
                             </div>
@@ -697,7 +702,7 @@ const FilePickerDialog: React.FC<{
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Search existing files..."
-                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
 
@@ -715,13 +720,13 @@ const FilePickerDialog: React.FC<{
                                     return (
                                         <div
                                             key={f.id}
-                                            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                                            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
                                         >
                                             <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
                                                 {isImg ? (
                                                     <ImageIcon size={18} className="text-emerald-500" />
                                                 ) : (
-                                                    <FileText size={18} className="text-violet-500" />
+                                                    <FileText size={18} className="text-indigo-500" />
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -742,7 +747,7 @@ const FilePickerDialog: React.FC<{
                                                 <button
                                                     type="button"
                                                     onClick={() => onSelect(`${window.location.origin}/f/${f.id}`)}
-                                                    className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition"
+                                                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"
                                                 >
                                                     Insert Link
                                                 </button>
@@ -986,7 +991,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         <ArrowLeft size={18} />
                     </button>
                     <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0">
-                        <span className="cursor-pointer hover:text-violet-600 font-medium hidden sm:inline" onClick={onBack}>Campaigns</span>
+                        <span className="cursor-pointer hover:text-indigo-600 font-medium hidden sm:inline" onClick={onBack}>Campaigns</span>
                         <ChevronDown size={14} className="-rotate-90 hidden sm:block" />
                         <span className="font-semibold text-slate-900 dark:text-white truncate">{local.name}</span>
                     </div>
@@ -1019,7 +1024,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         <button
                             onClick={() => onSend(local)}
                             disabled={!canSend || isSending}
-                            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+                            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
                         >
                             {isSending ? <><Loader2 size={14} className="animate-spin" />Sending...</> : <><Send size={14} />Send Now</>}
                         </button>
@@ -1039,7 +1044,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             type="text"
                             value={local.name}
                             onChange={e => update({ name: e.target.value })}
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             placeholder="e.g. Sunday Service Reminder"
                         />
                     </div>
@@ -1072,7 +1077,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 <button
                                     key={tab}
                                     onClick={() => setToTab(tab)}
-                                    className={`flex-1 py-1.5 text-xs font-bold capitalize transition ${toTab === tab ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                    className={`flex-1 py-1.5 text-xs font-bold capitalize transition ${toTab === tab ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                 >
                                     PCO {tab === 'lists' ? 'Lists' : 'Groups'}
                                 </button>
@@ -1087,7 +1092,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 ) : (
                                     <select
                                         title="Select a PCO list"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         value={local.toListId || ''}
                                         onChange={e => {
                                             const sel = pcoLists.find(l => l.id === e.target.value);
@@ -1108,7 +1113,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 ) : (
                                     <select
                                         title="Select a PCO group"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         value={local.toGroupId || ''}
                                         onChange={e => {
                                             const sel = pcoGroups.find(g => g.id === e.target.value);
@@ -1136,7 +1141,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">Campaign Type</label>
                                 <select
                                     title="Campaign Type"
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-bold"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
                                     value={local.campaignType || 'standard'}
                                     onChange={e => {
                                         const type = e.target.value;
@@ -1159,7 +1164,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     ) : (
                                         <select
                                             title="Select PCO Event"
-                                            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             value={local.pcoSignupId || ''}
                                             onChange={e => update({ pcoSignupId: e.target.value })}
                                         >
@@ -1209,7 +1214,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             type="text"
                                             value={local.emailSubject || ''}
                                             onChange={e => update({ emailSubject: e.target.value })}
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             placeholder="Enter subject line..."
                                         />
                                     </div>
@@ -1222,7 +1227,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 <>
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Message</label>
-                                        <span className={`text-xs font-bold ${isMmsActive ? 'text-violet-600 dark:text-violet-400' : segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                        <span className={`text-xs font-bold ${isMmsActive ? 'text-indigo-600 dark:text-indigo-400' : segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
                                             {isMmsActive
                                                 ? `${local.body?.length ?? 0} chars • MMS (1 media message)`
                                                 : `${local.body?.length ?? 0} chars • ${segments} segment${segments !== 1 ? 's' : ''}`
@@ -1235,7 +1240,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         value={local.body || ''}
                                         onChange={e => update({ body: e.target.value })}
                                         placeholder="Type your message here..."
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-medium leading-relaxed"
                                     />
                                     {/* Composer toolbar */}
                                     <div className="flex items-center gap-1 mt-2 flex-wrap">
@@ -1280,11 +1285,11 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                             value={linkUrl}
                                                             onChange={e => setLinkUrl(e.target.value)}
                                                             placeholder="https://example.com"
-                                                            className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                            className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                                         />
                                                         <button
                                                             onClick={() => { if (linkUrl.trim()) { insertAtCursor(' ' + linkUrl.trim()); setLinkUrl(''); setShowLinkDlg(false); } }}
-                                                            className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition"
+                                                            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition"
                                                         >Insert</button>
                                                     </div>
                                                 </div>
@@ -1315,7 +1320,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                         ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                                                         : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
                                                     : showImagePanel
-                                                        ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700'
+                                                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
                                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
                                             }`}
                                         >
@@ -1362,7 +1367,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             title="AI SMS helper ... suggest shorter message"
                                             onClick={handleAiSuggest}
                                             disabled={!local.body?.trim() || aiLoading}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 transition"
                                         >
                                             {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
                                             AI Shorten
@@ -1371,7 +1376,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                                     {/* Image upload & MMS delivery options panel */}
                                     {showImagePanel && (
-                                        <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-md">
+                                        <div className="mt-3 border-2 border-indigo-200 dark:border-indigo-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-md">
                                             <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                                                 {(['upload', 'url'] as const).map(t => (
                                                     <button
@@ -1380,11 +1385,14 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                         onClick={() => setImageTab(t)}
                                                         className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${
                                                             imageTab === t
-                                                                ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500 bg-white dark:bg-slate-900'
+                                                                ? 'text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500 bg-white dark:bg-slate-900'
                                                                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                                                         }`}
                                                     >
-                                                        {t === 'upload' ? '📁 Upload Image File' : '🔗 Paste Image URL'}
+                                                        <span className="inline-flex items-center justify-center gap-1.5">
+                                                            {t === 'upload' ? <Folder size={12} aria-hidden="true" /> : <Link2 size={12} aria-hidden="true" />}
+                                                            {t === 'upload' ? 'Upload Image File' : 'Paste Image URL'}
+                                                        </span>
                                                     </button>
                                                 ))}
                                             </div>
@@ -1409,7 +1417,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                                 const f = e.dataTransfer.files?.[0];
                                                                 if (f) handleImageFileUpload(f);
                                                             }}
-                                                            className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition text-center"
+                                                            className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition text-center"
                                                         >
                                                             <Upload size={22} className="text-slate-400" />
                                                             <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -1420,7 +1428,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                         {imageUploadProgress !== null && (
                                                             <div className="space-y-1">
                                                                 <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${imageUploadProgress}%` }} />
+                                                                    <div className="h-full bg-indigo-600 transition-all duration-200" style={{ width: `${imageUploadProgress}%` }} />
                                                                 </div>
                                                                 <p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p>
                                                             </div>
@@ -1436,7 +1444,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                                 value={urlInput}
                                                                 onChange={e => setUrlInput(e.target.value)}
                                                                 placeholder="https://example.com/photo.jpg"
-                                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                                             />
                                                             <button
                                                                 type="button"
@@ -1447,7 +1455,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                                     }
                                                                 }}
                                                                 disabled={!urlInput.trim()}
-                                                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition"
+                                                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition"
                                                             >
                                                                 Use URL
                                                             </button>
@@ -1516,12 +1524,13 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
                                                         sendAsMms
                                                             ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
                                                             : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
                                                     }`}>
-                                                        {sendAsMms ? '📷 MMS Picture Attachment' : '🔗 Link in Message'}
+                                                        {sendAsMms ? <Camera size={12} aria-hidden="true" /> : <Link2 size={12} aria-hidden="true" />}
+                                                        {sendAsMms ? 'MMS Picture Attachment' : 'Link in Message'}
                                                     </span>
                                                 </div>
                                                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -1542,7 +1551,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                     type="button"
                                                     onClick={handleInsertImageLink}
                                                     title="Insert link into text body"
-                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 transition flex items-center gap-1"
+                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 transition flex items-center gap-1"
                                                 >
                                                     <Link size={11} /> Insert Link
                                                 </button>
@@ -1571,16 +1580,16 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     )}
                                     {/* AI suggestion panel */}
                                     {showAiPanel && (
-                                        <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-4">
+                                        <div className="mt-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-2xl p-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-[10px] font-bold uppercase tracking-wide text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
-                                                <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
+                                                <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
+                                                <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-indigo-400 hover:text-indigo-600"><X size={14} /></button>
                                             </div>
                                             {aiLoading ? (
-                                                <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message...</div>
+                                                <div className="flex items-center gap-2 text-sm text-indigo-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message...</div>
                                             ) : (
                                                 <>
-                                                    <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
+                                                    <p className="text-sm text-indigo-800 dark:text-indigo-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
                                                     <div className="flex items-center gap-2">
                                                         <span className={`text-xs font-bold ${countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                                             {aiSuggestion.length} chars • {countSegments(aiSuggestion)} seg
@@ -1588,14 +1597,14 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                         <div className="flex-1" />
                                                         <button
                                                             onClick={() => { update({ body: aiSuggestion }); setShowAiPanel(false); }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition"
                                                         >
                                                             <ChevronRight size={12} /> Use This
                                                         </button>
                                                         <button
                                                             onClick={handleAiSuggest}
                                                             title="Regenerate AI suggestion"
-                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition"
+                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-xl hover:bg-indigo-200 transition"
                                                         >
                                                             <RotateCcw size={11} /> Retry
                                                         </button>
@@ -1618,7 +1627,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         key={tag}
                                         title={`Insert ${label} merge tag`}
                                         onClick={() => insertAtCursor(tag)}
-                                        className="px-3 py-1.5 text-xs font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900/40 border border-violet-200 dark:border-violet-800 transition"
+                                        className="px-3 py-1.5 text-xs font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"
                                     >
                                         {tag}
                                     </button>
@@ -1652,7 +1661,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         </div>
                                     </div>
                                 )}
-                                <div className="bg-violet-600 text-white text-sm px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm max-w-[220px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+                                <div className="bg-indigo-600 text-white text-sm px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm max-w-[220px] leading-relaxed whitespace-pre-wrap break-words font-medium">
                                     {(local.body || '')
                                         .replace('{firstName}', 'John').replace('{lastName}', 'Smith')
                                         .replace('{fullName}', 'John Smith').replace('{email}', 'john@example.com')
@@ -1731,47 +1740,47 @@ const CampaignList: React.FC<{
     };
 
     return (
-        <div className="p-4 max-w-4xl mx-auto">
+        <ToolPage>
             {/* Header */}
             <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
                 <div>
-                    <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <MessageSquare size={22} className="text-violet-500" /> Text Campaigns
-                    </h1>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <MessageSquare size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> Text campaigns
+                    </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Send bulk SMS to your congregation</p>
                 </div>
-                <button onClick={onCreate} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                    <Plus size={16} /> New
-                </button>
+                <ToolButton variant="primary" icon={Plus} onClick={onCreate}>
+                    New
+                </ToolButton>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-                {(['all', 'draft', 'scheduled', 'sent'] as const).map(t => (
-                    <button
-                        key={t}
-                        onClick={() => setTab(t)}
-                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                    >
-                        {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : t === 'scheduled' ? 'Scheduled' : 'Sent'}
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === t ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>{counts[t]}</span>
-                    </button>
-                ))}
-            </div>
+            <ToolTabs
+                ariaLabel="Filter campaigns by status"
+                className="mb-5"
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                    { value: 'all', label: 'All', count: counts.all },
+                    { value: 'draft', label: 'Drafts', count: counts.draft },
+                    { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
+                    { value: 'sent', label: 'Sent', count: counts.sent },
+                ]}
+            />
 
             {/* List */}
             {isLoading ? (
                 <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaigns...</div>
             ) : filtered.length === 0 ? (
-                <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <MessageSquare size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-slate-600 dark:text-slate-400 font-semibold">{tab === 'sent' ? 'No sent campaigns yet' : 'No text campaigns yet'}</p>
-                    {tab !== 'sent' && (
-                        <button onClick={onCreate} className="mt-4 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                            <span className="flex items-center gap-1.5"><Plus size={14} /> Create Campaign</span>
-                        </button>
-                    )}
-                </div>
+                <ToolEmptyState
+                    icon={MessageSquare}
+                    title={tab === 'sent' ? 'No sent campaigns yet' : 'No text campaigns yet'}
+                    action={tab !== 'sent' ? (
+                        <ToolButton variant="primary" icon={Plus} onClick={onCreate}>
+                            Create Campaign
+                        </ToolButton>
+                    ) : undefined}
+                />
             ) : (
                 <div className="space-y-3">
                     {filtered.map(c => {
@@ -1779,12 +1788,12 @@ const CampaignList: React.FC<{
                         return (
                             <div
                                 key={c.id}
-                                className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-300 dark:hover:border-violet-600 transition cursor-pointer"
+                                className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-indigo-300 dark:hover:border-indigo-600 transition cursor-pointer"
                                 onClick={() => onOpen(c)}
                             >
                                 <div className="flex items-start gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0 mt-0.5">
-                                        {c.channelType === 'email' ? <Mail size={16} className="text-violet-500" /> : <MessageSquare size={16} className="text-violet-500" />}
+                                    <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 mt-0.5">
+                                        {c.channelType === 'email' ? <Mail size={16} className="text-indigo-500" /> : <MessageSquare size={16} className="text-indigo-500" />}
                                     </div>
                                     <div className="flex-grow min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -1810,7 +1819,7 @@ const CampaignList: React.FC<{
                                     </div>
                                     {/* Always-visible action buttons (no hover-only on touch) */}
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button onClick={e => { e.stopPropagation(); onDuplicate(c); }} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Duplicate"><Copy size={14} /></button>
+                                        <button onClick={e => { e.stopPropagation(); onDuplicate(c); }} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Duplicate"><Copy size={14} /></button>
                                         <button onClick={e => { e.stopPropagation(); onDelete(c.id); }} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete"><Trash2 size={14} /></button>
                                     </div>
                                 </div>
@@ -1819,7 +1828,7 @@ const CampaignList: React.FC<{
                     })}
                 </div>
             )}
-        </div>
+        </ToolPage>
     );
 };
 
@@ -2143,7 +2152,7 @@ const NewMessageComposer: React.FC<{
                             : `Queued for ${sentCount.toLocaleString()} recipient${sentCount !== 1 ? 's' : ''}.`
                         }
                     </p>
-                    <button onClick={onSent} className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
+                    <button onClick={onSent} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition">
                         Done
                     </button>
                 </div>
@@ -2158,7 +2167,7 @@ const NewMessageComposer: React.FC<{
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
                     <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <Edit3 size={18} className="text-violet-500" /> New Message
+                        <Edit3 size={18} className="text-indigo-500" /> New Message
                     </h2>
                     <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
                         <X size={20} />
@@ -2180,8 +2189,8 @@ const NewMessageComposer: React.FC<{
                                     key={opt.key}
                                     onClick={() => setMode(opt.key)}
                                     className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition text-xs font-black ${mode === opt.key
-                                            ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
-                                            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
+                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                                            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300'
                                         }`}
                                 >
                                     {opt.icon}
@@ -2198,21 +2207,21 @@ const NewMessageComposer: React.FC<{
 
                             {/* Selected person card */}
                             {selectedPerson ? (
-                                <div className="flex items-center gap-3 p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
-                                    <div className="w-10 h-10 rounded-full bg-violet-200 dark:bg-violet-800 overflow-hidden flex items-center justify-center shrink-0">
+                                <div className="flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500 rounded-2xl">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-200 dark:bg-indigo-800 overflow-hidden flex items-center justify-center shrink-0">
                                         {selectedPerson.avatar
                                             ? <img src={selectedPerson.avatar} alt={selectedPerson.name} className="w-full h-full object-cover" />
-                                            : <span className="text-sm font-black text-violet-600 dark:text-violet-300">{selectedPerson.name.charAt(0)}</span>
+                                            : <span className="text-sm font-black text-indigo-600 dark:text-indigo-300">{selectedPerson.name.charAt(0)}</span>
                                         }
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-violet-800 dark:text-violet-200 truncate">{selectedPerson.name}</p>
-                                        <p className="text-xs text-violet-500 font-mono">{formatPhone(selectedPerson.phone)}</p>
+                                        <p className="text-sm font-bold text-indigo-800 dark:text-indigo-200 truncate">{selectedPerson.name}</p>
+                                        <p className="text-xs text-indigo-500 font-mono">{formatPhone(selectedPerson.phone)}</p>
                                     </div>
                                     <button
                                         onClick={() => { setSelectedPerson(null); setPersonSearch(''); setManualEntry(false); }}
                                         title="Change recipient"
-                                        className="text-violet-400 hover:text-violet-600 transition shrink-0"
+                                        className="text-indigo-400 hover:text-indigo-600 transition shrink-0"
 
                                     >
                                         <X size={16} />
@@ -2229,7 +2238,7 @@ const NewMessageComposer: React.FC<{
                                             onChange={e => setPhone(e.target.value)}
                                             placeholder="+1 (615) 555-0100"
                                             autoFocus
-                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         />
                                     </div>
                                     <div className="relative">
@@ -2239,12 +2248,12 @@ const NewMessageComposer: React.FC<{
                                             value={recipientName}
                                             onChange={e => setRecipientName(e.target.value)}
                                             placeholder="Name (optional)"
-                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         />
                                     </div>
                                     <button
                                         onClick={() => { setManualEntry(false); setPhone(''); setRecipientName(''); }}
-                                        className="text-xs text-violet-500 hover:text-violet-700 font-semibold"
+                                        className="text-xs text-indigo-500 hover:text-indigo-700 font-semibold"
                                     >? Search PCO people instead</button>
                                 </div>
                             ) : (
@@ -2252,14 +2261,14 @@ const NewMessageComposer: React.FC<{
                                 <div>
                                     <div className="relative">
                                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        {personLoading && <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-400 animate-spin" />}
+                                        {personLoading && <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400 animate-spin" />}
                                         <input
                                             type="text"
                                             value={personSearch}
                                             onChange={e => setPersonSearch(e.target.value)}
                                             placeholder="Search by name or phone number..."
                                             autoFocus
-                                            className="w-full pl-8 pr-8 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                            className="w-full pl-8 pr-8 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         />
                                     </div>
                                     {/* Results dropdown */}
@@ -2275,13 +2284,13 @@ const NewMessageComposer: React.FC<{
                                                         setPersonResults([]);
                                                     }}
                                                     disabled={!p.phone}
-                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-left ${!p.phone ? 'opacity-40 cursor-not-allowed' : ''
+                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition text-left ${!p.phone ? 'opacity-40 cursor-not-allowed' : ''
                                                         }`}
                                                 >
-                                                    <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/40 overflow-hidden flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 overflow-hidden flex items-center justify-center shrink-0">
                                                         {p.avatar
                                                             ? <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
-                                                            : <span className="text-xs font-black text-violet-600 dark:text-violet-300">{p.name.charAt(0)}</span>
+                                                            : <span className="text-xs font-black text-indigo-600 dark:text-indigo-300">{p.name.charAt(0)}</span>
                                                         }
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -2291,7 +2300,7 @@ const NewMessageComposer: React.FC<{
                                                             {p.membership && <span className="ml-2 text-[10px] text-slate-400">... {p.membership}</span>}
                                                         </p>
                                                     </div>
-                                                    {p.phone && <ChevronRight size={14} className="text-violet-400 shrink-0" />}
+                                                    {p.phone && <ChevronRight size={14} className="text-indigo-400 shrink-0" />}
                                                 </button>
                                             ))}
                                         </div>
@@ -2303,7 +2312,7 @@ const NewMessageComposer: React.FC<{
                                     )}
                                     <button
                                         onClick={() => setManualEntry(true)}
-                                        className="mt-2 text-xs text-slate-400 hover:text-violet-600 font-semibold transition"
+                                        className="mt-2 text-xs text-slate-400 hover:text-indigo-600 font-semibold transition"
                                     >
                                         + Enter phone number manually
                                     </button>
@@ -2317,12 +2326,12 @@ const NewMessageComposer: React.FC<{
                         <div>
                             <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Select Planning Center List</label>
                             {selectedList ? (
-                                <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
+                                <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500 rounded-2xl">
                                     <div>
-                                        <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedList.name}</p>
-                                        <p className="text-xs text-violet-500">{selectedList.total_people.toLocaleString()} people</p>
+                                        <p className="font-bold text-sm text-indigo-700 dark:text-indigo-300">{selectedList.name}</p>
+                                        <p className="text-xs text-indigo-500">{selectedList.total_people.toLocaleString()} people</p>
                                     </div>
-                                    <button onClick={() => setSelectedList(null)} title="Clear selected list" className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                    <button onClick={() => setSelectedList(null)} title="Clear selected list" className="text-indigo-400 hover:text-indigo-600 transition"><X size={16} /></button>
                                 </div>
                             ) : (
                                 <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
@@ -2342,7 +2351,7 @@ const NewMessageComposer: React.FC<{
                                         ) : filteredLists.length === 0 ? (
                                             <p className="text-center text-sm text-slate-400 py-4">No lists found</p>
                                         ) : filteredLists.map(l => (
-                                            <button key={l.id} onClick={() => setSelectedList(l)} className="w-full text-left px-4 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-between">
+                                            <button key={l.id} onClick={() => setSelectedList(l)} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition flex items-center justify-between">
                                                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{l.name}</span>
                                                 <span className="text-xs text-slate-400">{l.total_people.toLocaleString()}</span>
                                             </button>
@@ -2358,12 +2367,12 @@ const NewMessageComposer: React.FC<{
                         <div>
                             <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Select Planning Center Group</label>
                             {selectedGroup ? (
-                                <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
+                                <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500 rounded-2xl">
                                     <div>
-                                        <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedGroup.name}</p>
-                                        <p className="text-xs text-violet-500">{selectedGroup.memberCount.toLocaleString()} members</p>
+                                        <p className="font-bold text-sm text-indigo-700 dark:text-indigo-300">{selectedGroup.name}</p>
+                                        <p className="text-xs text-indigo-500">{selectedGroup.memberCount.toLocaleString()} members</p>
                                     </div>
-                                    <button onClick={() => setSelectedGroup(null)} title="Clear selected group" className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                    <button onClick={() => setSelectedGroup(null)} title="Clear selected group" className="text-indigo-400 hover:text-indigo-600 transition"><X size={16} /></button>
                                 </div>
                             ) : (
                                 <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
@@ -2383,7 +2392,7 @@ const NewMessageComposer: React.FC<{
                                         ) : filteredGroups.length === 0 ? (
                                             <p className="text-center text-sm text-slate-400 py-4">No groups found</p>
                                         ) : filteredGroups.map(g => (
-                                            <button key={g.id} onClick={() => setSelectedGroup(g)} className="w-full text-left px-4 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-between">
+                                            <button key={g.id} onClick={() => setSelectedGroup(g)} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition flex items-center justify-between">
                                                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{g.name}</span>
                                                 <span className="text-xs text-slate-400">{g.memberCount.toLocaleString()}</span>
                                             </button>
@@ -2412,7 +2421,7 @@ const NewMessageComposer: React.FC<{
                             placeholder={mode === 'individual'
                                 ? 'Type your message...'
                                 : 'Type your message... Use merge tags to personalize.'}
-                            className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 resize-none"
+                            className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 resize-none"
                         />
                         {/* Composer toolbar */}
                         <div className="flex items-center gap-1 mt-2 flex-wrap">
@@ -2443,10 +2452,10 @@ const NewMessageComposer: React.FC<{
                                         <div className="flex gap-2">
                                             <input type="url" value={linkUrlNM} onChange={e => setLinkUrlNM(e.target.value)}
                                                 placeholder="https://example.com"
-                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                             />
                                             <button onClick={() => { if (linkUrlNM.trim()) { insertAtCursorNM(' ' + linkUrlNM.trim()); setLinkUrlNM(''); setShowLinkDlgNM(false); } }}
-                                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition">Insert</button>
+                                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition">Insert</button>
                                         </div>
                                     </div>
                                 )}
@@ -2459,7 +2468,7 @@ const NewMessageComposer: React.FC<{
                             {/* Image / MMS */}
                             <button type="button" title="Attach image (MMS)"
                                 onClick={() => { setShowImagePanelNM(v => !v); setShowEmojisNM(false); setShowLinkDlgNM(false); setShowFilePickerNM(false); }}
-                                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : showImagePanelNM ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
+                                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : showImagePanelNM ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
                             ><ImageIcon size={12} /> {imageUrlNM ? 'Image \u2713' : 'Image (MMS)'}</button>
                             {imageUrlNM && (
                                 <button type="button" title="Remove image" onClick={() => { setImageUrlNM(''); setShowImagePanelNM(false); }} className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
@@ -2478,34 +2487,34 @@ const NewMessageComposer: React.FC<{
                             {/* AI Helper */}
                             <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
                                 disabled={!body.trim() || aiLoadingNM}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 transition"
                             >{aiLoadingNM ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Shorten</button>
                         </div>
                         {/* Image upload panel */}
                         {showImagePanelNM && (
-                            <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden">
+                            <div className="mt-3 border-2 border-indigo-200 dark:border-indigo-700 rounded-2xl overflow-hidden">
                                 <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                                     {(['upload', 'url'] as const).map(tab => (
-                                        <button key={tab} type="button" onClick={() => setImageTab(tab)} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${imageTab === tab ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{tab === 'upload' ? '\uD83D\uDCC1 Upload File' : '\uD83D\uDD17 Paste URL'}</button>
+                                        <button key={tab} type="button" onClick={() => setImageTab(tab)} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${imageTab === tab ? 'text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{tab === 'upload' ? '\uD83D\uDCC1 Upload File' : '\uD83D\uDD17 Paste URL'}</button>
                                     ))}
                                 </div>
                                 <div className="p-4 bg-white dark:bg-slate-900 space-y-3">
                                     {imageTab === 'upload' ? (
                                         <>
                                             <input ref={fileInputRefNM} type="file" accept="image/*" aria-label="Upload image for MMS" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFileUpload(f); }} />
-                                            <div onClick={() => fileInputRefNM.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageFileUpload(f); }} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition">
+                                            <div onClick={() => fileInputRefNM.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageFileUpload(f); }} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition">
                                                 <Upload size={24} className="text-slate-400" />
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
                                                 <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
                                             </div>
-                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-violet-500" ref={el => el?.style.setProperty('--bar-w', `${imageUploadProgress}%`)} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
+                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-indigo-500" ref={el => el?.style.setProperty('--bar-w', `${imageUploadProgress}%`)} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
                                         </>
                                     ) : (
                                         <div className="space-y-2">
                                             <div className="flex gap-2">
-                                                <input type="url" value={urlInputNM} onChange={e => setUrlInputNM(e.target.value)} placeholder="https://example.com/photo.jpg" className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500" />
-                                                <button type="button" onClick={() => { if (urlInputNM.trim()) { setImageUrlNM(urlInputNM.trim()); setUrlInputNM(''); } }} disabled={!urlInputNM.trim()} className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition">Use URL</button>
+                                                <input type="url" value={urlInputNM} onChange={e => setUrlInputNM(e.target.value)} placeholder="https://example.com/photo.jpg" className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                                <button type="button" onClick={() => { if (urlInputNM.trim()) { setImageUrlNM(urlInputNM.trim()); setUrlInputNM(''); } }} disabled={!urlInputNM.trim()} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition">Use URL</button>
                                             </div>
                                         </div>
                                     )}
@@ -2527,25 +2536,25 @@ const NewMessageComposer: React.FC<{
                         )}
                         {/* AI panel NM */}
                         {showAiPanelNM && (
-                            <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-3">
+                            <div className="mt-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-2xl p-3">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-violet-500 flex items-center gap-1"><Sparkles size={10} /> AI Suggestion</span>
-                                    <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-violet-400 hover:text-violet-600"><X size={13} /></button>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 flex items-center gap-1"><Sparkles size={10} /> AI Suggestion</span>
+                                    <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-indigo-400 hover:text-indigo-600"><X size={13} /></button>
                                 </div>
                                 {aiLoadingNM ? (
-                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzing...</div>
+                                    <div className="flex items-center gap-2 text-sm text-indigo-500"><Loader2 size={13} className="animate-spin" /> Analyzing...</div>
                                 ) : (
                                     <>
-                                        <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
+                                        <p className="text-sm text-indigo-800 dark:text-indigo-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
                                         <div className="flex items-center gap-2">
                                             <span className={`text-xs font-bold ${countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                                 {aiSuggestionNM.length} chars • {countSegments(aiSuggestionNM)} seg
                                             </span>
                                             <div className="flex-1" />
                                             <button onClick={() => { setBody(aiSuggestionNM); setShowAiPanelNM(false); }}
-                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
+                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition"
                                             ><ChevronRight size={11} /> Use This</button>
-                                            <button onClick={handleAiSuggestNM} title="Retry" className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition">
+                                            <button onClick={handleAiSuggestNM} title="Retry" className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-xl hover:bg-indigo-200 transition">
                                                 <RotateCcw size={10} /> Retry
                                             </button>
                                         </div>
@@ -2561,7 +2570,7 @@ const NewMessageComposer: React.FC<{
                                     {ALL_MERGE_TAGS.map(({ tag, label }) => (
                                         <button key={tag} type="button" title={`Insert ${label}`}
                                             onClick={() => insertAtCursorNM(tag)}
-                                            className="px-2 py-1 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40 border border-violet-200 dark:border-violet-800 transition"
+                                            className="px-2 py-1 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"
                                         >{tag}</button>
                                     ))}
                                 </div>
@@ -2584,7 +2593,7 @@ const NewMessageComposer: React.FC<{
                     <button
                         onClick={handleSend}
                         disabled={!canSend || sending}
-                        className="flex-[2] py-3 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-2xl transition flex items-center justify-center gap-2"
+                        className="flex-[2] py-3 text-sm font-black bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl transition flex items-center justify-center gap-2"
                     >
                         {sending
                             ? <><Loader2 size={16} className="animate-spin" /> Sending...</>
@@ -2642,7 +2651,7 @@ const ThreadImageAttachment: React.FC<{
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:opacity-90 transition"
             >
-                📎 Media {index + 1} ↗
+                <Paperclip size={12} aria-hidden="true" /> Media {index + 1} <ExternalLink size={11} aria-hidden="true" />
             </a>
         );
     }
@@ -2652,7 +2661,7 @@ const ThreadImageAttachment: React.FC<{
             type="button"
             onClick={onExpand}
             title="Click to expand image"
-            className="block relative max-w-[240px] sm:max-w-[300px] rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 bg-slate-900/5 hover:opacity-95 transition-all shadow-sm text-left shrink-0 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="block relative max-w-[240px] sm:max-w-[300px] rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 bg-slate-900/5 hover:opacity-95 transition-all shadow-sm text-left shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
             <img
                 src={targetUrl}
@@ -3327,12 +3336,15 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-900 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-2">
-                            <Inbox size={16} className="text-violet-500" /> Inbox
-                        </h2>
+                        <ToolHeader
+                            tool="sms"
+                            variant="compact"
+                            icon={Inbox}
+                            title="Inbox"
+                        />
                         <button
                             onClick={() => setShowComposer(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wide transition shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wide transition shadow-sm"
                         >
                             <Plus size={12} /> New
                         </button>
@@ -3344,7 +3356,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                             placeholder="Search..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
 
@@ -3354,8 +3366,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                             <button
                                 onClick={() => setTagFilter(null)}
                                 className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${tagFilter === null
-                                        ? 'bg-violet-600 text-white border-violet-600'
-                                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
                                     }`}
                             >All</button>
                             {tags.map(t => {
@@ -3365,7 +3377,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <button
                                         key={t.id}
                                         onClick={() => setTagFilter(isActive ? null : t.id)}
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
                                             }`}
                                     >
                                         {t.emoji && <span>{t.emoji}</span>}
@@ -3393,13 +3405,13 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         return (
                             <button
                                 key={conv.id}
-                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${isActive ? 'bg-violet-50 dark:bg-violet-900/20' : ''
+                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''
                                     }`}
                                 onClick={() => setActiveConv(conv)}
                             >
                                 {/* Unread left accent bar */}
                                 {isUnread && !isActive && (
-                                    <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-violet-500 rounded-full" />
+                                    <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-indigo-500 rounded-full" />
                                 )}
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2.5 min-w-0">
@@ -3411,9 +3423,9 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex'; }}
                                             />
                                         ) : null}
-                                        <div className={`w-9 h-9 rounded-full text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm shrink-0 ${isUnread
-                                                ? 'bg-violet-200 dark:bg-violet-700'
-                                                : 'bg-violet-100 dark:bg-violet-900/40'
+                                        <div className={`w-9 h-9 rounded-full text-indigo-600 dark:text-indigo-300 items-center justify-center font-black text-sm shrink-0 ${isUnread
+                                                ? 'bg-indigo-200 dark:bg-indigo-700'
+                                                : 'bg-indigo-100 dark:bg-indigo-900/40'
                                             } ${conv.personAvatar ? 'hidden' : 'flex'}`}>
                                             {(conv.personName || conv.phoneNumber).charAt(0).toUpperCase()}
                                         </div>
@@ -3422,7 +3434,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 <p className={`text-sm truncate ${isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
                                                     }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
                                                 {convTags.some(t => t.name === 'Needs Prayer') && conv.lastMessageDirection === 'inbound' && (
-                                                    <span title="Needs Prayer (waiting for reply)" className="shrink-0 text-[13px] leading-none">🙏</span>
+                                                    <span title="Needs Prayer (waiting for reply)" className="shrink-0 leading-none text-amber-500 dark:text-amber-400"><HandHeart size={13} aria-hidden="true" /></span>
                                                 )}
                                             </div>
                                             {conv.personName && <p className={`text-[10px] ${isUnread ? 'text-slate-500' : 'text-slate-400'}`}>{formatPhone(conv.phoneNumber)}</p>}
@@ -3442,9 +3454,9 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         </div>
                                     </div>
                                     <div className="shrink-0 flex flex-col items-end gap-1">
-                                        <span className={`text-[10px] ${isUnread ? 'text-violet-500 font-semibold' : 'text-slate-400'}`}>{timeAgo(conv.lastMessageAt)}</span>
+                                        <span className={`text-[10px] ${isUnread ? 'text-indigo-500 font-semibold' : 'text-slate-400'}`}>{timeAgo(conv.lastMessageAt)}</span>
                                         {isUnread && (
-                                            <span className="min-w-[18px] h-[18px] bg-violet-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                                            <span className="min-w-[18px] h-[18px] bg-indigo-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
                                                 {conv.unreadCount}
                                             </span>
                                         )}
@@ -3474,11 +3486,11 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 <img
                                     src={activeConv.personAvatar}
                                     alt={activeConv.personName || activeConv.phoneNumber}
-                                    className="w-9 h-9 rounded-full object-cover ring-2 ring-violet-100 dark:ring-violet-900/40"
+                                    className="w-9 h-9 rounded-full object-cover ring-2 ring-indigo-100 dark:ring-indigo-900/40"
                                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex'; }}
                                 />
                             ) : null}
-                            <div className={`w-9 h-9 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm ${activeConv.personAvatar ? 'hidden' : 'flex'}`}>
+                            <div className={`w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 items-center justify-center font-black text-sm ${activeConv.personAvatar ? 'hidden' : 'flex'}`}>
                                 {(activeConv.personName || activeConv.phoneNumber).charAt(0).toUpperCase()}
                             </div>
                         </div>
@@ -3517,7 +3529,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 <button
                                     onClick={() => setShowTagPicker(v => !v)}
                                     title="Add or remove tags"
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
                                 >
                                     <Tag size={12} /> Tags
                                 </button>
@@ -3582,7 +3594,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
                                 return (
                                     <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
+                                        <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
                                             <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                                             {attachmentUrls.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-2">
@@ -3623,11 +3635,11 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                                 rel="noopener noreferrer"
                                                                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition shadow-sm ${
                                                                     msg.direction === 'outbound'
-                                                                        ? 'bg-violet-700/60 border-violet-500 text-white hover:bg-violet-700/80'
+                                                                        ? 'bg-indigo-700/60 border-indigo-500 text-white hover:bg-indigo-700/80'
                                                                         : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
                                                                 }`}
                                                             >
-                                                                <span className="text-base">{isVcard ? '🎴' : isPdf ? '📄' : isAudio ? '🎵' : isVideo ? '🎬' : '📎'}</span>
+                                                                <span className="shrink-0" aria-hidden="true">{isVcard ? <IdCard size={16} /> : isPdf ? <FileText size={16} /> : isAudio ? <Music size={16} /> : isVideo ? <Film size={16} /> : <Paperclip size={16} />}</span>
                                                                 <div className="flex flex-col truncate max-w-[200px]">
                                                                     <span className="truncate">{isVcard ? 'Contact Card (.vcf)' : isPdf ? 'Document (.pdf)' : `Attachment ${i + 1}`}</span>
                                                                     <span className="text-[10px] opacity-75">Click to view/download ↗</span>
@@ -3637,16 +3649,16 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                     })}
                                                 </div>
                                             )}
-                                            <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
+                                            <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             {msg.direction === 'outbound' && msg.sentByName && ` • ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
-                                                if (s === 'delivered') return <span className="text-emerald-300 font-semibold" title="Delivered">✅ delivered</span>;
-                                                if (s === 'sent') return <span className="text-violet-300" title="Accepted by carrier">? sent</span>;
-                                                if (s === 'queued') return <span className="text-violet-300/70" title="Queued by Twilio">• queued</span>;
-                                                if (s === 'failed') return <span className="text-red-400 font-bold" title="Failed ... not delivered">❌ failed</span>;
-                                                if (s === 'undelivered') return <span className="text-red-400 font-bold" title="Undelivered ... carrier rejected">🚫 undelivered</span>;
+                                                if (s === 'delivered') return <span className="inline-flex items-center gap-0.5 text-emerald-300 font-semibold" title="Delivered"><CircleCheck size={11} aria-hidden="true" /> delivered</span>;
+                                                if (s === 'sent') return <span className="inline-flex items-center gap-0.5 text-indigo-300" title="Accepted by carrier"><Check size={11} aria-hidden="true" /> sent</span>;
+                                                if (s === 'queued') return <span className="text-indigo-300/70" title="Queued by Twilio">• queued</span>;
+                                                if (s === 'failed') return <span className="inline-flex items-center gap-0.5 text-red-400 font-bold" title="Failed ... not delivered"><CircleX size={11} aria-hidden="true" /> failed</span>;
+                                                if (s === 'undelivered') return <span className="inline-flex items-center gap-0.5 text-red-400 font-bold" title="Undelivered ... carrier rejected"><Ban size={11} aria-hidden="true" /> undelivered</span>;
                                                 return <span className="opacity-60">• {s}</span>;
                                             })()}
                                         </div>
@@ -3700,15 +3712,15 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         {/* AI Suggested Replies panel */}
                         {smsAgentEnabled && userCanUseAiAgent && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
                             <div className="mb-3 space-y-2">
-                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-violet-500">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-indigo-500">
                                     <Sparkles size={10} /> AI Suggested Replies
                                 </div>
                                 {aiSuggestions.map(sug => (
                                     <div
                                         key={sug.id}
-                                        className="flex items-start gap-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl group"
+                                        className="flex items-start gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl group"
                                     >
-                                        <p className="flex-1 text-sm text-violet-900 dark:text-violet-100 leading-snug">{sug.suggestedBody}</p>
+                                        <p className="flex-1 text-sm text-indigo-900 dark:text-indigo-100 leading-snug">{sug.suggestedBody}</p>
                                         <div className="flex items-center gap-1 shrink-0">
                                             <button
                                                 title="Use this reply"
@@ -3719,7 +3731,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                         { status: 'accepted' }
                                                     ).catch(() => { });
                                                 }}
-                                                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
+                                                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
                                             >
                                                 <ChevronRight size={10} /> Use
                                             </button>
@@ -3731,7 +3743,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                         { status: 'dismissed' }
                                                     ).catch(() => { });
                                                 }}
-                                                className="p-1 text-violet-400 hover:text-violet-600 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
+                                                className="p-1 text-indigo-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
                                             >
                                                 <X size={11} />
                                             </button>
@@ -3800,7 +3812,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             onClick={handleAiSuggest}
                                             disabled={aiGenerating}
                                             title="AI: Suggest a reply based on this conversation"
-                                            className="flex items-center gap-1.5 px-3 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50 text-[11px] font-bold whitespace-nowrap"
+                                            className="flex items-center gap-1.5 px-3 h-10 shrink-0 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 transition disabled:opacity-50 text-[11px] font-bold whitespace-nowrap"
                                         >
                                             {aiGenerating
                                                 ? <Loader2 size={14} className="animate-spin" />
@@ -3819,7 +3831,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             // On mobile, scroll to bottom when keyboard opens
                                             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 350);
                                         }}
-                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                                     />
                                     {/* Emoji Picker Button */}
                                     <div className="relative shrink-0">
@@ -3855,7 +3867,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <button
                                         onClick={handleSendReply}
                                         disabled={(!replyBody.trim() && !replyMediaUrl) || isSending || replyUploading}
-                                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition font-bold shrink-0"
+                                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition font-bold shrink-0"
                                     >
                                         {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
@@ -3868,7 +3880,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 onClick={handleAiShorten}
                                                 disabled={aiGenerating || replyBody.length <= 160}
                                                 title={replyBody.length <= 160 ? 'Already under 160 characters' : 'AI: Shorten to under 160 characters'}
-                                                className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
+                                                className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 disabled:opacity-40 transition"
                                             >
                                                 <Sparkles size={11} />
                                                 {aiGenerating ? 'Shortening...' : 'Shorten to 160'}
@@ -3982,7 +3994,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-                    <Key size={18} className="text-violet-500" /> {isEdit ? 'Edit Keyword' : 'New Keyword'}
+                    <Key size={18} className="text-indigo-500" /> {isEdit ? 'Edit Keyword' : 'New Keyword'}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
                     When someone texts this word to your number, we'll auto-reply instantly.
@@ -3997,7 +4009,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                         onChange={e => setKeyword(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                         placeholder="YOUTH"
                         maxLength={30}
-                        className="w-full text-xl font-black tracking-wide border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-300 focus:outline-none focus:border-violet-500"
+                        className="w-full text-xl font-black tracking-wide border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 focus:outline-none focus:border-indigo-500"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Letters &amp; numbers only, no spaces. Stored as UPPERCASE.</p>
                 </div>
@@ -4009,7 +4021,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                         value={actionType}
                         onChange={e => setActionType(e.target.value as SmsKeywordAction)}
                         title="Action Type"
-                        className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                        className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                     >
                         <option value="static">Static Reply Message</option>
                         <option value="registration_events">Send Registration Events</option>
@@ -4035,7 +4047,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                                     value={pcoSignupId}
                                     onChange={e => setPcoSignupId(e.target.value)}
                                     title="PCO Event Signup"
-                                    className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                 >
                                     <option value="">— Select PCO Event Signup —</option>
                                     {signups.map(s => (
@@ -4046,13 +4058,13 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                         </div>
 
                         {/* Automatically create workflow checkbox */}
-                        <div className="mb-4 bg-violet-50/20 dark:bg-violet-950/10 border border-violet-100 dark:border-violet-900/30 rounded-2xl p-4">
+                        <div className="mb-4 bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl p-4">
                             <label className="flex items-start gap-2.5 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200 select-none">
                                 <input
                                     type="checkbox"
                                     checked={createWorkflow}
                                     onChange={e => setCreateWorkflow(e.target.checked)}
-                                    className="mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-4 h-4 shrink-0"
+                                    className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 shrink-0"
                                 />
                                 <span>Automatically create keyword workflow</span>
                             </label>
@@ -4078,13 +4090,13 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
                         placeholder={actionType === 'static' ? `Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to know...` : 'Here is the link you requested:'}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
 
                     {/* Phone bubble preview */}
                     {replyMessage.trim() && (
                         <div className="mt-2 bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-3 flex justify-end">
-                            <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
+                            <div className="bg-indigo-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
                                 {replyMessage}
                                 {actionType === 'registration_events' && "\n\nhttps://[your-church].churchcenter.com/registrations"}
                                 {actionType === 'small_groups' && "\n\nhttps://[your-church].churchcenter.com/groups"}
@@ -4105,7 +4117,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                             value={addToListId}
                             onChange={e => setAddToListId(e.target.value)}
                             title="Add to PCO list"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value="">-- Don't add to a list --</option>
                             {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
@@ -4124,13 +4136,13 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                             value={linkedPollId}
                             onChange={e => setLinkedPollId(e.target.value)}
                             title="Linked Poll"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value="">-- Don't link a poll --</option>
                             {polls.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
                         </select>
                         {linkedPollId && (
-                            <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 flex items-center gap-1">
+                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1 flex items-center gap-1">
                                 <Tv2 size={10} />
                                 Poll link will be appended: {window.location.origin}/poll/{linkedPollId}
                             </p>
@@ -4162,11 +4174,11 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                                             );
                                         }}
                                         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${isChecked
-                                                ? 'bg-violet-50 dark:bg-violet-900/40 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300'
-                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-violet-300'
+                                                ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
                                             }`}
                                     >
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'
                                             }`}>
                                             {isChecked && <CheckCircle size={10} className="text-white" />}
                                         </div>
@@ -4188,7 +4200,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                     <button
                         onClick={() => setIsActive(v => !v)}
                         title={isActive ? 'Deactivate keyword' : 'Activate keyword'}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${isActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                     >
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isActive ? 'translate-x-6' : 'translate-x-0'}`} />
                     </button>
@@ -4207,7 +4219,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                     <button
                         onClick={handleSubmit}
                         disabled={isBusy}
-                        className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                        className="flex-1 py-2.5 text-sm font-black bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                     >
                         {isBusy ? <><Loader2 size={14} className="animate-spin" />Saving...</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
                     </button>
@@ -4297,14 +4309,14 @@ const AddSubscriberModal: React.FC<{
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                        <UserPlus size={15} className="text-violet-600 dark:text-violet-300" />
+                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                        <UserPlus size={15} className="text-indigo-600 dark:text-indigo-300" />
                     </div>
                     <div>
                         <p className="text-sm font-black text-slate-900 dark:text-white">Add Subscriber</p>
                         <p className="text-[10px] text-slate-500">
                             Manually subscribe someone to{' '}
-                            <span className="font-black text-violet-600 tracking-wide">{keyword.keyword}</span>
+                            <span className="font-black text-indigo-600 tracking-wide">{keyword.keyword}</span>
                         </p>
                     </div>
                     <button onClick={onClose} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
@@ -4325,12 +4337,12 @@ const AddSubscriberModal: React.FC<{
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
                                 placeholder="Search by name…"
-                                className="flex-1 text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                className="flex-1 text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                             <button
                                 type="submit"
                                 disabled={searching || !query.trim()}
-                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5"
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5"
                             >
                                 {searching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
                                 Search
@@ -4346,16 +4358,16 @@ const AddSubscriberModal: React.FC<{
                                         key={person.id}
                                         onClick={() => handleAdd(person)}
                                         disabled={saving}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-violet-50 dark:hover:bg-violet-900/20 text-left transition disabled:opacity-50"
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-left transition disabled:opacity-50"
                                     >
-                                        <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xs font-black text-violet-600 dark:text-violet-300 shrink-0">
+                                        <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xs font-black text-indigo-600 dark:text-indigo-300 shrink-0">
                                             {person.name.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{person.name}</p>
                                             {person.phone && <p className="text-[10px] text-slate-400">{person.phone}</p>}
                                         </div>
-                                        <Plus size={13} className="ml-auto text-violet-400 shrink-0" />
+                                        <Plus size={13} className="ml-auto text-indigo-400 shrink-0" />
                                     </button>
                                 ))}
                             </div>
@@ -4659,7 +4671,7 @@ const SmsKeywordsManager: React.FC<{
     };
 
     return (
-        <div className="p-4 max-w-4xl mx-auto">
+        <ToolPage>
             {/* Manual subscriber modal */}
             {addSubKw && (
                 <AddSubscriberModal
@@ -4668,29 +4680,30 @@ const SmsKeywordsManager: React.FC<{
                     onClose={() => setAddSubKw(null)}
                 />
             )}
+            {/* Section title */}
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                <Key size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> Keywords &amp; tags
+            </h2>
             {/* Section toggle */}
             <div className="flex flex-wrap items-center gap-3 mb-5">
-                <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                    <button
-                        onClick={() => setActiveSection('keywords')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${activeSection === 'keywords' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                            }`}
-                    ><Key size={13} /> Keywords</button>
-                    <button
-                        onClick={() => setActiveSection('tags')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${activeSection === 'tags' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                            }`}
-                    ><Tag size={13} /> Tags</button>
-                </div>
+                <ToolTabs
+                    ariaLabel="Keywords or tags"
+                    value={activeSection}
+                    onChange={setActiveSection}
+                    tabs={[
+                        { value: 'keywords', label: 'Keywords', icon: Key },
+                        { value: 'tags', label: 'Tags', icon: Tag },
+                    ]}
+                />
                 {activeSection === 'keywords' && (
-                    <button onClick={openNew} className="ml-auto flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                        <Plus size={14} /> New Keyword
-                    </button>
+                    <ToolButton variant="primary" icon={Plus} onClick={openNew} className="ml-auto">
+                        New Keyword
+                    </ToolButton>
                 )}
                 {activeSection === 'tags' && (
-                    <button onClick={openNewTag} className="ml-auto flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                        <Plus size={14} /> New Tag
-                    </button>
+                    <ToolButton variant="primary" icon={Plus} onClick={openNewTag} className="ml-auto">
+                        New Tag
+                    </ToolButton>
                 )}
             </div>
 
@@ -4714,14 +4727,16 @@ const SmsKeywordsManager: React.FC<{
                                 {isLoading ? (
                                     <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords...</div>
                                 ) : filteredKeywords.length === 0 && !listError ? (
-                                    <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                                        <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                                        <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
-                                        <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first keyword to start auto-replying to texts.</p>
-                                        <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                                            <span className="flex items-center gap-1.5"><Plus size={14} /> New Keyword</span>
-                                        </button>
-                                    </div>
+                                    <ToolEmptyState
+                                        icon={Key}
+                                        title="No keywords yet"
+                                        description="Create your first keyword to start auto-replying to texts."
+                                        action={
+                                            <ToolButton variant="primary" icon={Plus} onClick={openNew}>
+                                                New Keyword
+                                            </ToolButton>
+                                        }
+                                    />
                                 ) : (
                                     <div className="space-y-3">
                                         {filteredKeywords.map(kw => {
@@ -4729,11 +4744,11 @@ const SmsKeywordsManager: React.FC<{
                                             return (
                                                 <div
                                                     key={kw.id}
-                                                    className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition"
+                                                    className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-indigo-200 dark:hover:border-indigo-700 transition"
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         {/* Keyword badge */}
-                                                        <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-wide self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
+                                                        <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-wide self-start ${kw.isActive ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
                                                             {kw.keyword}
                                                         </div>
 
@@ -4743,11 +4758,11 @@ const SmsKeywordsManager: React.FC<{
                                                             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
                                                                 {kw.addToListName && (
                                                                     <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                                                                        <Users size={10} /> ? {kw.addToListName}
+                                                                        <Users size={10} /> → {kw.addToListName}
                                                                     </span>
                                                                 )}
                                                                 {kw.linkedPollTitle && (
-                                                                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
+                                                                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
                                                                         <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
                                                                     </span>
                                                                 )}
@@ -4763,14 +4778,14 @@ const SmsKeywordsManager: React.FC<{
                                                         {/* Match count + actions */}
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             <div className="text-center hidden sm:block">
-                                                                <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
+                                                                <p className="text-lg font-black text-indigo-600 dark:text-indigo-300">{kw.matchCount}</p>
                                                                 <p className="text-[10px] text-slate-400 uppercase tracking-wide">matches</p>
                                                             </div>
                                                             {/* Add Subscriber button */}
                                                             <button
                                                                 onClick={() => setAddSubKw(kw)}
                                                                 title="Manually add a subscriber"
-                                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"
+                                                                className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
                                                             >
                                                                 <UserPlus size={14} />
                                                             </button>
@@ -4778,13 +4793,13 @@ const SmsKeywordsManager: React.FC<{
                                                             <button
                                                                 onClick={() => handleToggleActive(kw)}
                                                                 title={kw.isActive ? 'Deactivate' : 'Activate'}
-                                                                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${kw.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${kw.isActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                                             >
                                                                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${kw.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                                                             </button>
                                                             {/* Always-visible on mobile */}
                                                             <div className="flex items-center gap-1">
-                                                                <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
+                                                                <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
                                                                     <Pencil size={14} />
                                                                 </button>
                                                                 <button onClick={() => handleDelete(kw)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
@@ -4816,9 +4831,9 @@ const SmsKeywordsManager: React.FC<{
             {activeSection === 'tags' && (
                 <>
                     <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
-                        <div className="text-3xl">🤖</div>
+                        <Bot size={28} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" aria-hidden="true" />
                         <div>
-                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
+                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation tags</p>
                             <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
                                 Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
                                 <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times ⏰</span>, or{' '}<span className="font-bold">Pastoral Care 🤝</span>.
@@ -4834,20 +4849,22 @@ const SmsKeywordsManager: React.FC<{
                     )}
 
                     {tags.length === 0 ? (
-                        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                            <Tag size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                            <p className="text-slate-600 dark:text-slate-400 font-semibold">No tags yet</p>
-                            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Tags help you track conversations by topic.</p>
-                            <button onClick={openNewTag} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                                <span className="flex items-center gap-1.5"><Plus size={14} /> New Tag</span>
-                            </button>
-                        </div>
+                        <ToolEmptyState
+                            icon={Tag}
+                            title="No tags yet"
+                            description="Tags help you track conversations by topic."
+                            action={
+                                <ToolButton variant="primary" icon={Plus} onClick={openNewTag}>
+                                    New Tag
+                                </ToolButton>
+                            }
+                        />
                     ) : (
                         <div className="space-y-3">
                             {tags.map(t => {
                                 const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
                                 return (
-                                    <div key={t.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group">
+                                    <div key={t.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-indigo-200 dark:hover:border-indigo-700 transition group">
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${c.bg}`}>
                                             {t.emoji || <Tag size={18} className={c.text} />}
                                         </div>
@@ -4861,7 +4878,7 @@ const SmsKeywordsManager: React.FC<{
                                                     </span>
                                                 )}
                                                 {t.detectionEnabled && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
                                                         <Sparkles size={9} /> Auto-Detect
                                                     </span>
                                                 )}
@@ -4874,7 +4891,7 @@ const SmsKeywordsManager: React.FC<{
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                            <button onClick={() => openEditTag(t)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit tag">
+                                            <button onClick={() => openEditTag(t)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit tag">
                                                 <Pencil size={14} />
                                             </button>
                                             <button onClick={() => handleDeleteTag(t)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete tag">
@@ -4931,15 +4948,15 @@ const SmsKeywordsManager: React.FC<{
                         {/* Header */}
                         <div className="flex items-start justify-between gap-4 mb-4">
                             <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl shrink-0">
-                                    🙏
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                    <HandHeart size={18} aria-hidden="true" />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white">Prayer Request Detection</h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed max-w-lg">
                                         Automatically recognises natural-language prayer requests in incoming SMS messages
                                         and tags the conversation{' '}
-                                        <span className="font-semibold text-violet-600 dark:text-violet-400">🏷️ Needs Prayer</span>{' '}
+                                        <span className="inline-flex items-center gap-0.5 font-semibold text-indigo-600 dark:text-indigo-400"><Tag size={11} aria-hidden="true" /> Needs Prayer</span>{' '}
                                         in your Inbox. Generic asks (e.g. &ldquo;Will you pray for me?&rdquo;) trigger a clarifying reply first.
                                     </p>
                                 </div>
@@ -4951,7 +4968,7 @@ const SmsKeywordsManager: React.FC<{
                                     onClick={handleTogglePrayer}
                                     disabled={prayerSaving}
                                     title={prayerEnabled ? 'Disable prayer detection' : 'Enable prayer detection'}
-                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${prayerEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${prayerEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                                         }`}
                                 >
                                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${prayerEnabled ? 'translate-x-6' : 'translate-x-0'
@@ -4959,7 +4976,7 @@ const SmsKeywordsManager: React.FC<{
                                 </button>
                             ) : (
                                 <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${prayerEnabled
-                                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                        ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                                     }`}>
                                     {prayerEnabled ? 'On' : 'Off'}
@@ -4971,13 +4988,13 @@ const SmsKeywordsManager: React.FC<{
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
                                 <p className="text-xs font-black text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
-                                    <MessageSquare size={12} className="text-violet-500" /> Specific Request
+                                    <MessageSquare size={12} className="text-indigo-500" /> Specific Request
                                 </p>
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
                                     &ldquo;Please pray for my mom&rsquo;s surgery&rdquo;
                                 </p>
                                 <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                    <CheckCircle size={11} /> Tagged <span className="font-bold ml-0.5">🏷️ Needs Prayer</span> immediately
+                                    <CheckCircle size={11} /> Tagged <span className="inline-flex items-center gap-0.5 font-bold ml-0.5"><Tag size={10} aria-hidden="true" /> Needs Prayer</span> immediately
                                 </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
@@ -4992,7 +5009,7 @@ const SmsKeywordsManager: React.FC<{
                                         <MessageSquare size={11} /> Clarifying reply sent first
                                     </div>
                                     <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                        <CheckCircle size={11} /> On reply ➡️ tagged <span className="font-bold ml-0.5">🏷️ Needs Prayer</span>
+                                        <CheckCircle size={11} /> On reply <ArrowRight size={10} aria-hidden="true" /> tagged <span className="inline-flex items-center gap-0.5 font-bold ml-0.5"><Tag size={10} aria-hidden="true" /> Needs Prayer</span>
                                     </div>
                                 </div>
                             </div>
@@ -5014,12 +5031,12 @@ const SmsKeywordsManager: React.FC<{
                                         onChange={e => setDraftReply(e.target.value)}
                                         placeholder="What would you like prayer for?"
                                         maxLength={160}
-                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                     <button
                                         onClick={handleSaveReply}
                                         disabled={prayerSaving || draftReply.trim() === (church.smsSettings?.prayerClarifyingReply || '')}
-                                        className="px-3 py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center gap-1.5 shrink-0"
+                                        className="px-3 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition flex items-center gap-1.5 shrink-0"
                                     >
                                         {prayerSaving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
                                         Save
@@ -5027,7 +5044,7 @@ const SmsKeywordsManager: React.FC<{
                                 </div>
                                 {/* Bubble preview */}
                                 <div className="mt-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-3 flex justify-end">
-                                    <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
+                                    <div className="bg-indigo-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
                                         {draftReply.trim() || 'What would you like prayer for?'}
                                     </div>
                                 </div>
@@ -5036,9 +5053,9 @@ const SmsKeywordsManager: React.FC<{
 
                         {/* Info note */}
                         <div className="mt-4 flex items-start gap-2 text-[10px] text-slate-400 dark:text-slate-500">
-                            <Info size={11} className="shrink-0 mt-0.5 text-violet-400" />
+                            <Info size={11} className="shrink-0 mt-0.5 text-indigo-400" />
                             <span>
-                                The <span className="font-semibold">🏷️ Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
+                                The <span className="inline-flex items-center gap-0.5 font-semibold"><Tag size={10} aria-hidden="true" /> Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
                                 Keyword-based auto-replies always take priority over prayer detection.
                             </span>
                         </div>
@@ -5087,8 +5104,8 @@ const SmsKeywordsManager: React.FC<{
                     <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-8">
                         <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0">
-                                    <Sparkles size={18} className="text-violet-600 dark:text-violet-400" />
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                                    <Sparkles size={18} className="text-indigo-600 dark:text-indigo-400" />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white">SMS AI Agent</h3>
@@ -5097,7 +5114,7 @@ const SmsKeywordsManager: React.FC<{
                                         request an AI-suggested reply grounded in your church knowledge base.
                                         Incoming messages also receive an automatic AI suggestion in real time.
                                     </p>
-                                    <p className="text-[10px] text-violet-500 dark:text-violet-400 mt-1.5">
+                                    <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-1.5">
                                         Configure the knowledge base and test the agent in the{' '}
                                         <span className="font-semibold">SMS ? AI Agent</span> tab.
                                     </p>
@@ -5109,7 +5126,7 @@ const SmsKeywordsManager: React.FC<{
                                     onClick={handleToggleAgent}
                                     disabled={agentSaving}
                                     title={agentOn ? 'Disable SMS AI Agent' : 'Enable SMS AI Agent'}
-                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${agentOn ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${agentOn ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                                         }`}
                                 >
                                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${agentOn ? 'translate-x-6' : 'translate-x-0'
@@ -5117,7 +5134,7 @@ const SmsKeywordsManager: React.FC<{
                                 </button>
                             ) : (
                                 <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${agentOn
-                                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                        ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                                     }`}>
                                     {agentOn ? 'On' : 'Off'}
@@ -5126,7 +5143,7 @@ const SmsKeywordsManager: React.FC<{
                         </div>
 
                         <div className="mt-4 flex items-start gap-2 text-[10px] text-slate-400 dark:text-slate-500">
-                            <Info size={11} className="shrink-0 mt-0.5 text-violet-400" />
+                            <Info size={11} className="shrink-0 mt-0.5 text-indigo-400" />
                             <span>
                                 The AI never sends messages automatically \u2014 it only suggests replies for staff to review and edit.
                             </span>
@@ -5156,7 +5173,7 @@ const SmsKeywordsManager: React.FC<{
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setTagModalOpen(false)}>
                     <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <h3 className="text-lg font-black text-slate-900 dark:text-white mb-5 flex items-center gap-2">
-                            <Tag size={18} className="text-violet-500" /> {editTag ? 'Edit Tag' : 'New Tag'}
+                            <Tag size={18} className="text-indigo-500" /> {editTag ? 'Edit Tag' : 'New Tag'}
                         </h3>
 
                         <div className="mb-4">
@@ -5168,7 +5185,7 @@ const SmsKeywordsManager: React.FC<{
                                 placeholder="e.g. Prayer Request"
                                 maxLength={40}
                                 autoFocus
-                                className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                             />
                         </div>
 
@@ -5180,7 +5197,7 @@ const SmsKeywordsManager: React.FC<{
                                 onChange={e => setTagEmoji(e.target.value)}
                                 placeholder="👋"
                                 maxLength={4}
-                                className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 text-center"
+                                className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 text-center"
                             />
                         </div>
 
@@ -5223,11 +5240,11 @@ const SmsKeywordsManager: React.FC<{
                                 value={tagAutoReply}
                                 onChange={e => setTagAutoReply(e.target.value)}
                                 placeholder={`Thanks for reaching out! We've tagged your message as "${tagName || 'this tag'}" and will follow up soon.`}
-                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                             />
                             {tagAutoReply.trim() && (
                                 <div className="mt-2 bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-3 flex justify-end">
-                                    <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
+                                    <div className="bg-indigo-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
                                         {tagAutoReply}
                                     </div>
                                 </div>
@@ -5240,12 +5257,12 @@ const SmsKeywordsManager: React.FC<{
                             <button
                                 type="button"
                                 onClick={() => setTagDetectionEnabled(v => !v)}
-                                className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
                             >
                                 <div className="flex items-center gap-2.5 text-left">
-                                    <Sparkles size={14} className={tagDetectionEnabled ? 'text-violet-500' : 'text-slate-400'} />
+                                    <Sparkles size={14} className={tagDetectionEnabled ? 'text-indigo-500' : 'text-slate-400'} />
                                     <div>
-                                        <p className={`text-xs font-black ${tagDetectionEnabled ? 'text-violet-700 dark:text-violet-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                                        <p className={`text-xs font-black ${tagDetectionEnabled ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-300'}`}>
                                             Auto-Detection
                                         </p>
                                         <p className="text-[10px] text-slate-400 leading-tight">
@@ -5253,7 +5270,7 @@ const SmsKeywordsManager: React.FC<{
                                         </p>
                                     </div>
                                 </div>
-                                <span className={`relative shrink-0 w-10 h-5 rounded-full transition-colors ${tagDetectionEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                <span className={`relative shrink-0 w-10 h-5 rounded-full transition-colors ${tagDetectionEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                                     }`}>
                                     <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${tagDetectionEnabled ? 'translate-x-5' : 'translate-x-0'
                                         }`} />
@@ -5275,13 +5292,13 @@ const SmsKeywordsManager: React.FC<{
                                             value={tagDetectionPhrases}
                                             onChange={e => setTagDetectionPhrases(e.target.value)}
                                             placeholder="counseling, struggling, anxiety, mental health"
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
                                         {/* Live phrase chips preview */}
                                         {tagDetectionPhrases.trim() && (
                                             <div className="flex flex-wrap gap-1.5 mt-2">
                                                 {tagDetectionPhrases.split(',').map(p => p.trim()).filter(Boolean).map((phrase, i) => (
-                                                    <span key={i} className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                                    <span key={i} className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
                                                         {phrase}
                                                     </span>
                                                 ))}
@@ -5313,11 +5330,11 @@ const SmsKeywordsManager: React.FC<{
                                                                 );
                                                             }}
                                                             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${isChecked
-                                                                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200 border-violet-300 dark:border-violet-700'
-                                                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                                                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
+                                                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
                                                                 }`}
                                                         >
-                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'
                                                                 }`}>
                                                                 {isChecked && <CheckCircle size={10} className="text-white" />}
                                                             </span>
@@ -5352,11 +5369,11 @@ const SmsKeywordsManager: React.FC<{
                                             onChange={e => setTagClarifyingReply(e.target.value)}
                                             placeholder="Can you tell us more about what you're going through?"
                                             maxLength={160}
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                                         />
                                         {tagClarifyingReply.trim() && (
                                             <div className="mt-2 bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-3 flex justify-end">
-                                                <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
+                                                <div className="bg-indigo-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
                                                     {tagClarifyingReply}
                                                 </div>
                                             </div>
@@ -5376,7 +5393,7 @@ const SmsKeywordsManager: React.FC<{
                             <button
                                 onClick={handleSaveTag}
                                 disabled={tagBusy || !tagName.trim()}
-                                className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                                className="flex-1 py-2.5 text-sm font-black bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                             >
                                 {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving...</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
                             </button>
@@ -5384,7 +5401,7 @@ const SmsKeywordsManager: React.FC<{
                     </div>
                 </div>
             )}
-        </div>
+        </ToolPage>
     );
 };
 
@@ -5443,7 +5460,7 @@ const StatCard: React.FC<{
     );
 };
 
-const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pct, color = 'bg-violet-500', label }) => (
+const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pct, color = 'bg-indigo-500', label }) => (
     <div
         className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"
         title={label ?? `${Math.round(pct)}%`}
@@ -5575,28 +5592,26 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
     }
 
     return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <ToolPage className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                        <BarChart3 size={26} className="text-violet-500" /> Analytics
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Message performance, delivery rates, and usage overview</p>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <BarChart3 size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> Analytics
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Message performance, delivery rates, and usage overview</p>
                 </div>
                 {/* Period selector */}
-                <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                    {(['30d', '90d', 'all'] as const).map(p => (
-                        <button
-                            key={p}
-                            onClick={() => setPeriod(p)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${period === p ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'
-                                }`}
-                        >
-                            {p === '30d' ? 'Last 30d' : p === '90d' ? 'Last 90d' : 'All time'}
-                        </button>
-                    ))}
-                </div>
+                <ToolTabs
+                    ariaLabel="Analytics period"
+                    value={period}
+                    onChange={setPeriod}
+                    tabs={[
+                        { value: '30d', label: 'Last 30d' },
+                        { value: '90d', label: 'Last 90d' },
+                        { value: 'all', label: 'All time' },
+                    ]}
+                />
             </div>
 
             {/* KPI Cards */}
@@ -5666,11 +5681,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                                                 {/* Sent fill */}
                                                 {/* CSS custom properties ... consumed by .msg-col-* classes in components.css */}
                                                 <div
-                                                    className="msg-col-sent bg-violet-200 dark:bg-violet-900/40 flex flex-col justify-end" ref={el => { if (el) { el.style.setProperty('--col-h', `${heightPct}%`); el.style.setProperty('--col-mt', `${100 - heightPct}%`); } }}
+                                                    className="msg-col-sent bg-indigo-200 dark:bg-indigo-900/40 flex flex-col justify-end" ref={el => { if (el) { el.style.setProperty('--col-h', `${heightPct}%`); el.style.setProperty('--col-mt', `${100 - heightPct}%`); } }}
                                                 >
                                                     {/* Delivered overlay */}
                                                     <div
-                                                        className="msg-col-deliv bg-violet-600" ref={el => el?.style.setProperty('--col-deliv-h', `${delivPct}%`)}
+                                                        className="msg-col-deliv bg-indigo-600" ref={el => el?.style.setProperty('--col-deliv-h', `${delivPct}%`)}
                                                     />
                                                 </div>
                                             </div>
@@ -5684,10 +5699,10 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     {/* Legend */}
                     <div className="flex items-center gap-4 mt-3">
                         <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <span className="w-3 h-3 rounded-sm bg-violet-200 dark:bg-violet-900/40" /> Sent
+                            <span className="w-3 h-3 rounded-sm bg-indigo-200 dark:bg-indigo-900/40" /> Sent
                         </span>
                         <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <span className="w-3 h-3 rounded-sm bg-violet-600" /> Delivered
+                            <span className="w-3 h-3 rounded-sm bg-indigo-600" /> Delivered
                         </span>
                     </div>
                 </div>
@@ -5814,7 +5829,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     </div>
                 </div>
             </div>
-        </div>
+        </ToolPage>
     );
 };
 
@@ -6069,7 +6084,7 @@ const DelayNodeCard: React.FC<{
                     </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">{summary}</span>
                     {isRepeating && (
-                        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
+                        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
                             Recurring
                         </span>
                     )}
@@ -6082,15 +6097,15 @@ const DelayNodeCard: React.FC<{
             {/* Schedule type toggle */}
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
-                    { id: 'relative', label: '⏱️ Relative' },
-                    { id: 'day_of_week', label: '📅 Weekday' },
-                    { id: 'day_of_month', label: '📆 Month Day' },
-                    { id: 'specific_date', label: '📅 Specific Date' },
-                ] as const).map(({ id, label }) => (
+                    { id: 'relative', label: 'Relative', Icon: Timer },
+                    { id: 'day_of_week', label: 'Weekday', Icon: CalendarDays },
+                    { id: 'day_of_month', label: 'Month Day', Icon: Calendar },
+                    { id: 'specific_date', label: 'Specific Date', Icon: CalendarClock },
+                ] as const).map(({ id, label, Icon }) => (
                     <button key={id} type="button" onClick={() => onChange({ scheduleType: id, repeatType: 'none', repeatDays: [] })}
-                        className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
+                        className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
                             }`}
-                    >{label}</button>
+                    ><Icon size={11} aria-hidden="true" />{label}</button>
                 ))}
             </div>
 
@@ -6230,8 +6245,8 @@ const DelayNodeCard: React.FC<{
                             <button key={rt} type="button"
                                 onClick={() => onChange({ repeatType: rt, repeatDays: [] })}
                                 className={`px-3 py-1 transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 capitalize ${repeatType === rt
-                                        ? 'bg-violet-600 text-white'
-                                        : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-slate-600'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-slate-600'
                                     }`}
                             >{rt}</button>
                         ))}
@@ -6250,8 +6265,8 @@ const DelayNodeCard: React.FC<{
                                         onClick={() => toggleRepeatDay(i)}
                                         title={DOW_LABELS_LONG[i]}
                                         className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${active
-                                                ? 'bg-violet-600 text-white shadow-sm'
-                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
                                             }`}
                                     >{d}</button>
                                 );
@@ -6259,12 +6274,12 @@ const DelayNodeCard: React.FC<{
                         </div>
                         {repeatDays.length > 0 && (
                             <div className="flex items-center gap-2">
-                                <Clock size={11} className="text-violet-400 shrink-0" />
+                                <Clock size={11} className="text-indigo-400 shrink-0" />
                                 <span className="text-[10px] text-slate-400">Send at</span>
                                 <input type="time" value={node.scheduleTime ?? '09:00'}
                                     onChange={e => onChange({ scheduleTime: e.target.value })}
                                     title="Recurring send time"
-                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    className="text-sm border border-indigo-200 dark:border-indigo-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                 />
                             </div>
                         )}
@@ -6283,8 +6298,8 @@ const DelayNodeCard: React.FC<{
                                         onClick={() => toggleRepeatDay(d)}
                                         title={`${d}${ORDINAL_SUFFIX(d)} of the month`}
                                         className={`w-8 h-8 text-[10px] font-bold rounded-lg transition ${active
-                                                ? 'bg-violet-600 text-white shadow-sm'
-                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
                                             }`}
                                     >{d}</button>
                                 );
@@ -6292,12 +6307,12 @@ const DelayNodeCard: React.FC<{
                         </div>
                         {repeatDays.length > 0 && (
                             <div className="flex items-center gap-2">
-                                <Clock size={11} className="text-violet-400 shrink-0" />
+                                <Clock size={11} className="text-indigo-400 shrink-0" />
                                 <span className="text-[10px] text-slate-400">Send at</span>
                                 <input type="time" value={node.scheduleTime ?? '09:00'}
                                     onChange={e => onChange({ scheduleTime: e.target.value })}
                                     title="Recurring send time"
-                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    className="text-sm border border-indigo-200 dark:border-indigo-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                 />
                             </div>
                         )}
@@ -6306,15 +6321,15 @@ const DelayNodeCard: React.FC<{
 
                 {/* End condition row ... only shown when recurrence is active */}
                 {isRepeating && repeatDays.length > 0 && (
-                    <div className="mt-3 pt-2 border-t border-violet-100 dark:border-violet-800 space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Stop after</p>
+                    <div className="mt-3 pt-2 border-t border-indigo-100 dark:border-indigo-800 space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Stop after</p>
                         <div className="flex items-center gap-2 flex-wrap">
                             {/* Count */}
                             <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                                 <input type="checkbox"
                                     checked={!!node.repeatCount}
                                     onChange={e => onChange({ repeatCount: e.target.checked ? 4 : null })}
-                                    className="accent-violet-600"
+                                    className="accent-indigo-600"
                                 />
                                 Max
                             </label>
@@ -6324,7 +6339,7 @@ const DelayNodeCard: React.FC<{
                                         value={node.repeatCount}
                                         onChange={e => onChange({ repeatCount: Math.max(1, parseInt(e.target.value) || 1) })}
                                         title="Max repeat count"
-                                        className="w-14 text-center text-sm font-black border border-violet-200 dark:border-violet-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                        className="w-14 text-center text-sm font-black border border-indigo-200 dark:border-indigo-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                     />
                                     <span className="text-xs text-slate-400">sends</span>
                                 </>
@@ -6334,7 +6349,7 @@ const DelayNodeCard: React.FC<{
                                 <input type="checkbox"
                                     checked={!!node.repeatUntil}
                                     onChange={e => onChange({ repeatUntil: e.target.checked ? Date.now() + 30 * 86_400_000 : null })}
-                                    className="accent-violet-600"
+                                    className="accent-indigo-600"
                                 />
                                 Until
                             </label>
@@ -6343,7 +6358,7 @@ const DelayNodeCard: React.FC<{
                                     value={new Date(node.repeatUntil).toISOString().slice(0, 10)}
                                     onChange={e => onChange({ repeatUntil: new Date(e.target.value).getTime() })}
                                     title="Repeat until this date"
-                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    className="text-sm border border-indigo-200 dark:border-indigo-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                 />
                             )}
                             {!node.repeatCount && !node.repeatUntil && (
@@ -6425,15 +6440,15 @@ const BranchNodeCard: React.FC<{
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
-                                { id: 'replied', label: '💬 Replied' },
-                                { id: 'email_opened', label: '📧 Email Opened' },
-                                { id: 'tag_applied', label: '🏷️ Tag Applied' },
-                                { id: 'custom', label: '⚙️ Custom' },
-                            ] as const).map(({ id, label }) => (
+                                { id: 'replied', label: 'Replied', Icon: MessageCircle },
+                                { id: 'email_opened', label: 'Email Opened', Icon: MailOpen },
+                                { id: 'tag_applied', label: 'Tag Applied', Icon: Tag },
+                                { id: 'custom', label: 'Custom', Icon: Cog },
+                            ] as const).map(({ id, label, Icon }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
-                                    className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
+                                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
                                         }`}
-                                >{label}</button>
+                                ><Icon size={11} aria-hidden="true" />{label}</button>
                             ))}
                         </div>
                         {/* Tag picker */}
@@ -6682,16 +6697,16 @@ const WorkflowSmsImageAttachment: React.FC<{
                 onChange={handleFileChange}
             />
             {mmsUrl ? (
-                <div className="flex items-center gap-2 p-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl">
-                    <img src={mmsUrl} alt="Attached image" className="w-10 h-10 object-cover rounded-lg shrink-0 border border-violet-200 dark:border-violet-700" />
+                <div className="flex items-center gap-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl">
+                    <img src={mmsUrl} alt="Attached image" className="w-10 h-10 object-cover rounded-lg shrink-0 border border-indigo-200 dark:border-indigo-700" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-semibold text-violet-700 dark:text-violet-300 truncate">Image attached (MMS)</p>
+                        <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 truncate">Image attached (MMS)</p>
                     </div>
                     <button
                         type="button"
                         title="Remove image"
                         onClick={() => onUrlChange('')}
-                        className="p-1 text-violet-400 hover:text-red-500 rounded-lg transition shrink-0"
+                        className="p-1 text-indigo-400 hover:text-red-500 rounded-lg transition shrink-0"
                     >
                         <X size={13} />
                     </button>
@@ -6702,15 +6717,15 @@ const WorkflowSmsImageAttachment: React.FC<{
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     title="Attach image ... converts this step to MMS"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-600 hover:border-violet-300 dark:hover:border-violet-700 transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 hover:border-indigo-300 dark:hover:border-indigo-700 transition disabled:opacity-50"
                 >
                     {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
                     {uploading ? `Uploading ${uploadPct}%...` : 'Attach Image (MMS)'}
                 </button>
             )}
             {uploading && (
-                <div className="h-1 bg-violet-100 dark:bg-violet-900/40 rounded-full overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${uploadPct}%` }} />
+                <div className="h-1 bg-indigo-100 dark:bg-indigo-900/40 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${uploadPct}%` }} />
                 </div>
             )}
         </div>
@@ -6773,7 +6788,7 @@ const ActionNodeCard: React.FC<{
             {/* Step header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-full bg-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0">{index + 1}</span>
+                    <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0">{index + 1}</span>
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Step {index + 1}</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -6831,7 +6846,7 @@ const ActionNodeCard: React.FC<{
                         value={step.message}
                         onChange={e => onChange({ message: e.target.value })}
                         placeholder="Type your message... Use {firstName} for personalisation."
-                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
                     <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
                         <div className="relative">
@@ -6855,13 +6870,13 @@ const ActionNodeCard: React.FC<{
                         </div>
                         {ALL_MERGE_TAGS.map(({ tag }) => (
                             <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'message')}
-                                className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition"
+                                className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition"
                             >{tag}</button>
                         ))}
                     </div>
                     {step.message.trim() && (
                         <div className="bg-slate-100 dark:bg-slate-900/40 rounded-2xl p-3 flex justify-end mt-2">
-                            <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
+                            <div className="bg-indigo-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
                                 {step.message
                                     .split('{firstName}').join('John').split('{lastName}').join('Smith')
                                     .split('{fullName}').join('John Smith').split('{email}').join('john@example.com')
@@ -7038,7 +7053,7 @@ const EXAMPLE_PROMPTS = [
 
 const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => void; onApply: () => void; onClose: () => void; loading: boolean; prompt?: string }> = ({ draft, onRegenerate, onApply, onClose, loading, prompt }) => {
     const chBadgeClass: Record<string, string> = {
-        sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        sms: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
         mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
         email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
         staff_sms: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
@@ -7054,7 +7069,7 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
                     <h3 className="font-black text-slate-900 dark:text-white text-base">{draft.name}</h3>
                     {draft.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.description}</p>}
                 </div>
-                <span className="text-xs font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2.5 py-1 rounded-full">{draft.steps.length} step{draft.steps.length !== 1 ? 's' : ''}</span>
+                <span className="text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-full">{draft.steps.length} step{draft.steps.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="space-y-3">
                 {draft.steps.map((step, idx) => {
@@ -7076,7 +7091,7 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
                     return (
                         <div key={idx} className={`border rounded-2xl p-4 ${isStaff ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
+                                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>
                                     {chLabel[step.channelType] ?? step.channelType.toUpperCase()}
                                 </span>
@@ -7093,14 +7108,14 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
                                     <div className={`text-xs px-3 py-2 rounded-2xl max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm ${
                                         isStaff
                                             ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-bl-sm'
-                                            : 'bg-violet-600 text-white rounded-br-sm'
+                                            : 'bg-indigo-600 text-white rounded-br-sm'
                                     }`}>
                                         {step.message}
                                     </div>
                                 </div>
                             )}
                             {step.staffNote && (
-                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 italic">📋 {step.staffNote}</p>
+                                <p className="flex items-start gap-1 text-[10px] text-amber-600 dark:text-amber-400 mt-2 italic"><StickyNote size={11} className="shrink-0 mt-px" aria-hidden="true" /> <span>{step.staffNote}</span></p>
                             )}
                         </div>
                     );
@@ -7119,7 +7134,7 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
                 <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
                 <button
                     onClick={onApply}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
                 >
                     <ChevronRight size={15} /> Apply to Editor
                 </button>
@@ -7244,23 +7259,23 @@ const GuidedBuilderTab: React.FC<{
         ? (manualDate ? new Date(manualDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
         : (selectedPcoEvent?.startsAt ? new Date(selectedPcoEvent.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
-    const inputBase = 'w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500';
+    const inputBase = 'w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500';
     const radioCard = (active: boolean) => `flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition ${
-        active ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700'
+        active ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
     }`;
 
     if (draftPair) {
         const PairCard = ({
             label, emoji, draft: d, goalKey, borderColor, headerBg, labelColor, subColor,
         }: {
-            label: string; emoji: string; draft: AiWorkflowDraft;
+            label: string; emoji: React.ReactNode; draft: AiWorkflowDraft;
             goalKey: 'invite' | 'remind';
             borderColor: string; headerBg: string; labelColor: string; subColor: string;
         }) => {
             const applied = appliedPair[goalKey];
             const [saving, setSaving] = useState(false);
             const chBadge: Record<string, string> = {
-                sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+                sms: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
                 email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
                 staff_sms: 'bg-amber-100 text-amber-700',
                 staff_email: 'bg-orange-100 text-orange-700',
@@ -7285,7 +7300,7 @@ const GuidedBuilderTab: React.FC<{
             return (
                 <div className={`border-2 ${borderColor} rounded-2xl overflow-hidden`}>
                     <div className={`${headerBg} px-4 py-2.5 flex items-center gap-2`}>
-                        <span className="text-base">{emoji}</span>
+                        <span className={`shrink-0 ${labelColor}`}>{emoji}</span>
                         <div className="flex-1">
                             <p className={`font-black text-sm ${labelColor}`}>{label}</p>
                             <p className={`text-[10px] ${subColor}`}>{d.name}</p>
@@ -7309,7 +7324,7 @@ const GuidedBuilderTab: React.FC<{
                                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                                     }`}>
                                         <div className="flex items-center gap-2 mb-1.5">
-                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                                            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase ${chBadge[s.channelType] ?? chBadge.sms}`}>{chLabel[s.channelType] ?? s.channelType}</span>
                                             <span className="text-slate-400 text-[10px]">{delay}</span>
                                         </div>
@@ -7327,7 +7342,7 @@ const GuidedBuilderTab: React.FC<{
                             className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition disabled:opacity-60 ${
                                 applied
                                     ? 'bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-400 text-emerald-700 dark:text-emerald-300'
-                                    : 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40'
                             }`}
                         >
                             {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</>
@@ -7369,7 +7384,7 @@ const GuidedBuilderTab: React.FC<{
                 </div>
 
                 <PairCard
-                    label="Workflow 1 — Invitation" emoji="📣"
+                    label="Workflow 1 — Invitation" emoji={<Megaphone size={16} aria-hidden="true" />}
                     draft={draftPair.invite} goalKey="invite"
                     borderColor="border-blue-200 dark:border-blue-800"
                     headerBg="bg-blue-50 dark:bg-blue-900/20"
@@ -7378,12 +7393,12 @@ const GuidedBuilderTab: React.FC<{
                 />
 
                 <PairCard
-                    label="Workflow 2 — Reminders" emoji="🔔"
+                    label="Workflow 2 — Reminders" emoji={<Bell size={16} aria-hidden="true" />}
                     draft={draftPair.remind} goalKey="remind"
-                    borderColor="border-violet-200 dark:border-violet-800"
-                    headerBg="bg-violet-50 dark:bg-violet-900/20"
-                    labelColor="text-violet-700 dark:text-violet-300"
-                    subColor="text-violet-500 dark:text-violet-400"
+                    borderColor="border-indigo-200 dark:border-indigo-800"
+                    headerBg="bg-indigo-50 dark:bg-indigo-900/20"
+                    labelColor="text-indigo-700 dark:text-indigo-300"
+                    subColor="text-indigo-500 dark:text-indigo-400"
                 />
 
                 <div className="flex items-center gap-3 pt-1">
@@ -7436,10 +7451,10 @@ const GuidedBuilderTab: React.FC<{
         return (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
                 <div className="relative">
-                    <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                        <Sparkles size={28} className="text-violet-500 animate-pulse" />
+                    <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <Sparkles size={28} className="text-indigo-500 animate-pulse" />
                     </div>
-                    <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
+                    <Loader2 size={48} className="absolute inset-0 m-auto text-indigo-400 animate-spin opacity-40" />
                 </div>
                 <div className="text-center">
                     <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow...</p>
@@ -7459,7 +7474,7 @@ const GuidedBuilderTab: React.FC<{
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-violet-500 rounded-full transition-all duration-500"
+                        className="h-full bg-indigo-500 rounded-full transition-all duration-500"
                         style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
                     />
                 </div>
@@ -7486,17 +7501,17 @@ const GuidedBuilderTab: React.FC<{
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={() => { setEventType('registration'); setManualMode(false); }}
-                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'registration' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'registration' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
                             >
-                                <div className="text-2xl mb-1">📋</div>
+                                <ClipboardList size={24} className="mb-1 text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                                 <p className="font-bold text-sm text-slate-900 dark:text-white">Registration Event</p>
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">People sign up via PCO Registrations</p>
                             </button>
                             <button
                                 onClick={() => { setEventType('calendar'); setManualMode(true); setSelectedPcoEvent(null); }}
-                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'calendar' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'calendar' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
                             >
-                                <div className="text-2xl mb-1">📅</div>
+                                <CalendarDays size={24} className="mb-1 text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                                 <p className="font-bold text-sm text-slate-900 dark:text-white">Calendar Event</p>
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">A service, retreat, or campus event</p>
                             </button>
@@ -7515,7 +7530,7 @@ const GuidedBuilderTab: React.FC<{
                                     }`}
                                 >
                                     <div className="flex items-start gap-3">
-                                        <span className="text-xl shrink-0">📣</span>
+                                        <Megaphone size={20} className="shrink-0 text-blue-500 dark:text-blue-400" aria-hidden="true" />
                                         <div>
                                             <p className="font-bold text-sm text-slate-900 dark:text-white">Invite people to sign up</p>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">Messages go to a list of people who haven't registered yet — build excitement and drive signups</p>
@@ -7525,11 +7540,11 @@ const GuidedBuilderTab: React.FC<{
                                 <button
                                     onClick={() => setGoal('remind')}
                                     className={`w-full p-3.5 rounded-xl border-2 text-left transition ${
-                                        goal === 'remind' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                        goal === 'remind' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'
                                     }`}
                                 >
                                     <div className="flex items-start gap-3">
-                                        <span className="text-xl shrink-0">🔔</span>
+                                        <Bell size={20} className="shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                                         <div>
                                             <p className="font-bold text-sm text-slate-900 dark:text-white">Remind registered attendees</p>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">Messages go to people who are already signed up — prepare them and build anticipation</p>
@@ -7543,7 +7558,7 @@ const GuidedBuilderTab: React.FC<{
                                     }`}
                                 >
                                     <div className="flex items-start gap-3">
-                                        <span className="text-xl shrink-0">🎯</span>
+                                        <Target size={20} className="shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden="true" />
                                         <div>
                                             <p className="font-bold text-sm text-slate-900 dark:text-white">Both — build two workflows</p>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">AI generates an Invitation workflow AND a Reminder workflow — apply each one separately</p>
@@ -7579,7 +7594,7 @@ const GuidedBuilderTab: React.FC<{
                             )}
                             <button
                                 onClick={() => setManualMode(true)}
-                                className="text-xs text-violet-600 dark:text-violet-400 underline underline-offset-2 hover:no-underline transition"
+                                className="text-xs text-indigo-600 dark:text-indigo-400 underline underline-offset-2 hover:no-underline transition"
                             >
                                 Or enter event details manually →
                             </button>
@@ -7592,7 +7607,7 @@ const GuidedBuilderTab: React.FC<{
                             {eventType === 'registration' && (
                                 <button
                                     onClick={() => setManualMode(false)}
-                                    className="text-xs text-violet-600 dark:text-violet-400 underline underline-offset-2 hover:no-underline transition"
+                                    className="text-xs text-indigo-600 dark:text-indigo-400 underline underline-offset-2 hover:no-underline transition"
                                 >
                                     ← Back to PCO event list
                                 </button>
@@ -7621,12 +7636,12 @@ const GuidedBuilderTab: React.FC<{
 
                     {/* Confirmation chip */}
                     {eventDisplayName && goal && (
-                        <div className="flex items-center gap-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-2">
-                            <span className="text-sm">{eventType === 'registration' ? '📋' : '📅'}</span>
-                            <span className="text-xs font-bold text-violet-700 dark:text-violet-300">{eventDisplayName}</span>
+                        <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl px-3 py-2">
+                            <span className="shrink-0 text-indigo-500 dark:text-indigo-400" aria-hidden="true">{eventType === 'registration' ? <ClipboardList size={14} /> : <CalendarDays size={14} />}</span>
+                            <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">{eventDisplayName}</span>
                             {eventDisplayDate && <span className="text-xs text-slate-500 dark:text-slate-400">· {eventDisplayDate}</span>}
-                            <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-violet-500 dark:text-violet-400">
-                                {goal === 'invite' ? '📣 Invite' : goal === 'remind' ? '🔔 Remind' : '🎯 Both'}
+                            <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-400">
+                                {goal === 'invite' ? <><Megaphone size={11} aria-hidden="true" /> Invite</> : goal === 'remind' ? <><Bell size={11} aria-hidden="true" /> Remind</> : <><Target size={11} aria-hidden="true" /> Both</>}
                             </span>
                         </div>
                     )}
@@ -7661,9 +7676,9 @@ const GuidedBuilderTab: React.FC<{
                         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">When should the first message go out?</label>
                         <label className={radioCard(timingMode === 'before_event')} onClick={() => setTimingMode('before_event')}>
                             <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                                timingMode === 'before_event' ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                timingMode === 'before_event' ? 'border-indigo-500' : 'border-slate-300 dark:border-slate-600'
                             }`}>
-                                {timingMode === 'before_event' && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                {timingMode === 'before_event' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Days before the event</p>
@@ -7675,7 +7690,7 @@ const GuidedBuilderTab: React.FC<{
                                             value={daysBefore}
                                             onChange={e => setDaysBefore(parseInt(e.target.value) || 1)}
                                             onClick={e => e.stopPropagation()}
-                                            className="w-16 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-16 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
                                         <span className="text-xs text-slate-500">days before the event</span>
                                     </div>
@@ -7684,9 +7699,9 @@ const GuidedBuilderTab: React.FC<{
                         </label>
                         <label className={radioCard(timingMode === 'after_registration')} onClick={() => setTimingMode('after_registration')}>
                             <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                                timingMode === 'after_registration' ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                timingMode === 'after_registration' ? 'border-indigo-500' : 'border-slate-300 dark:border-slate-600'
                             }`}>
-                                {timingMode === 'after_registration' && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                {timingMode === 'after_registration' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Immediately after they register</p>
@@ -7700,9 +7715,9 @@ const GuidedBuilderTab: React.FC<{
                         {(['even', 'closer_to_event', 'ai_decides'] as const).map(s => (
                             <label key={s} className={radioCard(spacing === s)} onClick={() => setSpacing(s)}>
                                 <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                                    spacing === s ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                    spacing === s ? 'border-indigo-500' : 'border-slate-300 dark:border-slate-600'
                                 }`}>
-                                    {spacing === s && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                    {spacing === s && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -7739,8 +7754,8 @@ const GuidedBuilderTab: React.FC<{
                                 onClick={() => setTone(t.value)}
                                 className={`p-3 text-left rounded-xl border-2 transition text-xs font-semibold ${
                                     tone === t.value
-                                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
-                                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300'
                                 }`}
                             >
                                 {t.label}
@@ -7755,7 +7770,7 @@ const GuidedBuilderTab: React.FC<{
                             value={tone}
                             onChange={e => setTone(e.target.value)}
                             placeholder='e.g. "Casual and friendly, like a text from a friend — include a relevant Bible verse in each message"'
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none leading-relaxed"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
                         />
                     </div>
                 </div>
@@ -7773,17 +7788,17 @@ const GuidedBuilderTab: React.FC<{
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             onClick={() => setIncludeStaffAlert(true)}
-                            className={`p-4 rounded-2xl border-2 text-left transition ${includeStaffAlert ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${includeStaffAlert ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
                         >
-                            <div className="text-xl mb-1">✅</div>
+                            <CircleCheck size={20} className="mb-1 text-emerald-500 dark:text-emerald-400" aria-hidden="true" />
                             <p className="font-bold text-sm text-slate-900 dark:text-white">Yes, alert staff</p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Send a staff reminder email</p>
                         </button>
                         <button
                             onClick={() => setIncludeStaffAlert(false)}
-                            className={`p-4 rounded-2xl border-2 text-left transition ${!includeStaffAlert ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${!includeStaffAlert ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
                         >
-                            <div className="text-xl mb-1">🚫</div>
+                            <Ban size={20} className="mb-1 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                             <p className="font-bold text-sm text-slate-900 dark:text-white">No staff alert</p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Contacts only</p>
                         </button>
@@ -7800,9 +7815,9 @@ const GuidedBuilderTab: React.FC<{
                                 ] as const).map(opt => (
                                     <label key={opt.value} className={radioCard(staffAlertTiming === opt.value)} onClick={() => setStaffAlertTiming(opt.value)}>
                                         <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
-                                            staffAlertTiming === opt.value ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                            staffAlertTiming === opt.value ? 'border-indigo-500' : 'border-slate-300 dark:border-slate-600'
                                         }`}>
-                                            {staffAlertTiming === opt.value && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                            {staffAlertTiming === opt.value && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold text-slate-900 dark:text-white">{opt.label}</p>
@@ -7818,7 +7833,7 @@ const GuidedBuilderTab: React.FC<{
                                     <button
                                         onClick={() => setIncludeRegistrantCount(true)}
                                         className={`p-3 rounded-xl border-2 text-left text-xs font-semibold transition ${
-                                            includeRegistrantCount ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                            includeRegistrantCount ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300'
                                         }`}
                                     >
                                         Yes — show <span className="font-black">{'{registrantCount}'}</span> people registered
@@ -7826,7 +7841,7 @@ const GuidedBuilderTab: React.FC<{
                                     <button
                                         onClick={() => setIncludeRegistrantCount(false)}
                                         className={`p-3 rounded-xl border-2 text-left text-xs font-semibold transition ${
-                                            !includeRegistrantCount ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                            !includeRegistrantCount ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300'
                                         }`}
                                     >
                                         No — just the alert
@@ -7852,7 +7867,7 @@ const GuidedBuilderTab: React.FC<{
                         value={customContent}
                         onChange={e => setCustomContent(e.target.value)}
                         placeholder={'e.g. "Mention parking is on the east side, include John 3:16 in the final message, and remind them to bring a friend"'}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none leading-relaxed"
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
                     />
 
                     {/* Summary card */}
@@ -7888,7 +7903,7 @@ const GuidedBuilderTab: React.FC<{
                     <button
                         onClick={() => setStep(s => s + 1)}
                         disabled={!canProceed()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition"
                     >
                         Next <ChevronRight size={15} />
                     </button>
@@ -7896,7 +7911,7 @@ const GuidedBuilderTab: React.FC<{
                     <button
                         onClick={handleGenerate}
                         disabled={loading}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
                     >
                         <Sparkles size={14} /> Generate Workflow
                     </button>
@@ -7959,7 +7974,7 @@ const CustomPromptTab: React.FC<{
                     onChange={e => setPrompt(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
-                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
+                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 resize-none leading-relaxed"
                 />
                 <p className="text-[10px] text-slate-400 mt-1.5">Tip: ⌘ / Ctrl + Enter to generate</p>
             </div>
@@ -7972,7 +7987,7 @@ const CustomPromptTab: React.FC<{
                             <button
                                 key={i}
                                 onClick={() => setPrompt(ep)}
-                                className="w-full text-left text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-700 dark:hover:text-violet-300 border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700 rounded-xl px-3 py-2.5 transition leading-relaxed"
+                                className="w-full text-left text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 rounded-xl px-3 py-2.5 transition leading-relaxed"
                             >
                                 "{ep}"
                             </button>
@@ -7984,10 +7999,10 @@ const CustomPromptTab: React.FC<{
             {loading && (
                 <div className="flex flex-col items-center justify-center py-12 gap-4 text-slate-400">
                     <div className="relative">
-                        <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                            <Sparkles size={28} className="text-violet-500 animate-pulse" />
+                        <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                            <Sparkles size={28} className="text-indigo-500 animate-pulse" />
                         </div>
-                        <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
+                        <Loader2 size={48} className="absolute inset-0 m-auto text-indigo-400 animate-spin opacity-40" />
                     </div>
                     <div className="text-center">
                         <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow...</p>
@@ -8008,7 +8023,7 @@ const CustomPromptTab: React.FC<{
                 <button
                     onClick={handleGenerate}
                     disabled={loading || !prompt.trim()}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
                 >
                     {loading ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Sparkles size={14} /> Generate Workflow</>}
                 </button>
@@ -8028,7 +8043,7 @@ const AiWorkflowBuilderPanel: React.FC<{
     const [activeTab, setActiveTab] = useState<'guided' | 'custom'>('guided');
 
     const chBadgeClass: Record<string, string> = {
-        sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        sms: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
         mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
         email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
         staff_sms: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
@@ -8044,7 +8059,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="shrink-0 px-6 pt-5 pb-0 bg-gradient-to-r from-violet-600 to-purple-600">
+                <div className="shrink-0 px-6 pt-5 pb-0 bg-gradient-to-r from-indigo-600 to-purple-600">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 bg-white/20 rounded-2xl flex items-center justify-center text-white">
@@ -8052,7 +8067,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                             </div>
                             <div>
                                 <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
-                                <p className="text-violet-200 text-xs">Let AI write every step — guided or freeform</p>
+                                <p className="text-indigo-200 text-xs">Let AI write every step — guided or freeform</p>
                             </div>
                         </div>
                         <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
@@ -8065,7 +8080,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                             onClick={() => setActiveTab('guided')}
                             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold rounded-t-xl transition ${
                                 activeTab === 'guided'
-                                    ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300'
+                                    ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300'
                                     : 'text-white/70 hover:text-white hover:bg-white/10'
                             }`}
                         >
@@ -8075,7 +8090,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                             onClick={() => setActiveTab('custom')}
                             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold rounded-t-xl transition ${
                                 activeTab === 'custom'
-                                    ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300'
+                                    ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300'
                                     : 'text-white/70 hover:text-white hover:bg-white/10'
                             }`}
                         >
@@ -8438,7 +8453,7 @@ const WorkflowEditor: React.FC<{
                         <ArrowLeft size={18} />
                     </button>
                     <div className="text-sm text-slate-500 dark:text-slate-400">
-                        <span className="cursor-pointer hover:text-violet-600 font-medium" onClick={onBack}>Workflows</span>
+                        <span className="cursor-pointer hover:text-indigo-600 font-medium" onClick={onBack}>Workflows</span>
                         <span className="mx-1.5 text-slate-300 dark:text-slate-600">/</span>
                         <span className="font-semibold text-slate-900 dark:text-white">{wf.name || 'New Workflow'}</span>
                     </div>
@@ -8448,7 +8463,7 @@ const WorkflowEditor: React.FC<{
                     <button
                         onClick={() => setShowAiBuilder(true)}
                         title="Build this workflow with AI"
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-violet-300 dark:border-violet-600 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
                     >
                         <Sparkles size={12} /> AI Build
                     </button>
@@ -8472,7 +8487,7 @@ const WorkflowEditor: React.FC<{
                     <button
                         onClick={handleSave}
                         disabled={isBusy}
-                        className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
                     >
                         {isBusy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                         {initial ? 'Save Changes' : 'Create Workflow'}
@@ -8504,7 +8519,7 @@ const WorkflowEditor: React.FC<{
                                 value={wf.name}
                                 onChange={e => patch({ name: e.target.value })}
                                 placeholder="e.g. New Visitor Follow-Up"
-                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
                         <div>
@@ -8514,7 +8529,7 @@ const WorkflowEditor: React.FC<{
                                 value={wf.description || ''}
                                 onChange={e => patch({ description: e.target.value })}
                                 placeholder="What does this workflow do?"
-                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                             />
                         </div>
                         <div>
@@ -8523,7 +8538,7 @@ const WorkflowEditor: React.FC<{
                                 value={wf.twilioNumberId || ''}
                                 onChange={e => patch({ twilioNumberId: e.target.value || null })}
                                 title="Sending Phone Number"
-                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="">(Default Church Number)</option>
                                 {twilioNumbers.map(num => (
@@ -8538,7 +8553,7 @@ const WorkflowEditor: React.FC<{
                                     type="checkbox"
                                     checked={!!wf.allowReentry}
                                     onChange={e => patch({ allowReentry: e.target.checked })}
-                                    className="w-4 h-4 text-violet-600 border-slate-300 rounded focus:ring-violet-500 bg-white dark:bg-slate-800"
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 bg-white dark:bg-slate-800"
                                 />
                                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Allow Re-entry (Recurrence)</span>
                             </label>
@@ -8557,11 +8572,11 @@ const WorkflowEditor: React.FC<{
                                 <button
                                     key={t}
                                     onClick={() => patch({ trigger: t })}
-                                    className={`p-3 rounded-xl border-2 text-left transition ${wf.trigger === t ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                    className={`p-3 rounded-xl border-2 text-left transition ${wf.trigger === t ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'
                                         }`}
                                 >
-                                    <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'manual' ? '✋ Manual' : t === 'keyword' ? '💬 Keyword' : '📋 List Add'}
+                                    <p className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white mb-0.5">
+                                        {t === 'manual' ? <><Hand size={12} aria-hidden="true" /> Manual</> : t === 'keyword' ? <><MessageCircle size={12} aria-hidden="true" /> Keyword</> : <><ClipboardList size={12} aria-hidden="true" /> List Add</>}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -8579,8 +8594,8 @@ const WorkflowEditor: React.FC<{
                                             : 'border-slate-200 dark:border-slate-700 hover:border-pink-300'
                                         }`}
                                 >
-                                    <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
+                                    <p className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white mb-0.5">
+                                        {t === 'birthday' ? <><Cake size={12} aria-hidden="true" /> Birthday</> : <><Gem size={12} aria-hidden="true" /> Anniversary</>}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -8595,7 +8610,7 @@ const WorkflowEditor: React.FC<{
                                     : 'border-slate-200 dark:border-slate-700 hover:border-teal-300'
                                 }`}
                         >
-                            <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">🎟️ Event Registration</p>
+                            <p className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white mb-0.5"><Ticket size={12} aria-hidden="true" /> Event Registration</p>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel.event_registration}</p>
                         </button>
 
@@ -8613,7 +8628,7 @@ const WorkflowEditor: React.FC<{
                                             patch({ triggerKeywordId: e.target.value || null, triggerKeywordWord: kw?.keyword || null });
                                         }}
                                         title="Trigger keyword"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="">-- Select a keyword --</option>
                                         {keywords.filter(k => k.isActive).map(k => (
@@ -8637,7 +8652,7 @@ const WorkflowEditor: React.FC<{
                                             patch({ triggerListId: e.target.value || null, triggerListName: l?.name || null });
                                         }}
                                         title="Trigger PCO list"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="">-- Select a list --</option>
                                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -8653,7 +8668,7 @@ const WorkflowEditor: React.FC<{
                                             patch({ triggerGroupId: e.target.value || null, triggerGroupName: g?.name || null });
                                         }}
                                         title="Additional PCO group to daily-sync"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="">-- None --</option>
                                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -8712,7 +8727,7 @@ const WorkflowEditor: React.FC<{
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-2.5 p-3.5 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">🎟️</span>
+                                    <Ticket size={18} className="shrink-0 mt-0.5 text-teal-600 dark:text-teal-400" aria-hidden="true" />
                                     <div className="text-xs text-teal-700 dark:text-teal-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">Enrolls once per person</p>
                                         <p>The daily scanner checks confirmed registrants for this event and enrolls anyone not yet in the workflow. Each person is only enrolled once, regardless of how many times the scanner runs. Use <span className="font-mono bg-teal-100 dark:bg-teal-900/40 px-1 rounded">{'{firstName}'}</span> in your messages to personalize them.</p>
@@ -8777,7 +8792,7 @@ const WorkflowEditor: React.FC<{
                                 </div>
                                 {/* Info banner */}
                                 <div className="flex items-start gap-2.5 p-3.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '🎂' : '💍'}</span>
+                                    <span className="shrink-0 mt-0.5 text-pink-600 dark:text-pink-400" aria-hidden="true">{wf.trigger === 'birthday' ? <Cake size={18} /> : <Gem size={18} />}</span>
                                     <div className="text-xs text-pink-700 dark:text-pink-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">
                                             Automatically fires every year
@@ -8807,7 +8822,7 @@ const WorkflowEditor: React.FC<{
                             {/* 3-button add toolbar (top) */}
                             <div className="flex items-center gap-1.5">
                                 <button onClick={addActionNode}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-xl transition">
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-xl transition">
                                     <Plus size={11} /> Action
                                 </button>
                                 <button onClick={addDelayNode}
@@ -8884,7 +8899,7 @@ const WorkflowEditor: React.FC<{
                         {/* 3-button add toolbar (bottom) */}
                         <div className="flex items-center gap-2 pt-1">
                             <button onClick={addActionNode}
-                                className="flex-1 py-2.5 border-2 border-dashed border-violet-300 dark:border-violet-700 rounded-2xl text-xs font-bold text-violet-500 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-center gap-1.5">
+                                className="flex-1 py-2.5 border-2 border-dashed border-indigo-300 dark:border-indigo-700 rounded-2xl text-xs font-bold text-indigo-500 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition flex items-center justify-center gap-1.5">
                                 <Plus size={13} /> Action
                             </button>
                             <button onClick={addDelayNode}
@@ -9178,7 +9193,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
             case 'email': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
             case 'staff_sms': return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300';
             case 'staff_email': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-            default: return 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300'; // sms/mms
+            default: return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'; // sms/mms
         }
     };
 
@@ -9216,12 +9231,12 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                 {/* Header */}
                 <div className="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                            <Beaker size={20} className="text-violet-600 dark:text-violet-300" />
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                            <Beaker size={20} className="text-indigo-600 dark:text-indigo-300" />
                         </div>
                         <div>
                             <h3 className="text-base font-black text-slate-900 dark:text-white">Workflow Simulator</h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Trigger: {workflow.trigger === 'birthday' ? '🎂 Birthday' : workflow.trigger === 'anniversary' ? '💍 Anniversary' : workflow.trigger === 'keyword' ? `💬 Keyword ("${workflow.triggerKeywordWord || 'hello'}")` : workflow.trigger === 'list_add' ? `📋 List Add (${triggerListName})` : workflow.trigger === 'event_registration' ? `🎟️ Event Registration (${triggerEventName})` : '✋ Manual'}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Trigger: {workflow.trigger === 'birthday' ? 'Birthday' : workflow.trigger === 'anniversary' ? 'Anniversary' : workflow.trigger === 'keyword' ? `Keyword ("${workflow.triggerKeywordWord || 'hello'}")` : workflow.trigger === 'list_add' ? `List Add (${triggerListName})` : workflow.trigger === 'event_registration' ? `Event Registration (${triggerEventName})` : 'Manual'}</p>
                         </div>
                     </div>
                     <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={18} /></button>
@@ -9243,7 +9258,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     type="date"
                                     value={simDate}
                                     onChange={e => setSimDate(e.target.value)}
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                             <div>
@@ -9252,7 +9267,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     type="time"
                                     value={simTime}
                                     onChange={e => setSimTime(e.target.value)}
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                         </div>
@@ -9266,7 +9281,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     type="text"
                                     value={mockName}
                                     onChange={e => setMockName(e.target.value)}
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                             <div>
@@ -9275,7 +9290,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     type="text"
                                     value={mockPhone}
                                     onChange={e => setMockPhone(e.target.value)}
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                             <div>
@@ -9284,7 +9299,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     type="text"
                                     value={mockEmail}
                                     onChange={e => setMockEmail(e.target.value)}
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
@@ -9294,7 +9309,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                         type="text"
                                         value={mockCity}
                                         onChange={e => setMockCity(e.target.value)}
-                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                     />
                                 </div>
                                 <div>
@@ -9303,7 +9318,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                         type="text"
                                         value={mockState}
                                         onChange={e => setMockState(e.target.value)}
-                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                     />
                                 </div>
                             </div>
@@ -9321,7 +9336,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                 type="date"
                                                 value={mockBirthday}
                                                 onChange={e => setMockBirthday(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                             />
                                         </div>
                                     )}
@@ -9332,7 +9347,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                 type="date"
                                                 value={mockAnniversary}
                                                 onChange={e => setMockAnniversary(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                             />
                                         </div>
                                     )}
@@ -9343,7 +9358,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                 type="datetime-local"
                                                 value={mockEventStartsAt}
                                                 onChange={e => setMockEventStartsAt(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                             />
                                         </div>
                                     )}
@@ -9364,7 +9379,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition ${
                                         isSimulating
                                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                            : 'bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-200 dark:shadow-none'
+                                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200 dark:shadow-none'
                                     }`}
                                 >
                                     {isSimulating ? (
@@ -9399,11 +9414,11 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
 
                                     let bulletClass = 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500';
                                     if (isSent) bulletClass = 'bg-emerald-500 text-white';
-                                    else if (isCurrent) bulletClass = 'bg-violet-600 text-white animate-pulse ring-4 ring-violet-200 dark:ring-violet-900';
+                                    else if (isCurrent) bulletClass = 'bg-indigo-600 text-white animate-pulse ring-4 ring-indigo-200 dark:ring-indigo-900';
 
                                     let cardClass = 'bg-white dark:bg-slate-800 border rounded-2xl p-4 shadow-xs transition duration-300';
                                     if (isSent) cardClass += ' border-slate-200 dark:border-slate-700';
-                                    else if (isCurrent) cardClass += ' border-violet-500 dark:border-violet-500 shadow-md ring-1 ring-violet-500 scale-[1.01]';
+                                    else if (isCurrent) cardClass += ' border-indigo-500 dark:border-indigo-500 shadow-md ring-1 ring-indigo-500 scale-[1.01]';
                                     else if (isQueued) cardClass += ' opacity-35 select-none pointer-events-none border-dashed border-slate-200 dark:border-slate-700';
 
                                     return (
@@ -9434,7 +9449,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                         </span>
                                                     )}
                                                     {isCurrent && (
-                                                        <span className="flex items-center gap-1 text-[11px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
+                                                        <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
                                                             <Loader2 size={10} className="animate-spin" /> Simulating...
                                                         </span>
                                                     )}
@@ -9449,7 +9464,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                     Scheduled Time
                                                 </h5>
                                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
-                                                    <Calendar size={12} className="text-violet-500" />
+                                                    <Calendar size={12} className="text-indigo-500" />
                                                     {formatSimDate(item.scheduledMs)}
                                                 </p>
 
@@ -9586,7 +9601,7 @@ const EnrollmentPane: React.FC<{
                             value={phone}
                             onChange={e => setPhone(e.target.value)}
                             placeholder="(615) 555-0100"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                     <div>
@@ -9596,14 +9611,14 @@ const EnrollmentPane: React.FC<{
                             value={name}
                             onChange={e => setName(e.target.value)}
                             placeholder="Jane Smith"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                     {errMsg && <p className="text-xs text-red-500">{errMsg}</p>}
                     <button
                         onClick={handleEnroll}
                         disabled={!phone.trim() || enrolling}
-                        className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
                     >
                         {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrolling...</> : <><Plus size={13} />Enroll in Workflow</>}
                     </button>
@@ -9626,7 +9641,7 @@ const EnrollmentPane: React.FC<{
                                             Step {en.currentStep + 1} of {workflow.steps.length} • enrolled {timeAgo(en.enrolledAt)}
                                         </p>
                                     </div>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${en.completed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${en.completed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
                                         }`}>{en.completed ? 'Done' : 'Active'}</span>
                                 </div>
                             ))}
@@ -9735,8 +9750,8 @@ const BulkEnrollFromListModal: React.FC<{
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                            <ListPlus size={17} className="text-violet-600 dark:text-violet-300" />
+                        <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                            <ListPlus size={17} className="text-indigo-600 dark:text-indigo-300" />
                         </div>
                         <div>
                             <h3 className="text-sm font-black text-slate-900 dark:text-white">Start Workflow from List</h3>
@@ -9755,13 +9770,13 @@ const BulkEnrollFromListModal: React.FC<{
                         </div>
                         <p className="font-black text-slate-900 dark:text-white text-base mb-1">Workflow Started!</p>
                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                            <span className="font-bold text-violet-600 dark:text-violet-300">{result.enrolled}</span> contact{result.enrolled !== 1 ? 's' : ''} enrolled.
+                            <span className="font-bold text-indigo-600 dark:text-indigo-300">{result.enrolled}</span> contact{result.enrolled !== 1 ? 's' : ''} enrolled.
                             {result.skipped > 0 && <span className="text-slate-400"> {result.skipped} already enrolled (skipped).</span>}
                         </p>
                         <p className="text-xs text-slate-400 mt-3">The workflow scheduler will fire Step 1 within 60 seconds.</p>
                         <button
                             onClick={onClose}
-                            className="mt-5 px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition"
+                            className="mt-5 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition"
                         >
                             Done
                         </button>
@@ -9769,9 +9784,9 @@ const BulkEnrollFromListModal: React.FC<{
                 ) : (
                     <div className="p-5 space-y-4">
                         {/* How-it-works explainer */}
-                        <div className="flex items-start gap-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 rounded-2xl p-3">
-                            <Zap size={14} className="text-violet-500 mt-0.5 shrink-0" />
-                            <p className="text-[11px] text-violet-700 dark:text-violet-300 leading-relaxed">
+                        <div className="flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl p-3">
+                            <Zap size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
                                 Every person on the selected list with a phone number will be enrolled in <strong>{workflow.name}</strong> immediately. Step 1 fires within 60 seconds.
                             </p>
                         </div>
@@ -9783,7 +9798,7 @@ const BulkEnrollFromListModal: React.FC<{
                                     key={t}
                                     onClick={() => setTab(t)}
                                     className={`flex-1 py-2 text-xs font-bold transition ${tab === t
-                                            ? 'bg-violet-600 text-white'
+                                            ? 'bg-indigo-600 text-white'
                                             : 'bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
                                         }`}
                                 >
@@ -9804,7 +9819,7 @@ const BulkEnrollFromListModal: React.FC<{
                                         onChange={e => { setSelectedListId(e.target.value); setResult(null); setErrMsg(''); }}
                                         title="Select a PCO List"
                                         aria-label="Select a PCO List"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="">— Select a PCO List —</option>
                                         {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
@@ -9823,7 +9838,7 @@ const BulkEnrollFromListModal: React.FC<{
                                         onChange={e => { setSelectedGroupId(e.target.value); setResult(null); setErrMsg(''); }}
                                         title="Select a PCO Group"
                                         aria-label="Select a PCO Group"
-                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                         <option value="">— Select a PCO Group —</option>
                                         {pcoGroups.length === 0 && <option disabled>No groups found (connect PCO first)</option>}
@@ -9839,7 +9854,7 @@ const BulkEnrollFromListModal: React.FC<{
                                 {loadingCount ? (
                                     <span className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Fetching count...</span>
                                 ) : memberCount !== null ? (
-                                    <span className="flex items-center gap-1.5 text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full">
                                         <Users size={11} /> {memberCount.toLocaleString()} member{memberCount !== 1 ? 's' : ''}
                                     </span>
                                 ) : null}
@@ -9863,7 +9878,7 @@ const BulkEnrollFromListModal: React.FC<{
                             <button
                                 onClick={handleEnroll}
                                 disabled={!selectedId || enrolling}
-                                className="flex-1 py-2.5 text-sm font-black text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/30 flex items-center justify-center gap-2"
+                                className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30 flex items-center justify-center gap-2"
                             >
                                 {enrolling
                                     ? <><Loader2 size={13} className="animate-spin" /> Enrolling...</>
@@ -9914,7 +9929,7 @@ const WorkflowEnrollmentsModal: React.FC<{
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Users size={20} className="text-violet-500" />
+                            <Users size={20} className="text-indigo-500" />
                             Enrolled People
                         </h2>
                         <p className="text-xs text-slate-500 mt-1">Workflow: {workflow.name}</p>
@@ -9945,7 +9960,7 @@ const WorkflowEnrollmentsModal: React.FC<{
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
                                             {e.completed ? (
                                                 <>
                                                     <CheckCircle size={12} />
@@ -10120,13 +10135,13 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const openNew = () => { setEditing(null); setSaveError(null); setViewMode('editor'); };
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setSaveError(null); setViewMode('editor'); };
 
-    const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual: { label: 'Manual', color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300', icon: '✋' },
-        keyword: { label: 'Keyword', color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
-        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: '📋' },
-        birthday: { label: 'Birthday', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300', icon: '🎂' },
-        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300', icon: '💍' },
-        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300', icon: '🎟️' },
+    const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+        manual: { label: 'Manual', color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300', icon: Hand },
+        keyword: { label: 'Keyword', color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: MessageCircle },
+        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: ClipboardList },
+        birthday: { label: 'Birthday', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300', icon: Cake },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300', icon: Gem },
+        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300', icon: Ticket },
     };
 
     // Show editor view
@@ -10158,29 +10173,25 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     // List view
     return (
         <div className="h-full overflow-y-auto w-full">
-            <div className="p-6 max-w-4xl mx-auto">
+            <ToolPage>
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                        <Zap size={26} className="text-violet-500" /> Workflows
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Automated drip sequences — the right message at the right time.
-                    </p>
-                </div>
-                <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                    <Plus size={16} /> New Workflow
-                </button>
-            </div>
+            <ToolHeader
+                tool="workflows"
+                description="Automated drip sequences — the right message at the right time."
+                actions={
+                    <ToolButton variant="primary" icon={Plus} onClick={openNew}>
+                        New Workflow
+                    </ToolButton>
+                }
+            />
 
             {/* Explainer */}
-            <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">💡</div>
+            <div className="flex items-start gap-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4 mb-6">
+                <Lightbulb size={24} className="shrink-0 text-indigo-500 dark:text-indigo-400 mt-0.5" aria-hidden="true" />
                 <div>
-                    <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
-                    <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, a <strong>💍 anniversary</strong>, a <strong>🎟️ PCO event registration</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule.
+                    <p className="text-sm font-bold text-indigo-800 dark:text-indigo-200 mb-1">How workflows work</p>
+                    <p className="text-xs text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong className="inline-flex items-center gap-0.5"><Cake size={12} aria-hidden="true" /> birthday</strong>, a <strong className="inline-flex items-center gap-0.5"><Gem size={12} aria-hidden="true" /> anniversary</strong>, a <strong className="inline-flex items-center gap-0.5"><Ticket size={12} aria-hidden="true" /> PCO event registration</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule.
                     </p>
                 </div>
             </div>
@@ -10189,25 +10200,28 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             {isLoading ? (
                 <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflows...</div>
             ) : workflows.length === 0 ? (
-                <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <Zap size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-slate-600 dark:text-slate-400 font-semibold">No workflows yet</p>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Build your first automated text sequence.</p>
-                    <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                        <span className="flex items-center gap-1.5"><Plus size={14} />New Workflow</span>
-                    </button>
-                </div>
+                <ToolEmptyState
+                    icon={Zap}
+                    title="No workflows yet"
+                    description="Build your first automated text sequence."
+                    action={
+                        <ToolButton variant="primary" icon={Plus} onClick={openNew}>
+                            New Workflow
+                        </ToolButton>
+                    }
+                />
             ) : (
                 <div className="space-y-3">
                     {workflows.map(wf => {
                         const tb = TRIGGER_BADGE[wf.trigger] || TRIGGER_BADGE.manual;
+                        const TriggerIcon = tb.icon;
                         return (
-                            <div key={wf.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 hover:border-violet-200 dark:hover:border-violet-700 transition group">
+                            <div key={wf.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 hover:border-indigo-200 dark:hover:border-indigo-700 transition group">
                                 <div className="flex items-start justify-between gap-4">
                                     {/* Left: info */}
                                     <div className="flex items-start gap-3 min-w-0">
-                                        <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0 text-lg">
-                                            {tb.icon}
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                                            <TriggerIcon size={18} aria-hidden="true" />
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -10233,7 +10247,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                     })}
                                                 </div>
                                                 {wf.trigger === 'keyword' && wf.triggerKeywordWord && (
-                                                    <span className="text-[10px] font-mono font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-1.5 py-0.5 rounded">{wf.triggerKeywordWord}</span>
+                                                    <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">{wf.triggerKeywordWord}</span>
                                                 )}
                                                 {wf.trigger === 'list_add' && wf.triggerListName && (
                                                     <span className="text-[10px] text-blue-600 dark:text-blue-400">{wf.triggerListName}</span>
@@ -10249,9 +10263,9 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                     <div className="flex items-center gap-3 shrink-0">
                                         {/* Enrolled / completed / in-progress */}
                                         <div className="text-right hidden sm:block">
-                                            <button onClick={() => setViewingEnrollments(wf)} className="group/enroll flex flex-col items-end hover:bg-violet-50 dark:hover:bg-violet-900/20 px-2 py-1 rounded-lg transition-colors">
-                                                <p className="text-lg font-black text-violet-600 dark:text-violet-300 group-hover/enroll:text-violet-700 dark:group-hover/enroll:text-violet-200 transition-colors">{wf.enrolledCount}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase tracking-wide group-hover/enroll:text-violet-500 transition-colors">enrolled</p>
+                                            <button onClick={() => setViewingEnrollments(wf)} className="group/enroll flex flex-col items-end hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded-lg transition-colors">
+                                                <p className="text-lg font-black text-indigo-600 dark:text-indigo-300 group-hover/enroll:text-indigo-700 dark:group-hover/enroll:text-indigo-200 transition-colors">{wf.enrolledCount}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-wide group-hover/enroll:text-indigo-500 transition-colors">enrolled</p>
                                             </button>
                                         </div>
                                         <div className="text-right hidden sm:block">
@@ -10269,7 +10283,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                         <button
                                             onClick={() => handleToggleActive(wf)}
                                             title={wf.isActive ? 'Pause' : 'Activate'}
-                                            className={`relative w-11 h-6 rounded-full transition-colors ${wf.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            className={`relative w-11 h-6 rounded-full transition-colors ${wf.isActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
                                             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${wf.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                                         </button>
@@ -10279,7 +10293,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             {/* Test simulator button */}
                                             <button
                                                 onClick={() => setTestTarget(wf)}
-                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                                                 title="Test / Simulate Workflow"
                                             >
                                                 <Beaker size={14} />
@@ -10287,7 +10301,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             {/* Bulk-enroll from PCO list — available on all workflows */}
                                             <button
                                                 onClick={() => setListEnrollTarget(wf)}
-                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                                                 title="Start workflow from PCO List"
                                             >
                                                 <ListPlus size={14} />
@@ -10329,11 +10343,11 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                 );
                                             })()}
                                             {wf.trigger === 'manual' && (
-                                                <button onClick={() => setEnrollTarget(wf)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Enroll contact">
+                                                <button onClick={() => setEnrollTarget(wf)} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Enroll contact">
                                                     <Users size={14} />
                                                 </button>
                                             )}
-                                            <button onClick={() => openEdit(wf)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
+                                            <button onClick={() => openEdit(wf)} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
                                                 <Pencil size={14} />
                                             </button>
                                             <button onClick={() => handleDelete(wf)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
@@ -10352,7 +10366,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                 <React.Fragment key={step.id}>
                                                     {i > 0 && (
                                                         <div className="flex items-center gap-1 shrink-0">
-                                                            <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
+                                                            <div className="h-px w-4 bg-indigo-200 dark:bg-indigo-800" />
                                                             <span className="text-[11px] text-slate-400 whitespace-nowrap">
                                                                 {(() => {
                                                                     const st = step.scheduleType ?? 'relative';
@@ -10367,14 +10381,14 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                                     return `+${parts.join(' ')}`;
                                                                 })()}
                                                             </span>
-                                                            <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
+                                                            <div className="h-px w-4 bg-indigo-200 dark:bg-indigo-800" />
                                                         </div>
                                                     )}
                                                     <div className="flex flex-col items-center gap-0.5 shrink-0">
-                                                        <div className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center">{i + 1}</div>
+                                                        <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">{i + 1}</div>
                                                         {countAtStep > 0 && (
-                                                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                                                👤 {countAtStep}
+                                                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                <UserIcon size={10} aria-hidden="true" /> {countAtStep}
                                                             </span>
                                                         )}
                                                     </div>
@@ -10443,7 +10457,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     onClose={() => setViewingEnrollments(null)}
                 />
             )}
-        </div>
+            </ToolPage>
         </div>
     );
 };
@@ -10483,7 +10497,7 @@ const SmsTermsModal: React.FC<{
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="px-7 pt-7 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-start gap-4 shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0"><span className="text-2xl">📜</span></div>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0"><ScrollText size={22} aria-hidden="true" /></div>
                     <div>
                         <h2 className="text-lg font-black text-slate-900 dark:text-white">SMS Service Terms of Use</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Please read and accept before activating your church's SMS line.</p>
@@ -10530,8 +10544,8 @@ const SmsTermsModal: React.FC<{
                     ))}
                     <div className="flex gap-3 pt-1">
                         <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
-                        <button onClick={handleAccept} disabled={!allChecked || saving} className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30">
-                            {saving ? 'Saving...' : 'I Accept — Continue ➡️'}
+                        <button onClick={handleAccept} disabled={!allChecked || saving} className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30">
+                            {saving ? 'Saving...' : <>I Accept — Continue <ArrowRight size={14} aria-hidden="true" /></>}
                         </button>
                     </div>
                     {!allChecked && <p className="text-[10px] text-slate-400 text-center">Please check all three boxes above to continue.</p>}
@@ -10545,32 +10559,32 @@ const SmsTermsModal: React.FC<{
 
 const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
     <div className="p-6 max-w-2xl mx-auto mt-12">
-        <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl p-8 text-white text-center shadow-2xl shadow-violet-200 dark:shadow-violet-900/40">
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-8 text-white text-center shadow-2xl shadow-indigo-200 dark:shadow-indigo-900/40">
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Phone size={32} className="text-white" />
             </div>
             <h2 className="text-2xl font-black mb-2">Set Up SMS Messaging</h2>
-            <p className="text-violet-100 text-sm mb-6 leading-relaxed">
+            <p className="text-indigo-100 text-sm mb-6 leading-relaxed">
                 Get a dedicated local phone number for your church. Send bulk text campaigns to your Planning Center lists and groups, and manage a full 2-way inbox.
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8 text-center">
                 {[
-                    { icon: '📱', title: 'Local Number', desc: 'Pick an area code' },
-                    { icon: '📣', title: 'Bulk Texts', desc: 'Reach entire lists' },
-                    { icon: '💬', title: '2-Way Inbox', desc: 'Real conversations' },
+                    { Icon: Smartphone, title: 'Local Number', desc: 'Pick an area code' },
+                    { Icon: Megaphone, title: 'Bulk Texts', desc: 'Reach entire lists' },
+                    { Icon: MessageCircle, title: '2-Way Inbox', desc: 'Real conversations' },
                 ].map(f => (
                     <div key={f.title} className="bg-white/10 rounded-2xl p-3">
-                        <div className="text-2xl mb-1">{f.icon}</div>
+                        <f.Icon size={24} className="mx-auto mb-1" aria-hidden="true" />
                         <p className="font-bold text-sm">{f.title}</p>
-                        <p className="text-violet-200 text-xs">{f.desc}</p>
+                        <p className="text-indigo-200 text-xs">{f.desc}</p>
                     </div>
                 ))}
             </div>
             <button
                 onClick={onSetup}
-                className="px-8 py-3 bg-white text-violet-700 font-black rounded-2xl hover:bg-violet-50 transition text-sm shadow-lg"
+                className="inline-flex items-center gap-2 px-8 py-3 bg-white text-indigo-700 font-black rounded-2xl hover:bg-indigo-50 transition text-sm shadow-lg"
             >
-                Get Started 🚀
+                Get Started <Rocket size={16} aria-hidden="true" />
             </button>
         </div>
     </div>
@@ -10736,7 +10750,7 @@ const SmsSetupWizard: React.FC<{
                         <div className="flex items-center gap-2 mb-6">
                             {(['search', 'pick-number', 'done'] as const).map((s, i) => (
                                 <React.Fragment key={s}>
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${step === s ? 'bg-violet-600 text-white' :
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${step === s ? 'bg-indigo-600 text-white' :
                                             ['pick-number', 'done'].indexOf(step) > ['pick-number', 'done'].indexOf(s) || (s === 'search' && step !== 'search')
                                                  ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
                                         }`}>
@@ -10758,12 +10772,12 @@ const SmsSetupWizard: React.FC<{
                                     <button
                                         key={mode}
                                         onClick={() => { setSearchMode(mode); setError(''); }}
-                                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wide transition ${searchMode === mode
-                                                ? 'bg-violet-600 text-white'
+                                        className={`flex-1 inline-flex items-center justify-center gap-1 py-2 text-xs font-black uppercase tracking-wide transition ${searchMode === mode
+                                                ? 'bg-indigo-600 text-white'
                                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                             }`}
                                     >
-                                        {mode === 'city-state' ? '📍 City & State' : mode === 'area-code' ? '# Area Code' : '🔌 Ported Number'}
+                                        {mode === 'city-state' ? <><MapPin size={12} aria-hidden="true" /> City &amp; State</> : mode === 'area-code' ? <><Hash size={12} aria-hidden="true" /> Area Code</> : <><Plug size={12} aria-hidden="true" /> Ported Number</>}
                                     </button>
                                 ))}
                             </div>
@@ -10778,7 +10792,7 @@ const SmsSetupWizard: React.FC<{
                                             onChange={e => setCity(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
                                             placeholder="e.g. Nashville"
-                                            className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                            className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         />
                                         <p className="text-[10px] text-slate-400 mt-1">Leave blank to search across the whole state.</p>
                                     </div>
@@ -10788,7 +10802,7 @@ const SmsSetupWizard: React.FC<{
                                             value={stateAbbr}
                                             onChange={e => setStateAbbr(e.target.value)}
                                             title="State"
-                                            className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
+                                            className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 appearance-none"
                                         >
                                             <option value="">Select a state...</option>
                                             {US_STATES.map(([abbr, name]) => (
@@ -10809,7 +10823,7 @@ const SmsSetupWizard: React.FC<{
                                         onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
                                         onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
                                         placeholder="e.g. 615"
-                                        className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-wide"
+                                        className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 tracking-wide"
                                     />
                                 </div>
                             )}
@@ -10823,7 +10837,7 @@ const SmsSetupWizard: React.FC<{
                                         onChange={e => setPortedNumber(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
                                         placeholder="e.g. +1 (615) 555-0100"
-                                        className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                        className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                     />
                                     <p className="text-[10px] text-slate-400 mt-1">Enter the phone number that was ported into SignalWire.</p>
                                 </div>
@@ -10834,10 +10848,10 @@ const SmsSetupWizard: React.FC<{
                             <button
                                 onClick={fetchNumbers}
                                 disabled={loadingNums || !canSearch}
-                                className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                             >
                                 {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching...</> : 
-                                 searchMode === 'ported' ? 'Verify Ported Number ➔' : 'Find Available Numbers 🔍'}
+                                 searchMode === 'ported' ? <>Verify Ported Number <ArrowRight size={16} aria-hidden="true" /></> : <>Find Available Numbers <Search size={16} aria-hidden="true" /></>}
                             </button>
                         </>
                     )}
@@ -10861,15 +10875,15 @@ const SmsSetupWizard: React.FC<{
                                 {/* Results context */}
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
                                     {numbers.length > 0
-                                        ? <>Numbers for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
-                                        : <>No numbers found for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
+                                        ? <>Numbers for <span className="font-semibold text-indigo-600 dark:text-indigo-400">{resolvedSearch}</span>.</>
+                                        : <>No numbers found for <span className="font-semibold text-indigo-600 dark:text-indigo-400">{resolvedSearch}</span>.</>
                                     }
                                 </p>
 
                                 {/* Cross-state fallback notice (city found in a different state) */}
                                 {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
-                                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
-                                        ⚠️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
+                                    <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
+                                        <AlertTriangle size={13} className="shrink-0 mt-px" aria-hidden="true" /><span>No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.</span>
                                     </p>
                                 )}
 
@@ -10883,7 +10897,7 @@ const SmsSetupWizard: React.FC<{
                                             disabled={loadingNums}
                                             className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
                                         >
-                                            {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching...</> : `Search all of ${stateAbbr} 🔍`}
+                                            {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching...</> : <>Search all of {stateAbbr} <Search size={12} aria-hidden="true" /></>}
                                         </button>
                                     </div>
                                 )}
@@ -10896,17 +10910,17 @@ const SmsSetupWizard: React.FC<{
                                             return (
                                                 <label
                                                     key={n.phoneNumber}
-                                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
+                                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600'}`}
                                                 >
-                                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
+                                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-indigo-600 mt-0.5 shrink-0" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
                                                         <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                            📍 {cityState || `Area code ${areaCode}`}
+                                                            <MapPin size={11} aria-hidden="true" /> {cityState || `Area code ${areaCode}`}
                                                         </span>
                                                     </div>
                                                     {selectedNumber === n.phoneNumber && (
-                                                        <CheckCircle size={18} className="text-violet-600 shrink-0" />
+                                                        <CheckCircle size={18} className="text-indigo-600 shrink-0" />
                                                     )}
                                                 </label>
                                             );
@@ -10920,7 +10934,7 @@ const SmsSetupWizard: React.FC<{
                                         <button
                                             onClick={() => { setPage(p => Math.max(0, p - 1)); setSelectedNumber(''); }}
                                             disabled={page === 0}
-                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-30 transition"
                                         >
                                             ⬅️ Prev
                                         </button>
@@ -10931,9 +10945,9 @@ const SmsSetupWizard: React.FC<{
                                         <button
                                             onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); setSelectedNumber(''); }}
                                             disabled={page >= totalPages - 1}
-                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-30 transition"
                                         >
-                                            Next ➡️
+                                            Next <ArrowRight size={12} aria-hidden="true" />
                                         </button>
                                     </div>
                                 )}
@@ -10948,7 +10962,7 @@ const SmsSetupWizard: React.FC<{
                                                     type="text"
                                                     value={friendlyLabel}
                                                     onChange={e => setFriendlyLabel(e.target.value)}
-                                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
                                                     placeholder="Youth Ministry"
                                                 />
                                             </>
@@ -10958,7 +10972,7 @@ const SmsSetupWizard: React.FC<{
                                             type="text"
                                             value={senderName}
                                             onChange={e => setSenderName(e.target.value)}
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
                                             placeholder="Grace Community Church"
                                         />
                                     </>
@@ -10967,14 +10981,14 @@ const SmsSetupWizard: React.FC<{
                                 {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                                 <div className="flex gap-2">
-                                    <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">🔍 Search Again</button>
+                                    <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition"><span className="inline-flex items-center justify-center gap-1.5"><Search size={14} aria-hidden="true" /> Search Again</span></button>
                                     {numbers.length > 0 && (
                                         <button
                                             onClick={provision}
                                             disabled={provisioning || !selectedNumber}
-                                            className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                                            className="flex-1 py-2.5 text-sm font-black bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                                         >
-                                            {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning...</> : 'Claim Number ✅'}
+                                            {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning...</> : <>Claim Number <CircleCheck size={14} aria-hidden="true" /></>}
                                         </button>
                                     )}
                                 </div>
@@ -10985,17 +10999,17 @@ const SmsSetupWizard: React.FC<{
                     {step === 'done' && (
                         <div className="text-center py-4">
                             <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
-                                <CheckCircle size={32} className="text-emerald-600" />
+                                <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
                             </div>
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
+                            <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white mb-2">You're all set! <PartyPopper size={20} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /></h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                                 Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
                             </p>
                             <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-6 text-left">
                                 <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
                             </div>
-                            <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
-                                Start Messaging 💬
+                            <button onClick={onComplete} className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition">
+                                Start Messaging <MessageCircle size={16} aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -11092,7 +11106,7 @@ const NumberManager: React.FC<{
                 }),
             });
             setEditingId(null);
-            showToast('Saved ✅');
+            showToast('Saved');
         } catch {
             showToast('Save failed', 'error');
         } finally {
@@ -11106,7 +11120,7 @@ const NumberManager: React.FC<{
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ churchId, twilioNumberId: numId }),
         });
-        showToast('Default number updated ✅');
+        showToast('Default number updated');
     };
 
     const releaseNumber = async (num: TwilioPhoneNumber) => {
@@ -11127,7 +11141,7 @@ const NumberManager: React.FC<{
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2">
-                        <Phone size={18} className="text-violet-500" />
+                        <Phone size={18} className="text-indigo-500" />
                         <h2 className="text-lg font-black text-slate-900 dark:text-white">Phone Numbers</h2>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold">{numbers.length}</span>
                     </div>
@@ -11135,7 +11149,7 @@ const NumberManager: React.FC<{
                         {isAdmin && (
                             <button
                                 onClick={onAddNumber}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition"
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition"
                             >
                                 <PlusCircle size={14} /> Add Number
                             </button>
@@ -11155,14 +11169,14 @@ const NumberManager: React.FC<{
                     )}
 
                     {numbers.map(num => (
-                        <div key={num.id} className={`border rounded-2xl overflow-hidden ${num.isDefault ? 'border-violet-300 dark:border-violet-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <div key={num.id} className={`border rounded-2xl overflow-hidden ${num.isDefault ? 'border-indigo-300 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'}`}>
                             {/* Number header row */}
                             <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/60">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-black text-sm text-slate-900 dark:text-white">{num.friendlyLabel}</span>
                                         {num.isDefault && (
-                                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Default</span>
+                                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">Default</span>
                                         )}
                                         {!num.smsEnabled && (
                                             <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400">Disabled</span>
@@ -11176,14 +11190,14 @@ const NumberManager: React.FC<{
                                             <button
                                                 onClick={() => setDefault(num.id)}
                                                 title="Set as default"
-                                                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 hover:text-violet-600 hover:border-violet-400 transition"
+                                                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 hover:text-indigo-600 hover:border-indigo-400 transition"
                                             >
                                                 Set Default
                                             </button>
                                         )}
                                         <button
                                             onClick={() => editingId === num.id ? setEditingId(null) : startEdit(num)}
-                                            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-violet-500 transition"
+                                            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition"
                                             title="Edit"
                                         >
                                             <Edit3 size={13} />
@@ -11223,7 +11237,7 @@ const NumberManager: React.FC<{
                                             onChange={e => setLabelDraft(e.target.value)}
                                             title="Number label"
                                             placeholder="e.g. Main Line, Youth Line"
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
                                     </div>
                                     <div>
@@ -11233,7 +11247,7 @@ const NumberManager: React.FC<{
                                             value={senderDraft}
                                             onChange={e => setSenderDraft(e.target.value)}
                                             placeholder="Grace Community Church"
-                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
                                     </div>
                                     <div>
@@ -11255,7 +11269,7 @@ const NumberManager: React.FC<{
                                                                 : [...cleaned, u.id];
                                                             return next.length === 0 ? ['_none_'] : next;
                                                         })}
-                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${selected ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-violet-400'}`}
+                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${selected ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-indigo-400'}`}
                                                     >
                                                         {selected && <CheckCircle size={10} />}
                                                         {u.name}
@@ -11266,7 +11280,7 @@ const NumberManager: React.FC<{
                                         </div>
                                     </div>
                                     <div className="flex gap-2 pt-1">
-                                        <button onClick={() => saveEdit(num.id)} disabled={saving} className="flex-1 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition disabled:opacity-50">
+                                        <button onClick={() => saveEdit(num.id)} disabled={saving} className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition disabled:opacity-50">
                                             {saving ? 'Saving...' : 'Save Changes'}
                                         </button>
                                         <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
@@ -11421,7 +11435,7 @@ const SmsAgentTab: React.FC<{
                 await updateDoc(churchRef, { 'smsSettings.executiveAiAgentEnabled': next });
                 if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, executiveAiAgentEnabled: next } });
             }
-            showToast(next ? '🚀 Executive AI enabled' : 'Executive AI disabled');
+            showToast(next ? 'Executive AI enabled' : 'Executive AI disabled');
         } catch {
             showToast('Failed to update setting', 'error');
         }
@@ -11479,7 +11493,7 @@ const SmsAgentTab: React.FC<{
                     smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName }
                 });
             }
-            showToast('✅ Authorized list saved');
+            showToast('Authorized list saved');
         } catch {
             showToast('Failed to save authorized list', 'error');
         }
@@ -11503,7 +11517,7 @@ const SmsAgentTab: React.FC<{
                 await updateDoc(churchRef, { 'smsSettings.smsAgentEnabled': next });
                 if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, smsAgentEnabled: next } });
             }
-            showToast(next ? '🚀 SMS Agent enabled' : 'SMS Agent disabled');
+            showToast(next ? 'SMS Agent enabled' : 'SMS Agent disabled');
         } catch {
             showToast('Failed to update setting', 'error');
         }
@@ -11520,7 +11534,7 @@ const SmsAgentTab: React.FC<{
                 updatedBy: currentUser.name,
             }, { merge: true });
             setSavedAt(Date.now());
-            showToast('Knowledge base saved ✅');
+            showToast('Knowledge base saved');
         } catch {
             showToast('Save failed', 'error');
         } finally {
@@ -11581,7 +11595,7 @@ Write the reply:`;
                     onChange={e => setKb(prev => ({ ...prev, [key]: e.target.value }))}
                     placeholder={placeholder}
                     disabled={!isAdmin}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none disabled:opacity-50"
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none disabled:opacity-50"
                 />
             ) : (
                 <input
@@ -11590,7 +11604,7 @@ Write the reply:`;
                     onChange={e => setKb(prev => ({ ...prev, [key]: e.target.value }))}
                     placeholder={placeholder}
                     disabled={!isAdmin}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 />
             )}
         </div>
@@ -11602,10 +11616,10 @@ Write the reply:`;
 
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                    <Sparkles size={24} className="text-violet-500" /> SMS AI Agent
-                </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Sparkles size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> SMS AI agent
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                     When enabled, the agent analyzes every incoming SMS and suggests a contextual reply for your staff ... drawing from your church knowledge base below.
                 </p>
             </div>
@@ -11623,7 +11637,7 @@ Write the reply:`;
                         value={selectedNumberId}
                         onChange={e => setSelectedNumberId(e.target.value)}
                         title="Phone Line"
-                        className="w-full md:w-64 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        className="w-full md:w-64 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         {numbers.map(num => (
                             <option key={num.id} value={num.id}>
@@ -11653,7 +11667,7 @@ Write the reply:`;
                             <button
                                 onClick={handleToggleAgent}
                                 title={agentEnabled ? 'Disable SMS Agent' : 'Enable SMS Agent'}
-                                className={`relative w-14 h-7 rounded-full transition-colors ${agentEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                className={`relative w-14 h-7 rounded-full transition-colors ${agentEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                                     }`}
                             >
                                 <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${agentEnabled ? 'translate-x-7' : 'translate-x-0'
@@ -11785,7 +11799,7 @@ Write the reply:`;
                     <button
                         onClick={handleSaveKb}
                         disabled={saving}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
                     >
                         {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <><CheckCircle size={14} /> Save Knowledge Base</>}
                     </button>
@@ -11876,12 +11890,12 @@ Write the reply:`;
                         onChange={e => setTestInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') handleTestMessage(); }}
                         placeholder='e.g. "What time is Sunday service?"'
-                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                     <button
                         onClick={handleTestMessage}
                         disabled={!testInput.trim() || testLoading}
-                        className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
                     >
                         {testLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                         Test
@@ -11889,9 +11903,9 @@ Write the reply:`;
                 </div>
                 {testOutput && (
                     <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Agent Reply Preview</p>
-                        <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-4">
-                            <p className="text-sm text-violet-900 dark:text-violet-100 leading-relaxed">{testOutput}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Agent Reply Preview</p>
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4">
+                            <p className="text-sm text-indigo-900 dark:text-indigo-100 leading-relaxed">{testOutput}</p>
                             <p className={`text-xs font-bold mt-2 ${testOutput.length > 160 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                 {testOutput.length} chars • {Math.ceil(testOutput.length / 160)} segment{Math.ceil(testOutput.length / 160) !== 1 ? 's' : ''}
                             </p>
@@ -12212,7 +12226,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             <div className="p-6 max-w-2xl mx-auto mt-12">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
                     <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl">📜</span>
+                        <ScrollText size={26} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
                     </div>
                     <h2 className="text-xl font-black text-slate-900 dark:text-white text-center mb-2">
                         Complete Your Business Profile First
@@ -12225,7 +12239,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
                     <div className="space-y-3 mb-6">
                         {[
-                            { num: '1', title: 'Go to Settings ? SMS', desc: 'Open the A2P 10DLC Registration tab and fill in your church\'s legal name, EIN, address, and authorized representative details.' },
+                            { num: '1', title: 'Go to Settings → SMS', desc: 'Open the A2P 10DLC Registration tab and fill in your church\'s legal name, EIN, address, and authorized representative details.' },
                             { num: '2', title: 'Click "Create & Submit Profile"', desc: 'Our system will automatically create and submit your Customer Profile Bundle to Twilio TrustHub for review (same-day approval).' },
                             { num: '3', title: 'Return here for your phone number', desc: 'Once your profile is created (any status), come back to this screen and click "Get Started" to pick your local number.' },
                         ].map(step => (
@@ -12242,19 +12256,19 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button
                             onClick={() => setShowSetup(false)}
-                            className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                         >
-                            ? Back
+                            <ArrowLeft size={14} aria-hidden="true" /> Back
                         </button>
                         <button
                             onClick={() => setShowSetup(false)}
-                            className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
                         >
-                            Open Settings ? SMS ?
+                            Open Settings → SMS <ChevronRight size={14} aria-hidden="true" />
                         </button>
                     </div>
                     <p className="text-[10px] text-slate-400 text-center mt-3">
-                        Navigate to Admin ? Settings ? SMS ? A2P 10DLC Registration tab
+                        Navigate to Admin → Settings → SMS → A2P 10DLC Registration tab
                     </p>
                 </div>
             </div>
@@ -12296,27 +12310,23 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             {showTopSection && (
                 <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 md:px-6 pt-3 pb-3 shrink-0 ${controlledTab ? 'border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20' : ''}`}>
                     {!controlledTab && (
-                        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto no-scrollbar w-full md:w-auto">
-                            {([
-                                { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} />, perm: 'broadcastUserIds' },
-                                { key: 'workflows', label: 'Workflows', icon: <Zap size={13} />, perm: 'broadcastUserIds' },
-                                { key: 'inbox', label: 'Inbox', icon: <Inbox size={13} />, perm: 'inboxUserIds' },
-                                { key: 'keywords', label: 'Keywords', icon: <Key size={13} />, perm: 'keywordsUserIds' },
-                                { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} />, perm: 'analyticsUserIds' },
-                                { key: 'agent', label: 'AI Agent', icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
+                        <ToolTabs
+                            ariaLabel="SMS sections"
+                            className="w-full md:w-auto"
+                            value={effectiveTab as string}
+                            onChange={key => setActiveTab(key as any)}
+                            tabs={([
+                                { key: 'campaigns', label: 'Broadcast', icon: MessageSquare, perm: 'broadcastUserIds' },
+                                { key: 'workflows', label: 'Workflows', icon: Zap, perm: 'broadcastUserIds' },
+                                { key: 'inbox', label: 'Inbox', icon: Inbox, perm: 'inboxUserIds' },
+                                { key: 'keywords', label: 'Keywords', icon: Key, perm: 'keywordsUserIds' },
+                                { key: 'analytics', label: 'Analytics', icon: BarChart3, perm: 'analyticsUserIds' },
+                                { key: 'agent', label: 'AI Agent', icon: Sparkles, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
-                                .concat((currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' } as any] : [])
-                                .map(t => (
-                                    <button
-                                        key={t.key}
-                                        onClick={() => setActiveTab(t.key as any)}
-                                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${effectiveTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                    >
-                                        {t.icon} {t.label}
-                                    </button>
-                                ))}
-                        </div>
+                                .concat((currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: Shield, perm: 'broadcastUserIds' } as any] : [])
+                                .map(t => ({ value: t.key as string, label: t.label, icon: t.icon }))}
+                        />
                     )}
                     {/* Number selector dropdown ... hidden when parent (MobileSmsLayout) owns this UI */}
                     {!hideNumberSelector && smsEnabled && visibleNumbers.length > 0 ? (
@@ -12329,7 +12339,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                     value={activeNumberId || ''}
                                     onChange={e => setActiveNumberId(e.target.value)}
                                     title="Active Phone Number"
-                                    className="appearance-none text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                    className="appearance-none text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                                 >
                                     {visibleNumbers.map(num => (
                                         <option key={num.id} value={num.id}>
@@ -12344,7 +12354,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             {(currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) && (
                                 <button
                                     onClick={() => setShowNumberManager(true)}
-                                    className="p-1.5 rounded-xl text-slate-500 hover:text-violet-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm"
+                                    className="p-1.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm"
                                     title="Manage Numbers"
                                 >
                                     <Settings size={14} />
@@ -12533,7 +12543,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <div className="flex items-center gap-2">
-                                <PlusCircle size={16} className="text-violet-500" />
+                                <PlusCircle size={16} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
                                 <h2 className="text-base font-black text-slate-900 dark:text-white">Add Phone Number</h2>
                             </div>
                             <button onClick={() => setShowAddNumber(false)} title="Close" className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition">

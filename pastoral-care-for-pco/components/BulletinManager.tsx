@@ -9,8 +9,9 @@ import { PcoImportModal } from './PcoImportModal';
 import { fetchContentRecommendations, generateCampaignContent } from '../services/geminiService';
 import {
   Plus, ArrowLeft, Trash2, Globe, Lock, Clock, Loader2, Link, Copy,
-  Eye, Monitor, Smartphone, Pencil, CheckCircle, X, Mail, Sparkles, Send,
+  Eye, Monitor, Smartphone, Pencil, CheckCircle, X, Mail, Sparkles, Send, Newspaper,
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from './tool-shell';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -85,14 +86,14 @@ const NewBulletinModal: React.FC<{
           onChange={e => setTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && title.trim()) onConfirm(title.trim()); }}
           autoFocus
-          className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+          className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
         />
         <div className="flex justify-end gap-2">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Cancel</button>
           <button
             onClick={() => title.trim() && onConfirm(title.trim())}
             disabled={!title.trim()}
-            className="px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
           >
             Create
           </button>
@@ -123,7 +124,7 @@ const ImportFromEmailModal: React.FC<{
             placeholder="Search campaigns…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
@@ -135,7 +136,7 @@ const ImportFromEmailModal: React.FC<{
                 <button
                   key={c.id}
                   onClick={() => onSelect(c)}
-                  className="w-full text-left px-4 py-3 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-700 transition"
+                  className="w-full text-left px-4 py-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700 transition"
                 >
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">{c.name || c.subject}</div>
                   {c.subject && c.name && <div className="text-xs text-slate-400 mt-0.5">{c.subject}</div>}
@@ -593,7 +594,7 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
               setBulletins(prev => prev.map(b => b.id === updated.id ? updated : b));
               try { await firestore.updateBulletin(activeBulletin.id, { title }); } catch { /* non-fatal */ }
             }}
-            className="flex-1 min-w-0 text-sm font-bold text-slate-900 dark:text-white bg-transparent border-none outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1"
+            className="flex-1 min-w-0 text-sm font-bold text-slate-900 dark:text-white bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
           />
 
           {/* Saving indicator */}
@@ -641,8 +642,8 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
             onClick={handleTogglePublish}
             className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
               isPublished
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700'
             }`}
           >
             {isPublished ? <Lock size={12} /> : <Globe size={12} />}
@@ -695,7 +696,11 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
             <div className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-950 px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
               <Eye size={14} className="text-slate-400" />
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Preview</span>
-              <span className="ml-auto text-xs text-slate-400">{previewMode === 'mobile' ? '📱 Mobile' : '🖥 Desktop'}</span>
+              <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
+                {previewMode === 'mobile'
+                  ? <><Smartphone size={12} aria-hidden="true" /> Mobile</>
+                  : <><Monitor size={12} aria-hidden="true" /> Desktop</>}
+              </span>
             </div>
             <div className="flex-1 p-4 flex justify-center">
               <div
@@ -783,69 +788,59 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
         </div>
       )}
 
-      {/* Header */}
-      <div className="shrink-0 px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            📋 Digital Bulletin
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Build and share responsive web pages for your congregation.
-          </p>
-        </div>
-        <button
-          onClick={handleDraftWeeklyBulletin}
-          disabled={draftingAi}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold shadow-sm transition disabled:opacity-50"
-          title="Draft this coming Sunday's digital bulletin with AI recommendations"
-        >
-          {draftingAi ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-          Draft This Week's Bulletin
-        </button>
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-        >
-          <Mail size={14} /> Import Email
-        </button>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition"
-        >
-          <Plus size={16} /> New Bulletin
-        </button>
-      </div>
-
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto">
+        <ToolPage>
+        {/* Header */}
+        <ToolHeader
+          tool="bulletin"
+          description="Build and share responsive web pages for your congregation."
+          actions={
+            <>
+              <ToolButton
+                variant="secondary"
+                onClick={handleDraftWeeklyBulletin}
+                disabled={draftingAi}
+                title="Draft this coming Sunday's digital bulletin with AI recommendations"
+              >
+                {draftingAi
+                  ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  : <Sparkles size={16} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" />}
+                Draft This Week's Bulletin
+              </ToolButton>
+              <ToolButton variant="secondary" icon={Mail} onClick={() => setShowImportModal(true)}>
+                Import Email
+              </ToolButton>
+              <ToolButton variant="primary" icon={Plus} onClick={() => setShowNewModal(true)}>
+                New Bulletin
+              </ToolButton>
+            </>
+          }
+        />
+
         {loading ? (
           <div className="flex items-center justify-center h-40 text-slate-400">
             <Loader2 size={24} className="animate-spin" />
           </div>
         ) : bulletins.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <div className="text-6xl mb-4">📋</div>
-            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No bulletins yet</h3>
-            <p className="text-sm text-center max-w-xs mb-6">
-              Create your first digital bulletin to share with your congregation as a web page.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleDraftWeeklyBulletin}
-                disabled={draftingAi}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold shadow-sm transition disabled:opacity-50"
-              >
-                {draftingAi ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                Draft This Week's Bulletin with AI
-              </button>
-              <button
-                onClick={() => setShowNewModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              >
-                <Plus size={16} /> Blank Bulletin
-              </button>
-            </div>
-          </div>
+          <ToolEmptyState
+            icon={Newspaper}
+            title="No bulletins yet"
+            description="Create your first digital bulletin to share with your congregation as a web page."
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <ToolButton variant="primary" onClick={handleDraftWeeklyBulletin} disabled={draftingAi}>
+                  {draftingAi
+                    ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    : <Sparkles size={16} aria-hidden="true" />}
+                  Draft This Week's Bulletin with AI
+                </ToolButton>
+                <ToolButton variant="secondary" icon={Plus} onClick={() => setShowNewModal(true)}>
+                  Blank Bulletin
+                </ToolButton>
+              </div>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {bulletins.map(b => (
@@ -860,6 +855,7 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
             ))}
           </div>
         )}
+        </ToolPage>
       </div>
 
       {/* Modals */}

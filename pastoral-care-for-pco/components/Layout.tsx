@@ -4,10 +4,11 @@ import {
   LayoutDashboard, Globe, Users, FolderKanban, Music, HandCoins, HeartHandshake,
   TrendingUp, Wrench, SlidersHorizontal, Home, AlertTriangle, FileText, Palette,
   MapPin, User as UserIcon, Calendar, Smartphone, BarChart3, Briefcase, Church as ChurchIcon,
-  Building2, Phone, ClipboardList, Pencil, Settings, Mail, MessageSquare, Zap,
-  Newspaper, StickyNote, QrCode, Folder, Sparkles, Brain, Compass, UserMinus, ChevronDown, LogOut, Target, Landmark,
+  Building2, Phone, ClipboardList, Pencil, Settings, MessageSquare,
+  Sparkles, Brain, Compass, ChevronDown, LogOut, Target, Landmark,
   type LucideIcon,
 } from 'lucide-react';
+import { TOOL_META, type ToolId } from './tool-shell';
 import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
@@ -254,20 +255,22 @@ const Layout: React.FC<LayoutProps> = ({
       });
     }
     if (hasPermission('tools')) {
+      // Icons and labels come from the shared TOOL_META so each tool is recognisable.
+      const tool = (id: ToolId) => ({ icon: TOOL_META[id].icon, label: TOOL_META[id].label });
       const toolItems: NavLeaf[] = [
-        { view: 'tools-team-chat',     icon: MessageSquare, label: 'Team Chat'     },
-        { view: 'tools-emails',        icon: Mail,          label: 'Emails'        },
-        { view: 'tools-sms-inbox',     icon: MessageSquare, label: 'SMS',          activeMatch: v => v.startsWith('tools-sms') },
-        { view: 'tools-workflows',     icon: Zap,           label: 'Workflows'     },
-        { view: 'tools-polls',         icon: BarChart3,     label: 'Polls'         },
-        { view: 'tools-bulletin',      icon: Newspaper,     label: 'Bulletins'     },
-        { view: 'tools-notes',         icon: StickyNote,    label: 'Notes'         },
-        { view: 'tools-website',       icon: Globe,         label: 'Website'       },
-        { view: 'tools-qrcodes',       icon: QrCode,        label: 'QR Codes'      },
-        { view: 'tools-files',         icon: Folder,        label: 'Files'         },
-        { view: 'tools-forms',         icon: FileText,      label: 'Forms'         },
-        { view: 'tools-church-helper', icon: Sparkles,      label: 'Church Helper' },
-        { view: 'tools-unsubscribers', icon: UserMinus,     label: 'Unsubscribers' },
+        { view: 'tools-team-chat',     ...tool('team-chat')     },
+        { view: 'tools-emails',        ...tool('emails')        },
+        { view: 'tools-sms-inbox',     ...tool('sms'),          activeMatch: (v: string) => v.startsWith('tools-sms') },
+        { view: 'tools-workflows',     ...tool('workflows')     },
+        { view: 'tools-polls',         ...tool('polls')         },
+        { view: 'tools-bulletin',      ...tool('bulletin')      },
+        { view: 'tools-notes',         ...tool('notes')         },
+        { view: 'tools-website',       ...tool('website')       },
+        { view: 'tools-qrcodes',       ...tool('qrcodes')       },
+        { view: 'tools-files',         ...tool('files')         },
+        { view: 'tools-forms',         ...tool('forms')         },
+        { view: 'tools-church-helper', ...tool('church-helper') },
+        { view: 'tools-unsubscribers', ...tool('unsubscribers') },
       ].filter(item => hasPermission(item.view));
       entries.push({ kind: 'menu', key: 'tools', icon: Wrench, label: 'Tools', prefix: 'tools', items: toolItems });
     }
@@ -565,7 +568,7 @@ const Layout: React.FC<LayoutProps> = ({
                     onClick={() => onNavigate(item.view)}
                     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition shrink-0 ${
                       currentView === item.view
-                        ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                   >
@@ -588,7 +591,7 @@ const Layout: React.FC<LayoutProps> = ({
                     onClick={() => onNavigate(item.view)}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition shrink-0 ${
                       currentView === item.view
-                        ? 'border-violet-600 text-violet-600 dark:text-violet-400'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                   >

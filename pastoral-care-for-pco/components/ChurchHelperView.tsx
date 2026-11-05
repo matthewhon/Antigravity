@@ -14,6 +14,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Church, User } from '../types';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
+import {
+    Plus, Play, Smartphone, Mail, Repeat, ClipboardList, Baby, Check, Users, User as UserIcon,
+    Bot, RefreshCw, Target, WandSparkles, TriangleAlert, Sparkles,
+} from 'lucide-react';
+import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from './tool-shell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +113,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string 
 };
 
 function StatusBadge({ status }: { status: string }) {
-    const cfg = STATUS_CONFIG[status] || { label: status, color: 'text-slate-500 bg-slate-100', dot: 'bg-slate-400' };
+    const cfg = STATUS_CONFIG[status] || { label: status, color: 'text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400', dot: 'bg-slate-400' };
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.color}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
@@ -178,10 +183,10 @@ function SessionDetailModal({ session, onClose, onRetry }: {
                                 <div className={`max-w-xs px-4 py-2.5 rounded-2xl text-sm ${
                                     msg.role === 'agent'
                                         ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm'
-                                        : 'bg-emerald-600 text-white rounded-tr-sm'
+                                        : 'bg-indigo-600 text-white rounded-tr-sm'
                                 }`}>
                                     <p className="leading-relaxed">{msg.text}</p>
-                                    <p className={`text-xs mt-1 ${msg.role === 'agent' ? 'text-slate-400' : 'text-emerald-200'}`}>
+                                    <p className={`text-xs mt-1 ${msg.role === 'agent' ? 'text-slate-400' : 'text-indigo-200'}`}>
                                         {msg.channel?.toUpperCase()} · {timeAgo(msg.ts)}
                                     </p>
                                 </div>
@@ -216,11 +221,11 @@ function SessionDetailModal({ session, onClose, onRetry }: {
                                     <div key={child.pcoPersonId} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <p className="font-semibold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                                                <span>👶</span> {child.personName}
+                                                <Baby size={12} aria-hidden="true" /> {child.personName}
                                             </p>
                                             {child.remainingFields.length === 0 ? (
-                                                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
-                                                    ✓ All Updated
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                                                    <Check size={10} aria-hidden="true" /> All Updated
                                                 </span>
                                             ) : (
                                                 <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
@@ -262,7 +267,7 @@ function SessionDetailModal({ session, onClose, onRetry }: {
                     {(session.status === 'max_attempts' || session.status === 'failed') && (
                         <button
                             onClick={() => { onRetry(session.id); onClose(); }}
-                            className="w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition"
+                            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition"
                         >
                             Retry Outreach
                         </button>
@@ -459,7 +464,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="e.g. Spring 2025 Directory & Children Update"
-                    className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </div>
 
@@ -472,7 +477,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     <select
                         value={pcoListId}
                         onChange={e => setPcoListId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         <option value="">Select a PCO list…</option>
                         {pcoLists.map((l: any) => (
@@ -488,15 +493,15 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Target Audience Scope</label>
                 <div className="grid grid-cols-3 gap-2.5">
                     {[
-                        { id: 'adults_only', label: '👤 Adults Only', desc: 'Update info for the adult member directly' },
-                        { id: 'children_only', label: '👶 Children via Parents', desc: 'Reach parents to update child details' },
-                        { id: 'household_all', label: '👨‍👩‍👧‍👦 Parents & Children', desc: 'Update both parent and child info' },
+                        { id: 'adults_only', label: 'Adults Only', icon: UserIcon, desc: 'Update info for the adult member directly' },
+                        { id: 'children_only', label: 'Children via Parents', icon: Baby, desc: 'Reach parents to update child details' },
+                        { id: 'household_all', label: 'Parents & Children', icon: Users, desc: 'Update both parent and child info' },
                     ].map(t => (
                         <label
                             key={t.id}
                             className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${
                                 targetScope === t.id
-                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
                                     : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                             }`}
                         >
@@ -507,10 +512,10 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                     value={t.id}
                                     checked={targetScope === t.id}
                                     onChange={() => setTargetScope(t.id as any)}
-                                    className="text-emerald-600 focus:ring-emerald-500"
+                                    className="text-indigo-600 focus:ring-indigo-500"
                                 />
-                                <span className={`text-xs font-semibold ${targetScope === t.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                    {t.label}
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${targetScope === t.id ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                    <t.icon size={14} aria-hidden="true" /> {t.label}
                                 </span>
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-5">
@@ -535,16 +540,16 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                     {FIELD_CATALOG.filter(f => group.keys.includes(f.key)).map(field => (
                                         <label key={field.key} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
                                             selectedFields.includes(field.key)
-                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
                                                 : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                                         }`}>
                                             <input
                                                 type="checkbox"
                                                 checked={selectedFields.includes(field.key)}
                                                 onChange={() => toggleField(field.key)}
-                                                className="rounded text-emerald-600 focus:ring-emerald-500"
+                                                className="rounded text-indigo-600 focus:ring-indigo-500"
                                             />
-                                            <span className={`text-sm ${selectedFields.includes(field.key) ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            <span className={`text-sm ${selectedFields.includes(field.key) ? 'text-indigo-700 dark:text-indigo-400 font-medium' : 'text-slate-700 dark:text-slate-300'}`}>
                                                 {field.label}
                                             </span>
                                         </label>
@@ -560,7 +565,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             {targetScope !== 'adults_only' && (
                 <div className="space-y-3 p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl border border-purple-200/60 dark:border-purple-800/40">
                     <div className="flex items-center gap-2">
-                        <span className="text-base">👶</span>
+                        <Baby size={16} className="text-purple-700 dark:text-purple-300 shrink-0" aria-hidden="true" />
                         <div>
                             <label className="text-sm font-semibold text-purple-900 dark:text-purple-300">Child Fields to Collect from Parents</label>
                             <p className="text-xs text-purple-700/80 dark:text-purple-400">These fields will be requested for each child found in the parent's household.</p>
@@ -571,7 +576,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             <label key={field.key} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
                                 selectedChildFields.includes(field.key)
                                     ? 'border-purple-500 bg-purple-100/50 dark:bg-purple-900/30'
-                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300'
+                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                             }`}>
                                 <input
                                     type="checkbox"
@@ -592,7 +597,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outreach Interaction Mode</label>
                 <div className="grid grid-cols-2 gap-3">
-                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'conversational' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'conversational' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -600,17 +605,17 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 value="conversational"
                                 checked={mode === 'conversational'}
                                 onChange={() => setMode('conversational')}
-                                className="text-emerald-600 focus:ring-emerald-500"
+                                className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className={`text-sm font-semibold ${mode === 'conversational' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                🤖 AI Conversation
+                            <span className={`text-sm font-semibold ${mode === 'conversational' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                <Bot size={14} className="inline -mt-0.5 mr-1" aria-hidden="true" />AI Conversation
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
                             Member updates info naturally by chatting with the AI agent over SMS or email.
                         </p>
                     </label>
-                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'form_link' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'form_link' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -618,10 +623,10 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 value="form_link"
                                 checked={mode === 'form_link'}
                                 onChange={() => setMode('form_link')}
-                                className="text-emerald-600 focus:ring-emerald-500"
+                                className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className={`text-sm font-semibold ${mode === 'form_link' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                📋 Update Form Link
+                            <span className={`text-sm font-semibold ${mode === 'form_link' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                <ClipboardList size={14} className="inline -mt-0.5 mr-1" aria-hidden="true" />Update Form Link
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
@@ -635,7 +640,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Field Behavior</label>
                 <div className="grid grid-cols-2 gap-3">
-                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'confirm_all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'confirm_all' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -643,17 +648,17 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 value="confirm_all"
                                 checked={fieldBehavior === 'confirm_all'}
                                 onChange={() => setFieldBehavior('confirm_all')}
-                                className="text-emerald-600 focus:ring-emerald-500"
+                                className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className={`text-sm font-semibold ${fieldBehavior === 'confirm_all' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                🔄 Confirm & Update All
+                            <span className={`text-sm font-semibold ${fieldBehavior === 'confirm_all' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                <RefreshCw size={14} className="inline -mt-0.5 mr-1" aria-hidden="true" />Confirm & Update All
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
                             Contacts everyone on the list to verify existing details and collect any blanks.
                         </p>
                     </label>
-                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'only_blank' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${fieldBehavior === 'only_blank' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
                         <div className="flex items-center gap-2">
                             <input
                                 type="radio"
@@ -661,10 +666,10 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 value="only_blank"
                                 checked={fieldBehavior === 'only_blank'}
                                 onChange={() => setFieldBehavior('only_blank')}
-                                className="text-emerald-600 focus:ring-emerald-500"
+                                className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className={`text-sm font-semibold ${fieldBehavior === 'only_blank' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                🎯 Only Missing Fields
+                            <span className={`text-sm font-semibold ${fieldBehavior === 'only_blank' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                <Target size={14} className="inline -mt-0.5 mr-1" aria-hidden="true" />Only Missing Fields
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
@@ -683,7 +688,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             type="checkbox"
                             checked={smsEnabled}
                             onChange={e => setSmsEnabled(e.target.checked)}
-                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
                         SMS (Primary)
                     </label>
@@ -692,7 +697,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             type="checkbox"
                             checked={emailEnabled}
                             onChange={e => setEmailEnabled(e.target.checked)}
-                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
                         />
                         Email (Fallback)
                     </label>
@@ -709,7 +714,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                     <div className="space-y-1">
@@ -717,7 +722,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                         <select
                             value={intervalDays}
                             onChange={e => setIntervalDays(Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value={1}>Every 1 day</option>
                             <option value={2}>Every 2 days</option>
@@ -733,7 +738,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                         <select
                             value={maxAttempts}
                             onChange={e => setMaxAttempts(Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
                             <option value={1}>1 attempt</option>
                             <option value={2}>2 attempts</option>
@@ -748,7 +753,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             type="time"
                             value={sendWindowStart}
                             onChange={e => setSendWindowStart(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                     <div className="space-y-1">
@@ -757,7 +762,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             type="time"
                             value={sendWindowEnd}
                             onChange={e => setSendWindowEnd(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                 </div>
@@ -772,9 +777,9 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     <button
                         type="button"
                         onClick={handleSuggestMessage}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition shadow-sm"
                     >
-                        🪄 Suggest Message
+                        <WandSparkles size={12} aria-hidden="true" /> Suggest Message
                     </button>
                 </div>
                 <textarea
@@ -782,7 +787,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     onChange={e => setIntroMessage(e.target.value)}
                     rows={4}
                     placeholder="Hi {{first_name}}! This is {{church_name}}. We're updating our records for {{children_names}} (Birthday, School Grade). Reply to help us keep their profiles up to date!"
-                    className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
                 <div>
                     <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Available Merge Tags (click to insert):</p>
@@ -803,7 +808,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                                 key={t.tag}
                                 type="button"
                                 onClick={() => setIntroMessage(prev => (prev ? prev + ' ' : '') + t.tag)}
-                                className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-emerald-700 dark:text-emerald-400 transition"
+                                className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:border-indigo-300 dark:hover:border-indigo-700 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-indigo-700 dark:text-indigo-400 transition"
                             >
                                 {t.tag} <span className="font-sans text-[10px] text-slate-400">({t.label})</span>
                             </button>
@@ -815,7 +820,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             {/* Validation Error Feedback */}
             {errorMsg && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
-                    <span>⚠️</span>
+                    <TriangleAlert size={14} className="shrink-0" aria-hidden="true" />
                     <span>{errorMsg}</span>
                 </div>
             )}
@@ -826,7 +831,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     type="button"
                     onClick={() => handleSave('active')}
                     disabled={isSaving}
-                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                    className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
                 >
                     {isSaving ? (
                         <>
@@ -834,7 +839,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             Saving…
                         </>
                     ) : (
-                        '✨ Save & Activate'
+                        <><Sparkles size={16} aria-hidden="true" /> Save & Activate</>
                     )}
                 </button>
                 <button
@@ -889,7 +894,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
         <div className="flex flex-col h-full">
             {/* Header */}
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:underline mb-3">
+                <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-600 dark:text-indigo-400 hover:underline mb-3">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     All Campaigns
                 </button>
@@ -910,9 +915,9 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                                     } catch { /* ignore */ }
                                     await loadSessions();
                                 }}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition shadow-sm flex items-center gap-1.5"
                             >
-                                🔄 Trigger Sync
+                                <RefreshCw size={12} aria-hidden="true" /> Trigger Sync
                             </button>
                         )}
                     </div>
@@ -974,7 +979,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                                             <p className="font-semibold text-slate-900 dark:text-white">{session.personName}</p>
                                             {session.children && session.children.length > 0 && (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50" title={session.children.map(c => c.personName).join(', ')}>
-                                                    👶 {session.children.length} {session.children.length === 1 ? 'child' : 'children'}
+                                                    <Baby size={12} aria-hidden="true" /> {session.children.length} {session.children.length === 1 ? 'child' : 'children'}
                                                 </span>
                                             )}
                                         </div>
@@ -985,7 +990,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                                     <td className="px-4 py-4 text-slate-500 dark:text-slate-400">{timeAgo(session.lastContactedAt)}</td>
                                     <td className="px-4 py-4">
                                         {session.remainingFields.length === 0 ? (
-                                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium">✓ All collected</span>
+                                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium"><Check size={12} aria-hidden="true" /> All collected</span>
                                         ) : (
                                             <span className="text-xs text-slate-500 dark:text-slate-400">
                                                 {session.remainingFields.slice(0,3).join(', ')}{session.remainingFields.length > 3 ? ` +${session.remainingFields.length - 3}` : ''}
@@ -995,7 +1000,7 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                                     <td className="px-6 py-4 text-right">
                                         <button
                                             onClick={() => setSelectedSession(session)}
-                                            className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition"
+                                            className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
                                         >
                                             View
                                         </button>
@@ -1111,62 +1116,46 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
     // Campaign list
     return (
         <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl">✨</span>
-                            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Church Helper</h1>
-                        </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Automated outreach to keep your PCO directory up to date — via SMS and email
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                        New Campaign
-                    </button>
-                </div>
-            </div>
-
             {/* Content */}
             <div className="flex-1 overflow-auto">
+              <ToolPage>
+                <ToolHeader
+                    tool="church-helper"
+                    description="Automated outreach to keep your PCO directory up to date — via SMS and email"
+                    actions={
+                        <ToolButton variant="primary" icon={Plus} onClick={() => setShowForm(true)}>
+                            New Campaign
+                        </ToolButton>
+                    }
+                />
                 {loading ? (
-                    <div className="flex items-center justify-center py-20 text-slate-400">
+                    <div className="flex items-center justify-center py-20 text-slate-400 dark:text-slate-500">
                         <svg className="w-6 h-6 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         Loading campaigns…
                     </div>
                 ) : campaigns.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-                        <div className="text-6xl mb-4">📋</div>
-                        <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-2">No campaigns yet</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-                            Create your first Church Helper campaign to start collecting updated contact info from your PCO members automatically.
-                        </p>
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                            Create your first campaign
-                        </button>
-                    </div>
+                    <ToolEmptyState
+                        icon={ClipboardList}
+                        title="No campaigns yet"
+                        description="Create your first Church Helper campaign to start collecting updated contact info from your PCO members automatically."
+                        action={
+                            <ToolButton variant="primary" icon={Plus} onClick={() => setShowForm(true)}>
+                                Create your first campaign
+                            </ToolButton>
+                        }
+                    />
                 ) : (
-                    <div className="p-6 space-y-4">
+                    <div className="space-y-4">
                         {campaigns.map(campaign => (
                             <div
                                 key={campaign.id}
                                 onClick={() => setSelectedCampaign(campaign)}
-                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-600 transition group"
+                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 transition group"
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-bold text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">{campaign.name}</h3>
+                                            <h3 className="font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{campaign.name}</h3>
                                             <StatusBadge status={campaign.status} />
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -1177,15 +1166,15 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
                                         {campaign.status !== 'active' && (
                                             <button
                                                 onClick={(e) => handleStartCampaign(campaign, e)}
-                                                className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold flex items-center gap-1 shadow-sm"
+                                                className="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-semibold flex items-center gap-1 shadow-sm"
                                             >
-                                                ▶ Start Now
+                                                <Play size={12} aria-hidden="true" /> Start Now
                                             </button>
                                         )}
                                         {campaign.status === 'active' && (
                                             <button
                                                 onClick={(e) => handlePauseResume(campaign, e)}
-                                                className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition font-medium rounded-lg"
+                                                className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition font-medium rounded-lg"
                                             >
                                                 Pause
                                             </button>
@@ -1206,14 +1195,20 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
                                 </div>
                                 <ProgressBar total={campaign.stats.total} complete={campaign.stats.complete} />
                                 <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 dark:text-slate-500">
-                                    <span>📱 {campaign.channels?.sms ? 'SMS' : '—'}{campaign.channels?.email ? ' · ✉️ Email' : ''}</span>
-                                    <span>↻ Every {campaign.schedule?.intervalDays ?? 3}d · max {campaign.schedule?.maxAttempts ?? 3} attempts</span>
+                                    <span className="inline-flex items-center gap-1">
+                                        <Smartphone size={12} aria-hidden="true" /> {campaign.channels?.sms ? 'SMS' : '—'}
+                                        {campaign.channels?.email && (
+                                            <> · <Mail size={12} aria-hidden="true" /> Email</>
+                                        )}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1"><Repeat size={12} aria-hidden="true" /> Every {campaign.schedule?.intervalDays ?? 3}d · max {campaign.schedule?.maxAttempts ?? 3} attempts</span>
                                     <span className="ml-auto">{campaign.stats.complete}/{campaign.stats.total} complete</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
+              </ToolPage>
             </div>
         </div>
     );

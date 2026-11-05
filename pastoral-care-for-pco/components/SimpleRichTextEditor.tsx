@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { Bold, Italic, List, ListOrdered, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import { PcoCardNode } from './notes/pcoCard';
 
 export interface SimpleRichTextEditorRef {
     insertHtml: (html: string) => void;
@@ -23,6 +24,8 @@ export const SimpleRichTextEditor = forwardRef<SimpleRichTextEditorRef, {
                 inline: false,
                 allowBase64: true,
             }),
+            // Keeps Planning Center cards (Notes) intact instead of flattening them to text.
+            PcoCardNode,
         ],
         content: value,
         onUpdate: ({ editor }) => {

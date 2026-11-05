@@ -26,6 +26,7 @@ import {
 import { generateTeamChatAiReply } from '../../services/geminiService';
 import { ChatWidgetCard } from './ChatWidgetCard';
 import { ChatWidgetPickerModal } from './ChatWidgetPickerModal';
+import { ToolHeader } from '../tool-shell';
 import {
     MessageSquare,
     Lock,
@@ -52,6 +53,10 @@ import {
     Smile,
     ClipboardList,
     Info,
+    Bot,
+    ChartColumn,
+    Folder,
+    UserRound,
 } from 'lucide-react';
 
 interface TeamChatWorkspaceProps {
@@ -707,25 +712,25 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                 } flex-col bg-slate-50 dark:bg-slate-950 h-full`}
             >
                 {/* Sidebar Header */}
-                <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <MessageSquare size={14} className="text-indigo-600 dark:text-indigo-400" />
-                            <span>Team Chat</span>
-                        </h3>
-                        <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5 truncate">
-                            {church.name} • {churchUsers.length} Staff
-                        </p>
-                    </div>
-                    {isCompactDrawer && (
-                        <button
-                            type="button"
-                            onClick={() => setShowMobileSidebar(false)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
-                        >
-                            <X size={15} />
-                        </button>
-                    )}
+                <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800">
+                    <ToolHeader
+                        tool="team-chat"
+                        variant="compact"
+                        actions={
+                            isCompactDrawer ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMobileSidebar(false)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                                >
+                                    <X size={15} />
+                                </button>
+                            ) : undefined
+                        }
+                    />
+                    <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 truncate">
+                        {church.name} • {churchUsers.length} Staff
+                    </p>
                 </div>
 
                 {/* Scrollable Channel Lists */}
@@ -812,7 +817,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                         }`}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-sm shrink-0">{ch.icon || '💬'}</span>
+                                            <span className="text-sm shrink-0">{ch.icon || <MessageSquare size={14} aria-hidden="true" />}</span>
                                             <span className={`text-xs truncate ${unread || active ? 'font-black' : 'font-semibold'}`}>
                                                 {ch.name}
                                             </span>
@@ -835,9 +840,9 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setShowNewChannelModal(true)}
-                                    className="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 text-[11px] font-semibold text-slate-400 hover:text-indigo-600 hover:border-indigo-400 transition text-left"
+                                    className="w-full inline-flex items-center gap-1 py-2 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 text-[11px] font-semibold text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-400 transition text-left"
                                 >
-                                    + Start a topic or Giving-only thread
+                                    <Plus size={12} aria-hidden="true" /> Start a topic or Giving-only thread
                                 </button>
                             )}
                         </div>
@@ -959,7 +964,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                                        <span>{activeChannel.icon || (activeChannel.type === 'direct' ? '👤' : '#')}</span>
+                                        <span>{activeChannel.icon || (activeChannel.type === 'direct' ? <UserRound size={14} aria-hidden="true" /> : '#')}</span>
                                         <span>{getChannelDisplayName(activeChannel)}</span>
                                     </span>
 
@@ -1001,7 +1006,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                         <button
                             type="button"
                             onClick={() => setShowWidgetPicker(true)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold transition shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition shadow-2xs"
                             title="Add an interactive widget (e.g. Lapsed Donors) to this conversation"
                         >
                             <Sparkles size={12} />
@@ -1062,7 +1067,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                     onClick={() => setPendingWidget(pw)}
                                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 text-[11px] font-bold text-slate-800 dark:text-slate-200 hover:border-indigo-500 transition shrink-0"
                                 >
-                                    <span>{pw.icon || '📊'}</span>
+                                    <span className="inline-flex items-center">{pw.icon || <ChartColumn size={12} aria-hidden="true" />}</span>
                                     <span>{pw.title}</span>
                                     {pw.snapshot?.headlineValue && (
                                         <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
@@ -1080,14 +1085,14 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                     {messages.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto py-12 px-4">
                             <div className="w-14 h-14 rounded-3xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl mb-3 shadow-xs">
-                                {activeChannel?.icon || '💬'}
+                                {activeChannel?.icon || <MessageSquare size={24} aria-hidden="true" />}
                             </div>
                             <h4 className="text-base font-black text-slate-900 dark:text-white">
                                 Welcome to #{activeChannel ? getChannelDisplayName(activeChannel) : 'Team Chat'}
                             </h4>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                                 {activeChannel?.requiredArea === 'giving'
-                                    ? '🔒 This channel is restricted to staff with Giving permissions. Share the Lapsed Donors widget, coordinate donor outreach, or ask @PastorAI for insights.'
+                                    ? <><Lock size={11} className="inline -mt-0.5 mr-1 text-amber-500 dark:text-amber-400" aria-hidden="true" />This channel is restricted to staff with Giving permissions. Share the Lapsed Donors widget, coordinate donor outreach, or ask @PastorAI for insights.</>
                                     : 'Share messages, drop files & pictures, mention people with #Name, or embed live analytics widgets to collaborate with your team.'}
                             </p>
                             <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
@@ -1138,7 +1143,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                                 : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
                                         }`}
                                     >
-                                        {isAi ? '🤖' : msg.isAutomatedBriefing ? '📋' : (msg.senderName || '?').charAt(0)}
+                                        {isAi ? <Bot size={16} aria-hidden="true" /> : msg.isAutomatedBriefing ? <ClipboardList size={16} aria-hidden="true" /> : (msg.senderName || '?').charAt(0)}
                                     </div>
 
                                     {/* Message Content Column */}
@@ -1414,7 +1419,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                     >
                                         <div className="flex items-center gap-2">
                                             <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">
-                                                {st.id === 'pastor-ai' ? '🤖' : st.name.charAt(0)}
+                                                {st.id === 'pastor-ai' ? <Bot size={12} aria-hidden="true" /> : st.name.charAt(0)}
                                             </div>
                                             <span className="text-xs font-bold text-slate-900 dark:text-white">
                                                 @{st.name}
@@ -1472,7 +1477,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                     {pendingWidget && (
                         <div className="mb-2 px-3.5 py-2.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="text-lg shrink-0">{pendingWidget.icon || '📊'}</span>
+                                <span className="text-lg shrink-0 text-indigo-600 dark:text-indigo-400">{pendingWidget.icon || <ChartColumn size={18} aria-hidden="true" />}</span>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
@@ -1690,7 +1695,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-400 transition"
                                     >
-                                        <span className="text-sm">{att.kind === 'image' ? '🖼️' : '📄'}</span>
+                                        <span className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true">{att.kind === 'image' ? <ImageIcon size={14} /> : <FileText size={14} />}</span>
                                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1">
                                             {att.name}
                                         </span>
@@ -1742,14 +1747,14 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                 <h3 className="text-base font-black text-slate-900 dark:text-white">
                                     New Channel or Topic Thread
                                 </h3>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                     Restrict by ministry permission (e.g. Giving Only) or invite specific staff
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowNewChannelModal(false)}
-                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"
+                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400"
                             >
                                 <X size={15} />
                             </button>
@@ -1778,23 +1783,23 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                     onChange={e => setNewChanRequiredArea(e.target.value as any)}
                                     className="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
-                                    <option value="all">🌐 All Staff Members</option>
+                                    <option value="all">All Staff Members</option>
                                     {canReadArea(user, 'giving') && (
                                         <option value="giving">
-                                            🔒 Giving & Finance Access Only (Hides from non-Giving users)
+                                            Giving &amp; Finance Access Only (Hides from non-Giving users)
                                         </option>
                                     )}
                                     {canReadArea(user, 'care') && (
-                                        <option value="care">🔒 Pastoral Care Access Only</option>
+                                        <option value="care">Pastoral Care Access Only</option>
                                     )}
                                     {canReadArea(user, 'people') && (
-                                        <option value="people">🔒 People Access Only</option>
+                                        <option value="people">People Access Only</option>
                                     )}
                                     {canReadArea(user, 'groups') && (
-                                        <option value="groups">🔒 Groups Access Only</option>
+                                        <option value="groups">Groups Access Only</option>
                                     )}
                                     {canReadArea(user, 'services') && (
-                                        <option value="services">🔒 Services Access Only</option>
+                                        <option value="services">Services Access Only</option>
                                     )}
                                 </select>
                             </div>
@@ -1907,14 +1912,14 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                 <h3 className="text-base font-black text-slate-900 dark:text-white">
                                     New Direct Message
                                 </h3>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                     Select 1 or more staff members (role badges shown for permission clarity)
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowNewDmModal(false)}
-                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"
+                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400"
                             >
                                 <X size={15} />
                             </button>
@@ -2020,14 +2025,14 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                 <h3 className="text-base font-black text-slate-900 dark:text-white">
                                     Attach from Church File Library
                                 </h3>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                     Select any uploaded image or document from your church File Manager
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowFileLibraryModal(false)}
-                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"
+                                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400"
                             >
                                 <X size={15} />
                             </button>
@@ -2066,8 +2071,8 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
                                                     <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                                         {tf.originalName}
                                                     </p>
-                                                    <p className="text-[10px] text-slate-400">
-                                                        {tf.folder ? `📁 ${tf.folder} • ` : ''}
+                                                    <p className="flex items-center gap-1 text-[10px] text-slate-400">
+                                                        {tf.folder && <><Folder size={10} aria-hidden="true" />{`${tf.folder} • `}</>}
                                                         {Math.max(1, Math.round((tf.sizeBytes || 0) / 1024))} KB
                                                     </p>
                                                 </div>

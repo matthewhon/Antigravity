@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import QRCode from 'qrcode';
 import {
   QrCode, Plus, Trash2, Download, Copy, Link2, Mail, Phone, MessageSquare,
-  Globe, User, Wifi, Calendar, ExternalLink, Check, Loader2, Pencil, X, Search
+  Globe, User, Wifi, Calendar, ExternalLink, Check, Loader2, Pencil, X, Search,
+  TriangleAlert, Smartphone, FileText, Newspaper
 } from 'lucide-react';
+import { ToolHeader, ToolButton } from './tool-shell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -183,8 +185,8 @@ const QrPreview: React.FC<{
 
   if (error) {
     return (
-      <div className="flex items-center justify-center w-full aspect-square bg-red-50 dark:bg-red-900/20 rounded-xl text-red-500 text-sm p-4 text-center">
-        ⚠️ {error}
+      <div className="flex items-center justify-center gap-1.5 w-full aspect-square bg-red-50 dark:bg-red-900/20 rounded-xl text-red-500 dark:text-red-400 text-sm p-4 text-center">
+        <TriangleAlert size={15} className="shrink-0" aria-hidden="true" /> {error}
       </div>
     );
   }
@@ -371,27 +373,31 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
       <div className="w-72 shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col">
         {/* Header */}
         <div className="px-4 pt-5 pb-3 shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <QrCode size={16} className="text-violet-500" /> QR Codes
-            </h2>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
-              title="Create new QR Code"
-            >
-              <Plus size={13} /> New
-            </button>
-          </div>
+          <ToolHeader
+            tool="qrcodes"
+            variant="compact"
+            className="mb-3"
+            actions={
+              <ToolButton
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={handleNew}
+                title="Create new QR Code"
+              >
+                New
+              </ToolButton>
+            }
+          />
           {/* Search */}
           <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
               type="text"
               placeholder="Search saved…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
@@ -414,7 +420,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                   onClick={() => loadIntoEditor(q)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition group ${
                     activeId === q.id && !isCreating
-                      ? 'bg-violet-50 dark:bg-violet-900/20 ring-1 ring-violet-200 dark:ring-violet-800'
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -452,8 +458,8 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
       {/* ── Main Panel ───────────────────────────────────────────────────── */}
       {!showEditor ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950 p-8">
-          <div className="w-20 h-20 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-            <QrCode size={40} className="text-violet-500" />
+          <div className="w-20 h-20 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+            <QrCode size={40} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" />
           </div>
           <div className="text-center">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">QR Code Generator</h3>
@@ -461,12 +467,9 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
               Create QR codes for links, contacts, WiFi credentials, and more. Select a saved code or create a new one.
             </p>
           </div>
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-          >
-            <Plus size={16} /> Create New QR Code
-          </button>
+          <ToolButton variant="primary" icon={Plus} onClick={handleNew}>
+            Create New QR Code
+          </ToolButton>
         </div>
       ) : (
         <div className="flex-1 flex overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -479,7 +482,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                 {editingLabel ? (
                   <input
                     autoFocus
-                    className="w-full text-sm font-bold border-b-2 border-violet-500 bg-transparent text-slate-900 dark:text-white outline-none pb-0.5"
+                    className="w-full text-sm font-bold border-b-2 border-indigo-500 bg-transparent text-slate-900 dark:text-white outline-none pb-0.5"
                     value={label}
                     onChange={e => setLabel(e.target.value)}
                     onBlur={() => setEditingLabel(false)}
@@ -503,7 +506,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                 <button
                   onClick={handleSave}
                   disabled={!qrValue.trim()}
-                  className="px-3 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-lg transition"
+                  className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-700 dark:disabled:text-slate-500 text-white rounded-lg transition"
                 >
                   {isCreating ? 'Save' : 'Update'}
                 </button>
@@ -523,8 +526,8 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                       onClick={() => { setSelectedType(t.type); setFields({}); }}
                       className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-[10px] font-semibold border transition ${
                         selectedType === t.type
-                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
-                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-violet-300 dark:hover:border-violet-700'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-700'
                       }`}
                     >
                       {t.icon}
@@ -552,7 +555,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                       placeholder={f.placeholder}
                       value={fields[f.key] || ''}
                       onChange={e => setField(f.key, e.target.value)}
-                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300 dark:placeholder:text-slate-500"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-300 dark:placeholder:text-slate-500"
                     />
                   </div>
                 ))}
@@ -580,7 +583,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                           type="text"
                           value={fgColor}
                           onChange={e => setFgColor(e.target.value)}
-                          className="flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                          className="flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                         />
                       </div>
                     </div>
@@ -598,7 +601,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                           type="text"
                           value={bgColor}
                           onChange={e => setBgColor(e.target.value)}
-                          className="flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                          className="flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                         />
                       </div>
                     </div>
@@ -622,8 +625,8 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                           onClick={() => { setFgColor(p.fg); setBgColor(p.bg); }}
                           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition ${
                             fgColor === p.fg && bgColor === p.bg
-                              ? 'ring-2 ring-violet-500 border-violet-300'
-                              : 'border-slate-200 dark:border-slate-600 hover:border-violet-300'
+                              ? 'ring-2 ring-indigo-500 border-indigo-300'
+                              : 'border-slate-200 dark:border-slate-600 hover:border-indigo-300'
                           }`}
                           style={{ backgroundColor: p.bg, color: p.fg }}
                         >
@@ -645,7 +648,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                       step={50}
                       value={size}
                       onChange={e => setSize(Number(e.target.value))}
-                      className="w-full accent-violet-600"
+                      className="w-full accent-indigo-600"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
                       <span>150px</span><span>600px</span>
@@ -666,7 +669,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                     </div>
                     <button
                       onClick={handleCopy}
-                      className="absolute top-2 right-2 p-1 text-slate-400 hover:text-violet-600 rounded transition"
+                      className="absolute top-2 right-2 p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition"
                       title="Copy value"
                     >
                       {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
@@ -717,7 +720,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                   <button
                     onClick={handleDownloadPng}
                     disabled={isDownloading}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 text-white rounded-xl transition shadow-sm"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl transition shadow-sm"
                   >
                     {isDownloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                     Download PNG
@@ -733,7 +736,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                 </div>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition"
+                  className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
                 >
                   {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                   {copied ? 'Copied!' : 'Copy encoded value'}
@@ -745,7 +748,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                     href={fields.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 transition"
+                    className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
                   >
                     <ExternalLink size={12} /> Open Link
                   </a>
@@ -755,15 +758,15 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
 
             {/* Tips */}
             <div className="max-w-sm text-center">
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-                {selectedType === 'wifi' && '📱 Scan to instantly connect to your church WiFi — no typing needed.'}
-                {selectedType === 'url'  && '🔗 Link to your website, giving page, event registration, or any URL.'}
-                {selectedType === 'email' && '✉️ Let visitors email you directly by scanning. Great for prayer requests.'}
-                {selectedType === 'sms'  && '💬 Allow people to text your church number instantly.'}
-                {selectedType === 'vcard' && '👤 Share a digital contact card for your pastor or staff.'}
-                {selectedType === 'text'  && '📝 Encode any plain text — service times, addresses, announcements.'}
-                {selectedType === 'phone' && '📞 Link directly to call your church phone number.'}
-                {selectedType === 'bulletin' && '📰 Always links to your most recently published Digital Bulletin.'}
+              <p className="flex items-start justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                {selectedType === 'wifi' && <><Smartphone size={13} className="shrink-0 mt-px" aria-hidden="true" />Scan to instantly connect to your church WiFi — no typing needed.</>}
+                {selectedType === 'url'  && <><Link2 size={13} className="shrink-0 mt-px" aria-hidden="true" />Link to your website, giving page, event registration, or any URL.</>}
+                {selectedType === 'email' && <><Mail size={13} className="shrink-0 mt-px" aria-hidden="true" />Let visitors email you directly by scanning. Great for prayer requests.</>}
+                {selectedType === 'sms'  && <><MessageSquare size={13} className="shrink-0 mt-px" aria-hidden="true" />Allow people to text your church number instantly.</>}
+                {selectedType === 'vcard' && <><User size={13} className="shrink-0 mt-px" aria-hidden="true" />Share a digital contact card for your pastor or staff.</>}
+                {selectedType === 'text'  && <><FileText size={13} className="shrink-0 mt-px" aria-hidden="true" />Encode any plain text — service times, addresses, announcements.</>}
+                {selectedType === 'phone' && <><Phone size={13} className="shrink-0 mt-px" aria-hidden="true" />Link directly to call your church phone number.</>}
+                {selectedType === 'bulletin' && <><Newspaper size={13} className="shrink-0 mt-px" aria-hidden="true" />Always links to your most recently published Digital Bulletin.</>}
               </p>
             </div>
           </div>

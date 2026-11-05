@@ -7,6 +7,22 @@
   --color-slate-950: #020617;
 }
 
+/* ─── Tool category accents ─────────────────────────────────────────────────
+   Semantic tokens for the Tools area. Each tool belongs to one category and
+   uses that category's accent for its icon tile (see components/tool-shell).
+   `-soft` variants are the lighter shade used on dark surfaces for contrast.
+   Usage: bg-tool-communicate/10 text-tool-communicate dark:text-tool-communicate-soft */
+@theme inline {
+  --color-tool-communicate: var(--color-indigo-600);
+  --color-tool-communicate-soft: var(--color-indigo-400);
+  --color-tool-create: var(--color-violet-600);
+  --color-tool-create-soft: var(--color-violet-400);
+  --color-tool-automate: var(--color-amber-600);
+  --color-tool-automate-soft: var(--color-amber-400);
+  --color-tool-library: var(--color-slate-600);
+  --color-tool-library-soft: var(--color-slate-300);
+}
+
 @variant dark (&:where(.dark, .dark *));
 
 :root {

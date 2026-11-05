@@ -8,6 +8,7 @@ import {
   Image as ImageIcon, Video, Music, FileText, CheckCircle, Loader2, Copy,
   Folder, Plus, Edit2, Tag, X, HardDrive
 } from 'lucide-react';
+import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from './tool-shell';
 
 interface FileManagerProps {
   churchId: string;
@@ -219,7 +220,8 @@ export const FileManager: React.FC<FileManagerProps> = ({
   const filteredFiles = files.filter(f => currentFolder === '' || f.folder === currentFolder);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-6 relative">
+    <div className="h-full bg-slate-50 dark:bg-slate-950 relative">
+      <ToolPage className="flex flex-col h-full">
       
       {toast && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white transition-all ${
@@ -249,7 +251,7 @@ export const FileManager: React.FC<FileManagerProps> = ({
                   value={editFolder}
                   onChange={e => setEditFolder(e.target.value)}
                   placeholder="e.g. Marketing, Documents/Policies"
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
               <div>
@@ -261,7 +263,7 @@ export const FileManager: React.FC<FileManagerProps> = ({
                   value={editTags}
                   onChange={e => setEditTags(e.target.value)}
                   placeholder="Comma separated tags (e.g. logo, print, internal)"
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
             </div>
@@ -284,38 +286,32 @@ export const FileManager: React.FC<FileManagerProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <FolderOpen className="text-indigo-600 dark:text-indigo-400" /> 
-            Tenant Files
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Upload and manage files. Organize with folders and tags.
-          </p>
-        </div>
-
-        <div className="shrink-0">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                handleFileUpload(e.target.files[0]);
-              }
-            }}
-          />
-          <button
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleFileUpload(e.target.files[0]);
+          }
+        }}
+      />
+      <ToolHeader
+        tool="files"
+        description="Upload and manage files. Organize with folders and tags."
+        actions={
+          <ToolButton
+            variant="primary"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 w-full sm:w-auto justify-center"
           >
-            {isUploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
+            {isUploading
+              ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+              : <UploadCloud size={16} aria-hidden="true" />}
             {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload File'}
-          </button>
-        </div>
-      </div>
+          </ToolButton>
+        }
+      />
 
       {/* Storage Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -366,7 +362,7 @@ export const FileManager: React.FC<FileManagerProps> = ({
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
         <button 
           onClick={() => setCurrentFolder('')}
-          className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${currentFolder === '' ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-md' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50'}`}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${currentFolder === '' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50'}`}
         >
           All Files
         </button>
@@ -374,9 +370,9 @@ export const FileManager: React.FC<FileManagerProps> = ({
           <button 
             key={folder}
             onClick={() => setCurrentFolder(folder)}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${currentFolder === folder ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-md' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50'}`}
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${currentFolder === folder ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50'}`}
           >
-            <Folder size={14} className={currentFolder === folder ? 'opacity-80' : 'text-indigo-500'} />
+            <Folder size={14} aria-hidden="true" className={currentFolder === folder ? 'opacity-80' : 'text-indigo-500 dark:text-indigo-400'} />
             {folder}
           </button>
         ))}
@@ -394,33 +390,26 @@ export const FileManager: React.FC<FileManagerProps> = ({
       </div>
 
       {/* File List */}
+      {!isLoading && filteredFiles.length === 0 ? (
+        <ToolEmptyState
+          icon={FolderOpen}
+          className="flex-1 justify-center"
+          title={currentFolder ? 'Folder is empty' : 'No files uploaded yet'}
+          description={currentFolder
+            ? `Upload a file into "${currentFolder}" to get started.`
+            : 'Click "Upload File" to add your first asset to the system.'}
+          action={currentFolder ? (
+            <ToolButton variant="secondary" size="sm" onClick={() => setCurrentFolder('')}>
+              Back to All Files
+            </ToolButton>
+          ) : undefined}
+        />
+      ) : (
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 flex flex-col">
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
             <Loader2 size={32} className="animate-spin mb-4" />
             <p>Loading files...</p>
-          </div>
-        ) : filteredFiles.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center">
-            <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800">
-              <FolderOpen size={32} className="text-slate-300 dark:text-slate-600" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-              {currentFolder ? 'Folder is empty' : 'No files uploaded yet'}
-            </h3>
-            <p className="text-sm max-w-sm">
-              {currentFolder 
-                ? `Upload a file into "${currentFolder}" to get started.` 
-                : 'Click "Upload File" to add your first asset to the system.'}
-            </p>
-            {currentFolder && (
-              <button 
-                onClick={() => setCurrentFolder('')}
-                className="mt-4 text-sm text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
-              >
-                Back to All Files
-              </button>
-            )}
           </div>
         ) : (
           <div className="overflow-auto flex-1 p-2">
@@ -530,6 +519,8 @@ export const FileManager: React.FC<FileManagerProps> = ({
           </div>
         )}
       </div>
+      )}
+      </ToolPage>
     </div>
   );
 };
