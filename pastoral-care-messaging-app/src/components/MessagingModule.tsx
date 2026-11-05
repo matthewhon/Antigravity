@@ -1207,8 +1207,11 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 <>
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
-                                        <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                            {local.body?.length ?? 0} chars • {segments} segment{segments !== 1 ? 's' : ''}
+                                        <span className={`text-xs font-bold ${isMmsActive ? 'text-violet-600 dark:text-violet-400' : segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                            {isMmsActive
+                                                ? `${local.body?.length ?? 0} chars • MMS (1 media message)`
+                                                : `${local.body?.length ?? 0} chars • ${segments} segment${segments !== 1 ? 's' : ''}`
+                                            }
                                         </span>
                                     </div>
                                     <textarea
@@ -1248,7 +1251,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             <button
                                                 type="button"
                                                 title="Insert link"
-                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); setShowFilePicker(false); }}
+                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); setShowFilePicker(false); setShowImagePanel(false); }}
                                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                             >
                                                 <Link size={13} /> Link
@@ -1275,37 +1278,69 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         {/* File inserter */}
                                         <button
                                             type="button"
-                                            title="Attach a file link"
-                                            onClick={() => { setShowFilePicker(v => !v); setShowEmojis(false); setShowLinkDlg(false); }}
+                                            title="Attach a file or document link"
+                                            onClick={() => { setShowFilePicker(v => !v); setShowEmojis(false); setShowLinkDlg(false); setShowImagePanel(false); }}
                                             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                         >
                                             <FileText size={13} /> File
                                         </button>
-                                        {/* Image URL */}
+                                        {/* Image button */}
                                         <button
                                             type="button"
-                                            title="Attach image (MMS)"
+                                            title="Attach or upload image (MMS / Link options)"
                                             onClick={() => {
-                                                const url = window.prompt('Enter image URL (MMS ... may incur additional carrier fees):');
-                                                if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
+                                                setShowImagePanel(v => !v);
+                                                setShowFilePicker(false);
+                                                setShowEmojis(false);
+                                                setShowLinkDlg(false);
                                             }}
-                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                                                }`}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
+                                                imageUrl
+                                                    ? sendAsMms
+                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                        : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
+                                                    : showImagePanel
+                                                        ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                            }`}
                                         >
-                                            <ImageIcon size={13} /> {imageUrl ? 'Image ?' : 'Image'}
+                                            <ImageIcon size={13} /> {imageUrl ? (sendAsMms ? 'Image (MMS) ✓' : 'Image (Link) ✓') : 'Image'}
                                         </button>
                                         {imageUrl && (
                                             <button
                                                 type="button"
                                                 title="Remove image"
-                                                onClick={() => { setImageUrl(''); update({ mediaUrls: [] }); }}
+                                                onClick={handleRemoveImage}
                                                 className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                                             >
                                                 <X size={13} />
                                             </button>
                                         )}
+                                        {/* Attach vCard */}
+                                        <button
+                                            type="button"
+                                            title="Attach Church Contact Card (vCard)"
+                                            onClick={() => {
+                                                const newValue = !local.attachVcard;
+                                                update({ attachVcard: newValue });
+                                            }}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${local.attachVcard ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                                }`}
+                                        >
+                                            <Contact size={13} /> {local.attachVcard ? 'Contact Card ✓' : 'Contact Card'}
+                                        </button>
                                         <div className="flex-1" />
+                                        {/* AI Event Recommender */}
+                                        <button
+                                            type="button"
+                                            title="Suggest message from upcoming event or registration"
+                                            onClick={() => setShowEventPicker(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+                                        >
+                                            <Calendar size={13} />
+                                            Suggest from Events
+                                        </button>
                                         {/* AI Helper */}
                                         <button
                                             type="button"
@@ -1318,10 +1353,205 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             AI Shorten
                                         </button>
                                     </div>
-                                    {/* Image preview */}
+
+                                    {/* Image upload & MMS delivery options panel */}
+                                    {showImagePanel && (
+                                        <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-md">
+                                            <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                                {(['upload', 'url'] as const).map(t => (
+                                                    <button
+                                                        key={t}
+                                                        type="button"
+                                                        onClick={() => setImageTab(t)}
+                                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${
+                                                            imageTab === t
+                                                                ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500 bg-white dark:bg-slate-900'
+                                                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                                                        }`}
+                                                    >
+                                                        {t === 'upload' ? '📁 Upload Image File' : '🔗 Paste Image URL'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                {imageTab === 'upload' ? (
+                                                    <>
+                                                        <input
+                                                            ref={imageFileInputRef}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={e => {
+                                                                const f = e.target.files?.[0];
+                                                                if (f) handleImageFileUpload(f);
+                                                            }}
+                                                        />
+                                                        <div
+                                                            onClick={() => imageFileInputRef.current?.click()}
+                                                            onDragOver={e => e.preventDefault()}
+                                                            onDrop={e => {
+                                                                e.preventDefault();
+                                                                const f = e.dataTransfer.files?.[0];
+                                                                if (f) handleImageFileUpload(f);
+                                                            }}
+                                                            className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition text-center"
+                                                        >
+                                                            <Upload size={22} className="text-slate-400" />
+                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                                Click or drag &amp; drop image here
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — up to 5 MB</p>
+                                                        </div>
+                                                        {imageUploadProgress !== null && (
+                                                            <div className="space-y-1">
+                                                                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-violet-600 transition-all duration-200" style={{ width: `${imageUploadProgress}%` }} />
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p>
+                                                            </div>
+                                                        )}
+                                                        {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
+                                                    </>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Public Image URL</p>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="url"
+                                                                value={urlInput}
+                                                                onChange={e => setUrlInput(e.target.value)}
+                                                                placeholder="https://example.com/photo.jpg"
+                                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (urlInput.trim()) {
+                                                                        handleSetImage(urlInput.trim(), sendAsMms);
+                                                                        setUrlInput('');
+                                                                    }
+                                                                }}
+                                                                disabled={!urlInput.trim()}
+                                                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition"
+                                                            >
+                                                                Use URL
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Delivery mode radio options */}
+                                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Delivery Options</p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <label
+                                                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                                                sendAsMms
+                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700'
+                                                                    : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="deliveryMode"
+                                                                checked={sendAsMms}
+                                                                onChange={() => handleToggleMms(true)}
+                                                                className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                                                            />
+                                                            <div className="text-left">
+                                                                <span className="block text-xs font-bold text-slate-900 dark:text-white">Send as MMS Attachment</span>
+                                                                <span className="block text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                                                                    Displays directly as an inline photo in the recipient's SMS app.
+                                                                </span>
+                                                            </div>
+                                                        </label>
+
+                                                        <label
+                                                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                                                                !sendAsMms
+                                                                    ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-300 dark:border-indigo-700'
+                                                                    : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="deliveryMode"
+                                                                checked={!sendAsMms}
+                                                                onChange={() => handleToggleMms(false)}
+                                                                className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                                            />
+                                                            <div className="text-left">
+                                                                <span className="block text-xs font-bold text-slate-900 dark:text-white">Send as Link in Text (SMS)</span>
+                                                                <span className="block text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                                                                    Sends standard SMS text with link to avoid carrier MMS fees.
+                                                                </span>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Image attachment status card */}
                                     {imageUrl && (
-                                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
-                                            <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
+                                        <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                            <div className="relative group w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 border border-slate-200 dark:border-slate-600">
+                                                <img src={imageUrl} alt="MMS attachment" className="w-full h-full object-cover" onError={() => setImageUrl('')} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                        sendAsMms
+                                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                                            : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
+                                                    }`}>
+                                                        {sendAsMms ? '📷 MMS Picture Attachment' : '🔗 Link in Message'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                    {sendAsMms
+                                                        ? 'Delivered natively as a photo message to recipients (MMS carrier rates apply).'
+                                                        : 'Delivered as standard SMS. Click "Insert Link" if you wish to include the URL in your text.'}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleMms(!sendAsMms)}
+                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition"
+                                                >
+                                                    {sendAsMms ? 'Switch to Link Only' : 'Send as MMS'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleInsertImageLink}
+                                                    title="Insert link into text body"
+                                                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 transition flex items-center gap-1"
+                                                >
+                                                    <Link size={11} /> Insert Link
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveImage}
+                                                    title="Remove image"
+                                                    className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Contact Card preview */}
+                                    {local.attachVcard && (
+                                        <div className="mt-2 flex items-center gap-2.5 p-2.5 bg-indigo-50 dark:bg-indigo-900/25 border border-indigo-200 dark:border-indigo-800 rounded-2xl max-w-[280px]">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                                <Contact size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 truncate">Contact Card Attached</p>
+                                                <p className="text-[10px] text-indigo-500 dark:text-indigo-400">Share your number and name</p>
+                                            </div>
                                         </div>
                                     )}
                                     {/* AI suggestion panel */}
@@ -1388,9 +1618,23 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Preview</label>
                             <div className="bg-slate-100 dark:bg-slate-800 rounded-3xl p-4 max-w-[260px] shadow-inner">
-                                {imageUrl && (
-                                    <div className="mb-2 rounded-xl overflow-hidden max-w-[220px]">
+                                {imageUrl && sendAsMms && (
+                                    <div className="mb-2 rounded-xl overflow-hidden max-w-[220px] border border-slate-200 dark:border-slate-700 shadow-sm relative group">
                                         <img src={imageUrl} alt="MMS preview" className="w-full h-auto object-cover" />
+                                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/60 backdrop-blur-xs rounded text-[9px] font-bold text-white uppercase tracking-wider">
+                                            MMS
+                                        </div>
+                                    </div>
+                                )}
+                                {local.attachVcard && (
+                                    <div className="mb-2 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-850 rounded-2xl p-2.5 flex items-center gap-2 max-w-[220px]">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            <Contact size={16} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-indigo-800 dark:text-indigo-200 truncate">Contact.vcf</p>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500">VCARD File • {church.name || 'Church'}</p>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="bg-violet-600 text-white text-sm px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm max-w-[220px] leading-relaxed whitespace-pre-wrap break-words font-medium">
@@ -1428,8 +1672,25 @@ const CampaignComposer: React.FC<ComposerProps> = ({
             {showFilePicker && (
                 <FilePickerDialog
                     churchId={churchId}
+                    currentUser={currentUser}
                     onSelect={(url) => { insertAtCursor(' ' + url); setShowFilePicker(false); }}
+                    onSelectAsMms={(url) => {
+                        handleSetImage(url, true);
+                        setShowFilePicker(false);
+                    }}
                     onClose={() => setShowFilePicker(false)}
+                />
+            )}
+
+            {/* Event Recommender Modal */}
+            {showEventPicker && (
+                <SmsEventPickerModal
+                    churchId={churchId}
+                    onSelect={(suggestedBody) => {
+                        update({ body: suggestedBody });
+                        setShowEventPicker(false);
+                    }}
+                    onClose={() => setShowEventPicker(false)}
                 />
             )}
         </div>
@@ -1592,8 +1853,10 @@ const NewMessageComposer: React.FC<{
     const [showEmojisNM, setShowEmojisNM] = useState(false);
     const [showLinkDlgNM, setShowLinkDlgNM] = useState(false);
     const [showFilePickerNM, setShowFilePickerNM] = useState(false);
+    const [showEventPickerNM, setShowEventPickerNM] = useState(false);
     const [linkUrlNM, setLinkUrlNM] = useState('');
     const [imageUrlNM, setImageUrlNM] = useState(''); // final publicly-accessible URL (MMS)
+    const [attachVcardNM, setAttachVcardNM] = useState(false);
     const [aiSuggestionNM, setAiSuggestionNM] = useState('');
     const [aiLoadingNM, setAiLoadingNM] = useState(false);
     const [showAiPanelNM, setShowAiPanelNM] = useState(false);
@@ -1629,7 +1892,7 @@ const NewMessageComposer: React.FC<{
         setShowAiPanelNM(true);
         setAiSuggestionNM('');
         try {
-            const suggestion = await getSmsAiSuggestion(body);
+            const suggestion = await getSmsAiSuggestion(body, churchId);
             setAiSuggestionNM(suggestion);
         } catch {
             setAiSuggestionNM('Unable to get AI suggestion. Please try again.');
@@ -1816,6 +2079,7 @@ const NewMessageComposer: React.FC<{
                         personName: toName || undefined,
                         personId: selectedPerson?.id || undefined,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1834,6 +2098,7 @@ const NewMessageComposer: React.FC<{
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1852,6 +2117,7 @@ const NewMessageComposer: React.FC<{
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -2223,7 +2489,17 @@ const NewMessageComposer: React.FC<{
                             {imageUrlNM && (
                                 <button type="button" title="Remove image" onClick={() => { setImageUrlNM(''); setShowImagePanelNM(false); }} className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
                             )}
+                            {/* Attach vCard */}
+                            <button type="button" title="Attach Church Contact Card (vCard)"
+                                onClick={() => setAttachVcardNM(v => !v)}
+                                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${attachVcardNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
+                            ><Contact size={12} /> {attachVcardNM ? 'Contact Card ✓' : 'Contact Card'}</button>
                             <div className="flex-1" />
+                            {/* AI Event Recommender */}
+                            <button type="button" title="Suggest message from upcoming event or registration"
+                                onClick={() => setShowEventPickerNM(true)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+                            ><Calendar size={12} /> Suggest from Events</button>
                             {/* AI Helper */}
                             <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
                                 disabled={!body.trim() || aiLoadingNM}
@@ -2259,6 +2535,18 @@ const NewMessageComposer: React.FC<{
                                         </div>
                                     )}
                                     {imageUrlNM && (<div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl"><img src={imageUrlNM} alt="MMS preview" className="w-16 h-16 object-cover rounded-lg shrink-0" onError={() => setImageUrlNM('')} /><div className="flex-1 min-w-0"><p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Image attached</p><p className="text-[10px] text-emerald-600 truncate">{imageUrlNM}</p></div><button type="button" title="Remove image" onClick={() => setImageUrlNM('')} className="text-red-400 hover:text-red-600 shrink-0"><X size={14} /></button></div>)}
+                                    {attachVcardNM && (
+                                        <div className="mt-2 flex items-center gap-2.5 p-2.5 bg-indigo-50 dark:bg-indigo-900/25 border border-indigo-200 dark:border-indigo-800 rounded-xl max-w-[280px]">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                                <Contact size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 truncate">Contact Card Attached</p>
+                                                <p className="text-[10px] text-indigo-550 dark:text-indigo-400">Share your number and name</p>
+                                            </div>
+                                            <button type="button" title="Remove contact card" onClick={() => setAttachVcardNM(false)} className="text-red-400 hover:text-red-600 shrink-0"><X size={14} /></button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -2331,6 +2619,34 @@ const NewMessageComposer: React.FC<{
                     </button>
                 </div>
             </div>
+
+            {/* Event Recommender Modal */}
+            {showEventPickerNM && (
+                <SmsEventPickerModal
+                    churchId={churchId}
+                    onSelect={(suggestedBody) => {
+                        setBody(suggestedBody);
+                        setShowEventPickerNM(false);
+                    }}
+                    onClose={() => setShowEventPickerNM(false)}
+                />
+            )}
+            {/* File Picker Modal */}
+            {showFilePickerNM && (
+                <FilePickerDialog
+                    churchId={churchId}
+                    currentUser={currentUser}
+                    onSelect={(url) => {
+                        insertAtCursorNM(' ' + url);
+                        setShowFilePickerNM(false);
+                    }}
+                    onSelectAsMms={(url) => {
+                        setImageUrlNM(url);
+                        setShowFilePickerNM(false);
+                    }}
+                    onClose={() => setShowFilePickerNM(false)}
+                />
+            )}
         </div>
     );
 };
@@ -9596,6 +9912,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         resolveFromList: campaignToSend.toListId || null,
                         resolveFromGroup: campaignToSend.toGroupId || null,
                         smsNumberId: campaignToSend.twilioNumberId || null,
+                        attachVcard: campaignToSend.attachVcard || false,
                     }),
                 });
                 const data = await safeJson(res);

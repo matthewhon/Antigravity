@@ -297,7 +297,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
                 {/* App version */}
                 <p className="text-center text-[12px] text-slate-400">
-                    Pastoral Care Messaging · v1.0
+                    Pastoral Care Messaging · v1.1.1
                 </p>
             </div>
         </div>
