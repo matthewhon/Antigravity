@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getDb } from './firebase';
 import { sgSend } from './sendEmail';
 import { resolveEmailProvider } from './emailProvider.js';
+import { getSmsPricingConfig } from './smsSend';
 
 // ─── Stripe Plan metadata ──────────────────────────────────────────────────────
 const PLAN_NAMES: Record<string, string> = {
@@ -228,6 +229,151 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                         customerId: session.customer as string,
                     }
                 });
+            }
+            break;
+        }
+
+        // ── Draft renewal invoice created → attach Pay-As-You-Go SMS/MMS & Email usage ──
+        case 'invoice.created': {
+            const invoice = event.data.object as Stripe.Invoice;
+            try {
+                // Only attach usage to draft subscription cycle / renewal invoices
+                if (invoice.status !== 'draft') break;
+                const billingReason = (invoice as any).billing_reason;
+                if (billingReason !== 'subscription_cycle' && billingReason !== 'subscription_threshold') {
+                    break;
+                }
+
+                const customerId = typeof invoice.customer === 'string'
+                    ? invoice.customer
+                    : (invoice.customer as any)?.id;
+                if (!customerId) break;
+
+                const churchSnap = await db.collection('churches')
+                    .where('subscription.customerId', '==', customerId)
+                    .limit(1)
+                    .get();
+
+                if (churchSnap.empty) break;
+
+                const churchDoc = churchSnap.docs[0];
+                const churchId = churchDoc.id;
+                const church = churchDoc.data() || {};
+
+                // Determine the usage month key (previous UTC month if invoice is on the 1st-5th, otherwise current UTC month)
+                const invoiceCreatedMs = (invoice.created || Math.floor(Date.now() / 1000)) * 1000;
+                const invDate = new Date(invoiceCreatedMs);
+                // Look back ~15 days from invoice creation to identify the primary usage month being closed out
+                const midPeriodDate = new Date(invoiceCreatedMs - 15 * 24 * 60 * 60 * 1000);
+                const periodKey = `${midPeriodDate.getUTCFullYear()}-${String(midPeriodDate.getUTCMonth() + 1).padStart(2, '0')}`;
+
+                // Idempotency guard: skip if this period or invoice has already been billed
+                const billedPeriods = church.usageBilledPeriods || {};
+                if (billedPeriods[periodKey] || billedPeriods[invoice.id]) {
+                    console.log(`[StripeWebhook] Usage already billed for church ${churchId} (${periodKey} / ${invoice.id})`);
+                    break;
+                }
+
+                const pricing = await getSmsPricingConfig(db);
+
+                // 1. Calculate SMS & MMS usage for the billing window
+                const windowStartMs = new Date(`${periodKey}-01T00:00:00.000Z`).getTime();
+                const [yearNum, monthNum] = periodKey.split('-').map(Number);
+                const windowEndMs = new Date(Date.UTC(yearNum, monthNum, 1)).getTime();
+
+                const usageSnap = await db.collection('smsUsageRecords')
+                    .where('churchId', '==', churchId)
+                    .where('createdAt', '>=', windowStartMs)
+                    .where('createdAt', '<', windowEndMs)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+
+                let outboundSmsSegments = 0;
+                let inboundSmsSegments = 0;
+                let outboundMmsCount = 0;
+                let inboundMmsCount = 0;
+                let smsChargeUsd = 0;
+
+                usageSnap.forEach((doc: any) => {
+                    const r = doc.data();
+                    const dir = r.direction === 'inbound' ? 'inbound' : 'outbound';
+                    const segs = Math.max(1, r.segments || 1);
+                    const isMms = !!r.isMms;
+
+                    if (isMms) {
+                        if (dir === 'inbound') inboundMmsCount += 1;
+                        else outboundMmsCount += 1;
+                    } else {
+                        if (dir === 'inbound') inboundSmsSegments += segs;
+                        else outboundSmsSegments += segs;
+                    }
+
+                    if (typeof r.customerChargeUsd === 'number') {
+                        smsChargeUsd += r.customerChargeUsd;
+                    } else {
+                        const unitPrice = isMms
+                            ? (dir === 'inbound' ? pricing.mmsInboundPriceUsd : pricing.mmsOutboundPriceUsd)
+                            : (dir === 'inbound' ? pricing.smsInboundPriceUsd : pricing.smsOutboundPriceUsd);
+                        smsChargeUsd += isMms ? unitPrice : (segs * unitPrice);
+                    }
+                });
+
+                const smsChargeCents = Math.round(smsChargeUsd * 100);
+
+                // 2. Calculate Email usage ($3.00 per started 1,000-email block)
+                const emailCount = Number(church.emailUsage?.[periodKey] || 0);
+                const emailBlocks = emailCount > 0 ? Math.ceil(emailCount / 1000) : 0;
+                const emailBlockPriceUsd = pricing.emailBlockPriceUsd || 3.00;
+                const emailChargeUsd = Number((emailBlocks * emailBlockPriceUsd).toFixed(2));
+                const emailChargeCents = Math.round(emailChargeUsd * 100);
+
+                // 3. Attach invoice line items if non-zero
+                if (smsChargeCents > 0) {
+                    const parts: string[] = [];
+                    if (outboundSmsSegments > 0) parts.push(`${outboundSmsSegments.toLocaleString()} outbound SMS seg`);
+                    if (inboundSmsSegments > 0)  parts.push(`${inboundSmsSegments.toLocaleString()} inbound SMS seg`);
+                    if (outboundMmsCount > 0)    parts.push(`${outboundMmsCount.toLocaleString()} outbound MMS`);
+                    if (inboundMmsCount > 0)     parts.push(`${inboundMmsCount.toLocaleString()} inbound MMS`);
+
+                    await stripe.invoiceItems.create({
+                        customer: customerId,
+                        invoice: invoice.id,
+                        amount: smsChargeCents,
+                        currency: 'usd',
+                        description: `SMS & MMS Usage (${periodKey}): ${parts.join(', ')}`,
+                    });
+                }
+
+                if (emailChargeCents > 0) {
+                    await stripe.invoiceItems.create({
+                        customer: customerId,
+                        invoice: invoice.id,
+                        amount: emailChargeCents,
+                        currency: 'usd',
+                        description: `Email Usage (${periodKey}): ${emailCount.toLocaleString()} emails (${emailBlocks} × 1,000-email block${emailBlocks !== 1 ? 's' : ''} @ $${emailBlockPriceUsd.toFixed(2)}/1k)`,
+                    });
+                }
+
+                // 4. Record period as billed on church doc for idempotency
+                await churchDoc.ref.set({
+                    usageBilledPeriods: {
+                        [periodKey]: {
+                            billedAt: new Date(invDate).toISOString(),
+                            invoiceId: invoice.id,
+                            smsChargeUsd: Number((smsChargeCents / 100).toFixed(2)),
+                            emailChargeUsd: Number((emailChargeCents / 100).toFixed(2)),
+                            emailCount,
+                            emailBlocks,
+                        },
+                    },
+                }, { merge: true });
+
+                console.log(
+                    `[StripeWebhook] Attached usage for church ${churchId} (${periodKey}) to invoice ${invoice.id}: ` +
+                    `SMS=$${(smsChargeCents / 100).toFixed(2)}, Email=$${(emailChargeCents / 100).toFixed(2)}`
+                );
+            } catch (usageErr: any) {
+                console.error('[StripeWebhook] Failed to attach usage items on invoice.created:', usageErr?.message || usageErr);
             }
             break;
         }

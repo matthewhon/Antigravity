@@ -5516,7 +5516,10 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                 const totalDelivered = sentCampaigns.reduce((s, c) => s + (c.deliveredCount ?? 0), 0);
                 const totalFailed = sentCampaigns.reduce((s, c) => s + (c.failedCount ?? 0), 0);
                 const totalOptOutC = sentCampaigns.reduce((s, c) => s + (c.optOutCount ?? 0), 0);
-                const totalCost = usageRecords.reduce((s, r) => s + (r.costUsd ?? 0), 0);
+                const totalCost = usageRecords.reduce(
+                    (s, r) => s + (typeof r.customerChargeUsd === 'number' ? r.customerChargeUsd : (r.costUsd ?? 0) * 1.2),
+                    0
+                );
 
                 // Inbound conversation count as proxy for replies
                 const convSnap = await getDocs(

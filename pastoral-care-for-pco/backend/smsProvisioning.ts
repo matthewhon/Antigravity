@@ -194,7 +194,7 @@ async function checkPhoneNumberLimit(db: any, churchId: string): Promise<void> {
     const planId: string = churchData.subscription?.planId || '';
     const baseLimit = PLAN_PHONE_NUMBER_LIMIT[planId] ?? Infinity;
     // Each SMS add-on grants +1 phone number
-    const addOnBonus = (churchData.smsAddOns?.quantity ?? 0) * 1;
+    const addOnBonus = 0;
     const limit = isFinite(baseLimit) ? baseLimit + addOnBonus : Infinity;
     if (!isFinite(limit)) return; // Unlimited plan
 
@@ -210,7 +210,7 @@ async function checkPhoneNumberLimit(db: any, churchId: string): Promise<void> {
         throw {
             status:  403,
             message: `Your plan allows a maximum of ${limit} phone number${limit !== 1 ? 's' : ''}. ` +
-                     `You currently have ${currentCount}. Add an SMS add-on ($20/mo) or upgrade your plan to add more.`,
+                     `You currently have ${currentCount}. Upgrade your plan to Kingdom for unlimited phone numbers.`,
         };
     }
 }

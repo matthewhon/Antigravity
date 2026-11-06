@@ -33,6 +33,7 @@ function validateRequest(signingKey: string, signature: string, webhookUrl: stri
 import { getDb, getStorage } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { FieldValue } from 'firebase-admin/firestore';
+import { recordUsage, countSegments } from './smsSend';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl, fetchSignalWireMedia } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
 import { updatePcoSubscriptionField } from './pcoFieldData';
@@ -706,37 +707,28 @@ export const handleInboundSms = async (req: any, res: any) => {
                 createdAt: now,
             });
 
-        // 4-0. Record inbound SMS usage
+        // 4-0. Record inbound SMS/MMS usage (SignalWire cost + 20% customer markup)
         // Keyed by SID so duplicate webhooks don't double-count usage.
         const segmentsStr = req.body.NumSegments || '1';
-        const segments = parseInt(segmentsStr, 10) || 1;
+        const segments = parseInt(segmentsStr, 10) || countSegments(latestBody) || 1;
         const isMms = mediaUrls.length > 0;
-        const costUsd = isMms ? 0.02 : segments * 0.0079; // Defaulting to outbound rates or generic inbound rate
         const usageId = resolvedSid
             ? `usage_inbound_sid_${resolvedSid.replace(/-/g, '')}`
             : `usage_inbound_${now}_${Math.random().toString(36).slice(2, 8)}`;
-        const d = new Date();
-        const currentMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-        
-        await db.collection('smsUsageRecords').doc(usageId).set({
-            id: usageId,
+
+        await recordUsage(db, {
+            usageId,
             churchId,
             conversationId: convId,
             toPhone: to,
             fromPhone: from,
-            segments,
+            segments: isMms ? 1 : segments,
             isMms,
-            costUsd,
+            messageSid: resolvedSid || usageId,
+            numberId: smsNumberId,
             direction: 'inbound',
-            messageSid: resolvedSid,
-            createdAt: now,
-        }, { merge: true });
-
-        await db.collection('churches').doc(churchId).set({
-            smsUsage: {
-                [currentMonth]: FieldValue.increment(segments)
-            }
-        }, { merge: true }).catch((e: any) => log.warn(`Failed to increment church inbound smsUsage: ${e.message}`, 'system', { churchId }, churchId));
+            source: 'inbound',
+        });
 
         // 4-A. Push notification — fire-and-forget, must not block the TwiML response
         const senderName = personMatch?.personName || convSnap.data()?.personName || from;
@@ -1387,6 +1379,22 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         let twiml = '<Response></Response>';
         if (allReplies.length > 0) {
+            for (const r of allReplies) {
+                const replyIsMms = !!r.mediaUrl;
+                const replySegments = replyIsMms ? 1 : Math.max(1, countSegments(r.body));
+                await recordUsage(db, {
+                    churchId,
+                    conversationId: convId,
+                    toPhone: from,
+                    fromPhone: to,
+                    segments: replySegments,
+                    isMms: replyIsMms,
+                    messageSid: `twiml_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                    numberId: smsNumberId,
+                    direction: 'outbound',
+                    source: 'auto-reply',
+                }).catch((e: any) => log.warn(`[Inbound SMS] Failed to record auto-reply usage: ${e.message}`, 'system', { churchId }, churchId));
+            }
             const msgXml = allReplies
                 .map(r => {
                     const safeBody = r.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1449,6 +1457,19 @@ export async function processRegistrationFlowReply(
             lastMessageAt: Date.now(),
             lastMessageBody: text,
             lastMessageDirection: 'outbound',
+        }).catch(() => {});
+
+        await recordUsage(db, {
+            churchId,
+            conversationId: convId,
+            toPhone: fromPhone,
+            fromPhone: toPhone,
+            segments: Math.max(1, countSegments(text)),
+            isMms: false,
+            messageSid: replyId,
+            numberId: smsNumberId,
+            direction: 'outbound',
+            source: 'auto-reply',
         }).catch(() => {});
     };
 

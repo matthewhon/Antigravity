@@ -17,6 +17,9 @@ export interface TenantBillingReport {
     postmarkCost: number;
     signalwireCost: number;
     totalCost: number;
+    smsCustomerRevenue: number;
+    emailCustomerRevenue: number;
+    totalUsageRevenue: number;
     metrics: {
         activeUsers: number;
         emailSent: number;
@@ -38,6 +41,9 @@ export interface BillingReportResponse {
         postmarkCost: number;
         signalwireCost: number;
         grandTotal: number;
+        smsCustomerRevenue: number;
+        emailCustomerRevenue: number;
+        totalUsageRevenue: number;
     };
     tenants: TenantBillingReport[];
 }
@@ -164,19 +170,43 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
     let totalActiveUsers = 0;
     let totalEmailSent = 0;
     let totalSmsSegments = 0;
+    let totalSignalwireCost = 0;
+    let totalSmsCustomerRevenue = 0;
+    let totalEmailCustomerRevenue = 0;
+
+    const smsOutboundCostRate = Number(settings.smsOutboundCostUsd ?? settings.smsSegmentCostUsd ?? 0.0079);
+    const smsMarkupMultiplier = 1 + (Number(settings.smsMarkupPercent ?? 20) / 100);
+    const emailBlockPriceUsd  = Number(settings.emailBlockPriceUsd ?? 3.00);
 
     const tenantsData = churches.map(church => {
         const activeUsers = church.activePeopleCount || 0;
         const emailSent = church.emailUsage?.[period] || 0;
         const smsSegments = church.smsUsage?.[period] || 0;
-        
+        const smsDetails = church.smsUsageDetails?.[period] || {};
+
+        const providerSmsCost = typeof smsDetails.providerCostUsd === 'number'
+            ? smsDetails.providerCostUsd
+            : smsSegments * smsOutboundCostRate;
+        const customerSmsCharge = typeof smsDetails.customerChargeUsd === 'number'
+            ? smsDetails.customerChargeUsd
+            : providerSmsCost * smsMarkupMultiplier;
+        const customerEmailCharge = emailSent > 0
+            ? Math.ceil(emailSent / 1000) * emailBlockPriceUsd
+            : 0;
+
         totalActiveUsers += activeUsers;
         totalEmailSent += emailSent;
         totalSmsSegments += smsSegments;
+        totalSignalwireCost += providerSmsCost;
+        totalSmsCustomerRevenue += customerSmsCharge;
+        totalEmailCustomerRevenue += customerEmailCharge;
 
         return {
             churchId: church.id,
             name: church.name,
+            providerSmsCost,
+            customerSmsCharge,
+            customerEmailCharge,
             metrics: {
                 activeUsers,
                 emailSent,
@@ -186,17 +216,12 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
     });
 
     // 3. Fetch Provider Costs
-    // Postmark base rate is $15/mo. Additional costs are per email, but for simplicity
-    // if we don't have a direct Postmark invoice API, we'll assume a $15 flat base 
-    // + $1.50 per 1k emails over 10k. Or we can just use the base rate for now.
-    // Let's calculate estimated postmark cost:
     let postmarkTotalCost = 15.00;
     if (totalEmailSent > 10000) {
         postmarkTotalCost += Math.ceil((totalEmailSent - 10000) / 1000) * 1.50;
     }
 
-    // Estimate SignalWire costs at $0.0079 per segment
-    const signalwireTotalCost = totalSmsSegments * 0.0079;
+    const signalwireTotalCost = totalSignalwireCost;
 
     const gcpCosts = await getGcpCosts(period);
     const gcpTotalCost = gcpCosts.total;
@@ -214,18 +239,15 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
             other: gcpCosts.other * gcpRatio,
         };
 
-        // Postmark allocated evenly for base rate + proportionally for overage, 
-        // OR simply distributed evenly based on the user's preference
-        // User said: "I would distribute the base rate per tenant"
         const activeTenantCount = tenantsData.length || 1;
         const postmarkBasePerTenant = 15.00 / activeTenantCount;
         const postmarkOverage = postmarkTotalCost - 15.00;
         const emailRatio = totalEmailSent > 0 ? (tenant.metrics.emailSent / totalEmailSent) : 0;
         const postmarkCost = postmarkBasePerTenant + (postmarkOverage * emailRatio);
 
-        // SignalWire allocated proportionally by SMS segments sent
-        // Estimated at standard rate
-        const signalwireCost = tenant.metrics.smsSegments * 0.0079;
+        const signalwireCost = tenant.providerSmsCost;
+        const smsCustomerRevenue = tenant.customerSmsCharge;
+        const emailCustomerRevenue = tenant.customerEmailCharge;
 
         return {
             churchId: tenant.churchId,
@@ -235,6 +257,9 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
             postmarkCost,
             signalwireCost,
             totalCost: gcpCost + postmarkCost + signalwireCost,
+            smsCustomerRevenue,
+            emailCustomerRevenue,
+            totalUsageRevenue: smsCustomerRevenue + emailCustomerRevenue,
             metrics: tenant.metrics
         };
     });
@@ -252,7 +277,10 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
             },
             postmarkCost: postmarkTotalCost,
             signalwireCost: signalwireTotalCost,
-            grandTotal: gcpTotalCost + postmarkTotalCost + signalwireTotalCost
+            grandTotal: gcpTotalCost + postmarkTotalCost + signalwireTotalCost,
+            smsCustomerRevenue: totalSmsCustomerRevenue,
+            emailCustomerRevenue: totalEmailCustomerRevenue,
+            totalUsageRevenue: totalSmsCustomerRevenue + totalEmailCustomerRevenue,
         },
         tenants: reports
     };

@@ -18,82 +18,13 @@ async function getStripeAndSettings(db: any): Promise<{ stripe: Stripe; settings
 }
 
 // ─── POST /api/billing/add-sms-addon ─────────────────────────────────────────
-// Adds one SMS add-on unit to the church's Growth subscription.
-// Each add-on: +$20/mo applied to next invoice, +1 phone number, +1,500 SMS segments/mo.
-// Body: { churchId }
+// Deprecated: SMS & MMS are now billed pay-as-you-go with no monthly cap.
 
 export const addSmsAddon = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
-
-    const { churchId } = req.body || {};
-    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
-
-    const db  = getDb();
-    const log = createServerLogger(db);
-
-    try {
-        const churchSnap = await db.collection('churches').doc(churchId).get();
-        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
-        const church = churchSnap.data() || {};
-
-        // Verify the church is on the Growth plan
-        if (church.subscription?.planId !== 'growth' || church.subscription?.status !== 'active') {
-            return res.status(403).json({ error: 'SMS add-ons are only available on the Growth plan.' });
-        }
-
-        const currentQty: number = church.smsAddOns?.quantity ?? 0;
-        if (currentQty >= MAX_ADDONS) {
-            return res.status(400).json({
-                error: `You have reached the maximum of ${MAX_ADDONS} SMS add-ons (10 phone numbers total). ` +
-                       'Upgrade to the Kingdom plan for unlimited SMS.',
-            });
-        }
-
-        const subscriptionId: string = church.subscription?.subscriptionId;
-        if (!subscriptionId) return res.status(400).json({ error: 'No active Stripe subscription found for this church.' });
-
-        const { stripe, addonPriceId } = await getStripeAndSettings(db);
-
-        const existingItemId: string | undefined = church.smsAddOns?.stripeItemId;
-        let newItemId: string;
-        const newQty = currentQty + 1;
-
-        if (existingItemId) {
-            // Update existing add-on line item — increase quantity by 1
-            const updated = await stripe.subscriptionItems.update(existingItemId, {
-                quantity: newQty,
-                proration_behavior: 'none', // Apply to next invoice
-            });
-            newItemId = updated.id;
-        } else {
-            // Create a new add-on line item on the subscription
-            const created = await stripe.subscriptionItems.create({
-                subscription: subscriptionId,
-                price: addonPriceId,
-                quantity: 1,
-                proration_behavior: 'none', // Apply to next invoice
-            });
-            newItemId = created.id;
-        }
-
-        await db.collection('churches').doc(churchId).update({
-            'smsAddOns.quantity':      newQty,
-            'smsAddOns.stripeItemId':  newItemId,
-        });
-
-        log.info(`[SmsAddon] Added add-on for church ${churchId}. New qty: ${newQty}`, 'system', { churchId }, churchId);
-
-        return res.json({
-            success:        true,
-            quantity:       newQty,
-            maxSmsPerMonth: 1500 + newQty * 1500,
-            maxSmsNumbers:  2    + newQty,
-            message:        `SMS add-on added. Your plan now includes ${1500 + newQty * 1500} SMS segments/mo and ${2 + newQty} phone numbers. Applied to next invoice.`,
-        });
-    } catch (e: any) {
-        log.error(`[SmsAddon] addSmsAddon failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
-        return res.status(e.status || 500).json({ error: e.message || 'Failed to add SMS add-on' });
-    }
+    return res.status(410).json({
+        error: 'SMS Add-On packs have been retired. All SMS and MMS messages are now billed pay-as-you-go with no monthly cap.',
+    });
 };
 
 // ─── POST /api/billing/remove-sms-addon ──────────────────────────────────────

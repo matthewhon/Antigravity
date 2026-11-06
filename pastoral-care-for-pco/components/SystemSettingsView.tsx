@@ -800,16 +800,130 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                         )}
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
-                            <p className="text-[11px] text-slate-400 mb-3">For in-app cost estimates only. Actual billing is in your SignalWire Dashboard.</p>
-                            <div className="grid grid-cols-2 gap-3">
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Pay-As-You-Go Usage Pricing <span className="normal-case font-normal">(SignalWire Base + Carrier Surcharge + Customer Markup)</span></label>
+                            <p className="text-[11px] text-slate-400 mb-3">
+                                Churches are billed per incoming and outgoing SMS segment and MMS message at the SignalWire cost plus the configured markup (default +20%), and per 1,000-email block.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                                 <div>
-                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">SMS per segment</label>
-                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="SMS cost per segment in USD" placeholder="0.0079" step="0.0001" min="0" value={settings.smsSegmentCostUsd ?? 0.0079} onChange={e => handleChange('smsSegmentCostUsd', parseFloat(e.target.value) || 0.0079)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Outbound SMS Cost / Seg</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Outbound SMS cost per segment in USD"
+                                            placeholder="0.0079"
+                                            step="0.00005"
+                                            min="0"
+                                            value={settings.smsOutboundCostUsd ?? settings.smsSegmentCostUsd ?? 0.0079}
+                                            onChange={e => {
+                                                const v = parseFloat(e.target.value) || 0.0079;
+                                                handleChange('smsOutboundCostUsd', v);
+                                                handleChange('smsSegmentCostUsd', v);
+                                            }}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.smsOutboundCostUsd ?? settings.smsSegmentCostUsd ?? 0.0079) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(5)}
+                                    </p>
                                 </div>
                                 <div>
-                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">MMS per message</label>
-                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="MMS cost per message in USD" placeholder="0.0200" step="0.001" min="0" value={settings.smsMmsSegmentCostUsd ?? 0.02} onChange={e => handleChange('smsMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Inbound SMS Cost / Seg</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Inbound SMS cost per segment in USD"
+                                            placeholder="0.00715"
+                                            step="0.00005"
+                                            min="0"
+                                            value={settings.smsInboundCostUsd ?? 0.00715}
+                                            onChange={e => handleChange('smsInboundCostUsd', parseFloat(e.target.value) || 0.00715)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.smsInboundCostUsd ?? 0.00715) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(5)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">SMS/MMS Markup (%)</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            aria-label="SMS and MMS markup percentage"
+                                            placeholder="20"
+                                            step="1"
+                                            min="0"
+                                            value={settings.smsMarkupPercent ?? 20}
+                                            onChange={e => handleChange('smsMarkupPercent', parseFloat(e.target.value) || 20)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Default: 20% over SignalWire cost</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Outbound MMS Cost / Msg</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Outbound MMS cost per message in USD"
+                                            placeholder="0.0280"
+                                            step="0.001"
+                                            min="0"
+                                            value={settings.mmsOutboundCostUsd ?? settings.smsMmsSegmentCostUsd ?? 0.028}
+                                            onChange={e => {
+                                                const v = parseFloat(e.target.value) || 0.028;
+                                                handleChange('mmsOutboundCostUsd', v);
+                                                handleChange('smsMmsSegmentCostUsd', v);
+                                            }}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.mmsOutboundCostUsd ?? settings.smsMmsSegmentCostUsd ?? 0.028) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(4)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Inbound MMS Cost / Msg</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Inbound MMS cost per message in USD"
+                                            placeholder="0.0150"
+                                            step="0.001"
+                                            min="0"
+                                            value={settings.mmsInboundCostUsd ?? 0.015}
+                                            onChange={e => handleChange('mmsInboundCostUsd', parseFloat(e.target.value) || 0.015)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.mmsInboundCostUsd ?? 0.015) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(4)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Email Price / 1,000 Emails</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Email price per 1,000 emails in USD"
+                                            placeholder="3.00"
+                                            step="0.50"
+                                            min="0"
+                                            value={settings.emailBlockPriceUsd ?? 3.00}
+                                            onChange={e => handleChange('emailBlockPriceUsd', parseFloat(e.target.value) || 3.00)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Billed per started 1,000-email block</p>
                                 </div>
                             </div>
                         </div>

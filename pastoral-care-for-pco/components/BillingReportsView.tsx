@@ -15,6 +15,9 @@ export interface TenantBillingReport {
     postmarkCost: number;
     signalwireCost: number;
     totalCost: number;
+    smsCustomerRevenue?: number;
+    emailCustomerRevenue?: number;
+    totalUsageRevenue?: number;
     metrics: {
         activeUsers: number;
         emailSent: number;
@@ -36,6 +39,9 @@ export interface BillingReportResponse {
         postmarkCost: number;
         signalwireCost: number;
         grandTotal: number;
+        smsCustomerRevenue?: number;
+        emailCustomerRevenue?: number;
+        totalUsageRevenue?: number;
     };
     tenants: TenantBillingReport[];
 }
@@ -112,11 +118,17 @@ export const BillingReportsView: React.FC = () => {
 
             {report && (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <div className="text-sm text-slate-500 mb-1">Total Allocated Cost</div>
+                            <div className="text-sm text-slate-500 mb-1">Total Provider Cost</div>
                             <div className="text-2xl font-bold text-slate-800 dark:text-white">
                                 {formatCurrency(report.totals.grandTotal)}
+                            </div>
+                        </div>
+                        <div className="bg-emerald-50/70 dark:bg-emerald-900/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-800/50">
+                            <div className="text-sm text-emerald-700 dark:text-emerald-400 mb-1">Billed Usage Revenue</div>
+                            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                                {formatCurrency(report.totals.totalUsageRevenue ?? 0)}
                             </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -126,13 +138,13 @@ export const BillingReportsView: React.FC = () => {
                             </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <div className="text-sm text-slate-500 mb-1">Postmark (Email)</div>
+                            <div className="text-sm text-slate-500 mb-1">Postmark Cost</div>
                             <div className="text-2xl font-bold text-slate-800 dark:text-white">
                                 {formatCurrency(report.totals.postmarkCost)}
                             </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <div className="text-sm text-slate-500 mb-1">SignalWire (SMS)</div>
+                            <div className="text-sm text-slate-500 mb-1">SignalWire Cost</div>
                             <div className="text-2xl font-bold text-slate-800 dark:text-white">
                                 {formatCurrency(report.totals.signalwireCost)}
                             </div>
@@ -149,15 +161,17 @@ export const BillingReportsView: React.FC = () => {
                                     <th className="px-4 py-4 font-medium text-right text-xs">Hosting</th>
                                     <th className="px-4 py-4 font-medium text-right text-xs">App Hosting</th>
                                     <th className="px-4 py-4 font-medium text-right text-xs border-r border-slate-200 dark:border-slate-800">Other GCP</th>
-                                    <th className="px-6 py-4 font-medium text-right text-xs">Postmark</th>
-                                    <th className="px-6 py-4 font-medium text-right text-xs">SignalWire</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs">Postmark Cost</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs">SignalWire Cost</th>
                                     <th className="px-6 py-4 font-medium text-right bg-slate-100 dark:bg-slate-800">Total Cost</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs text-emerald-600 dark:text-emerald-400">SMS Billed (+20%)</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs text-emerald-600 dark:text-emerald-400">Email Billed ($3/1k)</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-600 dark:text-slate-300">
                                 {report.tenants.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
+                                        <td colSpan={11} className="px-6 py-8 text-center text-slate-400">
                                             No billing data available for this period.
                                         </td>
                                     </tr>
@@ -177,6 +191,12 @@ export const BillingReportsView: React.FC = () => {
                                             <td className="px-6 py-4 text-right">{formatCurrency(t.signalwireCost)}</td>
                                             <td className="px-6 py-4 text-right font-bold bg-slate-50 dark:bg-slate-800/30">
                                                 {formatCurrency(t.totalCost)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                                                {formatCurrency(t.smsCustomerRevenue ?? 0)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                                                {formatCurrency(t.emailCustomerRevenue ?? 0)}
                                             </td>
                                         </tr>
                                     ))

@@ -2,7 +2,7 @@ import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { refreshCampaignBlocks } from './emailScheduler';
 import { fireAndForgetEmailNote } from './pcoNotes';
-import { resolveEmailProvider } from './emailProvider.js';
+import { resolveEmailProvider, recordEmailUsage } from './emailProvider.js';
 
 // ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
 // We use fetch() directly instead of @sendgrid/mail so we can set the
@@ -1565,26 +1565,7 @@ export async function executeSend(
         throw new Error('All recipients have unsubscribed. No emails were sent.');
     }
 
-    // 6. Check monthly email quota (Starter: 5,000/mo · Growth: 5,000/mo · Kingdom: unlimited)
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const usage = churchData.emailUsage || {};
-    const currentUsage = usage[currentMonth] || 0;
-
-    const EMAIL_QUOTA: Record<string, number> = { starter: 5000, growth: 5000 };
-    const planId = churchData.subscription?.planId || '';
-    const monthlyQuota = EMAIL_QUOTA[planId] ?? Infinity;
-
-    if (!testEmail && isFinite(monthlyQuota)) {
-        const remaining = monthlyQuota - currentUsage;
-        if (recipients.length > remaining) {
-            throw new Error(
-                `Monthly email limit reached: You can only send ${remaining} more emails this month ` +
-                `(${monthlyQuota.toLocaleString()} max on the ${planId} plan). ` +
-                `You are trying to send ${recipients.length}.`
-            );
-        }
-    }
+    // 6. Email is billed pay-as-you-go ($3 per started 1,000-email block/month) — no monthly hard cap.
 
     // 6.5 A/B Subject-Line Testing check
     const isAbTestPhase1 = !testEmail && campaign.abTest?.enabled && (!campaign.abTest.status || campaign.abTest.status === 'pending');
@@ -1661,9 +1642,7 @@ export async function executeSend(
                     updatedAt: Date.now(),
                 });
 
-                const emailUsage = churchData.emailUsage || {};
-                emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + testSlice.length;
-                await db.collection('churches').doc(churchId).update({ emailUsage });
+                await recordEmailUsage(db, churchId, testSlice.length);
 
                 return {
                     recipientCount: testSlice.length,
@@ -1784,9 +1763,7 @@ export async function executeSend(
 
     // 9. Update usage count
     if (!testEmail) {
-        const emailUsage = churchData.emailUsage || {};
-        emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + recipients.length;
-        await db.collection('churches').doc(churchId).update({ emailUsage });
+        await recordEmailUsage(db, churchId, recipients.length);
     }
 
     const msg = testEmail
@@ -1914,25 +1891,6 @@ export const sendEmail = async (req: any, res: any) => {
             const resolvedFromEmail = fromEmail || 'simulated-from@grace.church';
             const resolvedFromName = fromName || 'Simulated Church';
 
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const usage = churchData.emailUsage || {};
-            const currentUsage = usage[currentMonth] || 0;
-
-            const EMAIL_QUOTA_ADHOC: Record<string, number> = { starter: 5000, growth: 5000 };
-            const planIdAdhoc = churchData.subscription?.planId || '';
-            const monthlyQuotaAdhoc = EMAIL_QUOTA_ADHOC[planIdAdhoc] ?? Infinity;
-
-            if (isFinite(monthlyQuotaAdhoc)) {
-                const remaining = monthlyQuotaAdhoc - currentUsage;
-                if (toAddresses.length > remaining) {
-                    throw new Error(
-                        `Monthly email limit reached: ${remaining} emails remaining this month ` +
-                        `(${monthlyQuotaAdhoc.toLocaleString()} max on the ${planIdAdhoc} plan).`
-                    );
-                }
-            }
-
             // Resolve merge tags and send to each address
             for (const email of toAddresses) {
                 const personInfo = (personData && personData[email]) || {};
@@ -1957,9 +1915,7 @@ export const sendEmail = async (req: any, res: any) => {
             }
 
             // Update usage count
-            const emailUsage = churchData.emailUsage || {};
-            emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + toAddresses.length;
-            await db.collection('churches').doc(churchId).update({ emailUsage });
+            await recordEmailUsage(db, churchId, toAddresses.length);
 
             res.json({ success: true, recipientCount: toAddresses.length });
             return;

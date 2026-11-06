@@ -313,12 +313,12 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
   };
 
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const localMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const usage = church?.emailUsage || {};
-  const currentUsage = usage[currentMonth] || 0;
-  const isStarter = church?.subscription?.planId === 'starter';
-  const planLimit = isStarter ? 3000 : 'Unlimited';
-  const usagePercent = isStarter ? Math.min(100, Math.round((currentUsage / 3000) * 100)) : 0;
+  const currentUsage = usage[currentMonth] ?? usage[localMonth] ?? 0;
+  const emailBlocks = currentUsage > 0 ? Math.ceil(currentUsage / 1000) : 0;
+  const emailCostUsd = emailBlocks * 3;
 
   return (
     <ToolPage>
@@ -452,36 +452,14 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
             <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
               {currentUsage.toLocaleString()}
             </div>
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              / {isStarter ? '3000 limit' : 'Unlimited'}
+            <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+              ${emailCostUsd.toFixed(2)} est.
             </div>
           </div>
 
-          {isStarter && (
-            <>
-              <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                  style={{ width: `${usagePercent}%` }}
-                />
-              </div>
-              {usagePercent >= 100 ? (
-                <p className="text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2.5 py-2 rounded-lg">
-                  You have reached your starter plan limit. You cannot send more emails this month.
-                </p>
-              ) : (
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  You have <strong className="text-slate-700 dark:text-slate-300">{3000 - currentUsage}</strong> emails remaining this month.
-                </p>
-              )}
-            </>
-          )}
-          
-          {!isStarter && (
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-2 rounded-lg mt-3">
-              You are on an unlimited plan. Email sends are not capped.
-            </p>
-          )}
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-2 rounded-lg mt-3">
+            Billed at <strong className="text-slate-700 dark:text-slate-300">$3.00 per 1,000 emails</strong> ({emailBlocks} {emailBlocks === 1 ? 'block' : 'blocks'} this month). No monthly send limit.
+          </p>
         </div>
 
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">

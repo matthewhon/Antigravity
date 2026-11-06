@@ -1,7 +1,7 @@
 import { getDb } from './firebase.js';
 import { pcoRequest } from './pcoApi.js';
 import { createServerLogger } from '../services/logService.js';
-import { resolveEmailProvider } from './emailProvider.js';
+import { resolveEmailProvider, recordEmailUsage } from './emailProvider.js';
 import { renderBlocksToHtml } from './sendEmail.js';
 import type { 
   NewsletterWidgetConfig, 
@@ -516,6 +516,7 @@ export async function subscribeNewsletter(req: any, res: any) {
             [{ to: cleanEmail, from: { email: fromEmail, name: fromName }, subject: personalizedSubject, html: personalizedHtml }],
             { apiKey, tenantToken: subuserId, tag: 'newsletter_welcome', stream: 'broadcast' }
           );
+          await recordEmailUsage(db, churchId, 1);
           actionsExecuted.welcomeEmailSent = true;
           log.info(`[Newsletter] Sent automated welcome email to ${cleanEmail}`, 'system', {}, churchId);
         }
@@ -561,6 +562,7 @@ export async function subscribeNewsletter(req: any, res: any) {
             html: alertHtml
           }));
           await provider.send(messages, { apiKey, tag: 'newsletter_staff_alert', stream: 'broadcast' });
+          await recordEmailUsage(db, churchId, messages.length);
           actionsExecuted.staffNotified = true;
         }
       } catch (staffErr: any) {

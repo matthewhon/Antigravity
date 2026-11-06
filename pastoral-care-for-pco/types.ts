@@ -252,13 +252,33 @@ export interface Church {
     /** Epoch ms — when activePeopleCount was last computed. */
     activePeopleLastCalculatedAt?: number;
     emailUsage?: { [month: string]: number };
-    /** Outbound SMS segment counts per month key `YYYY-MM`. MMS messages count as 2 segments. */
+    /** Total SMS/MMS usage count per month key `YYYY-MM`. */
     smsUsage?: { [month: string]: number };
+    /** Detailed monthly SMS & MMS usage breakdown (`YYYY-MM`). */
+    smsUsageDetails?: {
+        [month: string]: {
+            outboundSmsSegments?: number;
+            inboundSmsSegments?: number;
+            outboundMmsCount?: number;
+            inboundMmsCount?: number;
+            providerCostUsd?: number;
+            customerChargeUsd?: number;
+        };
+    };
+    /** Tracks periods where usage has already been billed to Stripe invoices for idempotency. */
+    usageBilledPeriods?: {
+        [periodKey: string]: {
+            billedAt: string;
+            invoiceId?: string;
+            smsChargeUsd: number;
+            emailChargeUsd: number;
+            emailCount: number;
+            emailBlocks: number;
+        };
+    };
 
     /**
-     * SMS add-on subscriptions for Growth plan churches.
-     * Each add-on costs $20/mo and grants +1 phone number + 1,500 more SMS segments/month.
-     * Max quantity: 8 (total phone numbers cap: 10, total SMS cap: 13,500/mo).
+     * @deprecated Legacy SMS add-on subscriptions (replaced by pay-as-you-go usage billing).
      */
     smsAddOns?: {
         quantity: number;
@@ -1127,10 +1147,22 @@ export interface SystemSettings {
      * Defaults to apiBaseUrl.  Example: https://api.pastoralcare.barnabassoftware.com
      */
     smsWebhookBaseUrl?: string;
-    /** Cost per SMS segment in USD, used for the in-app usage estimate (default 0.0079) */
+    /** Cost per outbound SMS segment in USD (SignalWire base + carrier surcharge, default 0.0079) */
     smsSegmentCostUsd?: number;
-    /** Cost per MMS in USD (default 0.0200) */
+    /** Cost per outbound SMS segment in USD (SignalWire base + carrier surcharge, default 0.0079) */
+    smsOutboundCostUsd?: number;
+    /** Cost per inbound SMS segment in USD (SignalWire base + carrier surcharge, default 0.00715) */
+    smsInboundCostUsd?: number;
+    /** Cost per outbound MMS in USD (SignalWire base + carrier surcharge, default 0.0280) */
     smsMmsSegmentCostUsd?: number;
+    /** Cost per outbound MMS in USD (SignalWire base + carrier surcharge, default 0.0280) */
+    mmsOutboundCostUsd?: number;
+    /** Cost per inbound MMS in USD (SignalWire base + carrier surcharge, default 0.0150) */
+    mmsInboundCostUsd?: number;
+    /** Customer markup percentage over SignalWire cost (default 20 for +20%) */
+    smsMarkupPercent?: number;
+    /** Customer price per started 1,000-email block in USD (default 3.00) */
+    emailBlockPriceUsd?: number;
     /**
      * SignalWire Webhook Signing Key � from Dashboard ? API ? API Credentials ? Signing Key.
      * Used to verify the HMAC-SHA256 signature on all inbound webhook requests.
@@ -2206,10 +2238,16 @@ export interface SmsUsageRecord {
     campaignId?: string | null;
     conversationId?: string | null;
     toPhone: string;
+    fromPhone?: string | null;
+    direction?: SmsDirection;
     segments: number;
     isMms: boolean;
+    /** SignalWire provider cost in USD (base + carrier surcharge) */
     costUsd: number;
+    /** Customer price in USD (costUsd + 20% markup) */
+    customerChargeUsd?: number;
     twilioSid: string;
+    source?: 'inbox' | 'campaign' | 'workflow' | 'inbound' | 'auto-reply' | 'opt-in';
     createdAt: number;
 }
 

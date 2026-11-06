@@ -13,11 +13,18 @@ export const PLANS = [
         name: 'Starter',
         price: 39,
         interval: 'month',
-        features: ['5 Users', 'Up to 200 Active People', 'Basic Analytics', 'People & Groups Sync', 'Census Integration', 'Financial Insights', 'Email (5,000/mo)'],
+        features: [
+            '5 Users',
+            'Up to 200 Active People',
+            'Basic Analytics',
+            'People & Groups Sync',
+            'Census Integration',
+            'Financial Insights',
+            'Email ($3 / 1,000 emails)',
+        ],
         maxUsers: 5,
         maxActivePeople: 200,
-        /** Maximum outbound emails per calendar month. */
-        maxEmailsPerMonth: 5000,
+        maxSmsNumbers: 0,
     },
     {
         id: 'growth',
@@ -33,15 +40,11 @@ export const PLANS = [
             'Census Integration',
             'Polls & Workflows',
             'QR Codes',
-            'SMS (1,500 msg/mo · 2 numbers · MMS=2)',
-            'Custom Domain Email',
+            'SMS & MMS (2 numbers · pay-as-you-go)',
+            'Email ($3 / 1,000 emails · Custom Domain)',
         ],
         maxUsers: 10,
         maxActivePeople: 401,
-        /** Maximum outbound emails per calendar month. */
-        maxEmailsPerMonth: 5000,
-        /** Maximum outbound SMS segments per calendar month. MMS counts as 2 segments. */
-        maxSmsPerMonth: 1500,
         /** Maximum provisioned phone numbers. Grandfathered churches with more are not affected. */
         maxSmsNumbers: 2,
     },
@@ -50,11 +53,36 @@ export const PLANS = [
         name: 'Kingdom',
         price: 199,
         interval: 'month',
-        features: ['Everything in Growth', 'Custom Metrics', 'Dedicated Support', 'Multi-Site Data', 'Advanced Risk Profiling'],
+        features: [
+            'Everything in Growth',
+            'Unlimited Active People & Users',
+            'SMS & MMS (Unlimited numbers · pay-as-you-go)',
+            'Email ($3 / 1,000 emails · Custom Domain)',
+            'Custom Metrics',
+            'Dedicated Support',
+            'Multi-Site Data',
+            'Advanced Risk Profiling',
+        ],
         maxUsers: 99999,
         maxActivePeople: Infinity,
+        maxSmsNumbers: Infinity,
     }
 ];
+
+/** Default pay-as-you-go customer pricing constants (SignalWire cost + 20% markup, $3/1k email). */
+export const USAGE_PRICING = {
+    smsOutboundCostUsd: 0.0079,
+    smsInboundCostUsd: 0.00715,
+    mmsOutboundCostUsd: 0.0280,
+    mmsInboundCostUsd: 0.0150,
+    smsMarkupPercent: 20,
+    smsOutboundPriceUsd: 0.00948,
+    smsInboundPriceUsd: 0.00858,
+    mmsOutboundPriceUsd: 0.0336,
+    mmsInboundPriceUsd: 0.0180,
+    emailBlockPriceUsd: 3.00,
+    emailBlockSize: 1000,
+} as const;
 
 class StripeService {
     private stripePromise: Promise<Stripe | null> | null = null;
@@ -222,8 +250,8 @@ class StripeService {
 export const stripeService = new StripeService();
 
 /**
- * Compute effective SMS limits for a church, incorporating any purchased add-ons.
- * Returns the base plan limits when no add-ons are active.
+ * Compute effective SMS limits for a church.
+ * SMS/MMS messages are pay-as-you-go (unlimited), while phone numbers are capped per plan.
  */
 export function getEffectiveSmsLimits(church: { subscription?: { planId?: string }; smsAddOns?: { quantity?: number } }): {
     maxSmsPerMonth: number;
@@ -231,20 +259,9 @@ export function getEffectiveSmsLimits(church: { subscription?: { planId?: string
 } {
     const planId = church.subscription?.planId || '';
     const plan = PLANS.find(p => p.id === planId);
-    const baseSms     = (plan as any)?.maxSmsPerMonth  ?? Infinity;
-    const baseNumbers = (plan as any)?.maxSmsNumbers   ?? Infinity;
-    const addOnQty    = church.smsAddOns?.quantity ?? 0;
+    const baseNumbers = (plan as any)?.maxSmsNumbers ?? Infinity;
     return {
-        maxSmsPerMonth: isFinite(baseSms)     ? baseSms     + addOnQty * 1500 : Infinity,
-        maxSmsNumbers:  isFinite(baseNumbers) ? baseNumbers + addOnQty        : Infinity,
+        maxSmsPerMonth: Infinity,
+        maxSmsNumbers: baseNumbers,
     };
 }
-
-/** SMS Add-On product metadata (for display in the UI). */
-export const SMS_ADDON = {
-    pricePerMonth: 20,
-    smsPerAddon:   1500,
-    numbersPerAddon: 1,
-    maxAddons:     8,
-    maxTotalNumbers: 10,
-} as const;

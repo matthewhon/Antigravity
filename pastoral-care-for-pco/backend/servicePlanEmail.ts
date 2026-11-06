@@ -12,7 +12,7 @@
  */
 
 import { getDb } from './firebase.js';
-import { resolveEmailProvider } from './emailProvider.js';
+import { resolveEmailProvider, recordEmailUsage } from './emailProvider.js';
 
 // ─── HTML Email Generator ─────────────────────────────────────────────────────
 
@@ -437,6 +437,8 @@ export async function emailServicePlan(req: any, res: any) {
                 });
             }
         }
+
+        await recordEmailUsage(db, churchId, messages.length);
 
         return res.json({
             success: true,

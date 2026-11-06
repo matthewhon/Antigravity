@@ -1,6 +1,6 @@
 import { getDb } from './firebase.js';
 import { sgSend } from './sendEmail.js';
-import { resolveEmailProvider } from './emailProvider.js';
+import { resolveEmailProvider, recordEmailUsage } from './emailProvider.js';
 import { createServerLogger } from '../services/logService.js';
 
 /** Helper: generate a cryptographically-random 32-byte hex string */
@@ -294,6 +294,10 @@ export async function handleGrowDailyEmail(req: any, res: any) {
             } catch (err: any) {
                 errors.push(`Failed to send to ${email}: ${err.message}`);
             }
+        }
+
+        if (successCount > 0) {
+            await recordEmailUsage(db, churchId, successCount);
         }
 
         log.info(`[GrowIntegration] Sent ${successCount} daily emails for church ${churchId}`, 'system', { churchId, successCount }, churchId);

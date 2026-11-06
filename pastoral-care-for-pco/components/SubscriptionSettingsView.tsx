@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Church } from '../types';
-import { PLANS, stripeService, SMS_ADDON, getEffectiveSmsLimits } from '../services/stripeService';
+import { PLANS, stripeService, USAGE_PRICING, getEffectiveSmsLimits } from '../services/stripeService';
 import { auth } from '../services/firebase';
 import { computeActivePeopleCount, ACTIVE_WINDOW_DAYS } from '../services/activePeopleService';
 import { firestore } from '../services/firestoreService';
@@ -19,8 +19,6 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
     const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
     const [showUpgrade, setShowUpgrade] = useState(false);
-    const [addonLoading, setAddonLoading] = useState<'add' | 'remove' | null>(null);
-    const [addonMessage, setAddonMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
 
     // Active People state
     const [activePeopleCount, setActivePeopleCount] = useState<number | null>(church.activePeopleCount ?? null);
@@ -353,173 +351,141 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 </div>
             )}
 
-            {/* ── SMS Quota Card (Growth plan) ── */}
-            {currentPlanId === 'growth' && (() => {
-                const limits = getEffectiveSmsLimits(church);
-                const SMS_QUOTA = limits.maxSmsPerMonth;
+            {/* ── Monthly Pay-As-You-Go Messaging & Email Usage Card ── */}
+            {(() => {
                 const nowDate = new Date();
-                const monthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
-                const usedSegments = church.smsUsage?.[monthKey] ?? 0;
-                const pct = Math.min(100, Math.round((usedSegments / SMS_QUOTA) * 100));
-                const isWarning = pct >= 80;
-                const isExceeded = usedSegments >= SMS_QUOTA;
-                return (
-                    <div className="rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-8 shadow-sm">
-                        <div className="flex items-start justify-between gap-4 mb-5">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 flex items-center justify-center text-2xl">
-                                    💬
-                                </div>
-                                <div>
-                                    <h4 className="text-base font-black text-slate-900 dark:text-white">SMS Usage This Month</h4>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Resets on the 1st · MMS = 2 segments · 2 phone numbers included</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className={`text-2xl font-black tabular-nums ${isExceeded ? 'text-red-600 dark:text-red-400' : isWarning ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-white'}`}>
-                                    {usedSegments.toLocaleString()} <span className="text-sm font-semibold text-slate-400">/ {SMS_QUOTA.toLocaleString()}</span>
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">{SMS_QUOTA - usedSegments > 0 ? `${(SMS_QUOTA - usedSegments).toLocaleString()} remaining` : 'Limit reached'}</p>
-                            </div>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                                className={`h-full rounded-full transition-all ${isExceeded ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-violet-500'}`}
-                                style={{ width: `${pct}%` }}
-                            />
-                        </div>
-                        {isExceeded && (
-                            <div className="mt-4 flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                                <span className="text-lg">🚫</span>
-                                <p className="text-sm text-red-800 dark:text-red-300 font-medium">
-                                    SMS sending is paused — your monthly quota of {SMS_QUOTA.toLocaleString()} segments has been reached. Upgrade to <strong>Kingdom</strong> for unlimited SMS.
-                                </p>
-                                <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 ml-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition">
-                                    Upgrade
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                );
-            })()}
+                const monthKey = `${nowDate.getUTCFullYear()}-${String(nowDate.getUTCMonth() + 1).padStart(2, '0')}`;
+                const localMonthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
 
-            {/* ── SMS Add-On Card (Growth plan only) ── */}
-            {currentPlanId === 'growth' && (() => {
-                const addonQty      = church.smsAddOns?.quantity ?? 0;
-                const limits        = getEffectiveSmsLimits(church);
-                const atMax         = addonQty >= SMS_ADDON.maxAddons;
-                const canRemove     = addonQty > 0;
-                const effectiveSms  = limits.maxSmsPerMonth;
-                const effectiveNums = limits.maxSmsNumbers;
+                const details = church.smsUsageDetails?.[monthKey] || church.smsUsageDetails?.[localMonthKey] || {};
+                const totalSmsSegmentsFallback = church.smsUsage?.[monthKey] ?? church.smsUsage?.[localMonthKey] ?? 0;
+                const outboundSms = details.outboundSmsSegments ?? totalSmsSegmentsFallback;
+                const inboundSms = details.inboundSmsSegments ?? 0;
+                const outboundMms = details.outboundMmsCount ?? 0;
+                const inboundMms = details.inboundMmsCount ?? 0;
 
-                const handleAddAddon = async () => {
-                    setAddonLoading('add');
-                    setAddonMessage(null);
-                    try {
-                        const result = await stripeService.purchaseSmsAddon(church.id);
-                        setAddonMessage({ type: 'success', text: result.message });
-                        // Optimistic UI update
-                        onUpdateChurch({ smsAddOns: { quantity: result.quantity, stripeItemId: church.smsAddOns?.stripeItemId } });
-                    } catch (e: any) {
-                        setAddonMessage({ type: 'error', text: e.message || 'Could not add SMS pack.' });
-                    } finally {
-                        setAddonLoading(null);
-                    }
-                };
+                const calculatedSmsCharge =
+                    outboundSms * USAGE_PRICING.smsOutboundPriceUsd +
+                    inboundSms * USAGE_PRICING.smsInboundPriceUsd +
+                    outboundMms * USAGE_PRICING.mmsOutboundPriceUsd +
+                    inboundMms * USAGE_PRICING.mmsInboundPriceUsd;
+                const smsChargeUsd = details.customerChargeUsd ?? calculatedSmsCharge;
 
-                const handleRemoveAddon = async () => {
-                    if (!window.confirm('Remove one SMS Add-On? This will reduce your SMS and phone number limits at your next invoice.')) return;
-                    setAddonLoading('remove');
-                    setAddonMessage(null);
-                    try {
-                        const result = await stripeService.removeSmsAddon(church.id);
-                        setAddonMessage({ type: 'success', text: result.message });
-                        // Optimistic UI update
-                        onUpdateChurch({ smsAddOns: { quantity: result.quantity, stripeItemId: result.quantity > 0 ? church.smsAddOns?.stripeItemId : undefined } });
-                    } catch (e: any) {
-                        setAddonMessage({ type: 'error', text: e.message || 'Could not remove SMS pack.' });
-                    } finally {
-                        setAddonLoading(null);
-                    }
-                };
+                const emailsSent = church.emailUsage?.[monthKey] ?? church.emailUsage?.[localMonthKey] ?? 0;
+                const emailBlocks = emailsSent > 0 ? Math.ceil(emailsSent / USAGE_PRICING.emailBlockSize) : 0;
+                const emailChargeUsd = emailBlocks * USAGE_PRICING.emailBlockPriceUsd;
+
+                const totalEstimatedUsageUsd = smsChargeUsd + emailChargeUsd;
+                const limits = getEffectiveSmsLimits(church);
+                const maxNumsLabel = isFinite(limits.maxSmsNumbers) ? `${limits.maxSmsNumbers}` : 'Unlimited';
 
                 return (
-                    <div className="rounded-[2rem] border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 p-8 shadow-sm">
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-4 mb-5">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/40 border border-violet-200 dark:border-violet-700 flex items-center justify-center text-2xl">
-                                    ➕
+                    <div className="rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 md:p-10 shadow-sm space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-2xl">
+                                    📊
                                 </div>
                                 <div>
-                                    <h4 className="text-base font-black text-slate-900 dark:text-white">SMS Add-On Packs</h4>
+                                    <h4 className="text-lg font-black text-slate-900 dark:text-white">Messaging & Email Usage (This Month)</h4>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                        ${SMS_ADDON.pricePerMonth}/mo each · +{SMS_ADDON.smsPerAddon.toLocaleString()} SMS · +{SMS_ADDON.numbersPerAddon} number · max {SMS_ADDON.maxTotalNumbers} numbers total
+                                        Pay-as-you-go usage billed automatically on your monthly invoice · No monthly message caps
                                     </p>
                                 </div>
                             </div>
-                            {/* Current count badge */}
-                            <div className="text-right flex-shrink-0">
-                                <p className="text-2xl font-black text-violet-700 dark:text-violet-300 tabular-nums">{addonQty}</p>
-                                <p className="text-xs text-slate-400">{addonQty === 1 ? 'pack active' : 'packs active'}</p>
+                            <div className="text-left md:text-right bg-slate-50 dark:bg-slate-800/70 px-5 py-3 rounded-2xl border border-slate-100 dark:border-slate-700">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                    Est. Usage Charge ({monthKey})
+                                </p>
+                                <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums mt-0.5">
+                                    ${totalEstimatedUsageUsd.toFixed(2)}
+                                </p>
                             </div>
                         </div>
 
-                        {/* Effective limits summary */}
-                        <div className="flex flex-wrap gap-3 mb-5">
-                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                <span>💬</span>
-                                <span>{isFinite(effectiveSms) ? effectiveSms.toLocaleString() : '∞'} SMS/mo</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* SMS & MMS Breakdown */}
+                            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-xl">💬</span>
+                                        <div>
+                                            <h5 className="text-sm font-black text-slate-900 dark:text-white">SMS & MMS Messaging</h5>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                SignalWire rate + 20% · {maxNumsLabel} phone number{limits.maxSmsNumbers === 1 ? '' : 's'} included
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                                        ${smsChargeUsd.toFixed(2)}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Outbound SMS</span>
+                                        <span className="text-base font-black text-slate-800 dark:text-white tabular-nums">{outboundSms.toLocaleString()}</span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">${USAGE_PRICING.smsOutboundPriceUsd.toFixed(4)} / segment</span>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Inbound SMS</span>
+                                        <span className="text-base font-black text-slate-800 dark:text-white tabular-nums">{inboundSms.toLocaleString()}</span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">${USAGE_PRICING.smsInboundPriceUsd.toFixed(4)} / segment</span>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Outbound MMS</span>
+                                        <span className="text-base font-black text-slate-800 dark:text-white tabular-nums">{outboundMms.toLocaleString()}</span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">${USAGE_PRICING.mmsOutboundPriceUsd.toFixed(4)} / msg</span>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Inbound MMS</span>
+                                        <span className="text-base font-black text-slate-800 dark:text-white tabular-nums">{inboundMms.toLocaleString()}</span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">${USAGE_PRICING.mmsInboundPriceUsd.toFixed(4)} / msg</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                <span>📞</span>
-                                <span>{isFinite(effectiveNums) ? effectiveNums : '∞'} phone number{effectiveNums !== 1 ? 's' : ''}</span>
+
+                            {/* Email Breakdown */}
+                            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-6 flex flex-col justify-between space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-xl">✉️</span>
+                                        <div>
+                                            <h5 className="text-sm font-black text-slate-900 dark:text-white">Email Delivery</h5>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                ${USAGE_PRICING.emailBlockPriceUsd.toFixed(2)} per 1,000 emails · No monthly cap
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                                        ${emailChargeUsd.toFixed(2)}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">Emails Sent</span>
+                                        <span className="text-2xl font-black text-slate-800 dark:text-white tabular-nums mt-1 block">
+                                            {emailsSent.toLocaleString()}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">this month</span>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <span className="text-slate-400 block text-[10px] font-bold uppercase">1,000-Email Blocks</span>
+                                        <span className="text-2xl font-black text-slate-800 dark:text-white tabular-nums mt-1 block">
+                                            {emailBlocks}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                                            × ${USAGE_PRICING.emailBlockPriceUsd.toFixed(2)} / block
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                    Includes broadcast campaigns, automated workflows, service plan emails, and newsletter welcome messages.
+                                </p>
                             </div>
                         </div>
-
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-3">
-                            <button
-                                id="btn-add-sms-addon"
-                                onClick={handleAddAddon}
-                                disabled={atMax || addonLoading !== null}
-                                title={atMax ? `Maximum ${SMS_ADDON.maxAddons} add-ons reached (${SMS_ADDON.maxTotalNumbers} numbers)` : 'Add one SMS Pack (+$20/mo)'}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition shadow-md shadow-violet-300/30 dark:shadow-violet-900/40"
-                            >
-                                {addonLoading === 'add' ? <span className="animate-spin">⟳</span> : '+'} Add SMS Pack
-                            </button>
-                            {canRemove && (
-                                <button
-                                    id="btn-remove-sms-addon"
-                                    onClick={handleRemoveAddon}
-                                    disabled={addonLoading !== null}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed text-red-600 dark:text-red-400 font-bold text-sm rounded-xl border border-red-200 dark:border-red-800 transition"
-                                >
-                                    {addonLoading === 'remove' ? <span className="animate-spin">⟳</span> : '−'} Remove Pack
-                                </button>
-                            )}
-                            {atMax && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
-                                    Max reached — upgrade to Kingdom for unlimited SMS
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Status message */}
-                        {addonMessage && (
-                            <div className={`mt-4 p-3 rounded-xl text-sm font-medium ${
-                                addonMessage.type === 'success'
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                    : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
-                            }`}>
-                                {addonMessage.text}
-                            </div>
-                        )}
-
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-4">
-                            Changes apply to your next invoice. No immediate charge.
-                        </p>
                     </div>
                 );
             })()}

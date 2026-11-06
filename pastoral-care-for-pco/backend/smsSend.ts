@@ -5,65 +5,91 @@ import { getSignalWireClient, getSmsWebhookBaseUrl } from './signalwireClient';
 import { fireAndForgetSmsNote } from './pcoNotes';
 
 
-// ─── Segment cost constants (adjust to match SignalWire pricing) ──────────────
-const SMS_COST_PER_SEGMENT = 0.0079;  // USD per outbound SMS segment
-const MMS_COST_PER_MESSAGE = 0.02;    // USD per outbound MMS
+// ─── Default SignalWire Cost & Customer Markup Constants ──────────────────────
+// SignalWire US Local (10DLC) base rates + blended US carrier passthrough surcharges:
+// - SMS Outbound: $0.00415 base + $0.00375 carrier surcharge = $0.00790 -> +20% = $0.00948/segment
+// - SMS Inbound:  $0.00415 base + $0.00300 carrier surcharge = $0.00715 -> +20% = $0.00858/segment
+// - MMS Outbound: $0.02000 base + $0.00800 carrier surcharge = $0.02800 -> +20% = $0.03360/message
+// - MMS Inbound:  $0.01000 base + $0.00500 carrier surcharge = $0.01500 -> +20% = $0.01800/message
+export const DEFAULT_SMS_OUTBOUND_COST_USD = 0.0079;
+export const DEFAULT_SMS_INBOUND_COST_USD  = 0.00715;
+export const DEFAULT_MMS_OUTBOUND_COST_USD = 0.0280;
+export const DEFAULT_MMS_INBOUND_COST_USD  = 0.0150;
+export const DEFAULT_SMS_MARKUP_PERCENT    = 20;
+export const DEFAULT_EMAIL_BLOCK_PRICE_USD = 3.00;
 
-// ─── Plan SMS quotas (segments per month; MMS = 2 segments) ──────────────────
-const PLAN_SMS_QUOTA: Record<string, number> = {
-    starter: 0,       // No SMS on Starter plan
-    growth:  1500,
-    kingdom: Infinity,
-};
+export interface SmsPricingConfig {
+    smsOutboundCostUsd: number;
+    smsInboundCostUsd: number;
+    mmsOutboundCostUsd: number;
+    mmsInboundCostUsd: number;
+    smsMarkupPercent: number;
+    smsOutboundPriceUsd: number;
+    smsInboundPriceUsd: number;
+    mmsOutboundPriceUsd: number;
+    mmsInboundPriceUsd: number;
+    emailBlockPriceUsd: number;
+}
+
+let cachedPricingConfig: { config: SmsPricingConfig; fetchedAt: number } | null = null;
+
+export async function getSmsPricingConfig(db: any): Promise<SmsPricingConfig> {
+    const now = Date.now();
+    if (cachedPricingConfig && now - cachedPricingConfig.fetchedAt < 60_000) {
+        return cachedPricingConfig.config;
+    }
+
+    let settings: any = {};
+    try {
+        const snap = await db.collection('system').doc('settings').get();
+        if (snap.exists) settings = snap.data() || {};
+    } catch {
+        // Fall back to defaults on transient error
+    }
+
+    const smsOutboundCostUsd = Number(settings.smsOutboundCostUsd ?? settings.smsSegmentCostUsd ?? DEFAULT_SMS_OUTBOUND_COST_USD);
+    const smsInboundCostUsd  = Number(settings.smsInboundCostUsd ?? DEFAULT_SMS_INBOUND_COST_USD);
+    const mmsOutboundCostUsd = Number(settings.mmsOutboundCostUsd ?? settings.smsMmsSegmentCostUsd ?? DEFAULT_MMS_OUTBOUND_COST_USD);
+    const mmsInboundCostUsd  = Number(settings.mmsInboundCostUsd ?? DEFAULT_MMS_INBOUND_COST_USD);
+    const smsMarkupPercent   = Number(settings.smsMarkupPercent ?? DEFAULT_SMS_MARKUP_PERCENT);
+    const emailBlockPriceUsd = Number(settings.emailBlockPriceUsd ?? DEFAULT_EMAIL_BLOCK_PRICE_USD);
+
+    const multiplier = 1 + (smsMarkupPercent / 100);
+    const config: SmsPricingConfig = {
+        smsOutboundCostUsd,
+        smsInboundCostUsd,
+        mmsOutboundCostUsd,
+        mmsInboundCostUsd,
+        smsMarkupPercent,
+        smsOutboundPriceUsd: Number((smsOutboundCostUsd * multiplier).toFixed(6)),
+        smsInboundPriceUsd:  Number((smsInboundCostUsd * multiplier).toFixed(6)),
+        mmsOutboundPriceUsd: Number((mmsOutboundCostUsd * multiplier).toFixed(6)),
+        mmsInboundPriceUsd:  Number((mmsInboundCostUsd * multiplier).toFixed(6)),
+        emailBlockPriceUsd,
+    };
+
+    cachedPricingConfig = { config, fetchedAt: now };
+    return config;
+}
 
 /**
- * Hard SMS quota check. Queries smsUsageRecords for the current calendar month,
- * sums segments (MMS already recorded as isMms=true → counts as 2 segments),
- * and throws a 429-style error if adding `additionalSegments` would exceed the plan limit.
- *
- * Pass `additionalSegments = 0` for a read-only check (e.g. before a broadcast).
- * Grandfathered churches: only applies to plans with a finite quota.
+ * Plan access check for SMS.
+ * Starter plan does not include SMS phone numbers; Growth and Kingdom plans
+ * use pay-as-you-go usage billing with no monthly message cap.
  */
 async function checkSmsQuota(
     db: any,
     churchId: string,
-    additionalSegments: number,
+    _additionalSegments: number,
 ): Promise<void> {
-    // Determine plan and add-on quantity
     const churchSnap = await db.collection('churches').doc(churchId).get();
-    if (!churchSnap.exists) return; // If church not found, let other checks handle it
+    if (!churchSnap.exists) return;
     const churchData = churchSnap.data() || {};
     const planId: string = churchData.subscription?.planId || '';
-    const baseQuota = PLAN_SMS_QUOTA[planId] ?? Infinity;
-    // Each SMS add-on grants +1,500 segments/month
-    const addOnBonus = (churchData.smsAddOns?.quantity ?? 0) * 1500;
-    const quota = isFinite(baseQuota) ? baseQuota + addOnBonus : Infinity;
-    if (!isFinite(quota)) return; // Unlimited plan — no check needed
-
-    // Build YYYY-MM key for the current UTC month
-    const now = new Date();
-    const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const monthStart = new Date(`${monthKey}-01T00:00:00.000Z`).getTime();
-    const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).getTime();
-
-    // Sum all outbound segments for this month
-    const usageSnap = await db.collection('smsUsageRecords')
-        .where('churchId', '==', churchId)
-        .where('createdAt', '>=', monthStart)
-        .where('createdAt', '<',  monthEnd)
-        .get();
-
-    let used = 0;
-    usageSnap.forEach((doc: any) => {
-        const d = doc.data();
-        // MMS counts as 2 segments; SMS counts as its actual segment count
-        used += d.isMms ? 2 : (d.segments || 1);
-    });
-
-    if (used + additionalSegments > quota) {
+    if (planId === 'starter') {
         throw {
-            status:  429,
-            message: `SMS quota exceeded. Your plan allows ${quota} SMS segments per month. Used: ${used}, requested: ${additionalSegments}.`,
+            status: 403,
+            message: 'SMS messaging is not available on the Starter plan. Please upgrade to Growth or Kingdom to enable SMS & MMS.',
         };
     }
 }
@@ -78,7 +104,7 @@ function normaliseE164(phone: string): string {
 }
 
 /** Count SMS segments (GSM-7: 160 limit, 153 multi-segment limit. Unicode: 70 limit, 67 multi-segment limit). */
-function countSegments(body: string): number {
+export function countSegments(body: string): number {
     if (!body) return 0;
     // Check if the message contains any character outside the standard GSM-7 basic & extension set.
     const isUnicode = !/^[\n\r a-zA-Z0-9@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\[~\]|€]*$/.test(body);
@@ -263,7 +289,18 @@ async function sendOptInConfirmationIfNeeded(
 
     // 4. Send the compliance message (best-effort)
     try {
-        await client.messages.create({ from: fromNumber, to, body: confirmationBody });
+        const msg = await client.messages.create({ from: fromNumber, to, body: confirmationBody });
+        const segments = countSegments(confirmationBody) || 1;
+        await recordUsage(db, {
+            churchId,
+            toPhone: to,
+            fromPhone: fromNumber,
+            segments,
+            isMms: false,
+            messageSid: msg?.sid || `optin_${Date.now()}`,
+            direction: 'outbound',
+            source: 'opt-in',
+        });
     } catch (e: any) {
         console.warn(`[OptInConfirmation] Failed to send to ${to}: ${e.message}`);
     }
@@ -278,42 +315,96 @@ async function sendOptInConfirmationIfNeeded(
 }
 
 
-/** Record a usage entry and update conversation / campaign. */
-async function recordUsage(db: any, params: {
+/** Record a usage entry (inbound or outbound SMS/MMS) and update church monthly usage counters. */
+export async function recordUsage(db: any, params: {
+    usageId?:       string;
     churchId:       string;
     campaignId?:    string;
     conversationId?: string;
     toPhone:        string;
+    fromPhone?:     string | null;
     segments:       number;
     isMms:          boolean;
     messageSid:     string;
     numberId?:      string | null;
+    direction?:     'outbound' | 'inbound';
+    source?:        'inbox' | 'campaign' | 'workflow' | 'inbound' | 'auto-reply' | 'opt-in';
 }) {
-    const costUsd = params.isMms
-        ? MMS_COST_PER_MESSAGE
-        : params.segments * SMS_COST_PER_SEGMENT;
+    const pricing = await getSmsPricingConfig(db);
+    const direction = params.direction || 'outbound';
+    const segments = Math.max(1, params.segments || 1);
 
-    const usageId = `usage_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    await db.collection('smsUsageRecords').doc(usageId).set({
-        id:              usageId,
-        churchId:        params.churchId,
-        campaignId:      params.campaignId    || null,
-        conversationId:  params.conversationId || null,
-        toPhone:         params.toPhone,
-        segments:        params.segments,
-        isMms:           params.isMms,
+    let costUsd: number;
+    let customerChargeUsd: number;
+
+    if (params.isMms) {
+        costUsd = direction === 'inbound' ? pricing.mmsInboundCostUsd : pricing.mmsOutboundCostUsd;
+        customerChargeUsd = direction === 'inbound' ? pricing.mmsInboundPriceUsd : pricing.mmsOutboundPriceUsd;
+    } else {
+        const unitCost = direction === 'inbound' ? pricing.smsInboundCostUsd : pricing.smsOutboundCostUsd;
+        const unitPrice = direction === 'inbound' ? pricing.smsInboundPriceUsd : pricing.smsOutboundPriceUsd;
+        costUsd = Number((segments * unitCost).toFixed(6));
+        customerChargeUsd = Number((segments * unitPrice).toFixed(6));
+    }
+
+    const usageId = params.usageId || `usage_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const usageRef = db.collection('smsUsageRecords').doc(usageId);
+
+    // If a deterministic usageId is provided (e.g., inbound webhook SID), avoid double-counting retries
+    if (params.usageId) {
+        const existingSnap = await usageRef.get();
+        if (existingSnap.exists) {
+            return;
+        }
+    }
+
+    await usageRef.set({
+        id:                usageId,
+        churchId:          params.churchId,
+        campaignId:        params.campaignId     || null,
+        conversationId:    params.conversationId || null,
+        toPhone:           params.toPhone,
+        fromPhone:         params.fromPhone      || null,
+        direction,
+        source:            params.source || (direction === 'inbound' ? 'inbound' : (params.campaignId ? 'campaign' : 'inbox')),
+        segments,
+        isMms:             params.isMms,
         costUsd,
-        messageSid:      params.messageSid,   // renamed from twilioSid
-        numberId:        params.numberId || null,
-        createdAt:       Date.now(),
+        customerChargeUsd,
+        messageSid:        params.messageSid,
+        twilioSid:         params.messageSid,
+        numberId:          params.numberId || null,
+        createdAt:         Date.now(),
     });
 
     const d = new Date();
     const currentMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    const detailIncrement: Record<string, any> = {
+        providerCostUsd:   FieldValue.increment(costUsd),
+        customerChargeUsd: FieldValue.increment(customerChargeUsd),
+    };
+    if (params.isMms) {
+        if (direction === 'inbound') {
+            detailIncrement.inboundMmsCount = FieldValue.increment(1);
+        } else {
+            detailIncrement.outboundMmsCount = FieldValue.increment(1);
+        }
+    } else {
+        if (direction === 'inbound') {
+            detailIncrement.inboundSmsSegments = FieldValue.increment(segments);
+        } else {
+            detailIncrement.outboundSmsSegments = FieldValue.increment(segments);
+        }
+    }
+
     await db.collection('churches').doc(params.churchId).set({
         smsUsage: {
-            [currentMonth]: FieldValue.increment(params.segments)
-        }
+            [currentMonth]: FieldValue.increment(segments),
+        },
+        smsUsageDetails: {
+            [currentMonth]: detailIncrement,
+        },
     }, { merge: true }).catch((e: any) => console.error('[smsSend] Failed to increment church smsUsage:', e));
 }
 
@@ -401,7 +492,7 @@ export async function sendIndividualInternal(params: {
 
     const msg = await client.messages.create(msgParams);
 
-    await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId: resolvedNumberId });
+    await recordUsage(db, { churchId, toPhone: to, fromPhone: fromNumber, segments, isMms, messageSid: msg.sid, numberId: resolvedNumberId, direction: 'outbound', source: 'inbox' });
 
     // ── TCPA first-message compliance (fire-and-forget) ──────────────────────
     sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});
@@ -712,7 +803,18 @@ export async function sendBulkInternal(params: {
 
                 const msg = await client.messages.create(msgParams);
 
-                await recordUsage(db, { churchId, campaignId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId });
+                await recordUsage(db, {
+                    churchId,
+                    campaignId,
+                    toPhone: to,
+                    fromPhone: fromNumber,
+                    segments,
+                    isMms,
+                    messageSid: msg.sid,
+                    numberId,
+                    direction: 'outbound',
+                    source: campaignId?.startsWith('wf_') ? 'workflow' : 'campaign',
+                });
 
                 // ── TCPA first-message compliance (fire-and-forget) ──────────────────
                 sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});

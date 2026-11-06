@@ -7,8 +7,24 @@
 // To switch providers, set system/settings.emailProvider to 'sendgrid' or
 // 'postmark' — no code deploy required. The switch is live and reversible.
 
+import { FieldValue } from 'firebase-admin/firestore';
 import { SendGridProvider } from './sgProvider.js';
 import { PostmarkProvider } from './pmProvider.js';
+
+/**
+ * Atomically increment monthly email usage count for a church (`church.emailUsage[YYYY-MM]`).
+ * Billed at $3.00 per started 1,000-email block per month.
+ */
+export async function recordEmailUsage(db: any, churchId: string, count: number): Promise<void> {
+    if (!churchId || count <= 0) return;
+    const now = new Date();
+    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    await db.collection('churches').doc(churchId).set({
+        emailUsage: {
+            [currentMonth]: FieldValue.increment(count),
+        },
+    }, { merge: true }).catch((e: any) => console.error('[emailProvider] Failed to increment church emailUsage:', e));
+}
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
