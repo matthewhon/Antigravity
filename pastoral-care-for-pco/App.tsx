@@ -1392,7 +1392,11 @@ const App: React.FC = () => {
                 } />
                 <Route path="/global-admin" element={<GlobalAdminManager />} />
                 
-                <Route path="/tools/team-chat" element={<div className="flex-1 min-h-0 flex flex-col"><TeamChatWorkspace /></div>} />
+                <Route path="/tools/team-chat" element={
+                    hasPermission('tools-team-chat')
+                        ? <div className="flex-1 min-h-0 flex flex-col"><TeamChatWorkspace /></div>
+                        : <Navigate to="/" replace />
+                } />
                 <Route path="/tools/emails" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="emails" />} />
                 <Route path="/tools/polls" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="polls" />} />
                 <Route path="/tools/website" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="website" />} />
@@ -1456,7 +1460,7 @@ const App: React.FC = () => {
             </div>
             
             {/* Global Slide-Over Team Chat Drawer */}
-            <TeamChatDrawer />
+            {hasPermission('tools-team-chat') && <TeamChatDrawer />}
 
             {/* Global Profile Drawer Overlay */}
             {selectedPersonId && church && (

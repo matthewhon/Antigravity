@@ -114,7 +114,7 @@ export const hasModuleAccess = (
     const { isStarterPlan = false, communicationEnabled = true } = opts;
 
     // Plan gate applies to everyone, admins included.
-    if (isStarterPlan && view === 'pastor-ai') return false;
+    if (isStarterPlan && (view === 'pastor-ai' || view === 'tools-team-chat')) return false;
     if (view === 'communication' && !communicationEnabled) return false;
 
     if (isAdmin(user)) return true;

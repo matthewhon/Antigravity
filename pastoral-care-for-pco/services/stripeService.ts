@@ -37,6 +37,7 @@ export const PLANS = [
             'Advanced Analytics',
             'Financial Insights',
             'Pastor AI Assistant',
+            'Team Chat & Channels',
             'Census Integration',
             'Polls & Workflows',
             'QR Codes',

@@ -452,6 +452,7 @@ const Layout: React.FC<LayoutProps> = ({
                 })()}
 
                 {/* Team Chat Slide-Over Drawer Button */}
+                {hasPermission('tools-team-chat') && (
                 <button
                     type="button"
                     onClick={() => setIsDrawerOpen(!isDrawerOpen)}
@@ -471,6 +472,7 @@ const Layout: React.FC<LayoutProps> = ({
                         </span>
                     )}
                 </button>
+                )}
 
                 {/* Settings Gear Icon */}
                 {hasPermission('settings') && (
