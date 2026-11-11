@@ -7,11 +7,16 @@ import {
     Inbox, MessageSquare, Key, BarChart3, Phone, ChevronDown,
     Loader2, Bell, BellOff, Folder,
     Zap, Sparkles, Shield, Mail,
-    Settings2, Cake,
+    Settings2, Cake, UsersRound,
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { QuickSendModal } from './QuickSendModal';
 import logoIconTransparent from '../assets/logo-icon-transparent.png';
+import { useOptionalTeamChat } from '../contexts/TeamChatContext';
+import { hasMessagingAccess } from '../services/chatPermissions';
+import { TeamChatScreen } from './teamchat/TeamChatScreen';
+import { navigateWithTransition } from '../ui/transitions';
+import { useBackHandler } from '../ui/backButton';
 
 
 // ─── Web Push helper ──────────────────────────────────────────────────────────
@@ -42,7 +47,7 @@ const safeJson = async (res: Response): Promise<any> => {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SmsTab = 'inbox' | 'campaigns' | 'workflows' | 'keywords' | 'agent' | 'files' | 'analytics' | 'permissions';
+type SmsTab = 'inbox' | 'team' | 'campaigns' | 'workflows' | 'keywords' | 'agent' | 'files' | 'analytics' | 'permissions';
 
 interface MobileSmsLayoutProps {
     churchId: string;
@@ -81,6 +86,11 @@ const TABS: { id: SmsTab; label: string; icon: React.ReactNode; activeIcon: Reac
         id: 'inbox', label: 'Inbox', perm: 'inboxUserIds',
         icon:       <Inbox size={24} strokeWidth={1.6} />,
         activeIcon: <Inbox size={24} strokeWidth={2.5} />,
+    },
+    {
+        id: 'team', label: 'Team', perm: 'teamChat',
+        icon:       <UsersRound size={24} strokeWidth={1.6} />,
+        activeIcon: <UsersRound size={24} strokeWidth={2.5} />,
     },
     {
         id: 'campaigns', label: 'Broadcast', perm: 'broadcastUserIds',
@@ -201,23 +211,40 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     const tabParam       = initialParams.get('tab') as SmsTab | null;
     const numParam       = initialParams.get('numberId');
     const convParam      = initialParams.get('conversationId');
+    const channelParam   = initialParams.get('channelId');
+
+    // ── Access ────────────────────────────────────────────────────────────────
+    // Staff without the Messaging role can still sign in to use Team Chat.
+    const teamChat       = useOptionalTeamChat();
+    const teamEnabled    = !!teamChat?.enabled;
+    const teamUnread     = teamChat?.totalUnreadCount || 0;
+    const canUseMessaging = hasMessagingAccess(currentUser);
 
     // ── Tab state ─────────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<SmsTab>(() => {
         if (tabParam && TABS.some(t => t.id === tabParam)) return tabParam;
-        return 'inbox';
+        return canUseMessaging ? 'inbox' : 'team';
     });
 
     const [pressedTab, setPressedTab] = useState<SmsTab | null>(null);
 
+    // Last SMS tool tab, so visiting Team and coming back keeps your place
+    const lastSmsTab = useRef<Exclude<SmsTab, 'team'>>('inbox');
+    if (activeTab !== 'team') lastSmsTab.current = activeTab;
+
     // ── Deep-link conversation ID (from notification tap) ─────────────────────
     // Passed down to MessagingModule so SmsInbox can auto-open the right thread.
     const [deepLinkConversationId, setDeepLinkConversationId] = useState<string | null>(convParam);
+    // Team Chat channel to open (from a team-chat push notification)
+    const [deepLinkChannelId, setDeepLinkChannelId] = useState<string | null>(channelParam);
 
     // Responsive states
     const [isTablet, setIsTablet] = useState(() => window.innerWidth >= 640);
     const [showEmailModal, setShowEmailModal] = useState(false);
     const navigate = useNavigate();
+
+    // Android back button closes the Quick Email sheet
+    useBackHandler(showEmailModal, () => { setShowEmailModal(false); return true; });
 
     useEffect(() => {
         const handleResize = () => {
@@ -234,8 +261,8 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     // We handle it here to switch tab, switch number, and open the conversation.
     useEffect(() => {
         const handler = (e: Event) => {
-            const { tab, numberId, conversationId } = (e as CustomEvent).detail as {
-                tab?: string; numberId?: string; conversationId?: string;
+            const { tab, numberId, conversationId, channelId } = (e as CustomEvent).detail as {
+                tab?: string; numberId?: string; conversationId?: string; channelId?: string;
             };
             if (tab && TABS.some(t => t.id === tab)) {
                 setActiveTab(tab as SmsTab);
@@ -248,6 +275,9 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
             if (conversationId) {
                 setDeepLinkConversationId(conversationId);
             }
+            if (channelId) {
+                setDeepLinkChannelId(channelId);
+            }
         };
         window.addEventListener('pushDeepLink', handler);
         return () => window.removeEventListener('pushDeepLink', handler);
@@ -256,8 +286,13 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     const handleTabChange = (tab: SmsTab) => {
         setPressedTab(tab);
         setTimeout(() => setPressedTab(null), 150);
-        setActiveTab(tab);
         sessionStorage.setItem(SESSION_TAB_KEY, tab);
+        if (tab === activeTab) return;
+        // Slide content left/right based on tab order (View Transitions, iOS 18+)
+        const order = tabBarTabs.map(t => t.id);
+        const from = order.indexOf(activeTab);
+        const to = order.indexOf(tab);
+        navigateWithTransition(() => setActiveTab(tab), to >= from ? 'forward' : 'backward');
     };
 
     // ── Phone number state ────────────────────────────────────────────────────
@@ -289,7 +324,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     
     const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
     
+    // Tabs the user may open at all
     const visibleTabs = TABS.filter(t => {
+        if (t.id === 'team') return teamEnabled;
+        // Chat-only staff (no Messaging role) only get Team Chat
+        if (!canUseMessaging) return false;
         if (!isTablet && ['workflows', 'keywords', 'agent', 'permissions'].includes(t.id)) {
             return false;
         }
@@ -298,12 +337,24 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
         return canUserUseFeature(activeNumber, currentUser, t.perm as any);
     });
 
+    // Tabs shown in the bottom bar. On phones Analytics moves to Settings to
+    // make room for Team (it stays reachable via #/?tab=analytics).
+    const tabBarTabs = visibleTabs.filter(t => isTablet || t.id !== 'analytics');
+
     useEffect(() => {
+        if (!canUseMessaging) {
+            if (activeTab !== 'team' && teamEnabled) setActiveTab('team');
+            return;
+        }
+        if (activeTab === 'team') {
+            if (teamChat && !teamEnabled && visibleTabs.length > 0) setActiveTab(visibleTabs[0].id);
+            return;
+        }
         if (numbersLoading || !activeNumber) return;
         if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
             setActiveTab(visibleTabs[0].id);
         }
-    }, [activeNumber, activeTab, currentUser, isTablet, visibleTabs, numbersLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeNumber, activeTab, currentUser, isTablet, visibleTabs, numbersLoading, canUseMessaging, teamEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -496,29 +547,50 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
             </header>
 
             {/* ── Main Content ─────────────────────────────────────────────── */}
-            <main className="flex-1 min-h-0 overflow-hidden relative">
-                <MessagingModule
-                    churchId={churchId}
-                    church={church}
-                    currentUser={currentUser}
-                    onUpdateChurch={onUpdateChurch}
-                    controlledTab={activeTab}
-                    initialNumberId={activeNumberId}
-                    hideNumberSelector={true}
-                    deepLinkConversationId={deepLinkConversationId}
-                    onDeepLinkConversationOpened={() => setDeepLinkConversationId(null)}
-                />
+            {/* view-transition-name scopes tab slide animations to this area */}
+            <main className="flex-1 min-h-0 overflow-hidden relative" style={{ viewTransitionName: 'tab-content' } as React.CSSProperties}>
+                {canUseMessaging && (
+                    <div className={activeTab === 'team' ? 'hidden' : 'h-full'}>
+                        <MessagingModule
+                            churchId={churchId}
+                            church={church}
+                            currentUser={currentUser}
+                            onUpdateChurch={onUpdateChurch}
+                            controlledTab={activeTab === 'team' ? lastSmsTab.current : activeTab}
+                            initialNumberId={activeNumberId}
+                            hideNumberSelector={true}
+                            deepLinkConversationId={deepLinkConversationId}
+                            onDeepLinkConversationOpened={() => setDeepLinkConversationId(null)}
+                        />
+                    </div>
+                )}
+                {teamEnabled && (
+                    <div className={activeTab === 'team' ? 'h-full' : 'hidden'}>
+                        <TeamChatScreen
+                            visible={activeTab === 'team'}
+                            deepLinkChannelId={deepLinkChannelId}
+                            onDeepLinkHandled={() => setDeepLinkChannelId(null)}
+                        />
+                    </div>
+                )}
+                {!canUseMessaging && !teamEnabled && (
+                    <div className="h-full flex flex-col items-center justify-center text-center px-8 text-slate-500 dark:text-slate-400">
+                        <UsersRound size={40} className="mb-3 opacity-40" />
+                        <p className="font-semibold text-slate-700 dark:text-slate-200">Nothing to show yet</p>
+                        <p className="text-sm mt-1">Your account doesn&apos;t have access to Messaging or Team Chat. Ask your church admin.</p>
+                    </div>
+                )}
             </main>
 
-            {/* ── iOS-style Bottom Tab Bar ──────────────────────────────────── */}
+            {/* ── iOS-style Bottom Tab Bar (hidden when there is only one tab) ── */}
             <nav
-                className="shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800"
+                className={`shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 ${tabBarTabs.length <= 1 ? 'hidden' : ''}`}
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
                 <div className="flex items-stretch h-[49px]">
                     {isTablet ? (
-                        // Tablet/iPad Layout: Show all 8 tabs inline
-                        visibleTabs.map(tab => {
+                        // Tablet/iPad Layout: Show all tabs inline
+                        tabBarTabs.map(tab => {
                             const isActive  = activeTab === tab.id;
                             const isPressed = pressedTab === tab.id;
                             return (
@@ -533,7 +605,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                 >
                                     {/* Icon container with iOS pill highlight */}
                                     <span
-                                        className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                                        className="relative flex items-center justify-center rounded-2xl transition-all duration-150"
                                         style={{
                                             width: 44,
                                             height: 28,
@@ -543,6 +615,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                         }}
                                     >
                                         {isActive ? tab.activeIcon : tab.icon}
+                                        {tab.id === 'team' && teamUnread > 0 && (
+                                            <span className="absolute -top-1 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900">
+                                                {teamUnread > 99 ? '99+' : teamUnread}
+                                            </span>
+                                        )}
                                     </span>
                                     {/* Label */}
                                     <span
@@ -560,8 +637,8 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                             );
                         })
                     ) : (
-                        // Phone Layout: Show Inbox, Broadcast, Email, Files, Analytics inline
-                        visibleTabs.map(tab => {
+                        // Phone Layout: Inbox, Team, Broadcast, Email, Files (Analytics lives in Settings)
+                        tabBarTabs.map(tab => {
                             const isActive  = activeTab === tab.id;
                             const isPressed = pressedTab === tab.id;
                             return (
@@ -575,7 +652,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                         style={{ WebkitTapHighlightColor: 'transparent' }}
                                     >
                                         <span
-                                            className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                                            className="relative flex items-center justify-center rounded-2xl transition-all duration-150"
                                             style={{
                                                 width: 44,
                                                 height: 28,
@@ -585,6 +662,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                             }}
                                         >
                                             {isActive ? tab.activeIcon : tab.icon}
+                                        {tab.id === 'team' && teamUnread > 0 && (
+                                            <span className="absolute -top-1 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900">
+                                                {teamUnread > 99 ? '99+' : teamUnread}
+                                            </span>
+                                        )}
                                         </span>
                                         <span
                                             className="leading-none"
@@ -607,7 +689,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                             style={{ WebkitTapHighlightColor: 'transparent' }}
                                         >
                                             <span
-                                                className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                                                className="relative flex items-center justify-center rounded-2xl transition-all duration-150"
                                                 style={{
                                                     width: 44,
                                                     height: 28,

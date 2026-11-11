@@ -65,3 +65,27 @@ DEMO BEHAVIOUR NOTES
 • The app works fully offline once loaded (PWA with service worker caching).
 
 ================================================================================
+
+================================================================================
+TEAM CHAT (added in iOS 2.1 / Android 1.2.0) — NOTES FOR REVIEWERS
+================================================================================
+The native "Pastoral Care Messaging" app now includes a "Team" tab: an
+internal chat for the staff of one church (channels and direct messages).
+
+User-generated content safeguards (App Review Guideline 1.2):
+• Not public: only signed-in staff accounts that a church administrator has
+  created can use it. There is no sign-up and no contact with outside users.
+• Members only see their own church. Some channels are limited further to
+  staff in a ministry area (for example Giving or Pastoral Care).
+• Report: long-press any message → "Report to church admin". This sends the
+  reported message to the church's administrators.
+• Delete: users can delete their own messages (long-press → Delete).
+• Church administrators can remove staff accounts from the web dashboard, which
+  takes away their access to the app.
+
+How to test with the demo account:
+1. Sign in and tap the "Team" tab.
+2. Open #general and send a message. Type "@" to mention a teammate.
+3. Long-press a message to react, reply, edit, delete, or report.
+4. Tap "+" to start a direct message or create a channel.
+5. Swipe right on an open conversation to go back.

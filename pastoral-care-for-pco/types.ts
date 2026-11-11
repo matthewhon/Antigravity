@@ -3184,6 +3184,10 @@ export interface TeamChannel {
     lastReadAt?: Record<string, number>;
     /** Last ISO week key (e.g. '2026-W45') when an automated weekly briefing was posted */
     lastBriefingWeekKey?: string;
+    /** Users who opted into a native push for EVERY message in this channel ("Notify me for all messages") */
+    notifyUserIds?: string[];
+    /** Users who muted this channel — suppresses their notifyUserIds pushes (DMs and @mentions still notify) */
+    mutedUserIds?: string[];
 }
 
 export interface ChatFileAttachment {
@@ -3269,5 +3273,7 @@ export interface TeamMessage {
     mentionedUserIds?: string[];
     /** Emoji -> array of userIds */
     reactions?: Record<string, string[]>;
+    /** Epoch ms when the server sent native push notifications for this message (idempotency guard) */
+    pushNotifiedAt?: number;
 }
 

@@ -14,6 +14,10 @@ import { NoChurchAccess } from './components/NoChurchAccess';
 import { TodaysCelebrationsModal } from './components/TodaysCelebrationsModal';
 import { ForceChangePasswordModal } from './components/ForceChangePasswordModal';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { TeamChatProvider } from './contexts/TeamChatContext';
+import { hasMessagingAccess, hasTeamChatAccess } from './services/chatPermissions';
+import { AndroidBackButton } from './components/AndroidBackButton';
+import { useBackHandler } from './ui/backButton';
 import {
   CelebrationNotificationsNative,
   getCelebrationsForDate,
@@ -32,6 +36,9 @@ const App: React.FC = () => {
 
   // Initialize Push Notifications if logged in and on a native device
   usePushNotifications(user);
+
+  // Android back button closes the Today's Celebrations popup
+  useBackHandler(showCelebrationsModal, () => { setShowCelebrationsModal(false); return true; });
 
   const todayCelebrationsCount = useMemo(() => {
     return getCelebrationsForDate(people, new Date()).length;
@@ -140,7 +147,11 @@ const App: React.FC = () => {
           console.log("Fetching user profile for:", authUser.uid);
           const userProfile = await firestore.getUserProfile(authUser.uid);
           console.log("User profile fetched:", userProfile);
-          if (userProfile && (userProfile.roles.includes('Messaging') || userProfile.roles.includes('Church Admin') || userProfile.roles.includes('System Administration'))) {
+          // Load the church up front: Team Chat access depends on the church plan.
+          const churchProfile = userProfile?.churchId ? await firestore.getChurch(userProfile.churchId) : null;
+          // Messaging/Admin users get the full app; any other staff can sign in for Team Chat.
+          const allowed = !!userProfile && (hasMessagingAccess(userProfile) || hasTeamChatAccess(userProfile, churchProfile));
+          if (userProfile && allowed) {
             // Sync Firestore user profile email with Auth user email if changed & verified
             if (authUser.email && authUser.email.toLowerCase() !== userProfile.email.toLowerCase()) {
               const updatedProfile = { ...userProfile, email: authUser.email.toLowerCase() };
@@ -149,14 +160,12 @@ const App: React.FC = () => {
             } else {
               setUser(userProfile);
             }
-            if (userProfile.churchId) {
-              console.log("Fetching church profile for:", userProfile.churchId);
-              const churchProfile = await firestore.getChurch(userProfile.churchId);
+            if (churchProfile) {
               console.log("Church profile fetched:", churchProfile);
               setChurch(churchProfile);
             }
           } else {
-            console.warn("User does not have messaging access");
+            console.warn("User does not have messaging or team chat access");
             setUser(null);
           }
         } catch (e) {
@@ -241,26 +250,29 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
+      <AndroidBackButton />
       <Routes>
         <Route
           path="/"
           element={
             user ? (
               church ? (
-                <MobileSmsLayout
-                  churchId={church.id}
-                  church={church}
-                  currentUser={user}
-                  todayCelebrationsCount={todayCelebrationsCount}
-                  onOpenCelebrationsModal={() => setShowCelebrationsModal(true)}
-                  onUpdateChurch={async (updates) => {
-                    const updated = { ...church, ...updates };
-                    setChurch(updated);
-                    await firestore.updateChurch(church.id, updates);
-                  }}
-                  onNavigateHome={() => auth.signOut()}
-                  onLogout={() => auth.signOut()}
-                />
+                <TeamChatProvider currentUser={user} church={church} people={people}>
+                  <MobileSmsLayout
+                    churchId={church.id}
+                    church={church}
+                    currentUser={user}
+                    todayCelebrationsCount={todayCelebrationsCount}
+                    onOpenCelebrationsModal={() => setShowCelebrationsModal(true)}
+                    onUpdateChurch={async (updates) => {
+                      const updated = { ...church, ...updates };
+                      setChurch(updated);
+                      await firestore.updateChurch(church.id, updates);
+                    }}
+                    onNavigateHome={() => auth.signOut()}
+                    onLogout={() => auth.signOut()}
+                  />
+                </TeamChatProvider>
               ) : (
                 <NoChurchAccess />
               )

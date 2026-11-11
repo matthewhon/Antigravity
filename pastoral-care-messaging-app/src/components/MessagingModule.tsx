@@ -24,6 +24,11 @@ import {
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
 import { SmsEventPickerModal, generateCampaignContent } from './SmsEventPickerModal';
+import { PhoneStackPanes } from '../ui/PhoneStackPanes';
+import type { SwipeStackHandle } from '../ui/SwipeStack';
+import { SwipeRow } from '../ui/SwipeRow';
+import { ImageViewer } from '../ui/ImageViewer';
+import { isRendered, useBackHandler } from '../ui/backButton';
 
 // --- Constants --------------------------------------------------------------
 
@@ -917,8 +922,20 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const showStep3 = isDesktop || step === 3;
     const showStep4 = isDesktop || step === 4;
 
+    // Android back button: previous wizard step on phones, otherwise leave the editor
+    const composerRootRef = useRef<HTMLDivElement>(null);
+    useBackHandler(true, () => {
+        if (!isRendered(composerRootRef.current)) return false;
+        if (showSchedule) { setShowSchedule(false); return true; }
+        if (showFilePicker) { setShowFilePicker(false); return true; }
+        if (showEventPicker) { setShowEventPicker(false); return true; }
+        if (!isDesktop && step > 1) { setStep(s => (s - 1) as 1 | 2 | 3 | 4); return true; }
+        onBack();
+        return true;
+    });
+
     return (
-        <div className="flex flex-col h-full w-full max-w-full overflow-x-hidden">
+        <div ref={composerRootRef} className="flex flex-col h-full w-full max-w-full overflow-x-hidden">
             {/* Header */}
             <div className="flex flex-wrap items-center gap-2 px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -2752,6 +2769,33 @@ const SmsInbox: React.FC<{
     const [showUnreadOnly, setShowUnreadOnly] = useState(false);
     const [showComposer, setShowComposer] = useState(false);
 
+    // Phones get a swipe-back stack (list ↔ thread); tablets keep the split view
+    const [isPhone, setIsPhone] = useState(() => window.innerWidth < 768);
+    useEffect(() => {
+        const onResize = () => setIsPhone(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+    const inboxStackRef = useRef<SwipeStackHandle>(null);
+    const closeThread = () => {
+        if (isPhone && inboxStackRef.current) inboxStackRef.current.back();
+        else setActiveConv(null);
+    };
+
+    // Android back button: close the New Message composer (open conversations
+    // are handled by the SwipeStack; on tablets close the thread directly).
+    const inboxRootRef = useRef<HTMLDivElement>(null);
+    useBackHandler(showComposer, () => {
+        if (!isRendered(inboxRootRef.current)) return false;
+        setShowComposer(false);
+        return true;
+    });
+    useBackHandler(!!activeConv && !isPhone, () => {
+        if (!isRendered(inboxRootRef.current)) return false;
+        setActiveConv(null);
+        return true;
+    });
+
     // Tags
     const [tags, setTags] = useState<SmsTag[]>([]);
     const [tagFilter, setTagFilter] = useState<string | null>(null); // tag id to filter by
@@ -3253,7 +3297,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
     };
 
     return (
-        <div className="flex h-full min-h-0">
+        <div ref={inboxRootRef} className="flex h-full min-h-0">
             {/* Inbox Toast */}
             {inboxToast && <Toast msg={inboxToast.msg} type={inboxToast.type} onClose={() => setInboxToast(null)} />}
             {/* New Message Composer modal */}
@@ -3275,7 +3319,14 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             )}
 
             {/* Conversation list */}
-            <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-900 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
+            <PhoneStackPanes
+                ref={inboxStackRef}
+                isPhone={isPhone}
+                showDetail={!!activeConv}
+                detailKey={activeConv?.id}
+                onPop={() => setActiveConv(null)}
+            >
+            <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-900 text-left ${isPhone ? 'h-full flex' : activeConv ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-2">
@@ -3358,12 +3409,32 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         const isUnread = (conv.unreadCount || 0) > 0;
                         const isActive = activeConv?.id === conv.id;
                         const convTags = tags.filter(t => (conv.tags || []).includes(t.id) && (t.name !== 'Needs Prayer' || conv.lastMessageDirection === 'inbound'));
+                        const prayerTagOnConv = tags.find(t => t.name === 'Needs Prayer' && (conv.tags || []).includes(t.id));
+                        const rowActions = [
+                            {
+                                key: 'read',
+                                label: isUnread ? 'Read' : 'Unread',
+                                colorClass: 'bg-violet-600',
+                                icon: isUnread ? <CheckCircle size={18} /> : <Circle size={18} />,
+                                onClick: () => {
+                                    updateDoc(doc(firebaseDb, 'smsConversations', conv.id), { unreadCount: isUnread ? 0 : 1 })
+                                        .catch(() => showInboxToast('Could not update conversation', 'error'));
+                                },
+                            },
+                            ...(prayerTagOnConv ? [{
+                                key: 'prayer',
+                                label: 'Resolve',
+                                colorClass: 'bg-emerald-600',
+                                icon: <span className="text-[17px] leading-none">🙏</span>,
+                                onClick: () => handleToggleConvTag(conv, prayerTagOnConv.id),
+                            }] : []),
+                        ];
                         return (
+                            <SwipeRow key={conv.id} trailing={rowActions} onTap={() => setActiveConv(conv)}>
                             <button
-                                key={conv.id}
-                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${isActive ? 'bg-violet-50 dark:bg-violet-900/20' : ''
+                                type="button"
+                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${isActive && !isPhone ? 'bg-violet-50 dark:bg-violet-900/20' : 'bg-white dark:bg-slate-900'
                                     }`}
-                                onClick={() => setActiveConv(conv)}
                             >
                                 {/* Unread left accent bar */}
                                 {isUnread && !isActive && (
@@ -3420,6 +3491,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     </div>
                                 </div>
                             </button>
+                            </SwipeRow>
                         );
                     })}
                 </div>
@@ -3431,7 +3503,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     {/* Thread header */}
                     <div className="shrink-0 px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3 flex-wrap">
                         <button
-                            onClick={() => setActiveConv(null)}
+                            onClick={closeThread}
                             className="md:hidden p-1.5 -ml-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
                             title="Back"
                         >
@@ -3621,41 +3693,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         )}
                     </div>
 
-                    {/* Image Lightbox Modal */}
-                    {viewingImageUrl && (
-                        <div
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-                            onClick={() => setViewingImageUrl(null)}
-                        >
-                            <div className="relative max-w-4xl max-h-[90vh] overflow-hidden flex flex-col items-center">
-                                <button
-                                    type="button"
-                                    onClick={() => setViewingImageUrl(null)}
-                                    className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition shadow-lg z-10"
-                                    title="Close"
-                                >
-                                    <X size={20} />
-                                </button>
-                                <img
-                                    src={viewingImageUrl}
-                                    alt="Expanded attachment"
-                                    className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <div className="mt-3 flex gap-3">
-                                    <a
-                                        href={viewingImageUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-full text-xs font-semibold backdrop-blur-md transition flex items-center gap-1.5"
-                                    >
-                                        Open Original ↗
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {/* Image Lightbox: rendered once at the inbox root via <ImageViewer> (top layer) */}
 
                     {/* Reply box */}
                     <div className="shrink-0 p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
@@ -3868,6 +3906,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     <p className="font-semibold">Select a conversation</p>
                 </div>
             )}
+            </PhoneStackPanes>
+            <ImageViewer url={viewingImageUrl} onClose={() => setViewingImageUrl(null)} />
         </div>
     );
 };

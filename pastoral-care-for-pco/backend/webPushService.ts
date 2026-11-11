@@ -178,10 +178,7 @@ export async function sendPushToChurch(opts: {
                 }
             }
 
-            const tokensToSend: string[] = [];
-            const tokenToUserMap: { [token: string]: string } = {};
-            const apnsTokensToConvert: { token: string; userId: string }[] = [];
-
+            const eligibleUsers: FcmUserDoc[] = [];
             for (const userDoc of usersSnap.docs) {
                 const userData = userDoc.data();
                 const fcmTokens: string[] = userData.fcmTokens || [];
@@ -197,120 +194,184 @@ export async function sendPushToChurch(opts: {
                     continue;
                 }
 
-                for (const tok of fcmTokens) {
-                    if (/^[0-9a-fA-F]{64}$/.test(tok)) {
-                        apnsTokensToConvert.push({ token: tok, userId: userDoc.id });
-                    } else {
-                        tokensToSend.push(tok);
-                        tokenToUserMap[tok] = userDoc.id;
-                    }
-                }
+                eligibleUsers.push({ id: userDoc.id, data: userData });
             }
 
-            // Convert APNs tokens to FCM tokens dynamically
-            if (apnsTokensToConvert.length > 0) {
-                const uniqueApns = Array.from(new Set(apnsTokensToConvert.map(x => x.token)));
-                console.log(`[FCM] Converting ${uniqueApns.length} APNs tokens to FCM tokens...`);
-                
-                // Try production first (sandbox: false)
-                let converted: { [apnsToken: string]: string } = {};
-                try {
-                    converted = await convertApnsToFcm(uniqueApns, false);
-                } catch (e) {
-                    console.error('[FCM] APNs conversion (production) failed:', e);
-                }
-
-                // Try sandbox second for any that failed or weren't returned
-                const remainingApns = uniqueApns.filter(t => !converted[t]);
-                if (remainingApns.length > 0) {
-                    try {
-                        const convertedSandbox = await convertApnsToFcm(remainingApns, true);
-                        converted = { ...converted, ...convertedSandbox };
-                    } catch (e) {
-                        console.error('[FCM] APNs conversion (sandbox) failed:', e);
-                    }
-                }
-
-                // Add successfully converted tokens and save to Firestore
-                for (const item of apnsTokensToConvert) {
-                    const apnsToken = item.token;
-                    const fcmToken = converted[apnsToken];
-                    if (fcmToken) {
-                        console.log(`[FCM] Converted APNs token ${apnsToken.slice(0, 8)}... to FCM token ${fcmToken.slice(0, 8)}...`);
-                        tokensToSend.push(fcmToken);
-                        tokenToUserMap[fcmToken] = item.userId;
-
-                        // Persist FCM token and remove APNs token to avoid repeating conversion next time
-                        try {
-                            await db.collection('users').doc(item.userId).update({
-                                fcmTokens: FieldValue.arrayUnion(fcmToken)
-                            });
-                            await db.collection('users').doc(item.userId).update({
-                                fcmTokens: FieldValue.arrayRemove(apnsToken)
-                            });
-                            console.log(`[FCM] Swapped APNs token with FCM token for user ${item.userId}`);
-                        } catch (dbErr) {
-                            console.error(`[FCM] Failed to update Firestore token mapping for user ${item.userId}:`, dbErr);
-                        }
-                    } else {
-                        console.warn(`[FCM] Could not convert APNs token ${apnsToken.slice(0, 8)}... for user ${item.userId}`);
-                    }
-                }
-            }
-
-            if (tokensToSend.length > 0) {
-                const uniqueTokens = Array.from(new Set(tokensToSend));
-                
-                const response = await admin.messaging().sendEachForMulticast({
-                    tokens: uniqueTokens,
-                    notification: {
-                        title: opts.title,
-                        body: opts.body,
-                    },
-                    data: {
-                        url: opts.url || '/mobile/sms',
-                        tag: opts.tag || 'sms-new',
-                    },
-                    apns: {
-                        payload: {
-                            aps: {
-                                sound: 'default',
-                                badge: 1,
-                            }
-                        }
-                    }
-                });
-
-                console.log(`[FCM] Multicast sent. Success count: ${response.successCount}, failure count: ${response.failureCount}`);
-
-                // Clean up stale or unregistered tokens
-                const tokensToDelete: { userId: string; token: string }[] = [];
-                response.responses.forEach((resp, idx) => {
-                    if (!resp.success && resp.error) {
-                        const code = resp.error.code;
-                        if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
-                            const failedToken = uniqueTokens[idx];
-                            const uId = tokenToUserMap[failedToken];
-                            if (uId) {
-                                tokensToDelete.push({ userId: uId, token: failedToken });
-                            }
-                        }
-                    }
-                });
-
-                if (tokensToDelete.length > 0) {
-                    for (const item of tokensToDelete) {
-                        await db.collection('users').doc(item.userId).update({
-                            fcmTokens: FieldValue.arrayRemove(item.token)
-                        }).catch(err => console.error(`[FCM] Stale token cleanup failed for user ${item.userId}:`, err));
-                    }
-                    console.log(`[FCM] Cleaned up ${tokensToDelete.length} stale tokens.`);
-                }
-            }
+            await sendFcmToUsers(eligibleUsers, {
+                title: opts.title,
+                body: opts.body,
+                data: {
+                    url: opts.url || '/mobile/sms',
+                    tag: opts.tag || 'sms-new',
+                },
+                badge: 1,
+            });
         }
     } catch (err: any) {
         console.error('[FCM] Native push send error:', err?.message || err);
     }
+}
+
+/** A user document as consumed by {@link sendFcmToUsers}. */
+export type FcmUserDoc = { id: string; data: any };
+
+/**
+ * Send a native FCM push (iOS / Android) to the given users.
+ *
+ * Accepts either already-loaded user docs (`{ id, data }`) or bare user IDs
+ * (which are loaded from `users/{id}`). Performs NO role filtering — callers
+ * decide who is eligible (SMS push filters to Messaging/Admin roles in
+ * `sendPushToChurch`; Team Chat uses channel visibility instead).
+ *
+ * Handles:
+ *   - collecting `users.fcmTokens`
+ *   - converting raw APNs hex tokens to FCM tokens (production, then sandbox)
+ *     and persisting the swap on the user doc
+ *   - multicast send via `admin.messaging().sendEachForMulticast`
+ *   - cleanup of stale / unregistered tokens
+ *
+ * May throw if Firestore / FCM itself fails — callers should wrap in try/catch.
+ */
+export async function sendFcmToUsers(
+    users: FcmUserDoc[] | string[],
+    payload: { title: string; body: string; data: Record<string, string>; badge?: number }
+): Promise<{ tokenCount: number; successCount: number; failureCount: number }> {
+    const db = getDb();
+    const result = { tokenCount: 0, successCount: 0, failureCount: 0 };
+    if (!users || users.length === 0) return result;
+
+    // Resolve bare IDs into user docs
+    let userDocs: FcmUserDoc[];
+    if (typeof users[0] === 'string') {
+        const ids = Array.from(new Set(users as string[]));
+        const snaps = await Promise.all(ids.map(id => db.collection('users').doc(id).get()));
+        userDocs = snaps
+            .filter((snap: any) => snap.exists)
+            .map((snap: any) => ({ id: snap.id, data: snap.data() || {} }));
+    } else {
+        userDocs = users as FcmUserDoc[];
+    }
+
+    const tokensToSend: string[] = [];
+    const tokenToUserMap: { [token: string]: string } = {};
+    const apnsTokensToConvert: { token: string; userId: string }[] = [];
+
+    for (const userDoc of userDocs) {
+        const fcmTokens: string[] = userDoc.data?.fcmTokens || [];
+        if (fcmTokens.length === 0) continue;
+
+        for (const tok of fcmTokens) {
+            if (/^[0-9a-fA-F]{64}$/.test(tok)) {
+                apnsTokensToConvert.push({ token: tok, userId: userDoc.id });
+            } else {
+                tokensToSend.push(tok);
+                tokenToUserMap[tok] = userDoc.id;
+            }
+        }
+    }
+
+    // Convert APNs tokens to FCM tokens dynamically
+    if (apnsTokensToConvert.length > 0) {
+        const uniqueApns = Array.from(new Set(apnsTokensToConvert.map(x => x.token)));
+        console.log(`[FCM] Converting ${uniqueApns.length} APNs tokens to FCM tokens...`);
+
+        // Try production first (sandbox: false)
+        let converted: { [apnsToken: string]: string } = {};
+        try {
+            converted = await convertApnsToFcm(uniqueApns, false);
+        } catch (e) {
+            console.error('[FCM] APNs conversion (production) failed:', e);
+        }
+
+        // Try sandbox second for any that failed or weren't returned
+        const remainingApns = uniqueApns.filter(t => !converted[t]);
+        if (remainingApns.length > 0) {
+            try {
+                const convertedSandbox = await convertApnsToFcm(remainingApns, true);
+                converted = { ...converted, ...convertedSandbox };
+            } catch (e) {
+                console.error('[FCM] APNs conversion (sandbox) failed:', e);
+            }
+        }
+
+        // Add successfully converted tokens and save to Firestore
+        for (const item of apnsTokensToConvert) {
+            const apnsToken = item.token;
+            const fcmToken = converted[apnsToken];
+            if (fcmToken) {
+                console.log(`[FCM] Converted APNs token ${apnsToken.slice(0, 8)}... to FCM token ${fcmToken.slice(0, 8)}...`);
+                tokensToSend.push(fcmToken);
+                tokenToUserMap[fcmToken] = item.userId;
+
+                // Persist FCM token and remove APNs token to avoid repeating conversion next time
+                try {
+                    await db.collection('users').doc(item.userId).update({
+                        fcmTokens: FieldValue.arrayUnion(fcmToken)
+                    });
+                    await db.collection('users').doc(item.userId).update({
+                        fcmTokens: FieldValue.arrayRemove(apnsToken)
+                    });
+                    console.log(`[FCM] Swapped APNs token with FCM token for user ${item.userId}`);
+                } catch (dbErr) {
+                    console.error(`[FCM] Failed to update Firestore token mapping for user ${item.userId}:`, dbErr);
+                }
+            } else {
+                console.warn(`[FCM] Could not convert APNs token ${apnsToken.slice(0, 8)}... for user ${item.userId}`);
+            }
+        }
+    }
+
+    if (tokensToSend.length === 0) return result;
+
+    const uniqueTokens = Array.from(new Set(tokensToSend));
+    result.tokenCount = uniqueTokens.length;
+
+    const response = await admin.messaging().sendEachForMulticast({
+        tokens: uniqueTokens,
+        notification: {
+            title: payload.title,
+            body: payload.body,
+        },
+        data: payload.data,
+        apns: {
+            payload: {
+                aps: {
+                    sound: 'default',
+                    badge: payload.badge ?? 1,
+                }
+            }
+        }
+    });
+
+    result.successCount = response.successCount;
+    result.failureCount = response.failureCount;
+    console.log(`[FCM] Multicast sent. Success count: ${response.successCount}, failure count: ${response.failureCount}`);
+
+    // Clean up stale or unregistered tokens
+    const tokensToDelete: { userId: string; token: string }[] = [];
+    response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+            const code = resp.error.code;
+            if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+                const failedToken = uniqueTokens[idx];
+                const uId = tokenToUserMap[failedToken];
+                if (uId) {
+                    tokensToDelete.push({ userId: uId, token: failedToken });
+                }
+            }
+        }
+    });
+
+    if (tokensToDelete.length > 0) {
+        for (const item of tokensToDelete) {
+            await db.collection('users').doc(item.userId).update({
+                fcmTokens: FieldValue.arrayRemove(item.token)
+            }).catch(err => console.error(`[FCM] Stale token cleanup failed for user ${item.userId}:`, err));
+        }
+        console.log(`[FCM] Cleaned up ${tokensToDelete.length} stale tokens.`);
+    }
+
+    return result;
 }
 
 /** Express route handler: GET /push/vapid-public-key */

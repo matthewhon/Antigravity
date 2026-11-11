@@ -1739,3 +1739,126 @@ export function hasBroadcastAccess(currentUser: User | undefined, targetId: stri
     
     return false;
 }
+
+// ─── Internal Team Chat (shared with the web app's Team Chat) ────────────────
+// Mirrors pastoral-care-for-pco/types.ts. Both apps read/write the same
+// `team_channels` and `team_messages` Firestore collections, so keep in sync.
+
+export type TeamChannelType = 'department' | 'custom_channel' | 'direct' | 'widget_thread';
+
+export type TeamChatArea = 'giving' | 'care' | 'people' | 'groups' | 'services' | 'admin';
+
+export interface TeamChannel {
+    id: string;
+    churchId: string;
+    type: TeamChannelType;
+    /** Display name for channels/threads (for DMs, resolved from the other participants) */
+    name?: string;
+    description?: string;
+    icon?: string;
+    /** If set, ONLY users who pass canReadArea(user, requiredArea) can see this channel */
+    requiredArea?: TeamChatArea;
+    /** Explicit participant user IDs (DMs and private channels) */
+    participantIds: string[];
+    /** If true, anyone who passes requiredArea (or all staff) can view/join */
+    isAutoJoinedByRole?: boolean;
+    campusId?: string | null;
+    /** Widgets pinned to the top of this channel */
+    pinnedWidgets?: ChatWidgetAttachment[];
+    createdBy: string;
+    createdAt: number;
+    lastMessageAt: number;
+    lastMessagePreview?: string;
+    lastMessageSenderId?: string;
+    lastMessageSenderName?: string;
+    /** userId -> epoch ms when the user last read this channel */
+    lastReadAt?: Record<string, number>;
+    lastBriefingWeekKey?: string;
+    /** Users who opted into a push notification for every message in this channel */
+    notifyUserIds?: string[];
+    /** Users who muted this channel */
+    mutedUserIds?: string[];
+}
+
+export interface ChatFileAttachment {
+    id: string;
+    kind: 'image' | 'video' | 'document';
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    url: string;
+    gcsPath: string;
+    tenantFileId?: string;
+}
+
+export interface ChatWidgetItemClaim {
+    claimedByUserId: string;
+    claimedByUserName: string;
+    claimedAt: number;
+    status?: 'claimed' | 'contacted';
+}
+
+export interface ChatWidgetSnapshotItem {
+    id: string;
+    name: string;
+    avatar?: string | null;
+    primaryStat: string;
+    secondaryStat?: string;
+    riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' | 'Critical';
+    phone?: string;
+    email?: string;
+}
+
+export interface ChatWidgetAttachment {
+    widgetId: string;
+    area: TeamChatArea;
+    title: string;
+    icon?: string;
+    contextFilters?: {
+        campusId?: string;
+        givingFilter?: string;
+        dateRange?: { start: string; end: string };
+    };
+    snapshot: {
+        capturedAt: number;
+        headlineValue?: string;
+        subtitle?: string;
+        summaryMetrics?: { label: string; value: string; tone?: 'emerald' | 'amber' | 'rose' | 'indigo' | 'slate' }[];
+        items?: ChatWidgetSnapshotItem[];
+    };
+    /** item.id -> claim state ("Claim & Care") */
+    claims?: Record<string, ChatWidgetItemClaim>;
+}
+
+export interface ChatPersonMention {
+    id: string;
+    name: string;
+    avatar?: string | null;
+    membership?: string;
+    riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' | 'Critical';
+}
+
+export interface TeamMessage {
+    id: string;
+    channelId: string;
+    churchId: string;
+    senderId: string;
+    senderName: string;
+    senderRoles?: UserRole[];
+    isAiResponse?: boolean;
+    isAutomatedBriefing?: boolean;
+    text: string;
+    createdAt: number;
+    editedAt?: number;
+    replyToMessageId?: string;
+    replyPreview?: { id: string; senderName: string; text: string };
+    attachments?: ChatFileAttachment[];
+    widget?: ChatWidgetAttachment;
+    mentionedPeople?: ChatPersonMention[];
+    /** @Staff user IDs mentioned */
+    mentionedUserIds?: string[];
+    /** Emoji -> array of userIds */
+    reactions?: Record<string, string[]>;
+    /** Set by the backend once push notifications were sent */
+    pushNotifiedAt?: number;
+}

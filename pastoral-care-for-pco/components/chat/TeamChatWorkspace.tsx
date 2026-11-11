@@ -15,6 +15,7 @@ import {
 import { useTeamChat } from '../../contexts/TeamChatContext';
 import { useTenantData } from '../../contexts/TenantDataContext';
 import { firestore } from '../../services/firestoreService';
+import { notifyTeamChatPush } from '../../services/teamChatPushService';
 import { storage } from '../../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { canReadArea, DashboardArea } from '../../services/permissionService';
@@ -98,6 +99,38 @@ const AREA_LABELS: Record<TeamChatArea, { label: string; badgeClass: string; ico
         badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800',
         icon: '🛡️',
     },
+};
+
+/**
+ * Resolve `@<User.name>` tokens in `text` to staff user IDs (case-insensitive).
+ * Longest names are matched first and consumed, so "@Jo Ann Smith" wins over "@Jo".
+ * Excludes PastorAI and `excludeUserId` (the sender). Drives push for @mentions.
+ */
+const extractMentionedUserIds = (
+    text: string,
+    candidates: { id: string; name?: string }[],
+    excludeUserId: string
+): string[] => {
+    if (!text.includes('@')) return [];
+    let masked = text.toLowerCase();
+    const found = new Set<string>();
+    const sorted = candidates
+        .filter(u => u.id !== 'pastor-ai' && u.id !== excludeUserId && u.name && u.name.trim())
+        .sort((a, b) => (b.name || '').trim().length - (a.name || '').trim().length);
+
+    for (const u of sorted) {
+        const token = `@${(u.name || '').trim().toLowerCase()}`;
+        let idx = masked.indexOf(token);
+        while (idx !== -1) {
+            const nextChar = masked.charAt(idx + token.length);
+            if (!nextChar || !/[\w\u00C0-\u024F]/.test(nextChar)) {
+                found.add(u.id);
+                masked = masked.slice(0, idx) + ' '.repeat(token.length) + masked.slice(idx + token.length);
+            }
+            idx = masked.indexOf(token, idx + 1);
+        }
+    }
+    return Array.from(found);
 };
 
 const compressChatImage = (file: File): Promise<File> => {
@@ -545,6 +578,12 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
               }
             : undefined;
 
+        const mentionedUserIds = extractMentionedUserIds(
+            trimmed,
+            activeParticipants.length > 0 ? activeParticipants : churchUsers,
+            user.id
+        );
+
         const newMsg: TeamMessage = {
             id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             channelId: activeChannel.id,
@@ -559,6 +598,7 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
             attachments: attachmentsToSend,
             widget: widgetToSend,
             mentionedPeople: mentionsToSend,
+            ...(mentionedUserIds.length > 0 ? { mentionedUserIds } : {}),
         };
 
         // Reset composer immediately for snappy feel
@@ -570,6 +610,8 @@ export const TeamChatWorkspace: React.FC<TeamChatWorkspaceProps> = ({
         setActiveTrigger(null);
 
         await firestore.sendTeamMessage(newMsg);
+        // Native push for teammates (DMs, @mentions, "notify all" opt-ins) — fire-and-forget
+        notifyTeamChatPush(newMsg.id);
 
         // If the user tagged @PastorAI, automatically generate an AI response in the thread!
         if (/@pastorai\b/i.test(trimmed)) {

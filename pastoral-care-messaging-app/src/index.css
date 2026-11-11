@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./components.css";
+@import "./ui/motion.css";
 
 /* Use class-based dark mode so JS can control it (Light/Dark/System) */
 @variant dark (&:is(.dark, .dark *));

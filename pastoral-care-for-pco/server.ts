@@ -52,6 +52,7 @@ import { workflowEnrollList, workflowEnrollPreview, workflowForceScan, getWorkfl
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 import { handleCanvaOAuthCallback, handleGetCanvaDesigns, handleTriggerCanvaExport, handlePollCanvaExport } from './backend/canvaIntegration.js';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
+import { notifyTeamChatMessage } from './backend/teamChatNotify';
 import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
 import { listForms, saveForm, deleteForm, getPublicForm, submitForm, syncAllSubmissions } from './backend/pcoForms.js';
@@ -856,6 +857,9 @@ async function startServer() {
     app.get('/push/vapid-public-key',  getVapidPublicKey);
     app.post('/push/subscribe',        express.json(), savePushSubscription);
     app.delete('/push/subscribe',      express.json(), removePushSubscription);
+
+    // ─── Team Chat native push (FCM) — Bearer Firebase ID token required ───────
+    app.post('/api/team-chat/notify', express.json(), notifyTeamChatMessage);
 
     // Dynamic vCard endpoint for "Who Is This" contact card feature
     app.get('/api/messaging/vcard/:numberId', async (req: any, res: any) => {

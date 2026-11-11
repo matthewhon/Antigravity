@@ -4,10 +4,11 @@ import { Capacitor } from '@capacitor/core';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { User } from '../types';
+import { activeTeamChat } from '../services/teamChatService';
 
 // ─── Foreground notification toast ──────────────────────────────────────────
 
-function showInAppToast(title: string, body: string) {
+function showInAppToast(title: string, body: string, onTap?: () => void) {
     const toast = document.createElement('div');
     toast.role = 'alert';
     toast.setAttribute('aria-live', 'assertive');
@@ -35,10 +36,15 @@ function showInAppToast(title: string, body: string) {
         cursor: 'pointer',
     } as unknown as CSSStyleDeclaration);
 
-    toast.innerHTML = `
-        <span style="font-weight:700;font-size:13px;letter-spacing:-0.01em">${title}</span>
-        <span style="opacity:0.8;font-size:13px">${body}</span>
-    `;
+    // Build with text nodes, never innerHTML: titles/bodies can contain
+    // user-written chat text.
+    const titleEl = document.createElement('span');
+    titleEl.style.cssText = 'font-weight:700;font-size:13px;letter-spacing:-0.01em';
+    titleEl.textContent = title;
+    const bodyEl = document.createElement('span');
+    bodyEl.style.cssText = 'opacity:0.8;font-size:13px';
+    bodyEl.textContent = body;
+    toast.append(titleEl, bodyEl);
 
     document.body.appendChild(toast);
     // Animate in
@@ -54,10 +60,21 @@ function showInAppToast(title: string, body: string) {
         setTimeout(() => toast.remove(), 300);
     };
     const timer = setTimeout(dismiss, 4000);
-    toast.addEventListener('click', () => { clearTimeout(timer); dismiss(); });
+    toast.addEventListener('click', () => { clearTimeout(timer); dismiss(); onTap?.(); });
 }
 
 // ─── Deep-link navigation ────────────────────────────────────────────────────
+
+/** Open the Team tab (and a specific channel) from a team-chat push. */
+function navigateToTeamChat(data?: Record<string, string>) {
+    const channelId = data?.channelId;
+    let hashPath = '/?tab=team';
+    if (channelId) hashPath += `&channelId=${encodeURIComponent(channelId)}`;
+    window.location.hash = hashPath;
+    window.dispatchEvent(new CustomEvent('pushDeepLink', {
+        detail: { tab: 'team', channelId },
+    }));
+}
 
 function navigateToInbox(data?: Record<string, string>) {
     const numberId = data?.numberId;
@@ -129,16 +146,23 @@ export function usePushNotifications(user: User | null) {
 
         // Notification received while app is in the foreground → show in-app toast.
         const foregroundListener = PushNotifications.addListener('pushNotificationReceived', (notification) => {
+            const data = notification.data as Record<string, string> | undefined;
+            // Team chat: no toast for the thread the user is already reading
+            if (data?.type === 'team-chat' && data.channelId && data.channelId === activeTeamChat.channelId) return;
             const title = notification.title || 'New Message';
             const body  = notification.body  || '';
-            showInAppToast(title, body);
+            showInAppToast(title, body, data?.type === 'team-chat' ? () => navigateToTeamChat(data) : undefined);
         });
 
-        // User tapped a notification → deep-link into the inbox or Today's Celebrations.
+        // User tapped a notification → deep-link into the inbox, Team Chat, or Today's Celebrations.
         const actionListener = PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
             const data = action.notification.data as Record<string, string> | undefined;
             if (data?.tag === 'daily-celebrations' || data?.type === 'celebrations') {
                 window.dispatchEvent(new CustomEvent('openCelebrationsModal'));
+                return;
+            }
+            if (data?.type === 'team-chat') {
+                navigateToTeamChat(data);
                 return;
             }
             navigateToInbox(data);
