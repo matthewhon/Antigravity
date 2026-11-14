@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef, useId } from 'react';
 import { 
     PcoPerson, PeopleDashboardData, PastoralNote, CareFollowUpLog, 
     RiskSettings, Church, OutreachSession, OutreachSlot, StatusChangeRecord,
@@ -12,7 +12,7 @@ import {
     Download, Search, ChevronUp, ChevronDown, ChevronsUpDown, MessageSquare, 
     Filter, X, Phone, CheckCircle2, Trash2, Send, Users, PhoneOff, BarChart3, 
     Clock, Award, TrendingUp, Calendar, Check, RefreshCw, FileText, ChevronRight, 
-    UserCheck, Flame, ExternalLink, Activity
+    UserCheck, Flame, ExternalLink, Activity, UserX, Save, RotateCcw
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -401,6 +401,525 @@ const InlineContactForm: React.FC<InlineContactFormProps> = ({ person, onSave, o
 };
 
 // ---------------------------------------------------------------------------
+// Care Directory Person Detail Modal (Native <dialog>)
+// ---------------------------------------------------------------------------
+
+interface CareDirectoryPersonModalProps {
+    person: PcoPerson | null;
+    outreachSlots: OutreachSlot[];
+    sessions: OutreachSession[];
+    pastoralNotes: PastoralNote[];
+    membershipOptions: string[];
+    onClose: () => void;
+    onUpdateStatus: (person: PcoPerson, updates: { membership?: string; status?: string }) => Promise<void>;
+    onRequestDoNotContact: (person: PcoPerson) => void;
+    onRestoreDoNotContact: (person: PcoPerson) => Promise<void>;
+    onAddNote?: (personId: string, type: PastoralNote['type'], content: string) => Promise<void>;
+}
+
+const COMMON_MEMBERSHIP_OPTIONS = ['Member', 'Regular Attender', 'Visitor', 'Guest', 'None'];
+
+const CareDirectoryPersonModal: React.FC<CareDirectoryPersonModalProps> = ({
+    person,
+    outreachSlots,
+    sessions,
+    pastoralNotes,
+    membershipOptions,
+    onClose,
+    onUpdateStatus,
+    onRequestDoNotContact,
+    onRestoreDoNotContact,
+    onAddNote,
+}) => {
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const titleId = useId();
+
+    const [membership, setMembership] = useState(person?.membership || 'None');
+    const [customMembership, setCustomMembership] = useState('');
+    const [status, setStatus] = useState(person?.status || 'active');
+    const [savingStatus, setSavingStatus] = useState(false);
+    const [statusSavedMsg, setStatusSavedMsg] = useState<string | null>(null);
+
+    const [noteType, setNoteType] = useState<PastoralNote['type']>('Call');
+    const [noteContent, setNoteContent] = useState('');
+    const [savingNote, setSavingNote] = useState(false);
+
+    useEffect(() => {
+        if (person) {
+            setMembership(person.membership || 'None');
+            setCustomMembership('');
+            setStatus(person.status || 'active');
+            setStatusSavedMsg(null);
+            setNoteContent('');
+            const dlg = dialogRef.current;
+            if (dlg && !dlg.open) {
+                dlg.showModal();
+            }
+        } else {
+            const dlg = dialogRef.current;
+            if (dlg?.open) dlg.close();
+        }
+    }, [person]);
+
+    useEffect(() => {
+        const dlg = dialogRef.current;
+        if (!dlg) return;
+
+        const handleClose = () => onClose();
+        dlg.addEventListener('close', handleClose);
+
+        // Fallback light-dismiss for browsers without native closedby="any"
+        if (!('closedBy' in HTMLDialogElement.prototype)) {
+            let pressedOutside = false;
+            const isOutside = (e: PointerEvent) => {
+                const r = dlg.getBoundingClientRect();
+                return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+            };
+            const onPointerDown = (e: PointerEvent) => { pressedOutside = isOutside(e); };
+            const onPointerUp = (e: PointerEvent) => {
+                if (pressedOutside && isOutside(e)) dlg.close();
+            };
+            dlg.addEventListener('pointerdown', onPointerDown);
+            dlg.addEventListener('pointerup', onPointerUp);
+            return () => {
+                dlg.removeEventListener('close', handleClose);
+                dlg.removeEventListener('pointerdown', onPointerDown);
+                dlg.removeEventListener('pointerup', onPointerUp);
+            };
+        }
+
+        return () => dlg.removeEventListener('close', handleClose);
+    }, [onClose]);
+
+    const allMembershipChoices = useMemo(() => {
+        const set = new Set<string>([...COMMON_MEMBERSHIP_OPTIONS, ...membershipOptions]);
+        if (person?.membership) set.add(person.membership);
+        return Array.from(set).filter(Boolean).sort();
+    }, [membershipOptions, person?.membership]);
+
+    const sessionMap = useMemo(() => {
+        const m = new Map<string, OutreachSession>();
+        sessions.forEach(s => m.set(s.id, s));
+        return m;
+    }, [sessions]);
+
+    const personOutreachSlots = useMemo(() => {
+        if (!person) return [];
+        const bareId = person.id.includes('_') ? person.id.split('_').slice(1).join('_') : person.id;
+        return outreachSlots
+            .filter(s => {
+                const sBare = s.assignedPersonId.includes('_') ? s.assignedPersonId.split('_').slice(1).join('_') : s.assignedPersonId;
+                return s.assignedPersonId === person.id || sBare === bareId;
+            })
+            .sort((a, b) => (b.completedAt || b.assignedAt) - (a.completedAt || a.assignedAt));
+    }, [outreachSlots, person]);
+
+    const nonOutreachNotes = useMemo(() => {
+        const slotIds = new Set(personOutreachSlots.map(s => s.id));
+        return pastoralNotes.filter(n => !n.isOutreach && !slotIds.has(n.id));
+    }, [pastoralNotes, personOutreachSlots]);
+
+    const handleSaveStatus = async () => {
+        if (!person) return;
+        const resolvedMembership = membership === '__custom__' ? customMembership.trim() : (membership === 'None' ? '' : membership);
+        setSavingStatus(true);
+        setStatusSavedMsg(null);
+        try {
+            await onUpdateStatus(person, {
+                membership: resolvedMembership,
+                status,
+            });
+            setStatusSavedMsg('Saved');
+            setTimeout(() => setStatusSavedMsg(null), 2500);
+        } finally {
+            setSavingStatus(false);
+        }
+    };
+
+    const handleSaveNote = async () => {
+        if (!person || !onAddNote || !noteContent.trim()) return;
+        setSavingNote(true);
+        try {
+            await onAddNote(person.id, noteType, noteContent.trim());
+            setNoteContent('');
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const cat = person?.riskProfile?.category ?? 'Healthy';
+    const catColor = cat === 'Healthy'
+        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+        : cat === 'At Risk'
+        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+        : 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400';
+
+    return (
+        <dialog
+            ref={dialogRef}
+            aria-labelledby={titleId}
+            {...({ closedby: 'any' } as any)}
+            className="m-auto w-[min(680px,calc(100vw-2rem))] max-h-[88vh] rounded-3xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl p-0 backdrop:bg-slate-950/50 backdrop:backdrop-blur-xs"
+        >
+            {person && (
+                <div className="flex flex-col max-h-[88vh]">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                            {person.avatar ? (
+                                <img src={person.avatar} alt={person.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
+                            ) : (
+                                <div className="w-11 h-11 rounded-full bg-indigo-100 dark:bg-indigo-950/50 flex items-center justify-center text-sm font-black text-indigo-600 dark:text-indigo-400 shrink-0">
+                                    {person.name.substring(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h2 id={titleId} className="text-lg font-black text-slate-900 dark:text-white truncate">
+                                        {person.name}
+                                    </h2>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${catColor}`}>
+                                        {cat} ({person.riskProfile?.score ?? 100})
+                                    </span>
+                                    {person.doNotContact && (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400">
+                                            Do Not Contact
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {person.phone && <span className="font-mono">{person.phone}</span>}
+                                    {person.email && <span>{person.email}</span>}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            dialogRef.current?.close();
+                                            window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: person.id }));
+                                        }}
+                                        className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                                    >
+                                        <ExternalLink size={11} /> Full Profile
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => dialogRef.current?.close()}
+                            aria-label="Close modal"
+                            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-6 overflow-y-auto space-y-6">
+                        {/* Member Status & Membership */}
+                        <section className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Member Status
+                                </h3>
+                                {statusSavedMsg && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                        <Check size={12} /> {statusSavedMsg}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                        Membership
+                                    </label>
+                                    <select
+                                        autoFocus
+                                        value={membership}
+                                        onChange={e => setMembership(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-400"
+                                    >
+                                        {allMembershipChoices.map(m => (
+                                            <option key={m} value={m}>{m}</option>
+                                        ))}
+                                        <option value="__custom__">+ Custom…</option>
+                                    </select>
+                                    {membership === '__custom__' && (
+                                        <input
+                                            type="text"
+                                            value={customMembership}
+                                            onChange={e => setCustomMembership(e.target.value)}
+                                            placeholder="Enter membership status…"
+                                            className="mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-400"
+                                        />
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                        Directory Status
+                                    </label>
+                                    <select
+                                        value={status}
+                                        onChange={e => setStatus(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-400"
+                                    >
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive (Hidden from Outreach)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={handleSaveStatus}
+                                    disabled={savingStatus || (membership === '__custom__' && !customMembership.trim())}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide transition-all"
+                                >
+                                    <Save size={12} /> {savingStatus ? 'Saving…' : 'Save Status'}
+                                </button>
+
+                                {person.doNotContact ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => onRestoreDoNotContact(person)}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wide transition-all"
+                                    >
+                                        <RotateCcw size={12} /> Restore to Contact List
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => onRequestDoNotContact(person)}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-600 text-rose-600 dark:text-rose-400 hover:text-white text-xs font-bold uppercase tracking-wide transition-all"
+                                    >
+                                        <UserX size={12} /> Do Not Contact Again
+                                    </button>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Outreach Session Notes */}
+                        <section className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Outreach Session Notes ({personOutreachSlots.length})
+                                </h3>
+                            </div>
+                            {personOutreachSlots.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic py-2">
+                                    No outreach session activity recorded for this person yet.
+                                </p>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {personOutreachSlots.map(slot => {
+                                        const sess = sessionMap.get(slot.sessionId);
+                                        const dateMs = slot.completedAt || slot.assignedAt;
+                                        const outcomeBadge =
+                                            slot.status === 'contacted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                                            slot.status === 'no-answer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' :
+                                            slot.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' :
+                                            'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+
+                                        return (
+                                            <div key={slot.id} className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-2">
+                                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${outcomeBadge}`}>
+                                                            {slot.status === 'no-answer' ? 'No Answer' : slot.status}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                            {sess?.name || 'Outreach Session'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-400">
+                                                        {formatDate(new Date(dateMs).toISOString())} · {slot.volunteerName || maskPhone(slot.volunteerPhone)}
+                                                    </span>
+                                                </div>
+                                                {slot.notes ? (
+                                                    <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                                        {slot.notes}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-[11px] text-slate-400 italic">No note entered for this attempt.</p>
+                                                )}
+                                                {slot.followUpNotes && slot.followUpNotes.length > 0 && (
+                                                    <div className="pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1 pt-1">
+                                                        {slot.followUpNotes.map((fn, idx) => (
+                                                            <p key={idx} className="text-[11px] text-slate-600 dark:text-slate-300">
+                                                                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                                                    Follow-up ({formatDate(new Date(fn.addedAt).toISOString())}):
+                                                                </span>{' '}
+                                                                {fn.note}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Pastoral Notes & Quick Add */}
+                        <section className="space-y-3">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Pastoral Notes ({nonOutreachNotes.length})
+                            </h3>
+                            {nonOutreachNotes.length > 0 && (
+                                <div className="space-y-2">
+                                    {nonOutreachNotes.map(n => (
+                                        <div key={n.id} className="p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-1">
+                                            <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                                <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                    {noteTypeEmoji[n.type] || '📝'} {n.type}
+                                                </span>
+                                                <span>{formatDate(n.date)} · {n.authorName}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{n.content}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {onAddNote && (
+                                <div className="pt-2 space-y-2 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="flex flex-wrap gap-1">
+                                        {NOTE_TYPES.map(t => (
+                                            <button
+                                                key={t}
+                                                type="button"
+                                                onClick={() => setNoteType(t)}
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
+                                                    noteType === t
+                                                        ? 'bg-indigo-600 text-white'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600'
+                                                }`}
+                                            >
+                                                {noteTypeEmoji[t]} {t}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <textarea
+                                            value={noteContent}
+                                            onChange={e => setNoteContent(e.target.value)}
+                                            placeholder="Add a pastoral note…"
+                                            rows={2}
+                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 resize-none outline-none focus:ring-2 focus:ring-indigo-400"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveNote}
+                                            disabled={savingNote || !noteContent.trim()}
+                                            className="self-end px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide transition-all"
+                                        >
+                                            {savingNote ? 'Saving…' : 'Add Note'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                </div>
+            )}
+        </dialog>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Do Not Contact Confirmation Dialog (Native <dialog>)
+// ---------------------------------------------------------------------------
+
+interface DoNotContactConfirmDialogProps {
+    person: PcoPerson | null;
+    onCancel: () => void;
+    onConfirm: (person: PcoPerson) => Promise<void>;
+}
+
+const DoNotContactConfirmDialog: React.FC<DoNotContactConfirmDialogProps> = ({
+    person,
+    onCancel,
+    onConfirm,
+}) => {
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const titleId = useId();
+    const [removing, setRemoving] = useState(false);
+
+    useEffect(() => {
+        const dlg = dialogRef.current;
+        if (!dlg) return;
+        if (person) {
+            setRemoving(false);
+            if (!dlg.open) dlg.showModal();
+        } else if (dlg.open) {
+            dlg.close();
+        }
+    }, [person]);
+
+    useEffect(() => {
+        const dlg = dialogRef.current;
+        if (!dlg) return;
+        const handleClose = () => onCancel();
+        dlg.addEventListener('close', handleClose);
+        return () => dlg.removeEventListener('close', handleClose);
+    }, [onCancel]);
+
+    const handleConfirm = async () => {
+        if (!person) return;
+        setRemoving(true);
+        try {
+            await onConfirm(person);
+        } finally {
+            setRemoving(false);
+        }
+    };
+
+    return (
+        <dialog
+            ref={dialogRef}
+            aria-labelledby={titleId}
+            className="m-auto w-[min(420px,calc(100vw-2rem))] rounded-3xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 backdrop:bg-slate-950/50 backdrop:backdrop-blur-xs"
+        >
+            {person && (
+                <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                            <UserX size={18} />
+                        </div>
+                        <div>
+                            <h2 id={titleId} className="text-base font-black text-slate-900 dark:text-white">
+                                Remove {person.name} from Contact List?
+                            </h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                They will be removed from the Care Directory and excluded from all future Outreach Sessions so they are not contacted again.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            autoFocus
+                            onClick={() => dialogRef.current?.close()}
+                            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wide transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={removing}
+                            onClick={handleConfirm}
+                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide transition-colors"
+                        >
+                            {removing ? 'Removing…' : 'Do Not Contact'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </dialog>
+    );
+};
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -466,11 +985,15 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const [hasNotesFilter, setHasNotesFilter] = useState<'all' | 'has' | 'none'>('all');
     const [upcomingOnly, setUpcomingOnly] = useState(false);
     const [showDismissed, setShowDismissed] = useState(false);
+    const [showDoNotContact, setShowDoNotContact] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(true);
 
     const [sortKey, setSortKey] = useState<SortKey>('urgency');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [activeFormPersonId, setActiveFormPersonId] = useState<string | null>(null);
+    const [personOverrides, setPersonOverrides] = useState<Record<string, Partial<PcoPerson>>>({});
+    const [selectedDirectoryPersonId, setSelectedDirectoryPersonId] = useState<string | null>(null);
+    const [confirmDoNotContactPerson, setConfirmDoNotContactPerson] = useState<PcoPerson | null>(null);
 
     const handleSort = useCallback((key: SortKey) => {
         setSortKey(prev => {
@@ -480,10 +1003,83 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
         });
     }, []);
 
+    const handleUpdatePersonStatus = useCallback(async (person: PcoPerson, updates: { membership?: string; status?: string }) => {
+        setPersonOverrides(prev => ({
+            ...prev,
+            [person.id]: { ...prev[person.id], ...updates },
+        }));
+        await firestore.updatePersonFields(person.id, updates);
+        if (church?.id) {
+            fetch('/api/pco/update-person', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    churchId: church.id,
+                    personId: person.id,
+                    ...updates,
+                }),
+            }).catch(err => console.warn('PCO person update sync skipped:', err));
+        }
+    }, [church?.id]);
+
+    const handleConfirmDoNotContact = useCallback(async (person: PcoPerson) => {
+        const updates: Partial<PcoPerson> = {
+            doNotContact: true,
+            doNotContactAt: Date.now(),
+        };
+        setPersonOverrides(prev => ({
+            ...prev,
+            [person.id]: { ...prev[person.id], ...updates },
+        }));
+        await firestore.updatePersonFields(person.id, updates);
+        setConfirmDoNotContactPerson(null);
+        setSelectedDirectoryPersonId(prev => (prev === person.id ? null : prev));
+    }, []);
+
+    const handleRestoreDoNotContact = useCallback(async (person: PcoPerson) => {
+        const updates: Partial<PcoPerson> = {
+            doNotContact: false,
+            doNotContactAt: null,
+        };
+        setPersonOverrides(prev => ({
+            ...prev,
+            [person.id]: { ...prev[person.id], ...updates },
+        }));
+        await firestore.updatePersonFields(person.id, updates);
+    }, []);
+
+    // Merge pastoral notes with any outreach session slot notes/follow-up notes (deduped by id)
+    const mergedNotes = useMemo<PastoralNote[]>(() => {
+        const existingIds = new Set(notes.map(n => n.id));
+        const extraOutreachNotes: PastoralNote[] = slots
+            .filter(s => !existingIds.has(s.id) && ((!!s.notes && s.notes.trim().length > 0) || (s.followUpNotes && s.followUpNotes.length > 0)))
+            .map(s => {
+                const followUpStr = s.followUpNotes?.length
+                    ? s.followUpNotes.map(f => `Follow-up: ${f.note}`).join('\n')
+                    : '';
+                const content = [s.notes?.trim(), followUpStr].filter(Boolean).join('\n\n');
+                return {
+                    id: s.id,
+                    churchId: s.churchId,
+                    personId: s.assignedPersonId,
+                    personName: s.assignedPersonName,
+                    authorId: s.volunteerPhone,
+                    authorName: s.volunteerName || 'Volunteer',
+                    date: new Date(s.completedAt || s.assignedAt).toISOString(),
+                    type: 'Call',
+                    content,
+                    tags: s.status === 'no-answer' ? ['no-answer'] : undefined,
+                    isCompleted: true,
+                    isOutreach: true,
+                } as PastoralNote;
+            });
+        return [...notes, ...extraOutreachNotes].sort((a, b) => b.date.localeCompare(a.date));
+    }, [notes, slots]);
+
     // Index notes by personId
     const allNotesMap = useMemo(() => {
         const m = new Map<string, PastoralNote[]>();
-        notes.forEach(n => {
+        mergedNotes.forEach(n => {
             const raw = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             if (!m.has(raw)) m.set(raw, []);
@@ -494,11 +1090,11 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             }
         });
         return m;
-    }, [notes]);
+    }, [mergedNotes]);
 
     const lastNoteMap = useMemo(() => {
         const m = new Map<string, PastoralNote>();
-        notes.forEach(n => {
+        mergedNotes.forEach(n => {
             if (n.tags?.includes('no-answer')) return;
             const raw = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
@@ -506,29 +1102,29 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             if (!m.has(bare)) m.set(bare, n);
         });
         return m;
-    }, [notes]);
+    }, [mergedNotes]);
 
     const lastTouchpointMap = useMemo(() => {
         const m = new Map<string, PastoralNote>();
-        notes.forEach(n => {
+        mergedNotes.forEach(n => {
             const raw = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             if (!m.has(raw))  m.set(raw,  n);
             if (!m.has(bare)) m.set(bare, n);
         });
         return m;
-    }, [notes]);
+    }, [mergedNotes]);
 
     const noteCountMap = useMemo(() => {
         const m = new Map<string, number>();
-        notes.forEach(n => {
+        mergedNotes.forEach(n => {
             const raw  = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             m.set(raw,  (m.get(raw)  || 0) + 1);
             if (bare !== raw) m.set(bare, (m.get(bare) || 0) + 1);
         });
         return m;
-    }, [notes]);
+    }, [mergedNotes]);
 
     const followUpMap = useMemo(() => {
         const m = new Map<string, CareFollowUpLog>();
@@ -539,16 +1135,18 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const membershipOptions = useMemo(() => {
         if (!peopleData) return [];
         const s = new Set<string>();
-        peopleData.allPeople.forEach(p => {
+        peopleData.allPeople.forEach(rawP => {
+            const p = personOverrides[rawP.id] ? { ...rawP, ...personOverrides[rawP.id] } : rawP;
             if (p.status?.toLowerCase() !== 'inactive') s.add(p.membership || 'None');
         });
         return Array.from(s).sort();
-    }, [peopleData]);
+    }, [peopleData, personOverrides]);
 
     const allRows = useMemo<EnrichedRow[]>(() => {
         if (!peopleData) return [];
         const now = Date.now();
         return peopleData.allPeople
+            .map(rawP => (personOverrides[rawP.id] ? { ...rawP, ...personOverrides[rawP.id] } : rawP))
             .filter(p => p.status?.toLowerCase() !== 'inactive')
             .map(person => {
                 const lastNote = lastNoteMap.get(person.id) ?? null;
@@ -564,10 +1162,11 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                 const allNotes = allNotesMap.get(person.id) || [];
                 return { person, lastNote, lastTouchpoint, noteCount, daysSinceContact: days, urgencyScore: urgency, followedUpRecently, dismissed, allNotes };
             });
-    }, [peopleData, lastNoteMap, lastTouchpointMap, noteCountMap, followUpMap, allNotesMap]);
+    }, [peopleData, personOverrides, lastNoteMap, lastTouchpointMap, noteCountMap, followUpMap, allNotesMap]);
 
     const filteredRows = useMemo(() => {
-        return allRows.filter(({ person, lastNote, noteCount, daysSinceContact, dismissed }) => {
+        return allRows.filter(({ person, noteCount, daysSinceContact, dismissed }) => {
+            if (person.doNotContact && !showDoNotContact) return false;
             if (dismissed && !showDismissed) return false;
             if (search) {
                 const q = search.toLowerCase();
@@ -588,7 +1187,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             if (upcomingOnly && !isUpcomingAnnual(person.birthdate) && !isUpcomingAnnual(person.anniversary)) return false;
             return true;
         });
-    }, [allRows, search, riskFilter, membershipFilter, lastContactFilter, hasNotesFilter, upcomingOnly, showDismissed]);
+    }, [allRows, search, riskFilter, membershipFilter, lastContactFilter, hasNotesFilter, upcomingOnly, showDismissed, showDoNotContact]);
 
     const sortedRows = useMemo(() => {
         const mult = sortDir === 'asc' ? 1 : -1;
@@ -617,8 +1216,16 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             ? Math.round(withDays.reduce((s, r) => s + r.daysSinceContact, 0) / withDays.length)
             : null;
         const dismissed = allRows.filter(r => r.dismissed).length;
-        return { never, over90, avg, total: filteredRows.length, dismissed };
+        const doNotContact = allRows.filter(r => r.person.doNotContact).length;
+        return { never, over90, avg, total: filteredRows.length, dismissed, doNotContact };
     }, [filteredRows, allRows]);
+
+    const selectedDirectoryPerson = useMemo(() => {
+        if (!selectedDirectoryPersonId || !peopleData) return null;
+        const raw = peopleData.allPeople.find(p => p.id === selectedDirectoryPersonId);
+        if (!raw) return null;
+        return personOverrides[raw.id] ? { ...raw, ...personOverrides[raw.id] } : raw;
+    }, [selectedDirectoryPersonId, peopleData, personOverrides]);
 
     // --- Outreach Sessions Metrics Computation ---
     const sessionMetrics = useMemo(() => {
@@ -1107,11 +1714,17 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                             )}
                                                             <div className="min-w-0">
                                                                 <button
-                                                                    onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: person.id }))}
+                                                                    type="button"
+                                                                    onClick={() => setSelectedDirectoryPersonId(person.id)}
                                                                     className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate text-left block max-w-[140px]"
                                                                 >
                                                                     {person.name}
                                                                 </button>
+                                                                {person.doNotContact && (
+                                                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wide">
+                                                                        <UserX size={9} /> Do Not Contact
+                                                                    </span>
+                                                                )}
                                                                 {followedUpRecently && (
                                                                     <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                                                                         <CheckCircle2 size={9} /> Recent Contact
@@ -1232,11 +1845,29 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                                                             <button
                                                                 onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: person.id }))}
-                                                                title={`Open ${person.name}'s profile`}
+                                                                title={`Open ${person.name}'s full profile`}
                                                                 className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-600 hover:text-white text-slate-400 flex items-center justify-center transition-all"
                                                             >
                                                                 <MessageSquare size={12} />
                                                             </button>
+
+                                                            {person.doNotContact ? (
+                                                                <button
+                                                                    onClick={() => handleRestoreDoNotContact(person)}
+                                                                    title="Restore to contact list"
+                                                                    className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 hover:bg-emerald-600 text-emerald-600 hover:text-white flex items-center justify-center transition-all"
+                                                                >
+                                                                    <RotateCcw size={12} />
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => setConfirmDoNotContactPerson(person)}
+                                                                    title="Do Not Contact Again (remove from outreach)"
+                                                                    className="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-900/40 hover:bg-rose-600 text-rose-500 hover:text-white flex items-center justify-center transition-all"
+                                                                >
+                                                                    <UserX size={12} />
+                                                                </button>
+                                                            )}
 
                                                             {onDismiss && (
                                                                 dismissed ? (
@@ -1279,11 +1910,19 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                             </table>
                         </div>
 
-                        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
                             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                                 {sortedRows.length} of {allRows.length} people
                                 {directoryStats.dismissed > 0 && !showDismissed && (
                                     <button onClick={() => setShowDismissed(true)} className="ml-3 text-emerald-500 hover:underline">{directoryStats.dismissed} cleared (show)</button>
+                                )}
+                                {directoryStats.doNotContact > 0 && (
+                                    <button
+                                        onClick={() => setShowDoNotContact(s => !s)}
+                                        className="ml-3 text-rose-500 hover:underline"
+                                    >
+                                        {showDoNotContact ? 'Hide' : `${directoryStats.doNotContact} do not contact (show)`}
+                                    </button>
                                 )}
                             </p>
                             <p className="text-[10px] text-slate-300 dark:text-slate-600">
@@ -1291,6 +1930,25 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                             </p>
                         </div>
                     </div>
+
+                    <CareDirectoryPersonModal
+                        person={selectedDirectoryPerson}
+                        outreachSlots={slots}
+                        sessions={sessions}
+                        pastoralNotes={selectedDirectoryPerson ? (allNotesMap.get(selectedDirectoryPerson.id) || []) : []}
+                        membershipOptions={membershipOptions}
+                        onClose={() => setSelectedDirectoryPersonId(null)}
+                        onUpdateStatus={handleUpdatePersonStatus}
+                        onRequestDoNotContact={(p) => setConfirmDoNotContactPerson(p)}
+                        onRestoreDoNotContact={handleRestoreDoNotContact}
+                        onAddNote={onAddNote}
+                    />
+
+                    <DoNotContactConfirmDialog
+                        person={confirmDoNotContactPerson}
+                        onCancel={() => setConfirmDoNotContactPerson(null)}
+                        onConfirm={handleConfirmDoNotContact}
+                    />
                 </div>
             )}
 

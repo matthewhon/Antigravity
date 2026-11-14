@@ -745,6 +745,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         const { riskCategories, membershipStatuses, absenteeGroupIds, absenteeSince } = filters;
         const eligible = allPeople.filter(p => {
             if (p.status?.toLowerCase() === 'inactive') return false;
+            if (p.doNotContact) return false;
             if (!p.phone && !p.email) return false;
             if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
             if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;

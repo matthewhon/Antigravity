@@ -532,6 +532,16 @@ class FirestoreService {
       }
   }
 
+  async updatePersonFields(personId: string, updates: Partial<PcoPerson>): Promise<void> {
+      try {
+          const ref = doc(db, 'people', personId);
+          await updateDoc(ref, updates as any);
+      } catch (e) {
+          this.handleFirestoreError(e);
+          throw e;
+      }
+  }
+
   /**
    * Batch-updates the `checkInCount` field on person documents.
    * @param churchId The church tenant ID

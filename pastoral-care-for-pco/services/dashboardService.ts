@@ -392,7 +392,7 @@ export const calculateDashboardOverview = (inputs: DashboardInputs): DashboardOv
                 .map(s => s.assignedPersonId)
         );
         const atRiskNeverReached = people.filter(
-            p => p.historicRiskCategory === 'At Risk' && !everContacted.has(p.id)
+            p => !p.doNotContact && p.status?.toLowerCase() !== 'inactive' && p.historicRiskCategory === 'At Risk' && !everContacted.has(p.id)
         ).length;
         push('never_contacted', 'At-risk people never reached by any session', atRiskNeverReached, '/care/contact');
     }

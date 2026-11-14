@@ -61,3 +61,13 @@ body {
   color: #f1f5f9; /* slate-100 */
 }
 
+/* ─── Modal dialog scroll containment ─────────────────────────────────────── */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+

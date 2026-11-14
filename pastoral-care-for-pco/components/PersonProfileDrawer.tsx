@@ -385,11 +385,12 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
         setTimeline(changes);
 
         const outreachNotes: PastoralNote[] = outreachSlots
-            .filter(s => s.status === 'contacted' && !!s.notes)
+            .filter(s => (!!s.notes && s.notes.trim().length > 0) || (s.followUpNotes && s.followUpNotes.length > 0))
             .map(s => {
-                const noteStr = s.followUpNotes?.length
-                  ? s.notes + '\n\n' + s.followUpNotes.map(f => `Follow-up: ${f.note}`).join('\n')
-                  : s.notes;
+                const followUpStr = s.followUpNotes?.length
+                  ? s.followUpNotes.map(f => `Follow-up: ${f.note}`).join('\n')
+                  : '';
+                const noteStr = [s.notes?.trim(), followUpStr].filter(Boolean).join('\n\n');
 
                 return {
                     id: s.id,
@@ -401,6 +402,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
                     date: new Date(s.completedAt || s.assignedAt).toISOString(),
                     type: 'Call',
                     content: noteStr,
+                    tags: s.status === 'no-answer' ? ['no-answer'] : undefined,
                     isCompleted: true,
                     isOutreach: true
                 } as PastoralNote;

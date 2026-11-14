@@ -489,6 +489,8 @@ export interface PcoPerson {
     membershipStatus?: string | null;
     membership_status?: string | null;
     status?: string | null;
+    doNotContact?: boolean;
+    doNotContactAt?: number | null;
     risk_level?: string;
     gender?: string | null;
     birthdate?: string | null;

@@ -335,6 +335,57 @@ async function startServer() {
       }
     });
 
+    // Update a person's membership or status in Planning Center People
+    app.post('/api/pco/update-person', express.json(), async (req: any, res: any) => {
+      const { churchId, personId, membership, status } = req.body || {};
+      if (!churchId || !personId) return res.status(400).json({ error: 'Missing churchId or personId' });
+
+      if (churchId === 'c1') {
+        return res.json({ ok: true, pcoSynced: false });
+      }
+
+      try {
+        const db = getDb();
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        if (!churchDoc.exists) return res.status(404).json({ error: 'Church not found' });
+        const token = churchDoc.data()?.pcoAccessToken;
+        if (!token) return res.json({ ok: true, pcoSynced: false });
+
+        const pcoPersonId = String(personId).startsWith(`${churchId}_`)
+          ? String(personId).slice(churchId.length + 1)
+          : String(personId);
+
+        const attributes: Record<string, any> = {};
+        if (membership !== undefined) attributes.membership = membership;
+        if (status !== undefined) attributes.status = status;
+
+        if (Object.keys(attributes).length === 0) {
+          return res.json({ ok: true, pcoSynced: false });
+        }
+
+        const pcoRes = await fetch(`https://api.planningcenteronline.com/people/v2/people/${encodeURIComponent(pcoPersonId)}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'PastoralCareApp/1.0',
+          },
+          body: JSON.stringify({ data: { type: 'Person', id: pcoPersonId, attributes } }),
+        });
+
+        if (!pcoRes.ok) {
+          const errText = await pcoRes.text().catch(() => '');
+          console.warn(`[PcoUpdatePerson] PATCH failed (${pcoRes.status}) for ${pcoPersonId}: ${errText.slice(0, 200)}`);
+          return res.json({ ok: true, pcoSynced: false, pcoError: `PCO returned ${pcoRes.status}` });
+        }
+
+        return res.json({ ok: true, pcoSynced: true });
+      } catch (e: any) {
+        console.error('[PcoUpdatePerson]', e.message);
+        return res.json({ ok: true, pcoSynced: false, pcoError: e.message });
+      }
+    });
+
         // Gemini AI Proxy (key stays server-side)
     app.post('/ai/generate', express.json(), handleGeminiProxy);
     // Structured email/SMS/bulletin writer (subject variants, readability checks)
