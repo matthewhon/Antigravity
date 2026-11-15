@@ -83,6 +83,34 @@ function maskPhone(phone?: string | null): string {
     return `(${digits.slice(0, 3)}) ***-${digits.slice(-4)}`;
 }
 
+function formatDateTime(ts: number): string {
+    return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function timeSince(ts: number): string {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins === 1) return '1 min ago';
+    if (mins < 60) return `${mins} mins ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs === 1) return '1 hr ago';
+    if (hrs < 24) return `${hrs} hrs ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return '1 day ago';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) {
+        const weeks = Math.floor(days / 7);
+        return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+    }
+    if (days < 365) {
+        const months = Math.floor(days / 30);
+        return months === 1 ? '1 month ago' : `${months} months ago`;
+    }
+    const years = Math.floor(days / 365);
+    return years === 1 ? '1 year ago' : `${years} years ago`;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -991,6 +1019,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const [sortKey, setSortKey] = useState<SortKey>('urgency');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [activeFormPersonId, setActiveFormPersonId] = useState<string | null>(null);
+    const [expandedHistoryPersonId, setExpandedHistoryPersonId] = useState<string | null>(null);
     const [personOverrides, setPersonOverrides] = useState<Record<string, Partial<PcoPerson>>>({});
     const [selectedDirectoryPersonId, setSelectedDirectoryPersonId] = useState<string | null>(null);
     const [confirmDoNotContactPerson, setConfirmDoNotContactPerson] = useState<PcoPerson | null>(null);
@@ -1075,6 +1104,33 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             });
         return [...notes, ...extraOutreachNotes].sort((a, b) => b.date.localeCompare(a.date));
     }, [notes, slots]);
+
+    // All-time per-person outreach contact history (contacted & no-answer attempts across all sessions)
+    const personHistoryMap = useMemo(() => {
+        const m = new Map<string, OutreachSlot[]>();
+        const addSlot = (key: string, slot: OutreachSlot) => {
+            const list = m.get(key) ?? [];
+            if (!list.some(s => s.id === slot.id)) list.push(slot);
+            m.set(key, list);
+        };
+        slots.forEach(s => {
+            if (s.status !== 'contacted' && s.status !== 'no-answer') return;
+            const raw = s.assignedPersonId;
+            const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
+            addSlot(raw, s);
+            if (bare !== raw) addSlot(bare, s);
+        });
+        m.forEach((list, id) => {
+            m.set(id, list.sort((a, b) => (b.completedAt ?? b.assignedAt) - (a.completedAt ?? a.assignedAt)));
+        });
+        return m;
+    }, [slots]);
+
+    const sessionNameMap = useMemo(() => {
+        const m = new Map<string, string>();
+        sessions.forEach(s => m.set(s.id, s.name));
+        return m;
+    }, [sessions]);
 
     // Index notes by personId
     const allNotesMap = useMemo(() => {
@@ -1432,7 +1488,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const hasActiveFilter = search || riskFilter !== 'all' || membershipFilter !== 'all'
         || lastContactFilter !== 'all' || hasNotesFilter !== 'all' || upcomingOnly || showDismissed;
 
-    const COL_COUNT = 13;
+    const COL_COUNT = 14;
 
     if (!peopleData) {
         return (
@@ -1662,6 +1718,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                         <ThCol label="Risk Score" col="riskScore" className="text-center" />
                                         <ThCol label="Last Care Contact" col="lastContact" />
                                         <th className="p-2 text-[10px] font-black uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800">Last Touchpoint</th>
+                                        <th className="p-2 text-[10px] font-black uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800">Contact History</th>
                                         <ThCol label="Days Since" col="daysSince" className="text-center" />
                                         <ThCol label="Notes" col="notesCount" className="text-center" />
                                         <ThCol label="Urgency" col="urgency" className="text-center" />
@@ -1679,6 +1736,10 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                         </tr>
                                     ) : sortedRows.map(({ person, lastNote, lastTouchpoint, noteCount, daysSinceContact, urgencyScore, followedUpRecently, dismissed, allNotes }) => {
                                         const isFormOpen = activeFormPersonId === person.id;
+                                        const history = personHistoryMap.get(person.id) ?? [];
+                                        const mostRecentReached = history.find(h => h.status === 'contacted');
+                                        const mostRecentAttempt = history[0];
+                                        const isHistoryExpanded = expandedHistoryPersonId === person.id;
                                         const cat = person.riskProfile?.category ?? 'Healthy';
                                         const catColor = cat === 'Healthy' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                                             : cat === 'At Risk' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
@@ -1780,6 +1841,27 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                                 </span>
                                                                 <span className="text-slate-400">{formatDate(lastTouchpoint.date)}</span>
                                                             </div>
+                                                        ) : (
+                                                            <span className="text-slate-300 dark:text-slate-600 text-[10px]">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="p-2 whitespace-nowrap">
+                                                        {history.length > 0 ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setExpandedHistoryPersonId(isHistoryExpanded ? null : person.id)}
+                                                                className="inline-flex items-center gap-1.5 text-[10px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/30 px-2 py-1 rounded-lg transition-colors"
+                                                                title={`View ${history.length} contact attempt${history.length !== 1 ? 's' : ''}`}
+                                                            >
+                                                                <span className={mostRecentReached ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-amber-600 dark:text-amber-400 font-bold'}>
+                                                                    {timeSince((mostRecentReached ?? mostRecentAttempt).completedAt ?? (mostRecentReached ?? mostRecentAttempt).assignedAt)}
+                                                                </span>
+                                                                <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black">
+                                                                    {history.length}
+                                                                </span>
+                                                                <ChevronDown size={10} className={`text-slate-400 transition-transform ${isHistoryExpanded ? 'rotate-180' : ''}`} />
+                                                            </button>
                                                         ) : (
                                                             <span className="text-slate-300 dark:text-slate-600 text-[10px]">—</span>
                                                         )}
@@ -1891,6 +1973,53 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                         </div>
                                                     </td>
                                                 </tr>
+
+                                                {isHistoryExpanded && history.length > 0 && (
+                                                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                                                        <td colSpan={COL_COUNT} className="p-0">
+                                                            <div className="bg-slate-50 dark:bg-slate-800/40 px-6 py-3 space-y-2">
+                                                                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+                                                                    Contact History ({history.length} attempt{history.length !== 1 ? 's' : ''})
+                                                                </p>
+                                                                {history.map(h => (
+                                                                    <div key={h.id} className="space-y-1">
+                                                                        <div className="flex items-start gap-3 text-[10px] flex-wrap">
+                                                                            <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-black ${h.status === 'contacted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                                                {h.status === 'contacted' ? <Check size={7} /> : <PhoneOff size={7} />}
+                                                                                {h.status === 'contacted' ? 'Reached' : 'No Answer'}
+                                                                            </span>
+                                                                            <span className="text-slate-500 dark:text-slate-400 shrink-0">
+                                                                                {formatDateTime(h.completedAt ?? h.assignedAt)}
+                                                                            </span>
+                                                                            {sessionNameMap.get(h.sessionId) && (
+                                                                                <span className="text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
+                                                                                    {sessionNameMap.get(h.sessionId)}
+                                                                                </span>
+                                                                            )}
+                                                                            {h.volunteerName && (
+                                                                                <span className="text-slate-400 shrink-0">
+                                                                                    by <span className="font-bold text-slate-600 dark:text-slate-300">{h.volunteerName}</span>
+                                                                                </span>
+                                                                            )}
+                                                                            {h.notes?.trim() && (
+                                                                                <span className="text-slate-600 dark:text-slate-300 italic">— {h.notes.trim()}</span>
+                                                                            )}
+                                                                        </div>
+                                                                        {h.followUpNotes && h.followUpNotes.length > 0 && (
+                                                                            <div className="pl-6 space-y-0.5">
+                                                                                {h.followUpNotes.map((fn, fnIdx) => (
+                                                                                    <p key={fnIdx} className="text-[10px] text-slate-500 dark:text-slate-400">
+                                                                                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Follow-up:</span> {fn.note}
+                                                                                    </p>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
 
                                                 {isFormOpen && onAddNote && (
                                                     <InlineContactForm
