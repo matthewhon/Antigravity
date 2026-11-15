@@ -1215,14 +1215,10 @@ function renderAnalyticsBlockHtml(
         case 'people_birthdays': {
             const upcoming: { name: string; daysUntil: number; dateStr: string }[] = data.upcoming || [];
             const rows = upcoming.map(p => {
-                const badgeColor = p.daysUntil === 0 ? '#dc2626' : p.daysUntil <= 7 ? '#d97706' : '#6366f1';
-                const badgeBg    = p.daysUntil === 0 ? '#fee2e2' : p.daysUntil <= 7 ? '#fef3c7' : '#eef2ff';
-                const daysLabel  = p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`;
                 return `<tr>
                   <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;font-size:12px;font-weight:600;color:#1e293b;font-family:${fontFamily};">🎂 ${p.name}</td>
                   <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;text-align:right;">
                     <span style="font-size:10px;color:#64748b;font-family:${fontFamily};">${p.dateStr}</span>
-                    <span style="margin-left:6px;font-size:9px;font-weight:800;background:${badgeBg};color:${badgeColor};padding:2px 6px;border-radius:6px;">${daysLabel}</span>
                   </td>
                 </tr>`;
             }).join('');

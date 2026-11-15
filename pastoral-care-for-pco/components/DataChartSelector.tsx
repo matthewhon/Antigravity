@@ -1190,12 +1190,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
             {upcoming.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{p.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400">{p.dateStr}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    p.daysUntil <= 7 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                  }`}>{p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`}</span>
-                </div>
+                <span className="text-[10px] text-slate-400">{p.dateStr}</span>
               </div>
             ))}
           </div>
