@@ -3,6 +3,18 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInte
 import { Calendar, Clock, MapPin, ExternalLink, Sparkles, ArrowRight } from 'lucide-react';
 import { PledgeCampaignWidget } from './PledgeCampaignWidget';
 import { EventsTableWidget } from './EventsTableWidget';
+import {
+  AddToCalendarButtons,
+  EVENT_ACCENT_THEMES,
+  EventFallbackArtwork,
+  EventFeaturedHero,
+  EventFilterBar,
+  EventWeeklyRhythm,
+  formatEventDatePill,
+  getMonthBuckets,
+  getUniqueEventLocations,
+  getUniqueEventTags,
+} from './EventDirectoryControls';
 
 const apiBaseUrl = process.env.NODE_ENV === 'production' 
   ? 'https://pastoralcare.barnabassoftware.com' 
@@ -42,7 +54,7 @@ export default function WidgetApp() {
   const showCountdown = params.get('showCountdown') !== 'false';
   const showLocation = params.get('showLocation') !== 'false';
 
-  // Events Table specifics
+  // Events Table & Directory specifics (opt-in)
   const tableStyle = params.get('tableStyle') || 'clean';
   const tableHeaderStyle = params.get('tableHeaderStyle') || 'accent';
   const tableDensity = params.get('tableDensity') || 'comfortable';
@@ -53,6 +65,17 @@ export default function WidgetApp() {
   const showAction = params.get('showAction') !== 'false';
   const tableCtaText = params.get('tableCtaText') || 'Details';
   const tableTitle = params.get('tableTitle') || '';
+  const showFilters = params.get('showFilters') === 'true';
+  const showTagFilters = params.get('showTagFilters') === 'true';
+  const showLocationFilters = params.get('showLocationFilters') === 'true';
+  const showFeaturedHero = params.get('showFeaturedHero') === 'true';
+  const allowViewSwitch = params.get('allowViewSwitch') === 'true';
+  const showCalendarLink = params.get('showCalendarLink') === 'true';
+  const showWeeklyRhythm = params.get('showWeeklyRhythm') === 'true';
+  const weeklyRhythmText = params.get('weeklyRhythmText') || '';
+  const planVisitUrl = params.get('planVisitUrl') || '';
+  const posterCtaText = params.get('posterCtaText') || 'Register';
+  const posterCtaAccent = params.get('posterCtaAccent') === 'true';
 
   // Pledge Campaign specifics
   const campaignId = params.get('campaignId') || '';
@@ -107,7 +130,28 @@ export default function WidgetApp() {
     <div className={`min-h-screen bg-transparent p-4 font-sans ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
       {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
       {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
-      {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
+      {(type === 'events' || type === 'calendar') && (
+        <EventsWidget
+          churchId={churchId}
+          layout={layout}
+          color={color}
+          gridCols={gridCols}
+          imageRatio={imageRatio}
+          maxItems={maxItems}
+          tagFilter={tagFilter}
+          showFilters={showFilters}
+          showTagFilters={showTagFilters}
+          showLocationFilters={showLocationFilters}
+          showFeaturedHero={showFeaturedHero}
+          allowViewSwitch={allowViewSwitch}
+          showCalendarLink={showCalendarLink}
+          showWeeklyRhythm={showWeeklyRhythm}
+          weeklyRhythmText={weeklyRhythmText}
+          planVisitUrl={planVisitUrl}
+          posterCtaText={posterCtaText}
+          posterCtaAccent={posterCtaAccent}
+        />
+      )}
       {type === 'events_table' && (
         <EventsTableWidget
           churchId={churchId}
@@ -125,6 +169,15 @@ export default function WidgetApp() {
           showAction={showAction}
           tableCtaText={tableCtaText}
           tableTitle={tableTitle}
+          tagFilter={tagFilter}
+          showFilters={showFilters}
+          showTagFilters={showTagFilters}
+          showLocationFilters={showLocationFilters}
+          showFeaturedHero={showFeaturedHero}
+          showCalendarLink={showCalendarLink}
+          showWeeklyRhythm={showWeeklyRhythm}
+          weeklyRhythmText={weeklyRhythmText}
+          planVisitUrl={planVisitUrl}
         />
       )}
       {type === 'single_event' && (
@@ -395,12 +448,40 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
   );
 }
 
-function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems }: any) {
+function EventsWidget({
+  churchId,
+  layout,
+  color,
+  gridCols,
+  imageRatio,
+  maxItems,
+  tagFilter = '',
+  showFilters = false,
+  showTagFilters = false,
+  showLocationFilters = false,
+  showFeaturedHero = false,
+  allowViewSwitch = false,
+  showCalendarLink = false,
+  showWeeklyRhythm = false,
+  weeklyRhythmText = '',
+  planVisitUrl = '',
+  posterCtaText = 'Register',
+  posterCtaAccent = false,
+}: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [activeLayout, setActiveLayout] = useState<string>(layout || 'grid');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTag, setSelectedTag] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+
+  useEffect(() => {
+    setActiveLayout(layout || 'grid');
+  }, [layout]);
 
   useEffect(() => {
     const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
@@ -417,13 +498,148 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems 
       });
   }, [churchId]);
 
+  const preFilteredEvents = useMemo(() => {
+    const lowerPreTag = tagFilter.trim().toLowerCase();
+    if (!lowerPreTag) return events;
+    return events.filter(e =>
+      (Array.isArray(e.tags) && e.tags.some((t: string) => t.toLowerCase().includes(lowerPreTag))) ||
+      e.name?.toLowerCase().includes(lowerPreTag) ||
+      e.description?.toLowerCase().includes(lowerPreTag)
+    );
+  }, [events, tagFilter]);
+
+  const monthBuckets = useMemo(() => getMonthBuckets(preFilteredEvents), [preFilteredEvents]);
+  const uniqueTags = useMemo(() => getUniqueEventTags(preFilteredEvents), [preFilteredEvents]);
+  const uniqueLocations = useMemo(() => getUniqueEventLocations(preFilteredEvents), [preFilteredEvents]);
+
+  const featuredEvent = useMemo(() => {
+    if (!showFeaturedHero || !preFilteredEvents.length) return null;
+    return preFilteredEvents.find(e => e.featured) || preFilteredEvents[0];
+  }, [showFeaturedHero, preFilteredEvents]);
+
+  const filteredEvents = useMemo(() => {
+    let result = preFilteredEvents;
+    if (showFilters && activeLayout !== 'month') {
+      if (selectedMonth !== 'all') {
+        result = result.filter(e => e.startsAt && format(new Date(e.startsAt), 'yyyy-MM') === selectedMonth);
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(e =>
+          e.name?.toLowerCase().includes(q) ||
+          e.location?.toLowerCase().includes(q) ||
+          (Array.isArray(e.tags) && e.tags.some((t: string) => t.toLowerCase().includes(q)))
+        );
+      }
+      if (showTagFilters && selectedTag) {
+        result = result.filter(e => Array.isArray(e.tags) && e.tags.includes(selectedTag));
+      }
+      if (showLocationFilters && selectedLocation) {
+        result = result.filter(e => e.location?.trim() === selectedLocation);
+      }
+    }
+    if (maxItems > 0 && activeLayout !== 'month') {
+      result = result.slice(0, maxItems);
+    }
+    return result;
+  }, [preFilteredEvents, showFilters, showTagFilters, showLocationFilters, selectedMonth, searchQuery, selectedTag, selectedLocation, maxItems, activeLayout]);
+
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Events...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
-  if (!events.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No events available.</div>;
+  if (!preFilteredEvents.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No events available.</div>;
 
-  const filteredEvents = maxItems > 0 && layout !== 'month' ? events.slice(0, maxItems) : events;
+  const accentTheme = EVENT_ACCENT_THEMES[color] || EVENT_ACCENT_THEMES.indigo;
+  const calendarUrl = preFilteredEvents[0]?.churchCenterCalendarUrl || null;
 
-  if (layout === 'month') {
+  const viewSwitcherEl = allowViewSwitch ? (
+    <div className="mb-4 flex flex-wrap items-center justify-end gap-1.5">
+      {[
+        { id: 'poster', label: 'Poster' },
+        { id: 'grid', label: 'Tiles' },
+        { id: 'table', label: 'Table' },
+        { id: 'month', label: 'Month' },
+      ].map(v => (
+        <button
+          key={v.id}
+          type="button"
+          onClick={() => setActiveLayout(v.id)}
+          className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
+            activeLayout === v.id
+              ? accentTheme.pillActive
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'
+          }`}
+        >
+          {v.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  const eventDetailModal = selectedEvent ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative">
+        <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition shadow-sm border border-slate-200 dark:border-slate-700">✕</button>
+        {selectedEvent.imageUrl && <img src={selectedEvent.imageUrl} alt={selectedEvent.name} className="w-full h-48 object-cover rounded-t-2xl" />}
+        <div className="p-6 pt-8">
+          <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{selectedEvent.name}</h3>
+          <div className="text-sm font-medium text-slate-500 mb-4">
+            {selectedEvent.startsAt ? format(new Date(selectedEvent.startsAt), 'EEEE, MMMM d, yyyy h:mm a') : 'Time TBD'}
+            {selectedEvent.location && <span className="block mt-1">{selectedEvent.location}</span>}
+          </div>
+          {selectedEvent.description && (
+            <div className="prose dark:prose-invert prose-sm max-w-none text-slate-600 dark:text-slate-400 mb-6" dangerouslySetInnerHTML={{ __html: selectedEvent.description }} />
+          )}
+          {(selectedEvent.registrationUrl || selectedEvent.publicUrl) && (
+            <a href={selectedEvent.registrationUrl || selectedEvent.publicUrl} target="_blank" rel="noreferrer" className={`block w-full text-center px-4 py-3 rounded-xl font-bold shadow-md transition ${accentTheme.button}`}>
+              {selectedEvent.registrationUrl ? (posterCtaText || 'Register') : 'View Event Details'}
+            </a>
+          )}
+          <AddToCalendarButtons event={selectedEvent} />
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const weeklyRhythmEl = showWeeklyRhythm ? (
+    <EventWeeklyRhythm
+      weeklyRhythmText={weeklyRhythmText}
+      planVisitUrl={planVisitUrl}
+      color={color}
+    />
+  ) : null;
+
+  const calendarFooterEl = showCalendarLink && calendarUrl ? (
+    <div className="mt-5 flex justify-end">
+      <a href={calendarUrl} target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1.5 text-xs font-bold transition ${accentTheme.link}`}>
+        <span>Open the live calendar</span>
+        <ExternalLink size={12} />
+      </a>
+    </div>
+  ) : null;
+
+  if (activeLayout === 'table') {
+    return (
+      <div>
+        {viewSwitcherEl}
+        <EventsTableWidget
+          churchId={churchId}
+          color={color}
+          maxItems={maxItems}
+          tagFilter={tagFilter}
+          showFilters={showFilters}
+          showTagFilters={showTagFilters}
+          showLocationFilters={showLocationFilters}
+          showFeaturedHero={showFeaturedHero}
+          showCalendarLink={showCalendarLink}
+          showWeeklyRhythm={showWeeklyRhythm}
+          weeklyRhythmText={weeklyRhythmText}
+          planVisitUrl={planVisitUrl}
+        />
+      </div>
+    );
+  }
+
+  if (activeLayout === 'month') {
     const today = new Date();
     const start = startOfWeek(startOfMonth(currentDate));
     const end = endOfWeek(endOfMonth(currentDate));
@@ -434,129 +650,263 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems 
     const handleToday = () => setCurrentDate(new Date());
 
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-           <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">{format(currentDate, 'MMMM yyyy')}</h2>
-           <div className="flex gap-2">
-             <button onClick={handlePrevMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">←</button>
-             <button onClick={handleToday} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">Today</button>
-             <button onClick={handleNextMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">→</button>
-           </div>
-        </div>
-        <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-2 text-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{day}</span>
-                </div>
-            ))}
-        </div>
-        <div className="grid grid-cols-7 auto-rows-[minmax(80px,auto)]">
-          {days.map(day => {
-            const isCurrentMonth = isSameMonth(day, today);
-            const isToday = isSameDay(day, today);
-            const dayEvents = events.filter(e => e.startsAt && isSameDay(new Date(e.startsAt), day));
-
-            return (
-              <div 
-                  key={day.toString()} 
-                  className={`border-b border-r border-slate-100 dark:border-slate-800 p-1.5 transition-colors ${
-                      !isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-900/50 opacity-50' : 'bg-white dark:bg-slate-900'
-                  } ${isToday ? `bg-${color}-50/30 dark:bg-${color}-900/10` : ''}`}
-              >
-                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${
-                      isToday ? `bg-${color}-500 text-white` : 'text-slate-700 dark:text-slate-300'
-                  }`}>
-                      {format(day, 'd')}
-                  </div>
-                  <div className="space-y-2">
-                      {dayEvents.map(event => (
-                          <div 
-                              key={event.id}
-                              onClick={() => setSelectedEvent(event)}
-                              className={`block rounded-lg overflow-hidden border border-slate-100 dark:border-slate-800 transition shadow-sm hover:shadow-md group flex flex-col cursor-pointer`}
-                              title={event.name}
-                          >
-                              {dayEvents.length === 1 && event.imageUrl ? (
-                                <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 relative">
-                                    <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                    <div className="absolute bottom-0 left-0 right-0 p-1.5">
-                                        <div className="text-[10px] font-bold text-white truncate drop-shadow-md">
-                                            {format(new Date(event.startsAt), 'h:mm a')} {event.name}
-                                        </div>
-                                    </div>
-                                </div>
-                              ) : (
-                                <div className={`px-1.5 py-1.5 truncate text-[10px] font-bold bg-${color}-50 text-${color}-800 dark:bg-${color}-900/20 dark:text-${color}-300 group-hover:bg-${color}-100 dark:group-hover:bg-${color}-900/40 transition`}>
-                                    <span className="opacity-75 mr-1">{format(new Date(event.startsAt), 'h:mm a')}</span>
-                                    {event.name}
-                                </div>
-                              )}
-                          </div>
-                      ))}
-                  </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {selectedEvent && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative">
-                   <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition shadow-sm border border-slate-200 dark:border-slate-700">✕</button>
-                   {selectedEvent.imageUrl && <img src={selectedEvent.imageUrl} alt={selectedEvent.name} className="w-full h-48 object-cover rounded-t-2xl" />}
-                   <div className="p-6 pt-8">
-                       <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{selectedEvent.name}</h3>
-                       <div className="text-sm font-medium text-slate-500 mb-4">
-                           {selectedEvent.startsAt ? format(new Date(selectedEvent.startsAt), 'EEEE, MMMM d, yyyy h:mm a') : 'Time TBD'}
-                           {selectedEvent.location && <span className="block mt-1">{selectedEvent.location}</span>}
-                       </div>
-                       {selectedEvent.description && (
-                           <div className="prose dark:prose-invert prose-sm max-w-none text-slate-600 dark:text-slate-400 mb-6" dangerouslySetInnerHTML={{ __html: selectedEvent.description }} />
-                       )}
-                       {selectedEvent.publicUrl && (
-                           <a href={selectedEvent.publicUrl} target="_blank" rel="noreferrer" className={`block w-full text-center px-4 py-3 rounded-xl font-bold text-white bg-${color}-600 hover:bg-${color}-700 transition shadow-md`}>
-                               View Event Details
-                           </a>
-                       )}
-                   </div>
-                </div>
-            </div>
+      <div>
+        {showFeaturedHero && featuredEvent && (
+          <EventFeaturedHero event={featuredEvent} color={color} onSelectEvent={setSelectedEvent} />
         )}
+        {viewSwitcherEl}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+             <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">{format(currentDate, 'MMMM yyyy')}</h2>
+             <div className="flex gap-2">
+               <button onClick={handlePrevMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">←</button>
+               <button onClick={handleToday} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">Today</button>
+               <button onClick={handleNextMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">→</button>
+             </div>
+          </div>
+          <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="p-2 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{day}</span>
+                  </div>
+              ))}
+          </div>
+          <div className="grid grid-cols-7 auto-rows-[minmax(80px,auto)]">
+            {days.map(day => {
+              const isCurrentMonth = isSameMonth(day, today);
+              const isToday = isSameDay(day, today);
+              const dayEvents = events.filter(e => e.startsAt && isSameDay(new Date(e.startsAt), day));
+
+              return (
+                <div 
+                    key={day.toString()} 
+                    className={`border-b border-r border-slate-100 dark:border-slate-800 p-1.5 transition-colors ${
+                        !isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-900/50 opacity-50' : 'bg-white dark:bg-slate-900'
+                    } ${isToday ? `bg-${color}-50/30 dark:bg-${color}-900/10` : ''}`}
+                >
+                    <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${
+                        isToday ? `bg-${color}-500 text-white` : 'text-slate-700 dark:text-slate-300'
+                    }`}>
+                        {format(day, 'd')}
+                    </div>
+                    <div className="space-y-2">
+                        {dayEvents.map(event => (
+                            <div 
+                                key={event.id}
+                                onClick={() => setSelectedEvent(event)}
+                                className={`block rounded-lg overflow-hidden border border-slate-100 dark:border-slate-800 transition shadow-sm hover:shadow-md group flex flex-col cursor-pointer`}
+                                title={event.name}
+                            >
+                                {dayEvents.length === 1 && event.imageUrl ? (
+                                  <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 relative">
+                                      <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                      <div className="absolute bottom-0 left-0 right-0 p-1.5">
+                                          <div className="text-[10px] font-bold text-white truncate drop-shadow-md">
+                                              {format(new Date(event.startsAt), 'h:mm a')} {event.name}
+                                          </div>
+                                      </div>
+                                  </div>
+                                ) : (
+                                  <div className={`px-1.5 py-1.5 truncate text-[10px] font-bold bg-${color}-50 text-${color}-800 dark:bg-${color}-900/20 dark:text-${color}-300 group-hover:bg-${color}-100 dark:group-hover:bg-${color}-900/40 transition`}>
+                                      <span className="opacity-75 mr-1">{format(new Date(event.startsAt), 'h:mm a')}</span>
+                                      {event.name}
+                                  </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {weeklyRhythmEl}
+        {calendarFooterEl}
+        {eventDetailModal}
+      </div>
+    );
+  }
+
+  if (activeLayout === 'poster') {
+    return (
+      <div>
+        {showFeaturedHero && featuredEvent && (
+          <EventFeaturedHero event={featuredEvent} color={color} onSelectEvent={setSelectedEvent} />
+        )}
+        {viewSwitcherEl}
+        {showFilters && (
+          <EventFilterBar
+            color={color}
+            totalCount={preFilteredEvents.length}
+            filteredCount={filteredEvents.length}
+            monthBuckets={monthBuckets}
+            selectedMonth={selectedMonth}
+            onSelectMonth={setSelectedMonth}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            tags={uniqueTags}
+            showTagFilters={showTagFilters}
+            selectedTag={selectedTag}
+            onSelectTag={setSelectedTag}
+            locations={uniqueLocations}
+            showLocationFilters={showLocationFilters}
+            selectedLocation={selectedLocation}
+            onSelectLocation={setSelectedLocation}
+          />
+        )}
+
+        {!filteredEvents.length ? (
+          <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+            No upcoming events match your current filters.
+          </div>
+        ) : (
+          <div className={`grid gap-5 ${getGridClass('grid', gridCols)}`}>
+            {filteredEvents.map(e => {
+              const datePill = formatEventDatePill(e.startsAt, e.endsAt);
+              const metaParts = [datePill];
+              if (e.location) metaParts.push(e.location);
+
+              return (
+                <div
+                  key={e.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col group"
+                >
+                  <div className={`relative w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-100 dark:bg-slate-950 overflow-hidden`}>
+                    {e.imageUrl ? (
+                      <img src={e.imageUrl} alt={e.name} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" />
+                    ) : (
+                      <EventFallbackArtwork color={color} />
+                    )}
+
+                    {/* Top-left floating date pill */}
+                    <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white text-xs font-bold shadow-sm backdrop-blur-xs">
+                      {datePill}
+                    </span>
+
+                    {/* Top-right floating Register CTA if registrationUrl exists */}
+                    {e.registrationUrl && (
+                      <a
+                        href={e.registrationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`absolute top-3 right-3 px-3.5 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-xs transition ${
+                          posterCtaAccent
+                            ? accentTheme.button
+                            : 'bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white hover:bg-white dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        {posterCtaText || 'Register'}
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="p-5 flex-grow flex flex-col justify-center text-center">
+                    {e.publicUrl ? (
+                      <a
+                        href={e.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-extrabold text-lg text-slate-900 dark:text-slate-100 hover:underline leading-snug mb-1.5"
+                      >
+                        {e.name || 'Unnamed Event'}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEvent(e)}
+                        className="font-extrabold text-lg text-slate-900 dark:text-slate-100 hover:underline leading-snug mb-1.5"
+                      >
+                        {e.name || 'Unnamed Event'}
+                      </button>
+                    )}
+                    <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {metaParts.join(' · ')}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {weeklyRhythmEl}
+        {calendarFooterEl}
+        {eventDetailModal}
       </div>
     );
   }
 
   return (
-    <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
-      {filteredEvents.map(e => (
-        <div key={e.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
-          {e.imageUrl && (
-             <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
-                <img src={e.imageUrl} alt={e.name} className="w-full h-full object-cover" />
-             </div>
-          )}
-          <div className="p-5 flex-grow flex flex-col">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{e.name || 'Unnamed Event'}</h3>
-            {(e.featured || e.recurring || e.repeats) && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                    {e.featured && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">Featured</span>}
-                    {(e.recurring || e.repeats) && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Recurring</span>}
-                </div>
-            )}
-            <div className="text-sm text-slate-600 dark:text-slate-400 mb-3 flex flex-wrap items-center gap-2">
-                 {e.startsAt && <span className="font-medium whitespace-nowrap">{new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
-                 {e.startsAt && e.location && <span className="w-1 h-1 flex-shrink-0 rounded-full bg-slate-300 dark:bg-slate-700"/>}
-                 {e.location && <span className="truncate max-w-[200px]">{e.location}</span>}
-            </div>
-            {e.publicUrl && (
-                <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <a href={e.publicUrl} target="_blank" rel="noreferrer" className={`text-sm font-bold text-${color}-600 dark:text-${color}-400 hover:text-${color}-700 transition`}>More Info →</a>
-                </div>
-            )}
-          </div>
+    <div>
+      {showFeaturedHero && featuredEvent && (
+        <EventFeaturedHero event={featuredEvent} color={color} onSelectEvent={setSelectedEvent} />
+      )}
+      {viewSwitcherEl}
+      {showFilters && (
+        <EventFilterBar
+          color={color}
+          totalCount={preFilteredEvents.length}
+          filteredCount={filteredEvents.length}
+          monthBuckets={monthBuckets}
+          selectedMonth={selectedMonth}
+          onSelectMonth={setSelectedMonth}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          tags={uniqueTags}
+          showTagFilters={showTagFilters}
+          selectedTag={selectedTag}
+          onSelectTag={setSelectedTag}
+          locations={uniqueLocations}
+          showLocationFilters={showLocationFilters}
+          selectedLocation={selectedLocation}
+          onSelectLocation={setSelectedLocation}
+        />
+      )}
+
+      {!filteredEvents.length ? (
+        <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+          No upcoming events match your current filters.
         </div>
-      ))}
+      ) : (
+        <div className={`grid gap-4 ${getGridClass(activeLayout, gridCols)}`}>
+          {filteredEvents.map(e => (
+            <div key={e.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+              {e.imageUrl && (
+                 <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+                    <img src={e.imageUrl} alt={e.name} className="w-full h-full object-cover" />
+                 </div>
+              )}
+              <div className="p-5 flex-grow flex flex-col">
+                <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{e.name || 'Unnamed Event'}</h3>
+                {(e.featured || e.recurring || e.repeats) && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        {e.featured && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">Featured</span>}
+                        {(e.recurring || e.repeats) && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Recurring</span>}
+                    </div>
+                )}
+                <div className="text-sm text-slate-600 dark:text-slate-400 mb-3 flex flex-wrap items-center gap-2">
+                     {e.startsAt && <span className="font-medium whitespace-nowrap">{new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
+                     {e.startsAt && e.location && <span className="w-1 h-1 flex-shrink-0 rounded-full bg-slate-300 dark:bg-slate-700"/>}
+                     {e.location && <span className="truncate max-w-[200px]">{e.location}</span>}
+                </div>
+                {(e.registrationUrl || e.publicUrl) && (
+                    <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                        {e.publicUrl ? (
+                          <a href={e.publicUrl} target="_blank" rel="noreferrer" className={`text-sm font-bold text-${color}-600 dark:text-${color}-400 hover:text-${color}-700 transition`}>More Info →</a>
+                        ) : <span />}
+                        {e.registrationUrl && (
+                          <a href={e.registrationUrl} target="_blank" rel="noreferrer" className={`px-3 py-1 rounded-lg text-xs font-bold transition ${accentTheme.button}`}>Register</a>
+                        )}
+                    </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {weeklyRhythmEl}
+      {calendarFooterEl}
+      {eventDetailModal}
     </div>
   );
 }

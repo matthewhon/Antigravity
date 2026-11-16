@@ -221,14 +221,35 @@ export async function getPublicEvents(req: any, res: any) {
   }
 
   try {
-    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/calendar/v2/event_instances?include=event&filter=future&per_page=100');
-    
-    const includedEvents = data.included || [];
+    let data: any;
+    try {
+      data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/calendar/v2/event_instances?include=event,tags&filter=future&per_page=100');
+    } catch {
+      data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/calendar/v2/event_instances?include=event&filter=future&per_page=100');
+    }
+
+    const included = data.included || [];
+    const db = getDb();
+    const churchDoc = await db.collection('churches').doc(churchId).get();
+    const churchData = churchDoc.exists ? churchDoc.data() : null;
+    const subdomain = churchData?.subdomain || '';
+    const churchCenterCalendarUrl = subdomain ? `https://${subdomain}.churchcenter.com/calendar` : null;
 
     const events = (data.data || []).map((instance: any) => {
       const eventId = instance.relationships?.event?.data?.id;
-      const parentEvent = includedEvents.find((inc: any) => inc.type === 'Event' && inc.id === eventId);
+      const parentEvent = included.find((inc: any) => inc.type === 'Event' && inc.id === eventId);
       const eventDetails = parentEvent ? parentEvent.attributes : {};
+
+      const tagRefs = [
+        ...(instance.relationships?.tags?.data || []),
+        ...(parentEvent?.relationships?.tags?.data || []),
+      ];
+      const tagSet = new Set<string>();
+      for (const ref of tagRefs) {
+        const tagObj = included.find((inc: any) => inc.type === 'Tag' && inc.id === ref.id);
+        const tagName = tagObj?.attributes?.name;
+        if (tagName) tagSet.add(tagName);
+      }
 
       return {
         id: instance.id,
@@ -238,7 +259,12 @@ export async function getPublicEvents(req: any, res: any) {
         endsAt: instance.attributes.ends_at || null,
         location: instance.attributes.location || eventDetails.location || null,
         publicUrl: eventDetails.church_center_url || eventDetails.public_url || null,
+        registrationUrl: eventDetails.registration_url || null,
         imageUrl: eventDetails.image_url || null,
+        featured: Boolean(eventDetails.featured),
+        recurring: Boolean(instance.attributes.recurrence_description || eventDetails.recurrence_description || eventDetails.repeats),
+        tags: Array.from(tagSet),
+        churchCenterCalendarUrl,
       };
     });
     cache[cacheKey] = { data: events, timestamp: Date.now() };

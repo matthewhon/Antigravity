@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Clock, ExternalLink, MapPin } from 'lucide-react';
+import {
+  AddToCalendarButtons,
+  EventFeaturedHero,
+  EventFilterBar,
+  EventWeeklyRhythm,
+  getMonthBuckets,
+  getUniqueEventLocations,
+  getUniqueEventTags,
+} from './EventDirectoryControls';
 
 const apiBaseUrl = process.env.NODE_ENV === 'production'
   ? 'https://pastoralcare.barnabassoftware.com'
@@ -22,6 +31,15 @@ export interface EventsTableWidgetProps {
   showAction?: boolean;
   tableCtaText?: string;
   tableTitle?: string;
+  showFilters?: boolean;
+  showTagFilters?: boolean;
+  showLocationFilters?: boolean;
+  showFeaturedHero?: boolean;
+  showCalendarLink?: boolean;
+  tagFilter?: string;
+  showWeeklyRhythm?: boolean;
+  weeklyRhythmText?: string;
+  planVisitUrl?: string;
 }
 
 interface ColorTheme {
@@ -139,11 +157,24 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
   showAction = true,
   tableCtaText = 'Details',
   tableTitle = '',
+  showFilters = false,
+  showTagFilters = false,
+  showLocationFilters = false,
+  showFeaturedHero = false,
+  showCalendarLink = false,
+  tagFilter = '',
+  showWeeklyRhythm = false,
+  weeklyRhythmText = '',
+  planVisitUrl = '',
 }) => {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTag, setSelectedTag] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
 
   useEffect(() => {
     setLoading(true);
@@ -163,12 +194,20 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
       });
   }, [churchId, eventSource]);
 
-  const upcomingEvents = useMemo(() => {
+  const allUpcomingEvents = useMemo(() => {
     const now = new Date();
+    const lowerPreTag = tagFilter.trim().toLowerCase();
     const upcoming = events.filter(e => {
       const compareDate = e.endsAt || e.startsAt;
-      if (!compareDate) return true;
-      return new Date(compareDate) >= now;
+      if (compareDate && new Date(compareDate) < now) return false;
+      if (lowerPreTag) {
+        const matchesTag =
+          (Array.isArray(e.tags) && e.tags.some((t: string) => t.toLowerCase().includes(lowerPreTag))) ||
+          e.name?.toLowerCase().includes(lowerPreTag) ||
+          e.description?.toLowerCase().includes(lowerPreTag);
+        if (!matchesTag) return false;
+      }
+      return true;
     });
 
     upcoming.sort((a, b) => {
@@ -178,8 +217,44 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
       return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
     });
 
-    return maxItems > 0 ? upcoming.slice(0, maxItems) : upcoming;
-  }, [events, maxItems]);
+    return upcoming;
+  }, [events, tagFilter]);
+
+  const monthBuckets = useMemo(() => getMonthBuckets(allUpcomingEvents), [allUpcomingEvents]);
+  const uniqueTags = useMemo(() => getUniqueEventTags(allUpcomingEvents), [allUpcomingEvents]);
+  const uniqueLocations = useMemo(() => getUniqueEventLocations(allUpcomingEvents), [allUpcomingEvents]);
+
+  const featuredEvent = useMemo(() => {
+    if (!showFeaturedHero || !allUpcomingEvents.length) return null;
+    return allUpcomingEvents.find(e => e.featured) || allUpcomingEvents[0];
+  }, [showFeaturedHero, allUpcomingEvents]);
+
+  const upcomingEvents = useMemo(() => {
+    let result = allUpcomingEvents;
+
+    if (showFilters && selectedMonth !== 'all') {
+      result = result.filter(e => e.startsAt && format(new Date(e.startsAt), 'yyyy-MM') === selectedMonth);
+    }
+
+    if (showFilters && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(e =>
+        e.name?.toLowerCase().includes(q) ||
+        e.location?.toLowerCase().includes(q) ||
+        (Array.isArray(e.tags) && e.tags.some((t: string) => t.toLowerCase().includes(q)))
+      );
+    }
+
+    if (showFilters && showTagFilters && selectedTag) {
+      result = result.filter(e => Array.isArray(e.tags) && e.tags.includes(selectedTag));
+    }
+
+    if (showFilters && showLocationFilters && selectedLocation) {
+      result = result.filter(e => e.location?.trim() === selectedLocation);
+    }
+
+    return maxItems > 0 ? result.slice(0, maxItems) : result;
+  }, [allUpcomingEvents, maxItems, showFilters, selectedMonth, searchQuery, showTagFilters, selectedTag, showLocationFilters, selectedLocation]);
 
   const themeColors = COLOR_THEMES[color] || COLOR_THEMES.indigo;
 
@@ -230,7 +305,7 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
     );
   }
 
-  if (!upcomingEvents.length) {
+  if (!allUpcomingEvents.length) {
     return (
       <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
         No upcoming events scheduled.
@@ -241,9 +316,14 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
   const isCardRows = tableStyle === 'card';
   const isBordered = tableStyle === 'bordered';
   const isStriped = tableStyle === 'striped';
+  const calendarUrl = allUpcomingEvents[0]?.churchCenterCalendarUrl || null;
 
   return (
     <div className="w-full">
+      {showFeaturedHero && featuredEvent && (
+        <EventFeaturedHero event={featuredEvent} color={color} onSelectEvent={setSelectedEvent} />
+      )}
+
       {tableTitle && (
         <div className="mb-3 flex items-center gap-2">
           <Calendar size={18} className={themeColors.link} />
@@ -253,13 +333,39 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
         </div>
       )}
 
-      <div
-        className={`w-full overflow-x-auto ${
-          isCardRows
-            ? ''
-            : `bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm ${radiusClass} overflow-hidden`
-        }`}
-      >
+      {showFilters && (
+        <EventFilterBar
+          color={color}
+          totalCount={allUpcomingEvents.length}
+          filteredCount={upcomingEvents.length}
+          monthBuckets={monthBuckets}
+          selectedMonth={selectedMonth}
+          onSelectMonth={setSelectedMonth}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          tags={uniqueTags}
+          showTagFilters={showTagFilters}
+          selectedTag={selectedTag}
+          onSelectTag={setSelectedTag}
+          locations={uniqueLocations}
+          showLocationFilters={showLocationFilters}
+          selectedLocation={selectedLocation}
+          onSelectLocation={setSelectedLocation}
+        />
+      )}
+
+      {!upcomingEvents.length ? (
+        <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+          No upcoming events match your current filters.
+        </div>
+      ) : (
+        <div
+          className={`w-full overflow-x-auto ${
+            isCardRows
+              ? ''
+              : `bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm ${radiusClass} overflow-hidden`
+          }`}
+        >
         <table
           className={`w-full text-left ${
             isCardRows ? 'border-separate border-spacing-y-2.5' : 'border-collapse'
@@ -313,7 +419,8 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
           <tbody className={isCardRows ? '' : 'divide-y divide-slate-100 dark:divide-slate-800'}>
             {upcomingEvents.map((ev, idx) => {
               const startDate = ev.startsAt ? new Date(ev.startsAt) : null;
-              const eventUrl = ev.publicUrl || ev.churchCenterUrl || null;
+              const eventUrl = ev.registrationUrl || ev.publicUrl || ev.churchCenterUrl || null;
+              const actionLabel = ev.registrationUrl ? 'Register' : (tableCtaText || 'Details');
               const plainDesc = showDescription ? stripHtml(ev.description) : '';
 
               const rowBgClass = isCardRows
@@ -429,7 +536,7 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
                           rel="noreferrer"
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs ${themeColors.button}`}
                         >
-                          <span>{tableCtaText || 'Details'}</span>
+                          <span>{actionLabel}</span>
                           <ExternalLink size={12} />
                         </a>
                       ) : (
@@ -438,7 +545,7 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
                           onClick={() => setSelectedEvent(ev)}
                           className={`inline-flex items-center gap-1 text-xs font-bold transition ${themeColors.link}`}
                         >
-                          {tableCtaText || 'Details'}
+                          {actionLabel}
                         </button>
                       )}
                     </td>
@@ -449,6 +556,29 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
           </tbody>
         </table>
       </div>
+      )}
+
+      {showWeeklyRhythm && (
+        <EventWeeklyRhythm
+          weeklyRhythmText={weeklyRhythmText}
+          planVisitUrl={planVisitUrl}
+          color={color}
+        />
+      )}
+
+      {showCalendarLink && calendarUrl && (
+        <div className="mt-4 flex justify-end">
+          <a
+            href={calendarUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={`inline-flex items-center gap-1.5 text-xs font-bold transition ${themeColors.link}`}
+          >
+            <span>Open the live calendar</span>
+            <ExternalLink size={12} />
+          </a>
+        </div>
+      )}
 
       {/* Fallback detail modal for events without a public URL */}
       {selectedEvent && (
@@ -491,6 +621,7 @@ export const EventsTableWidget: React.FC<EventsTableWidgetProps> = ({
                   dangerouslySetInnerHTML={{ __html: selectedEvent.description }}
                 />
               )}
+              <AddToCalendarButtons event={selectedEvent} />
             </div>
           </div>
         </div>

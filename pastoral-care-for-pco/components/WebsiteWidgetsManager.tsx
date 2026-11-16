@@ -77,6 +77,20 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [tableCtaText, setTableCtaText] = useState('Details');
   const [tableTitle, setTableTitle] = useState('');
 
+  // Enhanced Event Directory options (opt-in)
+  const [eventShowFilters, setEventShowFilters] = useState(false);
+  const [eventShowTagFilters, setEventShowTagFilters] = useState(false);
+  const [eventShowLocationFilters, setEventShowLocationFilters] = useState(false);
+  const [eventShowFeaturedHero, setEventShowFeaturedHero] = useState(false);
+  const [eventAllowViewSwitch, setEventAllowViewSwitch] = useState(false);
+  const [eventShowCalendarLink, setEventShowCalendarLink] = useState(false);
+  const [eventTagFilter, setEventTagFilter] = useState('');
+  const [eventShowWeeklyRhythm, setEventShowWeeklyRhythm] = useState(false);
+  const [eventWeeklyRhythmText, setEventWeeklyRhythmText] = useState('Sundays: 9:00 AM & 11:00 AM | Wednesdays: 6:00 PM');
+  const [eventPlanVisitUrl, setEventPlanVisitUrl] = useState('');
+  const [posterCtaText, setPosterCtaText] = useState('Register');
+  const [posterCtaAccent, setPosterCtaAccent] = useState(false);
+
   React.useEffect(() => {
     if (type === 'bubble_form' && !customFormsLoaded) {
       const fetchCustomForms = async () => {
@@ -203,14 +217,25 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const visibleFormIdsArray = Array.from(visibleFormIds);
   const allFormsVisible = forms.length > 0 && visibleFormIds.size === forms.length;
   const effectiveMaxItems = type === 'events_table' ? tableMaxEvents : maxItems;
+  const isEventDirectoryType = type === 'events' || type === 'calendar' || type === 'events_table';
   const commonParams = `type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}` 
-      + (layout === 'grid' && type !== 'events_table' ? `&gridCols=${gridCols}` : '')
+      + ((layout === 'grid' || layout === 'poster') && type !== 'events_table' ? `&gridCols=${gridCols}` : '')
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
       + (type === 'events_table' ? `&eventSource=${tableEventSource}&tableStyle=${tableStyle}&tableHeaderStyle=${tableHeaderStyle}&tableDensity=${tableDensity}&tableRadius=${tableRadius}&tableDateFormat=${tableDateFormat}&showTime=${tableShowTime}&showLocation=${tableShowLocation}&showDescription=${tableShowDescription}&showAction=${tableShowAction}&tableCtaText=${encodeURIComponent(tableCtaText)}&tableTitle=${encodeURIComponent(tableTitle)}` : '')
+      + (isEventDirectoryType && eventShowFilters ? `&showFilters=true` : '')
+      + (isEventDirectoryType && eventShowFilters && eventShowTagFilters ? `&showTagFilters=true` : '')
+      + (isEventDirectoryType && eventShowFilters && eventShowLocationFilters ? `&showLocationFilters=true` : '')
+      + (isEventDirectoryType && eventTagFilter.trim() ? `&tagFilter=${encodeURIComponent(eventTagFilter.trim())}` : '')
+      + (isEventDirectoryType && eventShowFeaturedHero ? `&showFeaturedHero=true` : '')
+      + (type === 'events' && eventAllowViewSwitch ? `&allowViewSwitch=true` : '')
+      + (isEventDirectoryType && eventShowCalendarLink ? `&showCalendarLink=true` : '')
+      + (isEventDirectoryType && eventShowWeeklyRhythm ? `&showWeeklyRhythm=true&weeklyRhythmText=${encodeURIComponent(eventWeeklyRhythmText)}${eventPlanVisitUrl.trim() ? `&planVisitUrl=${encodeURIComponent(eventPlanVisitUrl.trim())}` : ''}` : '')
+      + (type === 'events' && layout === 'poster' && posterCtaText !== 'Register' ? `&posterCtaText=${encodeURIComponent(posterCtaText)}` : '')
+      + (type === 'events' && layout === 'poster' && posterCtaAccent ? `&posterCtaAccent=true` : '')
       + (type === 'bubble_form' ? `&formId=${bubbleFormId}&bubbleMode=${bubbleMode}&bubbleText=${encodeURIComponent(bubbleText)}&bubbleHoverText=${encodeURIComponent(bubbleHoverText)}&bubbleIcon=${encodeURIComponent(bubbleIcon)}&bubblePosition=${bubblePosition}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
@@ -322,6 +347,12 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                      <span className="text-[10px] uppercase font-bold tracking-wide">Month</span>
                    </button>
                  )}
+                 {type === 'events' && (
+                   <button onClick={() => setLayout('poster')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='poster'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                     <LayoutGrid size={20} />
+                     <span className="text-[10px] uppercase font-bold tracking-wide">Poster</span>
+                   </button>
+                 )}
                  <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <LayoutGrid size={20} />
                    <span className="text-[10px] uppercase font-bold tracking-wide">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
@@ -395,7 +426,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && layout === 'grid' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && (layout === 'grid' || layout === 'poster') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -406,7 +437,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && (layout === 'grid' || layout === 'list') && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && (layout === 'grid' || layout === 'list' || layout === 'poster') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -521,6 +552,136 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               <p className="text-[10px] text-slate-400 leading-relaxed">Toggle which forms appear in your embedded widget. Click a form to show or hide it.</p>
               {visibleFormIds.size === 0 && forms.length > 0 && (
                 <p className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold"><TriangleAlert size={12} className="shrink-0" aria-hidden="true" /> No forms selected — the widget will show nothing.</p>
+              )}
+            </div>
+          )}
+
+          {(type === 'events' || type === 'events_table') && (
+            <div className="space-y-2.5 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase">Event Directory Features (Optional)</label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eventShowFilters}
+                  onChange={e => setEventShowFilters(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Search &amp; Month Filter Bar</span>
+              </label>
+              {eventShowFilters && (
+                <>
+                  <label className="flex items-center gap-3 cursor-pointer pl-6">
+                    <input
+                      type="checkbox"
+                      checked={eventShowTagFilters}
+                      onChange={e => setEventShowTagFilters(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                    />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Show Ministry / Tag Pills</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer pl-6">
+                    <input
+                      type="checkbox"
+                      checked={eventShowLocationFilters}
+                      onChange={e => setEventShowLocationFilters(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                    />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Show Campus / Location Pills</span>
+                  </label>
+                </>
+              )}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eventShowFeaturedHero}
+                  onChange={e => setEventShowFeaturedHero(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Featured Event Hero Banner</span>
+              </label>
+              {type === 'events' && (
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={eventAllowViewSwitch}
+                    onChange={e => setEventAllowViewSwitch(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Allow Visitor View Switcher</span>
+                </label>
+              )}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eventShowCalendarLink}
+                  onChange={e => setEventShowCalendarLink(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show &quot;Open Live Calendar&quot; Link</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eventShowWeeklyRhythm}
+                  onChange={e => setEventShowWeeklyRhythm(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Weekly Rhythm / Service Times</span>
+              </label>
+              {eventShowWeeklyRhythm && (
+                <div className="space-y-2 pl-6 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Sundays: 9:00 AM & 11:00 AM | Wednesdays: 6:00 PM"
+                    value={eventWeeklyRhythmText}
+                    onChange={e => setEventWeeklyRhythmText(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Plan Your Visit URL (optional)"
+                    value={eventPlanVisitUrl}
+                    onChange={e => setEventPlanVisitUrl(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                  <p className="text-[10px] text-slate-400">Separate schedule items with a pipe (|).</p>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-1.5">Pre-Filter by Ministry / Tag</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Youth, Women (optional)"
+                  value={eventTagFilter}
+                  onChange={e => setEventTagFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              {type === 'events' && layout === 'poster' && (
+                <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-1.5">Poster Register Pill Label</label>
+                    <input
+                      type="text"
+                      placeholder="Register"
+                      value={posterCtaText}
+                      onChange={e => setPosterCtaText(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={posterCtaAccent}
+                      onChange={e => setPosterCtaAccent(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                    />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Use Accent Color for Poster Register Pill</span>
+                  </label>
+                </div>
               )}
             </div>
           )}
