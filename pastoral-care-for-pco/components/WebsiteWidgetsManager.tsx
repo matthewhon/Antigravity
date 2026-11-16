@@ -62,6 +62,21 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [customForms, setCustomForms] = useState<any[]>([]);
   const [customFormsLoaded, setCustomFormsLoaded] = useState(false);
 
+  // Upcoming Events Table specifics
+  const [tableMaxEvents, setTableMaxEvents] = useState('10');
+  const [tableEventSource, setTableEventSource] = useState<'calendar' | 'registrations'>('calendar');
+  const [tableStyle, setTableStyle] = useState<'clean' | 'striped' | 'bordered' | 'card'>('clean');
+  const [tableHeaderStyle, setTableHeaderStyle] = useState<'accent' | 'tinted' | 'minimal' | 'hidden'>('accent');
+  const [tableDensity, setTableDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
+  const [tableRadius, setTableRadius] = useState<'none' | 'md' | 'xl'>('md');
+  const [tableDateFormat, setTableDateFormat] = useState<'badge' | 'short' | 'numeric'>('badge');
+  const [tableShowTime, setTableShowTime] = useState(true);
+  const [tableShowLocation, setTableShowLocation] = useState(true);
+  const [tableShowDescription, setTableShowDescription] = useState(false);
+  const [tableShowAction, setTableShowAction] = useState(true);
+  const [tableCtaText, setTableCtaText] = useState('Details');
+  const [tableTitle, setTableTitle] = useState('');
+
   React.useEffect(() => {
     if (type === 'bubble_form' && !customFormsLoaded) {
       const fetchCustomForms = async () => {
@@ -150,7 +165,17 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       const res = await fetch(`${apiBaseUrl}/pco/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ churchId, area: (type === 'calendar' || type === 'single_event') ? 'events' : type })
+        body: JSON.stringify({
+          churchId,
+          area:
+            type === 'events_table'
+              ? tableEventSource === 'registrations'
+                ? 'registrations'
+                : 'events'
+              : type === 'calendar' || type === 'single_event'
+              ? 'events'
+              : type,
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -177,18 +202,20 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
     : window.location.origin;
   const visibleFormIdsArray = Array.from(visibleFormIds);
   const allFormsVisible = forms.length > 0 && visibleFormIds.size === forms.length;
+  const effectiveMaxItems = type === 'events_table' ? tableMaxEvents : maxItems;
   const commonParams = `type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}` 
-      + (layout === 'grid' ? `&gridCols=${gridCols}` : '')
+      + (layout === 'grid' && type !== 'events_table' ? `&gridCols=${gridCols}` : '')
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
+      + (type === 'events_table' ? `&eventSource=${tableEventSource}&tableStyle=${tableStyle}&tableHeaderStyle=${tableHeaderStyle}&tableDensity=${tableDensity}&tableRadius=${tableRadius}&tableDateFormat=${tableDateFormat}&showTime=${tableShowTime}&showLocation=${tableShowLocation}&showDescription=${tableShowDescription}&showAction=${tableShowAction}&tableCtaText=${encodeURIComponent(tableCtaText)}&tableTitle=${encodeURIComponent(tableTitle)}` : '')
       + (type === 'bubble_form' ? `&formId=${bubbleFormId}&bubbleMode=${bubbleMode}&bubbleText=${encodeURIComponent(bubbleText)}&bubbleHoverText=${encodeURIComponent(bubbleHoverText)}&bubbleIcon=${encodeURIComponent(bubbleIcon)}&bubblePosition=${bubblePosition}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
-      + (maxItems && maxItems !== '0' ? `&maxItems=${maxItems}` : '');
+      + (effectiveMaxItems && effectiveMaxItems !== '0' ? `&maxItems=${effectiveMaxItems}` : '');
 
   const iframeUrl = type === 'newsletter'
     ? `${domain}/newsletter/${churchId}?embedded=true`
@@ -251,6 +278,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'groups', label: 'Small Groups' },
                 { id: 'registrations', label: 'Registrations' },
                 { id: 'events', label: 'Calendar/Events' },
+                { id: 'events_table', label: 'Upcoming Events Table' },
                 { id: 'single_event', label: 'Featured Single Event' },
                 { id: 'forms', label: 'Forms' },
                 { id: 'newsletter', label: 'Newsletter Signup' },
@@ -263,7 +291,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     setType(opt.id);
                     if (opt.id === 'events') setLayout('month');
                     else if (opt.id === 'single_event') setLayout('card');
-                    else if (layout === 'month') setLayout('grid');
+                    else if (opt.id === 'events_table') setLayout('table');
+                    else if (layout === 'month' || layout === 'table') setLayout('grid');
                   }}
                   className={`text-left px-4 py-2.5 rounded-lg border text-sm font-semibold transition ${type === opt.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 text-indigo-700 dark:text-indigo-400 dark:border-indigo-800' : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'}`}
                 >
@@ -283,7 +312,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && type !== 'newsletter' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'newsletter' && type !== 'events_table' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
                <div className="flex gap-2">
@@ -349,22 +378,24 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               </div>
 
               {/* Max Items Limit */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Max Items to Display</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder="0 for unlimited" 
-                  value={maxItems} 
-                  onChange={e => setMaxItems(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                />
-                <p className="text-[10px] text-slate-500 mt-1">Leave as 0 to show all items.</p>
-              </div>
+              {type !== 'events_table' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Max Items to Display</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    placeholder="0 for unlimited" 
+                    value={maxItems} 
+                    onChange={e => setMaxItems(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Leave as 0 to show all items.</p>
+                </div>
+              )}
             </>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && layout === 'grid' && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && layout === 'grid' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -375,7 +406,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && type !== 'bubble_form' && (layout === 'grid' || layout === 'list') && (
+          {type !== 'popup' && type !== 'bubble_form' && type !== 'events_table' && (layout === 'grid' || layout === 'list') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -490,6 +521,251 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               <p className="text-[10px] text-slate-400 leading-relaxed">Toggle which forms appear in your embedded widget. Click a form to show or hide it.</p>
               {visibleFormIds.size === 0 && forms.length > 0 && (
                 <p className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold"><TriangleAlert size={12} className="shrink-0" aria-hidden="true" /> No forms selected — the widget will show nothing.</p>
+              )}
+            </div>
+          )}
+
+          {type === 'events_table' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Number of Upcoming Events</label>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[
+                    { value: '5', label: '5' },
+                    { value: '10', label: '10' },
+                    { value: '15', label: '15' },
+                    { value: '25', label: '25' },
+                    { value: '0', label: 'All' },
+                  ].map(preset => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setTableMaxEvents(preset.value)}
+                      className={`py-1.5 text-xs font-bold rounded-lg border transition ${
+                        tableMaxEvents === preset.value
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400'
+                          : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0 for all upcoming events"
+                  value={tableMaxEvents}
+                  onChange={e => setTableMaxEvents(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Enter 0 to show all upcoming events.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Event Source</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setTableEventSource('calendar')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${tableEventSource === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableEventSource('registrations')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${tableEventSource === 'registrations' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Registrations
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Table Heading (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Upcoming Events"
+                  value={tableTitle}
+                  onChange={e => setTableTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Table Style</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'clean', label: 'Clean' },
+                    { id: 'striped', label: 'Striped' },
+                    { id: 'bordered', label: 'Bordered' },
+                    { id: 'card', label: 'Card Rows' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTableStyle(opt.id as any)}
+                      className={`py-2 px-3 rounded-lg border text-xs font-bold transition ${
+                        tableStyle === opt.id
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400'
+                          : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Header Style</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'accent', label: 'Solid Accent' },
+                    { id: 'tinted', label: 'Soft Tinted' },
+                    { id: 'minimal', label: 'Minimal' },
+                    { id: 'hidden', label: 'Hidden' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTableHeaderStyle(opt.id as any)}
+                      className={`py-2 px-3 rounded-lg border text-xs font-bold transition ${
+                        tableHeaderStyle === opt.id
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400'
+                          : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Row Density</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  {[
+                    { id: 'compact', label: 'Compact' },
+                    { id: 'comfortable', label: 'Normal' },
+                    { id: 'spacious', label: 'Spacious' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTableDensity(opt.id as any)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                        tableDensity === opt.id
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Corner Radius</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  {[
+                    { id: 'none', label: 'Sharp' },
+                    { id: 'md', label: 'Rounded' },
+                    { id: 'xl', label: 'Pill' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTableRadius(opt.id as any)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                        tableRadius === opt.id
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Date Display</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  {[
+                    { id: 'badge', label: 'Badge' },
+                    { id: 'short', label: 'Text' },
+                    { id: 'numeric', label: 'Numeric' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTableDateFormat(opt.id as any)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                        tableDateFormat === opt.id
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase">Columns & Details</label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tableShowTime}
+                    onChange={e => setTableShowTime(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Event Time</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tableShowLocation}
+                    onChange={e => setTableShowLocation(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Location Column</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tableShowDescription}
+                    onChange={e => setTableShowDescription(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Description Snippet</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tableShowAction}
+                    onChange={e => setTableShowAction(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Action Button</span>
+                </label>
+              </div>
+
+              {tableShowAction && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Action Button Text</label>
+                  <input
+                    type="text"
+                    placeholder="Details"
+                    value={tableCtaText}
+                    onChange={e => setTableCtaText(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  />
+                </div>
               )}
             </div>
           )}

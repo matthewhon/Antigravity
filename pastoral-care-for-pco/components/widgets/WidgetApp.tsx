@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { Calendar, Clock, MapPin, ExternalLink, Sparkles, ArrowRight } from 'lucide-react';
 import { PledgeCampaignWidget } from './PledgeCampaignWidget';
+import { EventsTableWidget } from './EventsTableWidget';
 
 const apiBaseUrl = process.env.NODE_ENV === 'production' 
   ? 'https://pastoralcare.barnabassoftware.com' 
@@ -40,6 +41,18 @@ export default function WidgetApp() {
   const ctaText = params.get('ctaText') || 'Register Now';
   const showCountdown = params.get('showCountdown') !== 'false';
   const showLocation = params.get('showLocation') !== 'false';
+
+  // Events Table specifics
+  const tableStyle = params.get('tableStyle') || 'clean';
+  const tableHeaderStyle = params.get('tableHeaderStyle') || 'accent';
+  const tableDensity = params.get('tableDensity') || 'comfortable';
+  const tableRadius = params.get('tableRadius') || 'md';
+  const tableDateFormat = params.get('tableDateFormat') || 'badge';
+  const showTime = params.get('showTime') !== 'false';
+  const showDescription = params.get('showDescription') === 'true';
+  const showAction = params.get('showAction') !== 'false';
+  const tableCtaText = params.get('tableCtaText') || 'Details';
+  const tableTitle = params.get('tableTitle') || '';
 
   // Pledge Campaign specifics
   const campaignId = params.get('campaignId') || '';
@@ -95,6 +108,25 @@ export default function WidgetApp() {
       {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
       {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
       {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
+      {type === 'events_table' && (
+        <EventsTableWidget
+          churchId={churchId}
+          color={color}
+          maxItems={maxItems}
+          eventSource={eventSource}
+          tableStyle={tableStyle}
+          tableHeaderStyle={tableHeaderStyle}
+          tableDensity={tableDensity}
+          tableRadius={tableRadius}
+          tableDateFormat={tableDateFormat}
+          showTime={showTime}
+          showLocation={showLocation}
+          showDescription={showDescription}
+          showAction={showAction}
+          tableCtaText={tableCtaText}
+          tableTitle={tableTitle}
+        />
+      )}
       {type === 'single_event' && (
         <SingleEventWidget 
           churchId={churchId} 
