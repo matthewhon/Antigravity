@@ -66,6 +66,7 @@ export default function WidgetApp() {
   const tableCtaText = params.get('tableCtaText') || 'Details';
   const tableTitle = params.get('tableTitle') || '';
   const showFilters = params.get('showFilters') === 'true';
+  const openInModal = params.get('openInModal') === 'true';
   const showTagFilters = params.get('showTagFilters') === 'true';
   const showLocationFilters = params.get('showLocationFilters') === 'true';
   const showFeaturedHero = params.get('showFeaturedHero') === 'true';
@@ -128,8 +129,8 @@ export default function WidgetApp() {
 
   return (
     <div className={`min-h-screen bg-transparent p-4 font-sans ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
-      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
+      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} showFilters={showFilters} />}
+      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} showFilters={showFilters} />}
       {(type === 'events' || type === 'calendar') && (
         <EventsWidget
           churchId={churchId}
@@ -193,7 +194,7 @@ export default function WidgetApp() {
           imageRatio={imageRatio}
         />
       )}
-      {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} singleFormId={singleFormId} visibleFormIds={visibleFormIds} />}
+      {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} singleFormId={singleFormId} visibleFormIds={visibleFormIds} showFilters={showFilters} openInModal={openInModal} />}
       {(type === 'pledge_campaign' || type === 'pledges') && (
         <PledgeCampaignWidget 
           churchId={churchId}
@@ -222,10 +223,12 @@ function getGridClass(layout: string, gridCols: string) {
   }
 }
 
-function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, imageRatio, maxItems }: any) {
+function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, imageRatio, maxItems, showFilters = false }: any) {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('');
 
   useEffect(() => {
     const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
@@ -242,50 +245,151 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
       });
   }, [churchId]);
 
+  const preFilteredGroups = useMemo(() => {
+    if (!groupType) return groups;
+    return groups.filter(g => g.groupTypeName?.toLowerCase().includes(groupType.toLowerCase()));
+  }, [groups, groupType]);
+
+  const groupTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of preFilteredGroups) {
+      if (g.groupTypeName) set.add(g.groupTypeName);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [preFilteredGroups]);
+
   const filteredGroups = useMemo(() => {
-    let result = groups;
-    if (groupType) {
-      result = result.filter(g => g.groupTypeName?.toLowerCase().includes(groupType.toLowerCase()));
+    let result = preFilteredGroups;
+    if (showFilters) {
+      if (selectedType) {
+        result = result.filter(g => g.groupTypeName === selectedType);
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(g =>
+          g.name?.toLowerCase().includes(q) ||
+          g.groupTypeName?.toLowerCase().includes(q) ||
+          g.schedule?.toLowerCase().includes(q) ||
+          g.description?.toLowerCase().includes(q)
+        );
+      }
     }
     if (maxItems > 0) result = result.slice(0, maxItems);
     return result;
-  }, [groups, groupType, maxItems]);
+  }, [preFilteredGroups, showFilters, selectedType, searchQuery, maxItems]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Groups...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
 
-  if (!filteredGroups.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No groups found matching your criteria.</div>;
+  if (!preFilteredGroups.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No groups found matching your criteria.</div>;
+
+  const accentTheme = EVENT_ACCENT_THEMES[color] || EVENT_ACCENT_THEMES.indigo;
 
   return (
-    <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
-      {filteredGroups.map(g => (
-        <div key={g.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-          {g.headerImage && (
-             <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
-               <img src={g.headerImage} alt={g.name} className="w-full h-full object-cover" />
-             </div>
-          )}
-          <div className="p-5">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{g.name || 'Unnamed Group'}</h3>
-            {showTags && g.groupTypeName && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 mb-3">{g.groupTypeName}</span>}
-            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{g.description?.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ') || 'No description provided.'}</p>
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
-              <a href={g.publicUrl || '#'} target="_blank" rel="noreferrer" className={`text-sm font-semibold tracking-wide text-${color}-600 dark:text-${color}-400 hover:text-${color}-500 transition`}>
-                Join →
-              </a>
+    <div>
+      {showFilters && (
+        <div className="mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+          {groupTypes.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedType('')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${
+                  !selectedType
+                    ? accentTheme.pillActive
+                    : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                }`}
+              >
+                All Groups ({preFilteredGroups.length})
+              </button>
+              {groupTypes.map(gt => (
+                <button
+                  key={gt}
+                  type="button"
+                  onClick={() => setSelectedType(selectedType === gt ? '' : gt)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${
+                    selectedType === gt
+                      ? accentTheme.pillActive
+                      : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                  }`}
+                >
+                  {gt}
+                </button>
+              ))}
             </div>
+          )}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search groups by name, type, or schedule..."
+              className={`w-full max-w-md px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 ${accentTheme.ringFocus}`}
+            />
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Showing {filteredGroups.length} {filteredGroups.length === 1 ? 'group' : 'groups'}.
+            </span>
           </div>
         </div>
-      ))}
+      )}
+
+      {!filteredGroups.length ? (
+        <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No groups found matching your search.</div>
+      ) : (
+        <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
+          {filteredGroups.map(g => (
+            <div key={g.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+              <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+                {g.headerImage ? (
+                  <img src={g.headerImage} alt={g.name} className="w-full h-full object-cover" />
+                ) : (
+                  <EventFallbackArtwork color={color} />
+                )}
+              </div>
+              <div className="p-5 flex-1 flex flex-col">
+                <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{g.name || 'Unnamed Group'}</h3>
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {showTags && g.groupTypeName && (
+                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      {g.groupTypeName}
+                    </span>
+                  )}
+                  {g.locationTypePreference && (
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${accentTheme.badgeBg} ${accentTheme.badgeText}`}>
+                      {g.locationTypePreference === 'virtual' ? 'Online' : g.locationTypePreference === 'physical' ? 'In Person' : g.locationTypePreference}
+                    </span>
+                  )}
+                </div>
+                {g.schedule && (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                    <Clock size={12} className="shrink-0 opacity-75" />
+                    <span className="truncate">{g.schedule}</span>
+                  </div>
+                )}
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{g.description?.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ') || 'No description provided.'}</p>
+                {g.publicUrl && (
+                  <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+                    <a href={g.publicUrl} target="_blank" rel="noreferrer" className={`text-sm font-semibold tracking-wide transition ${accentTheme.link}`}>
+                      Join →
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio, maxItems, includeArchived }: any) {
+function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio, maxItems, includeArchived, showFilters = false }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     const queryParams = new URLSearchParams();
@@ -305,7 +409,7 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
       });
   }, [churchId]);
 
-  const filteredEvents = useMemo(() => {
+  const preFilteredEvents = useMemo(() => {
     let result = events;
 
     // Date Filter
@@ -333,14 +437,36 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
         e.description?.toLowerCase().includes(lowerTag)
       );
     }
+    return result;
+  }, [events, dateFilter, tagFilter]);
+
+  const monthBuckets = useMemo(() => getMonthBuckets(preFilteredEvents), [preFilteredEvents]);
+
+  const filteredEvents = useMemo(() => {
+    let result = preFilteredEvents;
+    if (showFilters) {
+      if (selectedMonth !== 'all') {
+        result = result.filter(e => e.startsAt && format(new Date(e.startsAt), 'yyyy-MM') === selectedMonth);
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(e =>
+          e.name?.toLowerCase().includes(q) ||
+          e.location?.toLowerCase().includes(q) ||
+          e.description?.toLowerCase().includes(q)
+        );
+      }
+    }
     if (maxItems > 0) result = result.slice(0, maxItems);
     return result;
-  }, [events, dateFilter, tagFilter, maxItems]);
+  }, [preFilteredEvents, showFilters, selectedMonth, searchQuery, maxItems]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Registrations...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
 
-  if (!filteredEvents.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No signups match your criteria.</div>;
+  if (!preFilteredEvents.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No signups match your criteria.</div>;
+
+  const accentTheme = EVENT_ACCENT_THEMES[color] || EVENT_ACCENT_THEMES.indigo;
 
   if (selectedEvent) {
     return (
@@ -353,7 +479,13 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
                ← Back to List
             </button>
         </div>
-        {selectedEvent.logoUrl && <img src={selectedEvent.logoUrl} className="w-full h-64 object-cover border-b border-slate-100 dark:border-slate-800" />}
+        {selectedEvent.logoUrl ? (
+          <img src={selectedEvent.logoUrl} alt={selectedEvent.name} className="w-full h-64 object-cover border-b border-slate-100 dark:border-slate-800" />
+        ) : (
+          <div className="w-full h-44 border-b border-slate-100 dark:border-slate-800">
+            <EventFallbackArtwork color={color} />
+          </div>
+        )}
         <div className="p-6">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{selectedEvent.name}</h2>
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-6 flex flex-wrap items-center gap-4">
@@ -364,86 +496,128 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
                 <div className="prose dark:prose-invert max-w-none text-sm mb-8 text-slate-600 dark:text-slate-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedEvent.description }} />
             )}
             
-            <a href={selectedEvent.publicUrl || '#'} target="_blank" rel="noreferrer" className={`block w-full text-center px-6 py-4 rounded-xl text-lg font-black text-white bg-${color}-600 hover:bg-${color}-700 transition shadow-lg hover:shadow-xl hover:-translate-y-0.5`}>
-               Register on Church Center
-            </a>
+            {selectedEvent.publicUrl && (
+              <a href={selectedEvent.publicUrl} target="_blank" rel="noreferrer" className={`block w-full text-center px-6 py-4 rounded-xl text-lg font-black transition shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${accentTheme.button}`}>
+                 Register on Church Center
+              </a>
+            )}
+            <AddToCalendarButtons event={selectedEvent} />
         </div>
+      </div>
+    );
+  }
+
+  const filterBarEl = showFilters ? (
+    <EventFilterBar
+      color={color}
+      totalCount={preFilteredEvents.length}
+      filteredCount={filteredEvents.length}
+      monthBuckets={monthBuckets}
+      selectedMonth={selectedMonth}
+      onSelectMonth={setSelectedMonth}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      tags={[]}
+      showTagFilters={false}
+      selectedTag=""
+      onSelectTag={() => {}}
+    />
+  ) : null;
+
+  if (!filteredEvents.length) {
+    return (
+      <div>
+        {filterBarEl}
+        <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No signups match your criteria.</div>
       </div>
     );
   }
 
   if (layout === 'simplified_list') {
     return (
-      <div className="space-y-3">
-        {filteredEvents.map(e => (
-           <div 
-             key={e.id} 
-             onClick={() => setSelectedEvent(e)}
-             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md"
-           >
-             <div>
-                <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition text-lg">{e.name}</h3>
-                {e.startsAt && (
-                   <div className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-2">
-                       <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                       {new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                   </div>
-                )}
+      <div>
+        {filterBarEl}
+        <div className="space-y-3">
+          {filteredEvents.map(e => (
+             <div 
+               key={e.id} 
+               onClick={() => setSelectedEvent(e)}
+               className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer ${accentTheme.hoverBorder} transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md`}
+             >
+               <div>
+                  <h3 className={`font-bold text-slate-900 dark:text-white ${accentTheme.groupHoverText} transition text-lg`}>{e.name}</h3>
+                  {e.startsAt && (
+                     <div className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-2">
+                         <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                         {new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                     </div>
+                  )}
+               </div>
+               <button className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold ${accentTheme.button} group-hover:shadow-md transition whitespace-nowrap`}>
+                  More Info
+               </button>
              </div>
-             <button className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 group-hover:shadow-md transition whitespace-nowrap`}>
-                More Info
-             </button>
-           </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
 
   if (layout === 'list') {
     return (
-      <div className="space-y-4">
-        {filteredEvents.map(e => (
-          <div key={e.id} onClick={() => setSelectedEvent(e)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col sm:flex-row cursor-pointer group hover:border-indigo-500 dark:hover:border-indigo-500">
-            {e.logoUrl && (
-                <div className={`sm:w-2/5 flex-shrink-0 bg-slate-50 dark:bg-slate-950 ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video sm:aspect-auto'}`}>
-                   <img src={e.logoUrl} alt={e.name} className="w-full h-full object-cover" />
+      <div>
+        {filterBarEl}
+        <div className="space-y-4">
+          {filteredEvents.map(e => (
+            <div key={e.id} onClick={() => setSelectedEvent(e)} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col sm:flex-row cursor-pointer group ${accentTheme.hoverBorder}`}>
+              <div className={`sm:w-2/5 flex-shrink-0 bg-slate-50 dark:bg-slate-950 ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video sm:aspect-auto'}`}>
+                {e.logoUrl ? (
+                  <img src={e.logoUrl} alt={e.name} className="w-full h-full object-cover" />
+                ) : (
+                  <EventFallbackArtwork color={color} />
+                )}
+              </div>
+              <div className="p-5 flex-1 flex flex-col">
+                <h3 className={`font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 ${accentTheme.groupHoverText} transition`}>{e.name || 'Unnamed Event'}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
+                <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
+                  <span className={`text-sm font-bold ${accentTheme.link}`}>Details →</span>
                 </div>
-            )}
-            <div className="p-5 flex-1 flex flex-col">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{e.name || 'Unnamed Event'}</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
-              <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
-                <span className={`text-sm font-bold text-${color}-600 dark:text-${color}-400`}>Details →</span>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
-      {filteredEvents.map(e => (
-        <div key={e.id} onClick={() => setSelectedEvent(e)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer group hover:border-indigo-500 dark:hover:border-indigo-500 flex flex-col">
-          {e.logoUrl && (
-             <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+    <div>
+      {filterBarEl}
+      <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
+        {filteredEvents.map(e => (
+          <div key={e.id} onClick={() => setSelectedEvent(e)} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer group ${accentTheme.hoverBorder} flex flex-col`}>
+            <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+              {e.logoUrl ? (
                 <img src={e.logoUrl} alt={e.name} className="w-full h-full object-cover" />
-             </div>
-          )}
-          <div className="p-5 flex-1 flex flex-col">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{e.name || 'Unnamed Event'}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
-            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
-              <span className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 transition`}>
-                Details
-              </span>
+              ) : (
+                <EventFallbackArtwork color={color} />
+              )}
+            </div>
+            <div className="p-5 flex-1 flex flex-col">
+              <h3 className={`font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 ${accentTheme.groupHoverText} transition`}>{e.name || 'Unnamed Event'}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
+              <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
+                <span className={`px-4 py-1.5 rounded-lg text-xs font-bold ${accentTheme.button} transition`}>
+                  Details
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -911,10 +1085,20 @@ function EventsWidget({
   );
 }
 
-function FormsWidget({ churchId, layout, color, gridCols, maxItems, singleFormId, visibleFormIds }: any) {
+function FormsWidget({ churchId, layout, color, gridCols, maxItems, singleFormId, visibleFormIds, showFilters = false, openInModal = false }: any) {
   const [forms, setForms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!openInModal) return;
+    if (document.querySelector('script[src="https://js.churchcenter.com/modal/v1"]')) return;
+    const script = document.createElement('script');
+    script.src = 'https://js.churchcenter.com/modal/v1';
+    script.async = true;
+    document.body.appendChild(script);
+  }, [openInModal]);
 
   useEffect(() => {
     const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
@@ -931,7 +1115,7 @@ function FormsWidget({ churchId, layout, color, gridCols, maxItems, singleFormId
       });
   }, [churchId]);
 
-  const filteredForms = useMemo(() => {
+  const preFilteredForms = useMemo(() => {
     let result = forms;
     // Support legacy singleFormId param
     if (singleFormId) {
@@ -940,47 +1124,109 @@ function FormsWidget({ churchId, layout, color, gridCols, maxItems, singleFormId
       // New multi-select: filter to only visible ones
       result = result.filter(f => (visibleFormIds as Set<string>).has(f.id));
     }
+    return result;
+  }, [forms, singleFormId, visibleFormIds]);
+
+  const filteredForms = useMemo(() => {
+    let result = preFilteredForms;
+    if (showFilters && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(f =>
+        f.name?.toLowerCase().includes(q) ||
+        f.description?.toLowerCase().includes(q)
+      );
+    }
     if (maxItems > 0 && !singleFormId) result = result.slice(0, maxItems);
     return result;
-  }, [forms, maxItems, singleFormId, visibleFormIds]);
+  }, [preFilteredForms, showFilters, searchQuery, maxItems, singleFormId]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Forms...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
-  if (!filteredForms.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No active forms available.</div>;
+  if (!preFilteredForms.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No active forms available.</div>;
+
+  const accentTheme = EVENT_ACCENT_THEMES[color] || EVENT_ACCENT_THEMES.indigo;
+
+  const searchBarEl = showFilters ? (
+    <div className="mb-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <input
+        type="search"
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        placeholder="Search forms..."
+        className={`w-full max-w-md px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 ${accentTheme.ringFocus}`}
+      />
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        Showing {filteredForms.length} {filteredForms.length === 1 ? 'form' : 'forms'}.
+      </span>
+    </div>
+  ) : null;
+
+  if (!filteredForms.length) {
+    return (
+      <div>
+        {searchBarEl}
+        <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No forms match your search.</div>
+      </div>
+    );
+  }
 
   if (layout === 'list') {
     return (
-      <div className="space-y-4">
-        {filteredForms.map(f => (
-          <div key={f.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col sm:flex-row group hover:border-indigo-500 dark:hover:border-indigo-500">
-            <div className="p-5 flex-1 flex flex-col">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{f.name || 'Unnamed Form'}</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{f.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
-              <div className="mt-auto pt-4 flex items-center justify-end border-t border-slate-100 dark:border-slate-800">
-                <a href={f.publicUrl || '#'} target="_blank" rel="noreferrer" className={`text-sm font-bold text-${color}-600 dark:text-${color}-400`}>Fill Out Form →</a>
+      <div>
+        {searchBarEl}
+        <div className="space-y-4">
+          {filteredForms.map(f => (
+            <div key={f.id} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col sm:flex-row group ${accentTheme.hoverBorder}`}>
+              <div className="p-5 flex-1 flex flex-col">
+                <h3 className={`font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 ${accentTheme.groupHoverText} transition`}>{f.name || 'Unnamed Form'}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{f.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
+                {f.publicUrl && (
+                  <div className="mt-auto pt-4 flex items-center justify-end border-t border-slate-100 dark:border-slate-800">
+                    <a
+                      href={f.publicUrl}
+                      target={openInModal ? undefined : '_blank'}
+                      rel={openInModal ? undefined : 'noreferrer'}
+                      data-open-in-church-center-modal={openInModal ? 'true' : undefined}
+                      className={`text-sm font-bold transition ${accentTheme.link}`}
+                    >
+                      Fill Out Form →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
-      {filteredForms.map(f => (
-        <div key={f.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col group hover:border-indigo-500 dark:hover:border-indigo-500">
-          <div className="p-5 flex-1 flex flex-col">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{f.name || 'Unnamed Form'}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{f.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
-            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
-              <a href={f.publicUrl || '#'} target="_blank" rel="noreferrer" className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 transition`}>
-                Start
-              </a>
+    <div>
+      {searchBarEl}
+      <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
+        {filteredForms.map(f => (
+          <div key={f.id} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col group ${accentTheme.hoverBorder}`}>
+            <div className="p-5 flex-1 flex flex-col">
+              <h3 className={`font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 ${accentTheme.groupHoverText} transition`}>{f.name || 'Unnamed Form'}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{f.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
+              {f.publicUrl && (
+                <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+                  <a
+                    href={f.publicUrl}
+                    target={openInModal ? undefined : '_blank'}
+                    rel={openInModal ? undefined : 'noreferrer'}
+                    data-open-in-church-center-modal={openInModal ? 'true' : undefined}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${accentTheme.button}`}
+                  >
+                    Start
+                  </a>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -1289,8 +1535,27 @@ function SingleEventWidget({
           </div>
         )}
 
-        <div className="mt-auto pt-2">
-          {hasPublicUrl ? (
+        <div className="mt-auto pt-2 space-y-2">
+          {event.registrationUrl && publicUrl && event.registrationUrl !== publicUrl ? (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                href={event.registrationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-bold text-white text-sm shadow-md hover:shadow-lg transition ${activeTheme.bg} ${activeTheme.hoverBg}`}
+              >
+                {buttonLabel} <ArrowRight size={16} />
+              </a>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm transition"
+              >
+                Details <ExternalLink size={14} />
+              </a>
+            </div>
+          ) : hasPublicUrl ? (
             <a
               href={publicUrl}
               target="_blank"
@@ -1308,6 +1573,7 @@ function SingleEventWidget({
               No Registration Required
             </div>
           )}
+          <AddToCalendarButtons event={event} />
         </div>
       </div>
     </div>

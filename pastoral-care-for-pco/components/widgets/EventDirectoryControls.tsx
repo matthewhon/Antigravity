@@ -11,6 +11,8 @@ export interface EventAccentTheme {
   badgeText: string;
   badgeBg: string;
   ringFocus: string;
+  hoverBorder: string;
+  groupHoverText: string;
 }
 
 export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
@@ -23,6 +25,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-indigo-700 dark:text-indigo-300',
     badgeBg: 'bg-indigo-50 dark:bg-indigo-950/60',
     ringFocus: 'focus:ring-indigo-500 focus:border-indigo-500',
+    hoverBorder: 'hover:border-indigo-500 dark:hover:border-indigo-500',
+    groupHoverText: 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400',
   },
   blue: {
     pillActive: 'bg-blue-600 text-white border-blue-600 shadow-xs',
@@ -33,6 +37,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-blue-700 dark:text-blue-300',
     badgeBg: 'bg-blue-50 dark:bg-blue-950/60',
     ringFocus: 'focus:ring-blue-500 focus:border-blue-500',
+    hoverBorder: 'hover:border-blue-500 dark:hover:border-blue-500',
+    groupHoverText: 'group-hover:text-blue-600 dark:group-hover:text-blue-400',
   },
   emerald: {
     pillActive: 'bg-emerald-600 text-white border-emerald-600 shadow-xs',
@@ -43,6 +49,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-emerald-700 dark:text-emerald-300',
     badgeBg: 'bg-emerald-50 dark:bg-emerald-950/60',
     ringFocus: 'focus:ring-emerald-500 focus:border-emerald-500',
+    hoverBorder: 'hover:border-emerald-500 dark:hover:border-emerald-500',
+    groupHoverText: 'group-hover:text-emerald-600 dark:group-hover:text-emerald-400',
   },
   amber: {
     pillActive: 'bg-amber-500 text-white border-amber-500 shadow-xs',
@@ -53,6 +61,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-amber-700 dark:text-amber-300',
     badgeBg: 'bg-amber-50 dark:bg-amber-950/60',
     ringFocus: 'focus:ring-amber-500 focus:border-amber-500',
+    hoverBorder: 'hover:border-amber-500 dark:hover:border-amber-500',
+    groupHoverText: 'group-hover:text-amber-600 dark:group-hover:text-amber-400',
   },
   red: {
     pillActive: 'bg-red-600 text-white border-red-600 shadow-xs',
@@ -63,6 +73,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-red-700 dark:text-red-300',
     badgeBg: 'bg-red-50 dark:bg-red-950/60',
     ringFocus: 'focus:ring-red-500 focus:border-red-500',
+    hoverBorder: 'hover:border-red-500 dark:hover:border-red-500',
+    groupHoverText: 'group-hover:text-red-600 dark:group-hover:text-red-400',
   },
   violet: {
     pillActive: 'bg-violet-600 text-white border-violet-600 shadow-xs',
@@ -73,6 +85,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-violet-700 dark:text-violet-300',
     badgeBg: 'bg-violet-50 dark:bg-violet-950/60',
     ringFocus: 'focus:ring-violet-500 focus:border-violet-500',
+    hoverBorder: 'hover:border-violet-500 dark:hover:border-violet-500',
+    groupHoverText: 'group-hover:text-violet-600 dark:group-hover:text-violet-400',
   },
   fuchsia: {
     pillActive: 'bg-fuchsia-600 text-white border-fuchsia-600 shadow-xs',
@@ -83,6 +97,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-fuchsia-700 dark:text-fuchsia-300',
     badgeBg: 'bg-fuchsia-50 dark:bg-fuchsia-950/60',
     ringFocus: 'focus:ring-fuchsia-500 focus:border-fuchsia-500',
+    hoverBorder: 'hover:border-fuchsia-500 dark:hover:border-fuchsia-500',
+    groupHoverText: 'group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400',
   },
   rose: {
     pillActive: 'bg-rose-600 text-white border-rose-600 shadow-xs',
@@ -93,6 +109,8 @@ export const EVENT_ACCENT_THEMES: Record<string, EventAccentTheme> = {
     badgeText: 'text-rose-700 dark:text-rose-300',
     badgeBg: 'bg-rose-50 dark:bg-rose-950/60',
     ringFocus: 'focus:ring-rose-500 focus:border-rose-500',
+    hoverBorder: 'hover:border-rose-500 dark:hover:border-rose-500',
+    groupHoverText: 'group-hover:text-rose-600 dark:group-hover:text-rose-400',
   },
 };
 

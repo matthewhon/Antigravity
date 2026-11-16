@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Loader2, RefreshCw, Copy, CheckCircle, Code, LayoutGrid, MonitorPlay, Eye, EyeOff, TriangleAlert, Info } from 'lucide-react';
+import { Loader2, RefreshCw, Copy, CheckCircle, Code, LayoutGrid, MonitorPlay, Eye, EyeOff, TriangleAlert, Info, Monitor, Tablet, Smartphone, Save, Trash2, Bookmark } from 'lucide-react';
 import { ToolHeader, ToolButton } from './tool-shell';
 import { db } from '../services/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 
 interface WebsiteWidgetsManagerProps {
   churchId: string;
@@ -91,6 +91,32 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [posterCtaText, setPosterCtaText] = useState('Register');
   const [posterCtaAccent, setPosterCtaAccent] = useState(false);
 
+  // Groups / Registrations / Forms opt-in options
+  const [widgetShowFilters, setWidgetShowFilters] = useState(false);
+  const [formsOpenInModal, setFormsOpenInModal] = useState(false);
+
+  // Preview viewport & Saved Presets
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [presets, setPresets] = useState<any[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
+
+  React.useEffect(() => {
+    const loadPresets = async () => {
+      try {
+        const q = query(collection(db, 'website_widget_presets'), where('churchId', '==', churchId));
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        list.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setPresets(list);
+      } catch (err) {
+        console.error('Failed to load widget presets', err);
+      }
+    };
+    loadPresets();
+  }, [churchId]);
+
   React.useEffect(() => {
     if (type === 'bubble_form' && !customFormsLoaded) {
       const fetchCustomForms = async () => {
@@ -169,6 +195,104 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
     setTimeout(() => setToast(''), 3000);
   };
 
+  const handleSavePreset = async () => {
+    const trimmed = presetName.trim();
+    if (!trimmed) {
+      showToast('Please enter a name for this preset');
+      return;
+    }
+    setIsSavingPreset(true);
+    try {
+      const config = {
+        type, theme, color, layout, gridCols, groupType, showTags,
+        dateFilter, tagFilter, includeArchived, imageRatio, autoHeight, scale, maxItems,
+        tableMaxEvents, tableEventSource, tableStyle, tableHeaderStyle, tableDensity,
+        tableRadius, tableDateFormat, tableShowTime, tableShowLocation, tableShowDescription,
+        tableShowAction, tableCtaText, tableTitle,
+        eventShowFilters, eventShowTagFilters, eventShowLocationFilters, eventShowFeaturedHero,
+        eventAllowViewSwitch, eventShowCalendarLink, eventTagFilter, eventShowWeeklyRhythm,
+        eventWeeklyRhythmText, eventPlanVisitUrl, posterCtaText, posterCtaAccent,
+        widgetShowFilters, formsOpenInModal,
+      };
+      const docRef = await addDoc(collection(db, 'website_widget_presets'), {
+        churchId,
+        name: trimmed,
+        config,
+        createdAt: new Date().toISOString(),
+      });
+      const newPreset = { id: docRef.id, churchId, name: trimmed, config, createdAt: new Date().toISOString() };
+      setPresets(prev => [newPreset, ...prev]);
+      setSelectedPresetId(docRef.id);
+      setPresetName('');
+      showToast(`Saved preset "${trimmed}"`);
+    } catch (err: any) {
+      showToast(`Failed to save preset: ${err.message}`);
+    } finally {
+      setIsSavingPreset(false);
+    }
+  };
+
+  const handleLoadPreset = (id: string) => {
+    setSelectedPresetId(id);
+    const found = presets.find(p => p.id === id);
+    if (!found?.config) return;
+    const c = found.config;
+    if (c.type !== undefined) setType(c.type);
+    if (c.theme !== undefined) setTheme(c.theme);
+    if (c.color !== undefined) setColor(c.color);
+    if (c.layout !== undefined) setLayout(c.layout);
+    if (c.gridCols !== undefined) setGridCols(c.gridCols);
+    if (c.groupType !== undefined) setGroupType(c.groupType);
+    if (c.showTags !== undefined) setShowTags(c.showTags);
+    if (c.dateFilter !== undefined) setDateFilter(c.dateFilter);
+    if (c.tagFilter !== undefined) setTagFilter(c.tagFilter);
+    if (c.includeArchived !== undefined) setIncludeArchived(c.includeArchived);
+    if (c.imageRatio !== undefined) setImageRatio(c.imageRatio);
+    if (c.autoHeight !== undefined) setAutoHeight(c.autoHeight);
+    if (c.scale !== undefined) setScale(c.scale);
+    if (c.maxItems !== undefined) setMaxItems(c.maxItems);
+    if (c.tableMaxEvents !== undefined) setTableMaxEvents(c.tableMaxEvents);
+    if (c.tableEventSource !== undefined) setTableEventSource(c.tableEventSource);
+    if (c.tableStyle !== undefined) setTableStyle(c.tableStyle);
+    if (c.tableHeaderStyle !== undefined) setTableHeaderStyle(c.tableHeaderStyle);
+    if (c.tableDensity !== undefined) setTableDensity(c.tableDensity);
+    if (c.tableRadius !== undefined) setTableRadius(c.tableRadius);
+    if (c.tableDateFormat !== undefined) setTableDateFormat(c.tableDateFormat);
+    if (c.tableShowTime !== undefined) setTableShowTime(c.tableShowTime);
+    if (c.tableShowLocation !== undefined) setTableShowLocation(c.tableShowLocation);
+    if (c.tableShowDescription !== undefined) setTableShowDescription(c.tableShowDescription);
+    if (c.tableShowAction !== undefined) setTableShowAction(c.tableShowAction);
+    if (c.tableCtaText !== undefined) setTableCtaText(c.tableCtaText);
+    if (c.tableTitle !== undefined) setTableTitle(c.tableTitle);
+    if (c.eventShowFilters !== undefined) setEventShowFilters(c.eventShowFilters);
+    if (c.eventShowTagFilters !== undefined) setEventShowTagFilters(c.eventShowTagFilters);
+    if (c.eventShowLocationFilters !== undefined) setEventShowLocationFilters(c.eventShowLocationFilters);
+    if (c.eventShowFeaturedHero !== undefined) setEventShowFeaturedHero(c.eventShowFeaturedHero);
+    if (c.eventAllowViewSwitch !== undefined) setEventAllowViewSwitch(c.eventAllowViewSwitch);
+    if (c.eventShowCalendarLink !== undefined) setEventShowCalendarLink(c.eventShowCalendarLink);
+    if (c.eventTagFilter !== undefined) setEventTagFilter(c.eventTagFilter);
+    if (c.eventShowWeeklyRhythm !== undefined) setEventShowWeeklyRhythm(c.eventShowWeeklyRhythm);
+    if (c.eventWeeklyRhythmText !== undefined) setEventWeeklyRhythmText(c.eventWeeklyRhythmText);
+    if (c.eventPlanVisitUrl !== undefined) setEventPlanVisitUrl(c.eventPlanVisitUrl);
+    if (c.posterCtaText !== undefined) setPosterCtaText(c.posterCtaText);
+    if (c.posterCtaAccent !== undefined) setPosterCtaAccent(c.posterCtaAccent);
+    if (c.widgetShowFilters !== undefined) setWidgetShowFilters(c.widgetShowFilters);
+    if (c.formsOpenInModal !== undefined) setFormsOpenInModal(c.formsOpenInModal);
+    showToast(`Loaded preset "${found.name}"`);
+  };
+
+  const handleDeletePreset = async () => {
+    if (!selectedPresetId) return;
+    try {
+      await deleteDoc(doc(db, 'website_widget_presets', selectedPresetId));
+      setPresets(prev => prev.filter(p => p.id !== selectedPresetId));
+      setSelectedPresetId('');
+      showToast('Preset deleted');
+    } catch (err: any) {
+      showToast(`Failed to delete preset: ${err.message}`);
+    }
+  };
+
   const handleSync = async () => {
     setIsSyncing(true);
     try {
@@ -222,6 +346,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + ((layout === 'grid' || layout === 'poster') && type !== 'events_table' ? `&gridCols=${gridCols}` : '')
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
+      + ((type === 'groups' || type === 'registrations' || type === 'forms') && widgetShowFilters ? `&showFilters=true` : '')
+      + (type === 'forms' && formsOpenInModal ? `&openInModal=true` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
@@ -294,6 +420,55 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
         <div className="w-80 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-y-auto p-6 space-y-6">
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-400">
             <strong>Note:</strong> Changes made here do not automatically update existing widgets on your real website. If you change a setting like Widget Size, you must copy the embed code below and replace it on your website.
+          </div>
+
+          {/* Saved Presets */}
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 space-y-2.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 tracking-wider uppercase">
+              <Bookmark size={12} /> Saved Presets
+            </label>
+            {presets.length > 0 && (
+              <div className="flex gap-1.5">
+                <select
+                  value={selectedPresetId}
+                  onChange={e => handleLoadPreset(e.target.value)}
+                  className="flex-1 min-w-0 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="">Load a saved preset...</option>
+                  {presets.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {selectedPresetId && (
+                  <button
+                    type="button"
+                    onClick={handleDeletePreset}
+                    title="Delete selected preset"
+                    className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Preset name (e.g. Homepage Events)"
+                value={presetName}
+                onChange={e => setPresetName(e.target.value)}
+                className="flex-1 min-w-0 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={handleSavePreset}
+                disabled={isSavingPreset}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50 shrink-0"
+              >
+                <Save size={12} />
+                {isSavingPreset ? 'Saving' : 'Save'}
+              </button>
+            </div>
           </div>
             
           <div>
@@ -468,6 +643,15 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 />
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Tags</span>
               </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={widgetShowFilters}
+                  onChange={e => setWidgetShowFilters(e.target.checked)}
+                  className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Search &amp; Type Filter Bar</span>
+              </label>
             </div>
           )}
 
@@ -505,6 +689,15 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Leave empty to show all tags.</p>
               </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={widgetShowFilters}
+                  onChange={e => setWidgetShowFilters(e.target.checked)}
+                  className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Search &amp; Month Filter Bar</span>
+              </label>
             </div>
           )}
 
@@ -553,6 +746,26 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               {visibleFormIds.size === 0 && forms.length > 0 && (
                 <p className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold"><TriangleAlert size={12} className="shrink-0" aria-hidden="true" /> No forms selected — the widget will show nothing.</p>
               )}
+              <div className="space-y-2.5 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={widgetShowFilters}
+                    onChange={e => setWidgetShowFilters(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Search Bar</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formsOpenInModal}
+                    onChange={e => setFormsOpenInModal(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Open Forms in Church Center Modal</span>
+                </label>
+              </div>
             </div>
           )}
 
@@ -1261,8 +1474,42 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
              <div className="flex-1 p-6 flex flex-col">
                  <div className="flex items-center justify-between mb-3 text-slate-500 dark:text-slate-400">
                     <span className="text-xs font-bold tracking-wide uppercase">Live Preview</span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice('desktop')}
+                        title="Desktop width"
+                        className={`p-1.5 rounded-md transition ${previewDevice === 'desktop' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                      >
+                        <Monitor size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice('tablet')}
+                        title="Tablet width"
+                        className={`p-1.5 rounded-md transition ${previewDevice === 'tablet' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                      >
+                        <Tablet size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDevice('mobile')}
+                        title="Mobile width"
+                        className={`p-1.5 rounded-md transition ${previewDevice === 'mobile' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                      >
+                        <Smartphone size={14} />
+                      </button>
+                    </div>
                  </div>
-                 <div className={`flex-1 rounded-2xl border-4 border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl bg-white dark:bg-slate-900 flex items-center justify-center ${layout === 'list' && type !== 'popup' ? 'max-w-3xl mx-auto w-full' : 'w-full'}`}>
+                 <div className={`flex-1 rounded-2xl border-4 border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl bg-white dark:bg-slate-900 flex items-center justify-center transition-all duration-200 mx-auto ${
+                   previewDevice === 'mobile'
+                     ? 'w-full max-w-[390px]'
+                     : previewDevice === 'tablet'
+                     ? 'w-full max-w-[768px]'
+                     : layout === 'list' && type !== 'popup'
+                     ? 'max-w-3xl w-full'
+                     : 'w-full'
+                 }`}>
                     {type === 'popup' ? (
                         <div className="text-center p-8">
                             <a href={popupUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '12px 24px', backgroundColor: btnColor, color: '#ffffff', fontFamily: 'sans-serif', fontWeight: 'bold', borderRadius: '8px', textDecoration: 'none', cursor: 'pointer' }}>

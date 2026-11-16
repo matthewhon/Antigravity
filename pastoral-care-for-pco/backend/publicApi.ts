@@ -138,6 +138,8 @@ export async function getPublicGroups(req: any, res: any) {
         groupTypeName: typeObj?.attributes?.name || 'Small Group',
         description: g.attributes.description,
         membersCount: g.attributes.members_count || 0,
+        schedule: g.attributes.schedule || null,
+        locationTypePreference: g.attributes.location_type_preference || null,
         headerImage: g.attributes.header_image?.medium || g.attributes.header_image?.thumbnail || null,
         publicUrl: g.attributes.public_church_center_web_url || g.attributes.public_url || null,
         isPublic: g.attributes.publicly_visible !== false
