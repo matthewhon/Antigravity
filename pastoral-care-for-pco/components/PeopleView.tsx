@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats, PcoRegistrationEvent, Church, User } from '../types';
+import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats, PcoRegistrationEvent, Church, User, PcoGroup } from '../types';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
 import { 
@@ -25,6 +25,7 @@ import { SendAssessmentModal } from './SendAssessmentModal';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
+  groups?: PcoGroup[];
   activePage?: 'overview' | 'households' | 'risk' | 'reports' | 'gifts-test' | 'mbti-test' | 'disc-test';
   overviewWidgets: string[];
   householdWidgets: string[];
@@ -78,6 +79,7 @@ const TOOLTIP_STYLE = {
 
 export const PeopleView: React.FC<PeopleViewProps> = ({ 
   data, 
+  groups,
   activePage,
   overviewWidgets = [], 
   householdWidgets = [],
@@ -1197,7 +1199,12 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
       </header>
 
       {activePage === 'reports' ? (
-        <PeopleReportsTab data={data} />
+        <PeopleReportsTab
+          data={data}
+          groups={groups}
+          churchId={churchId}
+          pcoConnected={pcoConnected}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 grid-flow-row-dense">
         {safeVisibleWidgets.map((id, index) => {

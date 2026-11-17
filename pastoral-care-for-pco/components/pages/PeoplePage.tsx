@@ -50,6 +50,7 @@ export const PeoplePage: React.FC<PeoplePageProps> = ({
     return (
         <PeopleView 
             data={peopleDashboardData}
+            groups={groups}
             activePage={activePage as any}
             church={church}
             user={user}

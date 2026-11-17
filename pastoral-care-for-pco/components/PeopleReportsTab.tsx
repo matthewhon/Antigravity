@@ -1,12 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { PeopleDashboardData } from '../types';
+import { PeopleDashboardData, PcoGroup } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
 import { NextGenReportsSection } from './NextGenReportsSection';
+import { ProfileCompletenessReport } from './ProfileCompletenessReport';
 
 interface PeopleReportsTabProps {
   data: PeopleDashboardData;
+  groups?: PcoGroup[];
+  churchId?: string;
+  pcoConnected?: boolean;
 }
 
 type TimeFilter = '3_months' | '6_months' | '12_months' | 'all_time';
@@ -43,9 +47,9 @@ const MEMBERSHIP_COLORS: Record<string, string> = {
   'Unknown': '#94a3b8',
 };
 
-type ReportSubTab = 'overview' | 'nextgen' | 'lifecycle' | 'demographics' | 'risk' | 'membership';
+type ReportSubTab = 'overview' | 'nextgen' | 'lifecycle' | 'demographics' | 'risk' | 'membership' | 'data_health';
 
-export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
+export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data, groups, churchId, pcoConnected }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('12_months');
   const [activeReportTab, setActiveReportTab] = useState<ReportSubTab>('overview');
 
@@ -337,6 +341,7 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
             { id: 'demographics', label: '🎂 Age Demographics' },
             { id: 'risk', label: '⚠️ Risk Profile' },
             { id: 'membership', label: '🎖️ Membership Status' },
+            { id: 'data_health', label: '📋 Profile Completeness' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -352,7 +357,7 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
           ))}
         </div>
 
-        {activeReportTab !== 'nextgen' && (
+        {activeReportTab !== 'nextgen' && activeReportTab !== 'data_health' && (
           <div className="flex items-center gap-2 px-2">
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time Range:</span>
             <select
@@ -368,6 +373,16 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
           </div>
         )}
       </div>
+
+      {/* ── Profile Completeness Tab ─────────────────────────────────────────── */}
+      {activeReportTab === 'data_health' && (
+        <ProfileCompletenessReport
+          data={data}
+          groups={groups}
+          churchId={churchId}
+          pcoConnected={pcoConnected}
+        />
+      )}
 
       {/* ── NextGen Ministry Tab ────────────────────────────────────────────── */}
       {activeReportTab === 'nextgen' && (
