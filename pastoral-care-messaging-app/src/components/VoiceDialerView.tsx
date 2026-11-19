@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
     Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, PhoneMissed, Delete,
-    Search, Loader2, AlertCircle, Volume2, User as UserIcon, Voicemail, Check, BellOff
+    Search, Loader2, AlertCircle, Volume2, User as UserIcon, Voicemail, Check, BellOff, Settings
 } from 'lucide-react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { auth, db as firebaseDb } from '../services/firebase';
 import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
 import { VoiceSoftphone } from './VoiceSoftphone';
+import { CallingPreferencesPanel } from './CallingPreferencesPanel';
 import type { Church, TwilioPhoneNumber, User } from '../types';
 
 interface VoiceCallRecord {
@@ -79,7 +80,8 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     const [voicemails, setVoicemails] = useState<any[]>([]);
     const [currentUserDoc, setCurrentUserDoc] = useState<User | null>(null);
     const [dialError, setDialError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails'>('keypad');
+    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails' | 'settings'>('keypad');
+    const [vmFilter, setVmFilter] = useState<'all' | 'unread' | 'urgent'>('all');
 
     useEffect(() => {
         if (defaultCallerId && !selectedNumberId) {
@@ -256,6 +258,18 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                             {voicemails.filter((v) => !v.listenedAt).length}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setViewMode('settings')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition inline-flex items-center gap-1 ${
+                        viewMode === 'settings'
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                    title="Edit Voicemail & Calling Hours"
+                >
+                    <Settings size={13} />
+                    Settings
                 </button>
                 {currentUserDoc && (
                     <button
@@ -449,13 +463,41 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
 
             {viewMode === 'voicemails' && (
                 <div className="max-w-md w-full mx-auto px-4 mt-4 space-y-2.5">
-                    {voicemails.length === 0 ? (
+                    <div className="flex gap-1.5">
+                        {(['all', 'unread', 'urgent'] as const).map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setVmFilter(f)}
+                                className={`px-3 py-1 rounded-full text-[11px] font-bold capitalize border transition ${
+                                    vmFilter === f
+                                        ? 'bg-violet-600 text-white border-violet-600'
+                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                }`}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                    {voicemails.filter((vm) => (vmFilter === 'unread' ? !vm.listenedAt : vmFilter === 'urgent' ? Boolean(vm.urgent) : true)).length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
                             <Voicemail size={28} className="mx-auto text-slate-300 mb-2" />
                             <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No voicemails yet</p>
                         </div>
                     ) : (
-                        voicemails.map((vm) => (
+                        voicemails
+                            .filter((vm) => (vmFilter === 'unread' ? !vm.listenedAt : vmFilter === 'urgent' ? Boolean(vm.urgent) : true))
+                            .map((vm) => {
+                                const markRead = async () => {
+                                    if (vm.listenedAt) return;
+                                    const token = await auth.currentUser?.getIdToken();
+                                    if (!token) return;
+                                    await fetch(`${apiBaseUrl}/api/voice/mark-voicemail-read`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ voicemailId: vm.id }),
+                                    }).catch(() => {});
+                                };
+                                return (
                             <div
                                 key={vm.id}
                                 className={`bg-white dark:bg-slate-900 border rounded-2xl p-3.5 space-y-2 ${
@@ -471,20 +513,15 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                             {!vm.listenedAt && <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black">NEW</span>}
                                             {vm.urgent && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">URGENT</span>}
                                         </div>
-                                        <p className="text-[11px] text-slate-400">{new Date(vm.createdAt).toLocaleString()}</p>
+                                        <p className="text-[11px] text-slate-400">
+                                            {vm.durationSec ? `${vm.durationSec}s · ` : ''}
+                                            {new Date(vm.createdAt).toLocaleString()}
+                                        </p>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         {!vm.listenedAt && (
                                             <button
-                                                onClick={async () => {
-                                                    const token = await auth.currentUser?.getIdToken();
-                                                    if (!token) return;
-                                                    await fetch(`${apiBaseUrl}/api/voice/mark-voicemail-read`, {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                                                        body: JSON.stringify({ voicemailId: vm.id }),
-                                                    }).catch(() => {});
-                                                }}
+                                                onClick={markRead}
                                                 className="px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-bold inline-flex items-center gap-1"
                                             >
                                                 <Check size={12} /> Listened
@@ -501,9 +538,35 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                 </div>
                                 {vm.summary && <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 rounded-xl">{vm.summary}</p>}
                                 {vm.transcript && <p className="text-xs text-slate-500 dark:text-slate-400">&ldquo;{vm.transcript}&rdquo;</p>}
-                                <audio controls src={vm.recordingUrl} className="w-full h-8" />
+                                <audio
+                                    controls
+                                    preload="metadata"
+                                    playsInline
+                                    onPlay={markRead}
+                                    src={vm.recordingUrl}
+                                    className="w-full h-8"
+                                />
                             </div>
-                        ))
+                                );
+                            })
+                    )}
+                </div>
+            )}
+
+            {viewMode === 'settings' && (
+                <div className="max-w-md w-full mx-auto px-4 mt-4">
+                    {currentUserDoc ? (
+                        <CallingPreferencesPanel
+                            user={currentUserDoc}
+                            churchId={churchId}
+                            churchTimezone={church.timezone || 'America/Chicago'}
+                            apiBaseUrl={apiBaseUrl}
+                        />
+                    ) : (
+                        <div className="p-8 text-center text-xs text-slate-400">
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                            Loading your voicemail settings...
+                        </div>
                     )}
                 </div>
             )}
