@@ -53,7 +53,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
         if (!res.ok) throw new Error(data.error || 'Failed to fetch voice token');
         return {
             token: data.token as string,
-            expiry_at: Math.floor(Date.now() / 1000) + 3000,
+            expiry_at: Date.now() + 3000 * 1000,
         };
     }, [churchId]);
 
