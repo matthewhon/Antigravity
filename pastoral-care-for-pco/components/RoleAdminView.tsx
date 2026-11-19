@@ -14,7 +14,7 @@ import DonorLifecycleSettingsView from './DonorLifecycleSettingsView';
 import NeedsAttentionSettingsView from './NeedsAttentionSettingsView';
 import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
-import { PLANS } from '../services/stripeService';
+import { PLANS, stripeService } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
 import { syncYoutubeMetrics } from '../services/youtubeService';
 
@@ -986,7 +986,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const { campuses } = useTenantData();
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Dashboard' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration' | 'Canva'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Dashboard' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'Voip / Messaging' | 'Grow Integration' | 'Canva'>('Team');
 
   // Delete Organization modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1014,6 +1014,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // SMS Settings state
   const [smsSubTab, setSmsSubTab] = useState<'setup' | 'first-message' | 'compliance' | 'numbers'>('setup');
+  const [isUpdatingVoice, setIsUpdatingVoice] = useState(false);
   const [showPortInModal, setShowPortInModal] = useState(false);
   const [showRep2, setShowRep2] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
@@ -1128,7 +1129,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   }, [church]);
 
   useEffect(() => {
-      if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription', 'Mail Settings', 'SMS'].includes(initialTab)) {
+      if (initialTab === 'SMS') {
+          setActiveTab('Voip / Messaging');
+      } else if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription', 'Mail Settings', 'Voip / Messaging'].includes(initialTab)) {
           setActiveTab(initialTab as any);
       }
   }, [initialTab]);
@@ -1169,7 +1172,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // Check A2P 10DLC Compliance status automatically when entering the SMS tab
   useEffect(() => {
-      if (activeTab !== 'SMS') return;
+      if (activeTab !== 'Voip / Messaging') return;
       if (regStatus !== null) return; // Only fetch if we haven't yet
 
       const checkStatus = async () => {
@@ -1798,7 +1801,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Canva', 'Dashboard', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'Voip / Messaging', 'Grow Integration', 'Canva', 'Dashboard', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -3613,7 +3616,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             );
         })()}
 
-        {activeTab === 'SMS' && (() => {
+        {activeTab === 'Voip / Messaging' && (() => {
             const handleSmsChange = (key: string, value: any) => {
                 setSmsForm((prev: any) => ({ ...prev, [key]: value }));
             };
@@ -3743,7 +3746,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 dark:text-white">SMS Settings</h3>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">Voip / Messaging Settings</h3>
                                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1">
                                     Messaging Compliance &amp; Setup
                                 </p>
@@ -3814,6 +3817,74 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             smsForm.smsEnabled ? 'translate-x-6' : 'translate-x-0'
                                         }`} />
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Optional Paid Voice Calling Add-On */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-2xl shrink-0">
+                                        📞
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2.5">
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Voice Calling Add-On (Optional)</h4>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                                church.voiceAddOn?.enabled
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                            }`}>
+                                                {church.voiceAddOn?.enabled ? 'Active' : 'Not Subscribed'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-1 max-w-xl">
+                                            Two-way browser &amp; mobile softphone calling on your church phone numbers, with opt-in voicemail, call recording, and native iOS/Android background ringing. Per-minute usage is billed pay-as-you-go on your monthly invoice.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="shrink-0">
+                                    {church.voiceAddOn?.enabled ? (
+                                        <button
+                                            disabled={isUpdatingVoice || Boolean(church.voiceAddOn?.comped)}
+                                            onClick={async () => {
+                                                if (!confirm('Disable the Voice Calling add-on? Voice calling will be turned off on all church numbers at the end of this billing cycle.')) return;
+                                                setIsUpdatingVoice(true);
+                                                setSmsMessage(null);
+                                                try {
+                                                    const res = await stripeService.disableVoiceAddon(church.id);
+                                                    onUpdateChurch?.({ voiceAddOn: { ...church.voiceAddOn, enabled: false, canceledAt: Date.now() } });
+                                                    setSmsMessage({ type: 'success', text: res.message });
+                                                } catch (e: any) {
+                                                    setSmsMessage({ type: 'error', text: e.message });
+                                                } finally {
+                                                    setIsUpdatingVoice(false);
+                                                }
+                                            }}
+                                            className="px-5 py-2.5 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50"
+                                        >
+                                            {isUpdatingVoice ? 'Updating...' : church.voiceAddOn?.comped ? 'Included (Comped)' : 'Remove Voice Add-On'}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            disabled={isUpdatingVoice || !Boolean(activeSubscription && planId)}
+                                            onClick={async () => {
+                                                setIsUpdatingVoice(true);
+                                                setSmsMessage(null);
+                                                try {
+                                                    const res = await stripeService.enableVoiceAddon(church.id);
+                                                    onUpdateChurch?.({ voiceAddOn: { enabled: true, subscribedAt: Date.now() } });
+                                                    setSmsMessage({ type: 'success', text: res.message });
+                                                } catch (e: any) {
+                                                    setSmsMessage({ type: 'error', text: e.message });
+                                                } finally {
+                                                    setIsUpdatingVoice(false);
+                                                }
+                                            }}
+                                            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm disabled:opacity-50"
+                                        >
+                                            {isUpdatingVoice ? 'Enabling...' : !(activeSubscription && planId) ? 'Active Plan Required' : 'Enable Voice Add-On'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
