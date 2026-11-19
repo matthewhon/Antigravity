@@ -315,6 +315,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
     const [saving, setSaving] = useState(false);
     const [statusMsg, setStatusMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -622,6 +623,11 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     };
 
     const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+    const selectedEdge = edges.find((e) => e.id === selectedEdgeId) || null;
+    const deleteEdge = (edgeId: string) => {
+        setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+        if (selectedEdgeId === edgeId) setSelectedEdgeId(null);
+    };
     const selectedType = selectedNode?.data?.nodeType as VoiceNodeType | undefined;
     const selectedData = (selectedNode?.data?.nodeData as Record<string, any>) || {};
 
@@ -805,13 +811,29 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                                 ...n,
                                 data: { ...n.data, simActive: simOpen && simNodeId === n.id },
                             }))}
-                            edges={edges}
+                            edges={edges.map((e) =>
+                                e.id === selectedEdgeId
+                                    ? { ...e, style: { ...(e.style || {}), stroke: '#e11d48', strokeWidth: 3 } }
+                                    : e
+                            )}
                             onNodesChange={onNodesChange}
                             onEdgesChange={onEdgesChange}
                             onConnect={onConnect}
                             onDrop={onDrop}
                             onDragOver={onDragOver}
-                            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+                            onNodeClick={(_, node) => {
+                                setSelectedNodeId(node.id);
+                                setSelectedEdgeId(null);
+                            }}
+                            onEdgeClick={(_, edge) => {
+                                setSelectedEdgeId(edge.id);
+                                setSelectedNodeId(null);
+                            }}
+                            onPaneClick={() => {
+                                setSelectedNodeId(null);
+                                setSelectedEdgeId(null);
+                            }}
+                            deleteKeyCode={['Backspace', 'Delete']}
                             nodeTypes={nodeTypes}
                             fitView
                         >
@@ -858,6 +880,52 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                 </div>
 
                 {/* Right Inspector */}
+                {selectedEdge && !selectedNode && (
+                    <div className="w-80 border-l border-slate-200 dark:border-slate-800 p-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                                Selected Link
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedEdgeId(null)}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                            <div>
+                                <span className="text-[10px] font-bold uppercase text-slate-400">From</span>
+                                <p className="font-bold text-slate-800 dark:text-slate-100">
+                                    {String(nodes.find((n) => n.id === selectedEdge.source)?.data?.label || selectedEdge.source)}
+                                </p>
+                                {selectedEdge.sourceHandle && selectedEdge.sourceHandle !== 'default' && (
+                                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold">
+                                        {String(selectedEdge.label || selectedEdge.sourceHandle)}
+                                    </span>
+                                )}
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-bold uppercase text-slate-400">To</span>
+                                <p className="font-bold text-slate-800 dark:text-slate-100">
+                                    {String(nodes.find((n) => n.id === selectedEdge.target)?.data?.label || selectedEdge.target)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => deleteEdge(selectedEdge.id)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete Link
+                        </button>
+                    </div>
+                )}
+
                 {selectedNode && selectedType && (
                     <div className="w-80 border-l border-slate-200 dark:border-slate-800 p-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
                         <div className="flex items-center justify-between">
@@ -1175,6 +1243,58 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                                 </label>
                             </div>
                         )}
+
+                        {(() => {
+                            const nodeLinks = edges.filter(
+                                (e) => e.source === selectedNode.id || e.target === selectedNode.id
+                            );
+                            if (nodeLinks.length === 0) return null;
+                            return (
+                                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                                    <label className="text-[11px] font-bold text-slate-500">
+                                        Links ({nodeLinks.length})
+                                    </label>
+                                    <div className="space-y-1.5">
+                                        {nodeLinks.map((edge) => {
+                                            const isOutgoing = edge.source === selectedNode.id;
+                                            const otherNode = nodes.find(
+                                                (n) => n.id === (isOutgoing ? edge.target : edge.source)
+                                            );
+                                            const otherLabel = String(otherNode?.data?.label || otherNode?.id || 'Block');
+                                            const handleLabel = edge.label || (edge.sourceHandle && edge.sourceHandle !== 'default' ? edge.sourceHandle : '');
+                                            return (
+                                                <div
+                                                    key={edge.id}
+                                                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]"
+                                                >
+                                                    <div className="min-w-0 truncate">
+                                                        <span className="font-bold text-slate-500 mr-1">
+                                                            {isOutgoing ? '→' : '←'}
+                                                        </span>
+                                                        {handleLabel && (
+                                                            <span className="font-bold text-indigo-600 dark:text-indigo-400 mr-1">
+                                                                [{String(handleLabel)}]
+                                                            </span>
+                                                        )}
+                                                        <span className="font-semibold text-slate-800 dark:text-slate-100">
+                                                            {otherLabel}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => deleteEdge(edge.id)}
+                                                        title="Delete link"
+                                                        className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
