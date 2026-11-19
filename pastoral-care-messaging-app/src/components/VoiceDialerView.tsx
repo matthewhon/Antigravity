@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Delete,
-    Search, Loader2, AlertCircle, Volume2, User as UserIcon
+    Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, PhoneMissed, Delete,
+    Search, Loader2, AlertCircle, Volume2, User as UserIcon, Voicemail, Check, BellOff
 } from 'lucide-react';
-import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
-import { db as firebaseDb } from '../services/firebase';
+import { collection, query, where, orderBy, limit, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { auth, db as firebaseDb } from '../services/firebase';
 import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
 import { VoiceSoftphone } from './VoiceSoftphone';
-import type { Church, TwilioPhoneNumber } from '../types';
+import type { Church, TwilioPhoneNumber, User } from '../types';
 
 interface VoiceCallRecord {
     id: string;
@@ -76,8 +76,10 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [people, setPeople] = useState<PersonMatch[]>([]);
     const [recentCalls, setRecentCalls] = useState<VoiceCallRecord[]>([]);
+    const [voicemails, setVoicemails] = useState<any[]>([]);
+    const [currentUserDoc, setCurrentUserDoc] = useState<User | null>(null);
     const [dialError, setDialError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'keypad' | 'recents'>('keypad');
+    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails'>('keypad');
 
     useEffect(() => {
         if (defaultCallerId && !selectedNumberId) {
@@ -100,9 +102,36 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
         );
         const unsub = onSnapshot(q, (snap) => {
             setRecentCalls(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-        }, () => {});
+        }, (err) => {
+            console.error('[VoiceDialerView] Failed to load voiceCalls:', err);
+        });
         return () => unsub();
     }, [churchId]);
+
+    useEffect(() => {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        const unsub = onSnapshot(doc(firebaseDb, 'users', uid), (snap) => {
+            if (snap.exists()) setCurrentUserDoc({ id: snap.id, ...(snap.data() as any) });
+        });
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        const uid = auth.currentUser?.uid;
+        if (!churchId || !uid) return;
+        const isAdmin = Boolean(
+            currentUserDoc?.roles?.includes('Church Admin') ||
+            currentUserDoc?.roles?.includes('System Administration')
+        );
+        const q = isAdmin
+            ? query(collection(firebaseDb, 'voiceVoicemails'), where('churchId', '==', churchId), orderBy('createdAt', 'desc'), limit(40))
+            : query(collection(firebaseDb, 'voiceVoicemails'), where('churchId', '==', churchId), where('targetUserId', 'in', [uid, null]), orderBy('createdAt', 'desc'), limit(40));
+        const unsub = onSnapshot(q, (snap) => {
+            setVoicemails(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+        }, () => {});
+        return () => unsub();
+    }, [churchId, currentUserDoc?.roles]);
 
     // Load church people for quick dial search
     useEffect(() => {
@@ -150,10 +179,12 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
             <VoiceSoftphone
                 activeCall={voice.activeCall}
                 incomingCall={voice.incomingCall}
+                isSpeakerOn={voice.isSpeakerOn}
                 onAnswer={voice.answer}
                 onReject={voice.reject}
                 onHangup={voice.hangup}
                 onToggleMute={voice.toggleMute}
+                onToggleSpeaker={voice.toggleSpeaker}
                 onSendDtmf={voice.sendDtmf}
             />
 
@@ -211,6 +242,45 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                 >
                     Recents ({recentCalls.length})
                 </button>
+                <button
+                    onClick={() => setViewMode('voicemails')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition inline-flex items-center gap-1.5 ${
+                        viewMode === 'voicemails'
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                >
+                    <Voicemail size={13} />
+                    Voicemails
+                    {voicemails.filter((v) => !v.listenedAt).length > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                            {voicemails.filter((v) => !v.listenedAt).length}
+                        </span>
+                    )}
+                </button>
+                {currentUserDoc && (
+                    <button
+                        onClick={async () => {
+                            const active = Boolean(currentUserDoc.callingPreferences?.dndOverride?.active);
+                            await updateDoc(doc(firebaseDb, 'users', currentUserDoc.id), {
+                                'callingPreferences.dndOverride': {
+                                    active: !active,
+                                    until: null,
+                                    reason: !active ? 'Mobile DND' : '',
+                                },
+                            }).catch(() => {});
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition inline-flex items-center gap-1 ${
+                            currentUserDoc.callingPreferences?.dndOverride?.active
+                                ? 'bg-rose-600 text-white shadow-sm'
+                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                        }`}
+                        title="Toggle Do Not Disturb"
+                    >
+                        <BellOff size={13} />
+                        {currentUserDoc.callingPreferences?.dndOverride?.active ? 'DND On' : 'DND'}
+                    </button>
+                )}
             </div>
 
             {(dialError || voice.error) && (
@@ -293,15 +363,25 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                         ))}
                     </div>
 
-                    {/* Call Button */}
-                    <button
-                        onClick={() => handleDial()}
-                        disabled={!dialInput.trim() || voice.status !== 'ready' || Boolean(voice.activeCall) || !(selectedNumberObj as any)?.voiceEnabled}
-                        className="w-16 h-16 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-lg flex items-center justify-center active:scale-95 transition"
-                        title="Place Call"
-                    >
-                        {voice.status === 'connecting' ? <Loader2 size={24} className="animate-spin" /> : <Phone size={26} />}
-                    </button>
+                    {/* Call / End Call Button */}
+                    {voice.activeCall ? (
+                        <button
+                            onClick={voice.hangup}
+                            className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg flex items-center justify-center active:scale-95 transition"
+                            title="End Call"
+                        >
+                            <PhoneOff size={26} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => handleDial()}
+                            disabled={!dialInput.trim() || voice.status !== 'ready' || !(selectedNumberObj as any)?.voiceEnabled}
+                            className="w-16 h-16 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-lg flex items-center justify-center active:scale-95 transition"
+                            title="Place Call"
+                        >
+                            {voice.status === 'connecting' ? <Loader2 size={24} className="animate-spin" /> : <Phone size={26} />}
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="max-w-xl w-full mx-auto p-4 space-y-2">
@@ -359,6 +439,67 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                 </div>
                             );
                         })
+                    )}
+                </div>
+            )}
+
+            {viewMode === 'voicemails' && (
+                <div className="max-w-md w-full mx-auto px-4 mt-4 space-y-2.5">
+                    {voicemails.length === 0 ? (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
+                            <Voicemail size={28} className="mx-auto text-slate-300 mb-2" />
+                            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No voicemails yet</p>
+                        </div>
+                    ) : (
+                        voicemails.map((vm) => (
+                            <div
+                                key={vm.id}
+                                className={`bg-white dark:bg-slate-900 border rounded-2xl p-3.5 space-y-2 ${
+                                    vm.urgent ? 'border-rose-300 dark:border-rose-800' : !vm.listenedAt ? 'border-violet-300 dark:border-violet-700' : 'border-slate-200 dark:border-slate-800'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                {vm.callerName ? `${vm.callerName} (${formatPhoneDisplay(vm.from)})` : formatPhoneDisplay(vm.from)}
+                                            </p>
+                                            {!vm.listenedAt && <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black">NEW</span>}
+                                            {vm.urgent && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">URGENT</span>}
+                                        </div>
+                                        <p className="text-[11px] text-slate-400">{new Date(vm.createdAt).toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {!vm.listenedAt && (
+                                            <button
+                                                onClick={async () => {
+                                                    const token = await auth.currentUser?.getIdToken();
+                                                    if (!token) return;
+                                                    await fetch(`${apiBaseUrl}/api/voice/mark-voicemail-read`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                        body: JSON.stringify({ voicemailId: vm.id }),
+                                                    }).catch(() => {});
+                                                }}
+                                                className="px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-bold inline-flex items-center gap-1"
+                                            >
+                                                <Check size={12} /> Listened
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleDial(vm.from)}
+                                            disabled={voice.status !== 'ready' || Boolean(voice.activeCall)}
+                                            className="p-2 rounded-xl bg-emerald-50 text-emerald-600 disabled:opacity-40"
+                                        >
+                                            <Phone size={15} />
+                                        </button>
+                                    </div>
+                                </div>
+                                {vm.summary && <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 rounded-xl">{vm.summary}</p>}
+                                {vm.transcript && <p className="text-xs text-slate-500 dark:text-slate-400">&ldquo;{vm.transcript}&rdquo;</p>}
+                                <audio controls src={vm.recordingUrl} className="w-full h-8" />
+                            </div>
+                        ))
                     )}
                 </div>
             )}

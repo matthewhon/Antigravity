@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
     Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Delete,
-    Search, Loader2, AlertCircle, Volume2, User as UserIcon
+    Search, Loader2, AlertCircle, Volume2, User as UserIcon, Voicemail, Clock, Check
 } from 'lucide-react';
-import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
-import { db as firebaseDb } from '../services/firebase';
+import { collection, query, where, orderBy, limit, onSnapshot, getDocs, doc } from 'firebase/firestore';
+import { auth, db as firebaseDb } from '../services/firebase';
 import { stripeService } from '../services/stripeService';
 import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
 import { VoiceSoftphone } from './VoiceSoftphone';
-import type { Church, TwilioPhoneNumber } from '../types';
+import { CallingPreferencesPanel } from './CallingPreferencesPanel';
+import type { Church, TwilioPhoneNumber, User } from '../types';
 
 interface VoiceCallRecord {
     id: string;
@@ -17,9 +18,26 @@ interface VoiceCallRecord {
     direction: 'inbound' | 'outbound';
     from: string;
     to: string;
+    callerName?: string | null;
     status: string;
     durationSec?: number;
     recordingUrl?: string | null;
+    createdAt: number;
+}
+
+interface VoicemailRecord {
+    id: string;
+    churchId: string;
+    from: string;
+    to: string;
+    callerName?: string | null;
+    targetUserId?: string | null;
+    recordingUrl: string;
+    durationSec?: number;
+    transcript?: string | null;
+    summary?: string | null;
+    urgent?: boolean;
+    listenedAt?: number | null;
     createdAt: number;
 }
 
@@ -75,8 +93,10 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [people, setPeople] = useState<PersonMatch[]>([]);
     const [recentCalls, setRecentCalls] = useState<VoiceCallRecord[]>([]);
+    const [voicemails, setVoicemails] = useState<VoicemailRecord[]>([]);
+    const [currentUserDoc, setCurrentUserDoc] = useState<User | null>(null);
     const [dialError, setDialError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'keypad' | 'recents'>('keypad');
+    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails' | 'hours'>('keypad');
 
     useEffect(() => {
         if (defaultCallerId && !selectedNumberId) {
@@ -87,6 +107,18 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     // Temporarily bypass church.voiceAddOn?.enabled for testing
     const voiceAddonEnabled = true || Boolean(church.voiceAddOn?.enabled);
     const voice = useSignalWireVoice({ churchId, voiceAddonEnabled });
+
+    // Load current user profile for calling hours & admin role check
+    useEffect(() => {
+        const uid = auth.currentUser?.uid;
+        if (!uid) return;
+        const unsub = onSnapshot(doc(firebaseDb, 'users', uid), (snap) => {
+            if (snap.exists()) {
+                setCurrentUserDoc({ id: snap.id, ...(snap.data() as any) });
+            }
+        });
+        return () => unsub();
+    }, []);
 
     // Load recent calls
     useEffect(() => {
@@ -102,6 +134,38 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
         }, () => {});
         return () => unsub();
     }, [churchId]);
+
+    // Load voicemails (strictly scoped: targetUserId == uid or null for non-admins; all for Church Admins)
+    useEffect(() => {
+        const uid = auth.currentUser?.uid;
+        if (!churchId || !uid) return;
+        const isAdmin = Boolean(
+            currentUserDoc?.roles?.includes('Church Admin') ||
+            currentUserDoc?.roles?.includes('System Administration')
+        );
+        const q = isAdmin
+            ? query(
+                  collection(firebaseDb, 'voiceVoicemails'),
+                  where('churchId', '==', churchId),
+                  orderBy('createdAt', 'desc'),
+                  limit(40)
+              )
+            : query(
+                  collection(firebaseDb, 'voiceVoicemails'),
+                  where('churchId', '==', churchId),
+                  where('targetUserId', 'in', [uid, null]),
+                  orderBy('createdAt', 'desc'),
+                  limit(40)
+              );
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                setVoicemails(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+            },
+            () => {}
+        );
+        return () => unsub();
+    }, [churchId, currentUserDoc?.roles]);
 
     // Load church people for quick dial search
     useEffect(() => {
@@ -208,6 +272,33 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                     }`}
                 >
                     Recents ({recentCalls.length})
+                </button>
+                <button
+                    onClick={() => setViewMode('voicemails')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition inline-flex items-center gap-1.5 ${
+                        viewMode === 'voicemails'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                >
+                    <Voicemail size={13} />
+                    Voicemails
+                    {voicemails.filter((v) => !v.listenedAt).length > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                            {voicemails.filter((v) => !v.listenedAt).length}
+                        </span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setViewMode('hours')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition inline-flex items-center gap-1.5 ${
+                        viewMode === 'hours'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                >
+                    <Clock size={13} />
+                    Calling Hours
                 </button>
             </div>
 
@@ -347,6 +438,120 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                 </div>
                             );
                         })
+                    )}
+                </div>
+            )}
+
+            {viewMode === 'voicemails' && (
+                <div className="max-w-xl w-full mx-auto px-4 mt-4 space-y-2.5">
+                    {voicemails.length === 0 ? (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
+                            <Voicemail size={28} className="mx-auto text-slate-300 mb-2" />
+                            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No voicemails yet</p>
+                            <p className="text-xs text-slate-400 mt-1">Voicemails left for you or the church will appear here with transcripts.</p>
+                        </div>
+                    ) : (
+                        voicemails.map((vm) => (
+                            <div
+                                key={vm.id}
+                                className={`bg-white dark:bg-slate-900 border rounded-2xl p-3.5 space-y-2.5 ${
+                                    vm.urgent
+                                        ? 'border-rose-300 dark:border-rose-800 ring-2 ring-rose-500/10'
+                                        : !vm.listenedAt
+                                        ? 'border-indigo-300 dark:border-indigo-700'
+                                        : 'border-slate-200 dark:border-slate-800'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                {vm.callerName ? `${vm.callerName} (${formatPhoneDisplay(vm.from)})` : formatPhoneDisplay(vm.from)}
+                                            </p>
+                                            {!vm.listenedAt && (
+                                                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase">New</span>
+                                            )}
+                                            {vm.urgent && (
+                                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase">Urgent</span>
+                                            )}
+                                            {!vm.targetUserId && (
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-bold">General</span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-400">
+                                            {vm.durationSec ? `${vm.durationSec}s · ` : ''}
+                                            {new Date(vm.createdAt).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {!vm.listenedAt && (
+                                            <button
+                                                onClick={async () => {
+                                                    const token = await auth.currentUser?.getIdToken();
+                                                    if (!token) return;
+                                                    await fetch('/api/voice/mark-voicemail-read', {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            Authorization: `Bearer ${token}`,
+                                                        },
+                                                        body: JSON.stringify({ voicemailId: vm.id }),
+                                                    }).catch(() => {});
+                                                }}
+                                                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-[11px] font-bold inline-flex items-center gap-1"
+                                                title="Mark as listened"
+                                            >
+                                                <Check size={13} /> Listened
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleDial(vm.from)}
+                                            disabled={voice.status !== 'ready' || Boolean(voice.activeCall)}
+                                            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-40"
+                                            title={`Call back ${vm.from}`}
+                                        >
+                                            <Phone size={15} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {vm.summary && (
+                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 rounded-xl">
+                                        {vm.summary}
+                                    </p>
+                                )}
+
+                                {vm.transcript && (
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        &ldquo;{vm.transcript}&rdquo;
+                                    </p>
+                                )}
+
+                                <div className="pt-1 flex items-center gap-2">
+                                    <Volume2 size={14} className="text-indigo-500 shrink-0" />
+                                    <audio controls src={vm.recordingUrl} className="w-full h-8" />
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {viewMode === 'hours' && (
+                <div className="max-w-2xl w-full mx-auto px-4 mt-4">
+                    {currentUserDoc ? (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+                            <CallingPreferencesPanel
+                                user={currentUserDoc}
+                                churchId={churchId}
+                                churchTimezone={church.timezone || 'America/Chicago'}
+                            />
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-xs text-slate-400">
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                            Loading your calling preferences...
+                        </div>
                     )}
                 </div>
             )}

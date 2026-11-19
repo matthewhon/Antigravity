@@ -25,6 +25,101 @@ export interface User {
     mustChangePassword?: boolean;
     /** Epoch timestamp of the last password change */
     passwordChangedAt?: number;
+    /** Per-user voice calling hours, extension, DND, and personal voicemail config */
+    callingPreferences?: UserCallingPreferences;
+}
+
+export type DayOfWeek = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+export interface TimeWindow {
+    start: string; // "HH:mm" 24h format, e.g. "09:00"
+    end: string;   // "HH:mm" 24h format, e.g. "17:00"
+}
+
+export interface UserVoicemailConfig {
+    enabled: boolean;
+    greetingType: 'tts' | 'audio';
+    greetingText?: string;
+    greetingAudioUrl?: string;
+    greetingAudioDurationSec?: number;
+    maxLengthSec?: number;
+    transcribeEnabled?: boolean;
+    notifyChannels?: {
+        push?: boolean;
+        email?: boolean;
+        sms?: boolean;
+    };
+}
+
+export interface UserCallingPreferences {
+    /** 3-4 digit extension unique within the church (e.g. "101") */
+    extension?: string;
+    /** IANA timezone (e.g. "America/Chicago"). Falls back to church timezone. */
+    timezone: string;
+    /** When false, user can receive calls 24/7 (unless DND is active). */
+    callingHoursEnabled: boolean;
+    /** Weekly schedule; supports multiple windows per day */
+    schedule: Record<DayOfWeek, { enabled: boolean; windows: TimeWindow[] }>;
+    /** Specific date overrides (vacations, holidays, special events) */
+    dateOverrides?: Array<{
+        date: string; // "YYYY-MM-DD"
+        label?: string;
+        available: boolean;
+        windows?: TimeWindow[];
+    }>;
+    /** Immediate manual override ("In a meeting", "On vacation", etc.) */
+    dndOverride?: {
+        active: boolean;
+        until?: number | null;
+        reason?: string;
+    };
+    /** Allow callers using an urgent/emergency IVR branch to bypass calling hours */
+    allowEmergencyBypass?: boolean;
+    voicemail?: UserVoicemailConfig;
+}
+
+export type VoiceNodeType =
+    | 'inbound_trigger'
+    | 'hours_check'
+    | 'voice_agent'
+    | 'extension_lookup'
+    | 'route_user'
+    | 'voicemail'
+    | 'forward_number'
+    | 'hangup';
+
+export interface VoiceFlowNode {
+    id: string;
+    type: VoiceNodeType;
+    position: { x: number; y: number };
+    label: string;
+    data: Record<string, any>;
+}
+
+export interface VoiceFlowEdge {
+    id: string;
+    source: string;
+    sourceHandle?: string;
+    target: string;
+}
+
+export interface VoiceFlowGraph {
+    entryNodeId: string;
+    nodes: VoiceFlowNode[];
+    edges: VoiceFlowEdge[];
+}
+
+export interface VoiceFlow {
+    id: string;
+    churchId: string;
+    name: string;
+    description?: string;
+    status: 'draft' | 'published';
+    draftGraph: VoiceFlowGraph;
+    publishedGraph?: VoiceFlowGraph | null;
+    publishedAt?: number | null;
+    updatedAt: number;
+    createdAt: number;
 }
 
 /**
@@ -2235,6 +2330,7 @@ export interface SmsPhoneNumber {
 
     // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
     voiceEnabled?: boolean;
+    voiceFlowId?: string | null;
     voiceForwardingNumber?: string;
     voicemailEnabled?: boolean;
     voicemailGreetingText?: string;
@@ -2246,6 +2342,7 @@ export interface VoiceCall {
     churchId: string;
     smsNumberId: string;
     personId?: string | null;
+    callerName?: string | null;
     direction: 'inbound' | 'outbound';
     from: string;
     to: string;
@@ -2253,6 +2350,13 @@ export interface VoiceCall {
     durationSec?: number;
     recordingUrl?: string | null;
     handledByUserId?: string | null;
+    targetUserId?: string | null;
+    isVoicemail?: boolean;
+    voicemailListenedAt?: number | null;
+    voicemailTranscript?: string | null;
+    voicemailSummary?: string | null;
+    voicemailUrgent?: boolean;
+    routingPath?: string[];
     createdAt: number;
     endedAt?: number;
 }
@@ -2611,6 +2715,7 @@ export interface TwilioPhoneNumber {
 
     // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
     voiceEnabled?: boolean;
+    voiceFlowId?: string | null;
     voiceForwardingNumber?: string;
     voicemailEnabled?: boolean;
     voicemailGreetingText?: string;
@@ -2622,6 +2727,7 @@ export interface VoiceCall {
     churchId: string;
     smsNumberId: string;
     personId?: string | null;
+    callerName?: string | null;
     direction: 'inbound' | 'outbound';
     from: string;
     to: string;
@@ -2629,6 +2735,13 @@ export interface VoiceCall {
     durationSec?: number;
     recordingUrl?: string | null;
     handledByUserId?: string | null;
+    targetUserId?: string | null;
+    isVoicemail?: boolean;
+    voicemailListenedAt?: number | null;
+    voicemailTranscript?: string | null;
+    voicemailSummary?: string | null;
+    voicemailUrgent?: boolean;
+    routingPath?: string[];
     createdAt: number;
     endedAt?: number;
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { SignalWire, type Call, type CredentialProvider } from '@signalwire/js';
 import { auth } from '../services/firebase';
 
@@ -48,15 +49,43 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
     const [error, setError] = useState<string | null>(null);
     const [activeCallInfo, setActiveCallInfo] = useState<ActiveCallInfo | null>(null);
     const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
+    const [isSpeakerOn, setIsSpeakerOn] = useState(false);
 
     const clientRef = useRef<SignalWire | null>(null);
     const activeCallRef = useRef<Call | null>(null);
     const incomingCallRef = useRef<IncomingCallInfo | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+    const cancelPendingDialRef = useRef(false);
+    const activeCallLogMetaRef = useRef<{ callId: string; smsNumberId?: string; to?: string; from?: string; direction: 'inbound' | 'outbound'; startedAt: number | null } | null>(null);
 
     useEffect(() => {
         incomingCallRef.current = incomingCall;
     }, [incomingCall]);
+
+    const logCallToServer = useCallback(async (payload: {
+        callId: string;
+        smsNumberId?: string;
+        direction: 'inbound' | 'outbound';
+        to?: string;
+        from?: string;
+        status: string;
+        durationSec?: number;
+    }) => {
+        try {
+            if (!churchId) return;
+            const idToken = await auth.currentUser?.getIdToken();
+            if (!idToken) return;
+            const base = apiBaseUrl.replace(/\/$/, '');
+            await fetch(`${base}/api/voice/log-call`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ churchId, ...payload }),
+            });
+        } catch {}
+    }, [churchId, apiBaseUrl]);
 
     const fetchVoiceToken = useCallback(async () => {
         if (!churchId) throw new Error('Missing churchId');
@@ -80,15 +109,34 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         };
     }, [churchId, apiBaseUrl]);
 
-    const attachCallListeners = useCallback((call: Call, remoteNumber: string, direction: 'inbound' | 'outbound') => {
+    const attachCallListeners = useCallback((call: Call, remoteNumber: string, direction: 'inbound' | 'outbound', smsNumberId?: string) => {
         activeCallRef.current = call;
+        const callId = call.id || activeCallLogMetaRef.current?.callId || `call_${Date.now()}`;
+        activeCallLogMetaRef.current = {
+            callId,
+            smsNumberId,
+            to: direction === 'outbound' ? remoteNumber : undefined,
+            from: direction === 'inbound' ? remoteNumber : undefined,
+            direction,
+            startedAt: null,
+        };
+        setIsSpeakerOn(false);
         setActiveCallInfo({
-            id: call.id || `call_${Date.now()}`,
+            id: callId,
             remoteNumber,
             direction,
             state: 'connecting',
             isMuted: false,
             startedAt: null,
+        });
+
+        logCallToServer({
+            callId,
+            smsNumberId,
+            direction,
+            to: direction === 'outbound' ? remoteNumber : undefined,
+            from: direction === 'inbound' ? remoteNumber : undefined,
+            status: direction === 'outbound' ? 'initiated' : 'in-progress',
         });
 
         if (!remoteAudioRef.current) {
@@ -122,10 +170,29 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             }
         };
 
+        const finalizeCallLog = (finalStatus: string) => {
+            const meta = activeCallLogMetaRef.current;
+            if (!meta) return;
+            activeCallLogMetaRef.current = null;
+            const durationSec = meta.startedAt ? Math.max(1, Math.round((Date.now() - meta.startedAt) / 1000)) : 0;
+            logCallToServer({
+                callId: meta.callId,
+                smsNumberId: meta.smsNumberId,
+                direction: meta.direction,
+                to: meta.to,
+                from: meta.from,
+                status: finalStatus,
+                durationSec,
+            });
+        };
+
         const stateSub = (call as any).state$?.subscribe?.((nextState: string) => {
+            const isLive = nextState === 'active' || nextState === 'answered';
+            if (isLive && activeCallLogMetaRef.current && !activeCallLogMetaRef.current.startedAt) {
+                activeCallLogMetaRef.current.startedAt = Date.now();
+            }
             setActiveCallInfo((prev) => {
                 if (!prev) return null;
-                const isLive = nextState === 'active' || nextState === 'answered';
                 return {
                     ...prev,
                     state: nextState,
@@ -133,9 +200,11 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 };
             });
             if (['ended', 'destroy', 'hangup', 'failed'].includes(nextState)) {
+                finalizeCallLog(nextState === 'failed' ? 'failed' : 'completed');
                 cleanupAudio();
                 activeCallRef.current = null;
                 setActiveCallInfo(null);
+                setIsSpeakerOn(false);
                 if (Capacitor.getPlatform() === 'ios') VoipPush.endCall?.().catch(() => {});
                 if (Capacitor.getPlatform() === 'android') VoipCall.endCall?.().catch(() => {});
             }
@@ -143,16 +212,19 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
 
         (call as any).on?.('destroy', () => {
             stateSub?.unsubscribe?.();
+            finalizeCallLog('completed');
             cleanupAudio();
             activeCallRef.current = null;
             setActiveCallInfo(null);
+            setIsSpeakerOn(false);
         });
-    }, []);
+    }, [logCallToServer]);
 
     const answer = useCallback(async () => {
         const inc = incomingCallRef.current;
         if (!inc) return;
         setIncomingCall(null);
+        setIsSpeakerOn(false);
         if (Capacitor.getPlatform() === 'ios') {
             await VoipPush.configureAudioSession?.().catch(() => {});
         }
@@ -161,14 +233,40 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
     }, [attachCallListeners]);
 
     const hangup = useCallback(async () => {
+        cancelPendingDialRef.current = true;
         const call = activeCallRef.current;
-        if (!call) return;
-        await (call as any).hangup?.();
-        activeCallRef.current = null;
-        setActiveCallInfo(null);
-        if (Capacitor.getPlatform() === 'ios') VoipPush.endCall?.().catch(() => {});
-        if (Capacitor.getPlatform() === 'android') VoipCall.endCall?.().catch(() => {});
-    }, []);
+        const meta = activeCallLogMetaRef.current;
+        if (meta) {
+            activeCallLogMetaRef.current = null;
+            const durationSec = meta.startedAt ? Math.max(1, Math.round((Date.now() - meta.startedAt) / 1000)) : 0;
+            logCallToServer({
+                callId: meta.callId,
+                smsNumberId: meta.smsNumberId,
+                direction: meta.direction,
+                to: meta.to,
+                from: meta.from,
+                status: 'completed',
+                durationSec,
+            });
+        }
+        try {
+            if (call) {
+                await (call as any).hangup?.();
+            }
+        } catch {
+            // Ensure local state and native CallKit still clean up
+        } finally {
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.pause();
+                remoteAudioRef.current.srcObject = null;
+            }
+            activeCallRef.current = null;
+            setActiveCallInfo(null);
+            setIsSpeakerOn(false);
+            if (Capacitor.getPlatform() === 'ios') VoipPush.endCall?.().catch(() => {});
+            if (Capacitor.getPlatform() === 'android') VoipCall.endCall?.().catch(() => {});
+        }
+    }, [logCallToServer]);
 
     // Register native PushKit / CallKit / ConnectionService listeners when voiceAddonEnabled
     useEffect(() => {
@@ -261,8 +359,17 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
 
                 errorSub = client.errors$.subscribe((err: Error) => {
                     if (cancelled) return;
+                    const msg = err?.message || 'Failed to connect voice client';
+                    if (/websocket/i.test(msg)) {
+                        // SignalWire WebSocketController automatically reconnects on socket drops
+                        // (common when iOS backgrounds WKWebView). Keep status as connecting so
+                        // ready$ can recover cleanly without locking the UI in an error state.
+                        console.warn('[Voice] Transient WebSocket error (reconnecting):', msg);
+                        setStatus((prev) => (prev === 'ready' ? 'connecting' : prev));
+                        return;
+                    }
                     setStatus('error');
-                    setError(err?.message || 'Failed to connect voice client');
+                    setError(msg);
                 });
 
                 readySub = client.ready$.subscribe((isReady: boolean) => {
@@ -299,8 +406,24 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
 
         init();
 
+        let appStateHandle: { remove: () => void } | null = null;
+        if (Capacitor.isNativePlatform()) {
+            CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+                if (!isActive || cancelled) return;
+                const client = clientRef.current;
+                if (client && !client.isConnected) {
+                    setStatus('connecting');
+                    client.connect().catch(() => {});
+                }
+            }).then((handle) => {
+                if (cancelled) handle.remove();
+                else appStateHandle = handle;
+            }).catch(() => {});
+        }
+
         return () => {
             cancelled = true;
+            appStateHandle?.remove();
             readySub?.unsubscribe();
             errorSub?.unsubscribe();
             incomingSub?.unsubscribe();
@@ -318,6 +441,24 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             throw new Error('Voice softphone is not ready.');
         }
         const destination = normalizeDialTarget(toNumber);
+        const tempId = `call_${Date.now()}`;
+        cancelPendingDialRef.current = false;
+        setIsSpeakerOn(false);
+        activeCallLogMetaRef.current = {
+            callId: tempId,
+            smsNumberId,
+            to: destination,
+            direction: 'outbound',
+            startedAt: null,
+        };
+        setActiveCallInfo({
+            id: tempId,
+            remoteNumber: destination,
+            direction: 'outbound',
+            state: 'dialing',
+            isMuted: false,
+            startedAt: null,
+        });
         try {
             if (Capacitor.getPlatform() === 'ios') {
                 await VoipPush.configureAudioSession?.();
@@ -331,9 +472,16 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                     userId: auth.currentUser?.uid || '',
                 },
             } as any);
-            attachCallListeners(call, destination, 'outbound');
+            if (cancelPendingDialRef.current) {
+                await (call as any)?.hangup?.().catch(() => {});
+                return call;
+            }
+            attachCallListeners(call, destination, 'outbound', smsNumberId);
             return call;
         } catch (err: any) {
+            activeCallLogMetaRef.current = null;
+            setActiveCallInfo(null);
+            setIsSpeakerOn(false);
             const inner = err?.error || err?.cause;
             const detail = inner?.message || (typeof inner === 'string' ? inner : inner ? JSON.stringify(inner) : '') || err?.message || 'Call creation failed';
             console.error('[Voice] dial failed:', err, inner);
@@ -360,6 +508,14 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: nextMuted } : null));
     }, [activeCallInfo]);
 
+    const toggleSpeaker = useCallback(async () => {
+        const next = !isSpeakerOn;
+        setIsSpeakerOn(next);
+        if (Capacitor.getPlatform() === 'ios') {
+            await VoipPush.setSpeakerphone?.({ enabled: next }).catch(() => {});
+        }
+    }, [isSpeakerOn]);
+
     const sendDtmf = useCallback(async (digit: string) => {
         const call = activeCallRef.current as any;
         if (!call) return;
@@ -371,11 +527,13 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         error,
         activeCall: activeCallInfo,
         incomingCall,
+        isSpeakerOn,
         dial,
         answer,
         reject,
         hangup,
         toggleMute,
+        toggleSpeaker,
         sendDtmf,
     };
 }

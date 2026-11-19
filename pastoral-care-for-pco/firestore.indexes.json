@@ -282,6 +282,31 @@
         { "fieldPath": "personId",  "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "voiceVoicemails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",     "order": "ASCENDING" },
+        { "fieldPath": "targetUserId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt",    "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "voiceVoicemails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "voiceFlows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

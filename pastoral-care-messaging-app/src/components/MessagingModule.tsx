@@ -3311,10 +3311,12 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                 <VoiceSoftphone
                     activeCall={voice.activeCall}
                     incomingCall={voice.incomingCall}
+                    isSpeakerOn={voice.isSpeakerOn}
                     onAnswer={voice.answer}
                     onReject={voice.reject}
                     onHangup={voice.hangup}
                     onToggleMute={voice.toggleMute}
+                    onToggleSpeaker={voice.toggleSpeaker}
                     onSendDtmf={voice.sendDtmf}
                 />
             )}

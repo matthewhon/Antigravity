@@ -4,6 +4,7 @@ import { auth } from '../services/firebase';
 import { verifyBeforeUpdateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { firestore } from '../services/firestoreService';
 import { User, Church } from '../types';
+import { CallingPreferencesPanel } from './CallingPreferencesPanel';
 
 interface UserProfileModalProps {
   user: User;
@@ -13,6 +14,7 @@ interface UserProfileModalProps {
 }
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClose, onUpdate }) => {
+  const [activeTab, setActiveTab] = useState<'profile' | 'calling'>('profile');
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [newPassword, setNewPassword] = useState('');
@@ -96,7 +98,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl border border-slate-100 relative">
+      <div className={`bg-white rounded-[2rem] w-full ${activeTab === 'calling' ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto p-8 shadow-2xl border border-slate-100 relative transition-all`}>
         <button 
             onClick={onClose}
             className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"
@@ -104,21 +106,37 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
 
-        <div className="mb-6">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Edit Profile</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">Update your account details</p>
+        <div className="mb-5">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Account Settings</h3>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">{church.name}</p>
         </div>
 
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
-            <div>
-                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Organization</p>
-                <p className="text-sm font-bold text-slate-900">{church.name}</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xs">
-                {church.name.charAt(0)}
-            </div>
+        <div className="flex gap-2 mb-6 p-1 bg-slate-100 rounded-xl">
+            <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'profile' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Profile
+            </button>
+            <button
+                type="button"
+                onClick={() => setActiveTab('calling')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'calling' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Calling Hours &amp; Voicemail
+            </button>
         </div>
 
+        {activeTab === 'calling' ? (
+            <CallingPreferencesPanel
+                user={user}
+                churchId={church.id}
+                churchTimezone={church.timezone || 'America/Chicago'}
+                onSaved={() => onUpdate()}
+            />
+        ) : (
+        <>
         {error && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs font-bold flex items-start gap-2">
                 <span>⚠️</span>
@@ -177,6 +195,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
                 {loading ? 'Saving...' : 'Save Changes'}
             </button>
         </form>
+        </>
+        )}
       </div>
     </div>
   );

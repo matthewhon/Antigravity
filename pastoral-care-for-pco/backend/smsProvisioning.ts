@@ -584,6 +584,7 @@ export const updateNumberSettings = async (req: any, res: any) => {
             executiveAiAgentListId,
             executiveAiAgentListName,
             voiceEnabled,
+            voiceFlowId,
             voiceForwardingNumber,
             voicemailEnabled,
             voicemailGreetingText,
@@ -630,6 +631,7 @@ export const updateNumberSettings = async (req: any, res: any) => {
             if (executiveAiAgentListId    !== undefined) patch.executiveAiAgentListId    = executiveAiAgentListId;
             if (executiveAiAgentListName  !== undefined) patch.executiveAiAgentListName  = executiveAiAgentListName;
             if (voiceEnabled              !== undefined) patch.voiceEnabled              = Boolean(voiceEnabled);
+            if (voiceFlowId               !== undefined) patch.voiceFlowId               = voiceFlowId || null;
             if (voiceForwardingNumber     !== undefined) patch.voiceForwardingNumber     = voiceForwardingNumber;
             if (voicemailEnabled          !== undefined) patch.voicemailEnabled          = Boolean(voicemailEnabled);
             if (voicemailGreetingText     !== undefined) patch.voicemailGreetingText     = voicemailGreetingText;

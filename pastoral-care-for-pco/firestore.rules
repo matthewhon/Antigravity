@@ -707,6 +707,22 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /voiceVoicemails/{voicemailId} {
+      allow read: if isSameChurch(resource.data.churchId) && (
+        resource.data.targetUserId == null ||
+        resource.data.targetUserId == request.auth.uid ||
+        isChurchAdmin()
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /voiceFlows/{flowId} {
+      allow read: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() && (isChurchAdmin() || hasRole('Messaging'));
+      allow update: if isDocInUserChurch() && churchIdNotModified() && (isChurchAdmin() || hasRole('Messaging'));
+      allow delete: if isDocInUserChurch() && (isChurchAdmin() || hasRole('Messaging'));
+    }
+
     // ===============================================================
     // Default Deny
     // ===============================================================

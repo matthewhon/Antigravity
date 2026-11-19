@@ -50,8 +50,13 @@ import {
     handleVoiceOutbound,
     handleVoiceNoAnswer,
     handleVoiceRecordingStatus,
-    handleVoiceStatus
+    handleVoiceStatus,
+    logClientCall,
+    handleVoiceFlowStep,
+    handleVoiceWhisper,
+    handleMarkVoicemailRead
 } from './backend/voiceWebhooks';
+import { handleUploadVoiceAudio } from './backend/voiceAudioService';
 import { handleInboundSms } from './backend/smsInbound';
 import { fetchSignalWireMedia } from './backend/signalwireClient';
 import { sendIndividual, sendBulk } from './backend/smsSend';
@@ -600,6 +605,11 @@ async function startServer() {
     app.post('/api/voice/recording-status',     express.urlencoded({ extended: false }), express.json(), handleVoiceRecordingStatus);
     app.post('/api/voice/recording-complete',   express.urlencoded({ extended: false }), express.json(), handleVoiceRecordingStatus);
     app.post('/api/voice/status',               express.urlencoded({ extended: false }), express.json(), handleVoiceStatus);
+    app.post('/api/voice/flow-step',            express.urlencoded({ extended: false }), express.json(), handleVoiceFlowStep);
+    app.post('/api/voice/whisper',              express.urlencoded({ extended: false }), express.json(), handleVoiceWhisper);
+    app.post('/api/voice/log-call',             express.json(), logClientCall);
+    app.post('/api/voice/upload-audio',         express.json({ limit: '25mb' }), handleUploadVoiceAudio);
+    app.post('/api/voice/mark-voicemail-read',  express.json(), handleMarkVoicemailRead);
     app.post('/api/admin/backfill-voice-webhooks', express.json(), backfillVoiceWebhooks);
 
     // Quick-send routes used by the NewMessageComposer modal (sends to a PCO List or Group

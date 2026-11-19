@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Grid, PhoneIncoming } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Grid, PhoneIncoming, Volume2 } from 'lucide-react';
 import type { ActiveCallInfo, IncomingCallInfo } from '../hooks/useSignalWireVoice';
 
 interface VoiceSoftphoneProps {
     activeCall: ActiveCallInfo | null;
     incomingCall: IncomingCallInfo | null;
+    isSpeakerOn?: boolean;
     onAnswer: () => void;
     onReject: () => void;
     onHangup: () => void;
     onToggleMute: () => void;
+    onToggleSpeaker?: () => void;
     onSendDtmf: (digit: string) => void;
 }
 
@@ -17,10 +19,12 @@ const DTMF_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 export const VoiceSoftphone: React.FC<VoiceSoftphoneProps> = ({
     activeCall,
     incomingCall,
+    isSpeakerOn = false,
     onAnswer,
     onReject,
     onHangup,
     onToggleMute,
+    onToggleSpeaker,
     onSendDtmf,
 }) => {
     const [showKeypad, setShowKeypad] = useState(false);
@@ -46,7 +50,7 @@ export const VoiceSoftphone: React.FC<VoiceSoftphoneProps> = ({
     if (!incomingCall && !activeCall) return null;
 
     return (
-        <div className="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-3 sm:left-auto sm:w-80">
+        <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-4 left-4 right-4 z-50 flex flex-col gap-3 sm:left-auto sm:w-80">
             {incomingCall && !activeCall && (
                 <div className="rounded-2xl bg-slate-900 text-white p-4 shadow-2xl border border-slate-700">
                     <div className="flex items-center gap-3 mb-3">
@@ -107,9 +111,22 @@ export const VoiceSoftphone: React.FC<VoiceSoftphoneProps> = ({
                             {activeCall.isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                             {activeCall.isMuted ? 'Unmute' : 'Mute'}
                         </button>
+                        {onToggleSpeaker && (
+                            <button
+                                onClick={onToggleSpeaker}
+                                title={isSpeakerOn ? 'Switch to Earpiece' : 'Switch to Speaker'}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold ${
+                                    isSpeakerOn ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'
+                                }`}
+                            >
+                                <Volume2 className="w-4 h-4" />
+                                Speaker
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowKeypad((v) => !v)}
-                            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold ${showKeypad ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                            aria-label="Toggle Keypad"
+                            className={`px-3 py-2.5 rounded-xl text-xs font-bold ${showKeypad ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}
                         >
                             <Grid className="w-4 h-4" />
                         </button>

@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole, PortingRequest } from '../types';
+import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole, PortingRequest, VoiceFlow } from '../types';
 import { CreateUserModal } from './CreateUserModal';
+import { CallFlowBuilder } from './CallFlowBuilder';
+import { CallingPreferencesPanel } from './CallingPreferencesPanel';
 import { firestore } from '../services/firestoreService';
 import { useTenantData } from '../contexts/TenantDataContext';
 import { auth, db as firebaseDb, storage } from '../services/firebase';
-import { setDoc, doc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { setDoc, doc, collection, query, where, getDocs, addDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
@@ -1071,6 +1073,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [smsNumbers, setSmsNumbers] = useState<any[]>([]);
+  const [voiceFlows, setVoiceFlows] = useState<VoiceFlow[]>([]);
+  const [showCallFlowBuilder, setShowCallFlowBuilder] = useState(false);
+  const [editingCallingUser, setEditingCallingUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!churchId) return;
+    const q = query(collection(firebaseDb, 'voiceFlows'), where('churchId', '==', churchId));
+    return onSnapshot(q, (snap) => {
+      setVoiceFlows(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as VoiceFlow[]);
+    }, () => {});
+  }, [churchId]);
   const [numLoading, setNumLoading] = useState(false);
   const [numError, setNumError] = useState('');
   const [numToast, setNumToast] = useState('');
@@ -1871,8 +1884,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <span>🔑</span> Must Reset Password
                                         </span>
                                     )}
+                                    {u.callingPreferences?.extension && (
+                                        <span className="px-2 py-1 rounded text-[11px] font-bold uppercase tracking-wide bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300">
+                                            Ext {u.callingPreferences.extension}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        onClick={() => setEditingCallingUser(u)}
+                                        className="transition-colors px-3 py-2 text-[10px] font-bold uppercase tracking-wide rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
+                                    >
+                                        Calling Hours
+                                    </button>
                                     {/* Require / Cancel Password Change */}
                                     {isChurchAdmin && currentUser.id !== u.id && (
                                         <button
@@ -4794,6 +4818,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             numId: string,
                             patch: {
                                 voiceEnabled?: boolean;
+                                voiceFlowId?: string | null;
                                 voicemailEnabled?: boolean;
                                 recordCalls?: boolean;
                                 voiceForwardingNumber?: string;
@@ -4831,6 +4856,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <p className="text-[10px] text-slate-400 mt-0.5">SignalWire numbers assigned to this church. The default number is used for outbound replies when no inbox is specified.</p>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setShowCallFlowBuilder(true)}
+                                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-sm"
+                                            >
+                                                Visual Call Flows
+                                            </button>
                                             <button
                                                 onClick={handleCheckRegistrationStatus}
                                                 disabled={isCheckingStatus}
@@ -5172,6 +5203,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                     }}
                                                                                     className="flex-1 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-white"
                                                                                 />
+                                                                                <select
+                                                                                    value={num.voiceFlowId || ''}
+                                                                                    onChange={(e) => handleUpdateVoiceSettings(num.id, { voiceFlowId: e.target.value || null })}
+                                                                                    className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-900 dark:text-white"
+                                                                                    title="Assigned Visual Call Flow"
+                                                                                >
+                                                                                    <option value="">Standard Ringing (No Call Flow)</option>
+                                                                                    {voiceFlows.map((vf) => (
+                                                                                        <option key={vf.id} value={vf.id}>
+                                                                                            Flow: {vf.name} ({vf.status})
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -5837,6 +5881,56 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
         )}
         </div>
+
+        {showCallFlowBuilder && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-7xl">
+                    <CallFlowBuilder
+                        churchId={churchId}
+                        churchTimezone={church?.timezone || 'America/Chicago'}
+                        users={users}
+                        numbers={smsNumbers}
+                        onClose={() => setShowCallFlowBuilder(false)}
+                        onNumberFlowAssigned={(numberId, flowId) => {
+                            setSmsNumbers((prev: any[]) => prev.map((n) => (n.id === numberId ? { ...n, voiceFlowId: flowId } : n)));
+                        }}
+                    />
+                </div>
+            </div>
+        )}
+
+        {editingCallingUser && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                                Calling Hours &amp; Voicemail — {editingCallingUser.name}
+                            </h3>
+                            <p className="text-xs text-slate-400">{editingCallingUser.email}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setEditingCallingUser(null)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    <CallingPreferencesPanel
+                        user={editingCallingUser}
+                        churchId={churchId}
+                        churchTimezone={church?.timezone || 'America/Chicago'}
+                        onSaved={(prefs) => {
+                            setUsers((prev) =>
+                                prev.map((u) => (u.id === editingCallingUser.id ? { ...u, callingPreferences: prefs } : u))
+                            );
+                            setEditingCallingUser((prev) => (prev ? { ...prev, callingPreferences: prefs } : null));
+                        }}
+                    />
+                </div>
+            </div>
+        )}
     </div>
   );
 };

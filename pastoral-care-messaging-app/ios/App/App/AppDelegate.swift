@@ -124,6 +124,7 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "register", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "configureAudioSession", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setSpeakerphone", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise)
     ]
 
@@ -161,7 +162,8 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
                     return
                 }
                 do {
-                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+                    try session.overrideOutputAudioPort(.none)
                     try session.setActive(true)
                     call.resolve(["granted": true])
                 } catch {
@@ -171,7 +173,23 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
         }
     }
 
+    @objc func setSpeakerphone(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        DispatchQueue.main.async {
+            let session = AVAudioSession.sharedInstance()
+            do {
+                try session.overrideOutputAudioPort(enabled ? .speaker : .none)
+                call.resolve(["speaker": enabled])
+            } catch {
+                call.reject("Failed to switch audio route: \(error.localizedDescription)")
+            }
+        }
+    }
+
     @objc func endCall(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.overrideOutputAudioPort(.none)
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
         guard let uuid = activeCallUUID else {
             call.resolve()
             return
@@ -235,13 +253,17 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
 
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+        try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+        try? session.overrideOutputAudioPort(.none)
         try? session.setActive(true)
         notifyListeners("callAnswered", data: [:])
         action.fulfill()
     }
 
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.overrideOutputAudioPort(.none)
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
         activeCallUUID = nil
         notifyListeners("callEnded", data: [:])
         action.fulfill()

@@ -11,6 +11,73 @@ export interface User {
     widgetPreferences?: Record<string, string[]>;
     theme?: 'traditional' | 'dark';
     mustChangePassword?: boolean;
+    callingPreferences?: UserCallingPreferences;
+}
+
+export type DayOfWeek = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+export interface TimeWindow {
+    start: string;
+    end: string;
+}
+
+export interface UserVoicemailConfig {
+    enabled: boolean;
+    greetingType: 'tts' | 'audio';
+    greetingText?: string;
+    greetingAudioUrl?: string;
+    greetingAudioDurationSec?: number;
+    maxLengthSec?: number;
+    transcribeEnabled?: boolean;
+    notifyChannels?: {
+        push?: boolean;
+        email?: boolean;
+        sms?: boolean;
+    };
+}
+
+export interface UserCallingPreferences {
+    extension?: string;
+    timezone: string;
+    callingHoursEnabled: boolean;
+    schedule: Record<DayOfWeek, { enabled: boolean; windows: TimeWindow[] }>;
+    dateOverrides?: Array<{
+        date: string;
+        label?: string;
+        available: boolean;
+        windows?: TimeWindow[];
+    }>;
+    dndOverride?: {
+        active: boolean;
+        until?: number | null;
+        reason?: string;
+    };
+    allowEmergencyBypass?: boolean;
+    voicemail?: UserVoicemailConfig;
+}
+
+export interface VoiceCall {
+    id: string;
+    churchId: string;
+    smsNumberId: string;
+    personId?: string | null;
+    callerName?: string | null;
+    direction: 'inbound' | 'outbound';
+    from: string;
+    to: string;
+    status: 'initiated' | 'ringing' | 'in-progress' | 'completed' | 'busy' | 'no-answer' | 'failed' | 'canceled';
+    durationSec?: number;
+    recordingUrl?: string | null;
+    handledByUserId?: string | null;
+    targetUserId?: string | null;
+    isVoicemail?: boolean;
+    voicemailListenedAt?: number | null;
+    voicemailTranscript?: string | null;
+    voicemailSummary?: string | null;
+    voicemailUrgent?: boolean;
+    routingPath?: string[];
+    createdAt: number;
+    endedAt?: number;
 }
 
 export interface RiskSettings {
