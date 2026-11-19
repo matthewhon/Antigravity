@@ -1,0 +1,717 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+// - users/{userId}: uid, email, displayName, churchId, roles (list)
+//   - voipDevices/{deviceId}: platform, voipToken, fcmToken, churchId, updatedAt
+// - churches/{churchId}: name, createdAt, updatedAt, settings
+// - team_channels/{channelId}: churchId, name, type ('public'|'private'|'direct'),
+//   requiredArea, isAutoJoinedByRole, participantIds (list), createdBy
+// - team_messages/{messageId}: churchId, channelId, senderId, text, createdAt,
+//   editedAt, isAiResponse, reactions, widget, pushNotifiedAt (server-only)
+// - smsConversations/{conversationId}: churchId, personId, phoneNumber, updatedAt
+//   - messages/{messageId}, aiSuggestions/{suggestionId}
+// - voiceCalls/{callSid}: churchId, smsNumberId, personId, direction, from, to,
+//   status, durationSec, recordingUrl, handledByUserId, createdAt, endedAt (server-only)
+// - Tenant-scoped collections: all include `churchId` (string)
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return (!('id' in request.resource.data) || request.resource.data.id == request.auth.uid) &&
+        (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid);
+    }
+
+    function uidNotModified() {
+      return (!('id' in request.resource.data) || !('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('uid' in request.resource.data) || !('uid' in resource.data) || request.resource.data.uid == resource.data.uid);
+    }
+
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userExists() {
+      return isAuthenticated() && exists(userDocPath());
+    }
+
+    function userDoc() {
+      return get(userDocPath()).data;
+    }
+
+    function userRoles() {
+      return userExists() && ('roles' in userDoc()) && (userDoc().roles is list)
+        ? userDoc().roles
+        : [];
+    }
+
+    function hasRole(role) {
+      return role in userRoles();
+    }
+
+    function isSystemAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'matthew@chill.dev' ||
+        hasRole('System Administration')
+      );
+    }
+
+    function isChurchAdmin() {
+      return isSystemAdmin() || hasRole('Church Admin') || hasRole('Church Administration') || hasRole('Admin');
+    }
+
+    function isPastor() {
+      return isChurchAdmin() || hasRole('Pastor');
+    }
+
+    function isSameChurch(churchId) {
+      return isAuthenticated() && (
+        isSystemAdmin() ||
+        (churchId != null && userExists() && userDoc().churchId == churchId)
+      );
+    }
+
+    function isDocInUserChurch() {
+      return isAuthenticated() && (
+        isSystemAdmin() ||
+        resource == null ||
+        (('churchId' in resource.data) && isSameChurch(resource.data.churchId))
+      );
+    }
+
+    function isNewDocInUserChurch() {
+      return isAuthenticated() && (
+        isSystemAdmin() ||
+        (('churchId' in request.resource.data) && isSameChurch(request.resource.data.churchId))
+      );
+    }
+
+    function churchIdNotModified() {
+      return !('churchId' in request.resource.data) ||
+        !('churchId' in resource.data) ||
+        request.resource.data.churchId == resource.data.churchId ||
+        isSystemAdmin();
+    }
+
+    function canReadArea(area) {
+      return isChurchAdmin() ||
+        (area != 'admin' && isPastor()) ||
+        (area == 'care' && (hasRole('Pastor') || hasRole('Pastoral Care'))) ||
+        (area == 'giving' && hasRole('Giving')) ||
+        (area == 'people' && hasRole('People')) ||
+        (area == 'groups' && hasRole('Groups')) ||
+        (area == 'services' && hasRole('Services'));
+    }
+
+    function canAccessChannelData(chan) {
+      return chan != null &&
+        isSameChurch(chan.churchId) &&
+        (!('requiredArea' in chan) || chan.requiredArea == null || chan.requiredArea == '' || canReadArea(chan.requiredArea)) &&
+        (
+          (chan.type == 'direct' && ('participantIds' in chan) && (request.auth.uid in chan.participantIds)) ||
+          (chan.type != 'direct' && (
+            (('isAutoJoinedByRole' in chan) && chan.isAutoJoinedByRole == true) ||
+            (('participantIds' in chan) && (request.auth.uid in chan.participantIds)) ||
+            (('createdBy' in chan) && chan.createdBy == request.auth.uid) ||
+            !('participantIds' in chan) ||
+            chan.participantIds.size() == 0
+          ))
+        );
+    }
+
+    function isValidVoipDevice(data) {
+      return data.keys().hasOnly(['platform', 'voipToken', 'fcmToken', 'churchId', 'updatedAt']) &&
+        data.keys().hasAll(['platform', 'churchId']) &&
+        data.platform is string && data.platform.size() > 0 && data.platform.size() <= 32 &&
+        data.churchId is string && data.churchId.size() > 0 && data.churchId.size() <= 128 &&
+        (!('voipToken' in data) || data.voipToken == null || (data.voipToken is string && data.voipToken.size() <= 4096)) &&
+        (!('fcmToken' in data) || data.fcmToken == null || (data.fcmToken is string && data.fcmToken.size() <= 4096)) &&
+        (!('updatedAt' in data) || data.updatedAt is number || data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Core & System Collections
+    // ===============================================================
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isDocInUserChurch() || isSystemAdmin();
+      allow list: if isAuthenticated() && (
+        isOwner(userId) ||
+        isDocInUserChurch() ||
+        isSystemAdmin() ||
+        (resource != null && ('email' in resource.data) && resource.data.email == request.auth.token.email)
+      );
+      allow create: if isAuthenticated() && (
+        (isOwner(userId) && uidUnchanged() && (
+          !('roles' in request.resource.data) ||
+          !('System Administration' in request.resource.data.roles) ||
+          isSystemAdmin()
+        )) ||
+        (isChurchAdmin() && isNewDocInUserChurch() && (
+          !('roles' in request.resource.data) ||
+          !('System Administration' in request.resource.data.roles) ||
+          isSystemAdmin()
+        ))
+      );
+      allow update: if isAuthenticated() && (
+        isSystemAdmin() ||
+        (isChurchAdmin() && isDocInUserChurch() && churchIdNotModified() && (
+          !('roles' in request.resource.data) ||
+          !('System Administration' in request.resource.data.roles)
+        )) ||
+        (isOwner(userId) && uidNotModified() && churchIdNotModified() && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles', 'churchId'])
+        ))
+      );
+      allow delete: if isSystemAdmin() || (isChurchAdmin() && isDocInUserChurch());
+
+      match /voipDevices/{deviceId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidVoipDevice(request.resource.data);
+      }
+    }
+
+    match /churches/{churchId} {
+      allow get, list: if isSameChurch(churchId);
+      allow create: if isAuthenticated() && (isSystemAdmin() || !userExists() || isSameChurch(churchId));
+      allow update: if isSameChurch(churchId);
+      allow delete: if isSystemAdmin();
+    }
+
+    match /system/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isChurchAdmin();
+    }
+
+    match /system_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isChurchAdmin();
+    }
+
+    match /logs/{logId} {
+      allow read: if isSystemAdmin() || isDocInUserChurch();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSystemAdmin();
+    }
+
+    match /debugLogs/{logId} {
+      allow read: if isSystemAdmin() || isDocInUserChurch();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSystemAdmin();
+    }
+
+    // ===============================================================
+    // Team Chat Collections
+    // ===============================================================
+    match /team_channels/{channelId} {
+      allow get: if isAuthenticated() && (resource == null || isDocInUserChurch());
+      allow list: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() &&
+        canAccessChannelData(request.resource.data) &&
+        (request.resource.data.type != 'direct' || (request.auth.uid in request.resource.data.participantIds));
+      allow update: if isDocInUserChurch() &&
+        churchIdNotModified() &&
+        canAccessChannelData(resource.data);
+      allow delete: if isDocInUserChurch() && (
+        isChurchAdmin() || resource.data.createdBy == request.auth.uid
+      );
+    }
+
+    match /team_messages/{messageId} {
+      allow get, list: if isDocInUserChurch() &&
+        canAccessChannelData(get(/databases/$(database)/documents/team_channels/$(resource.data.channelId)).data);
+      allow create: if isNewDocInUserChurch() &&
+        canAccessChannelData(get(/databases/$(database)/documents/team_channels/$(request.resource.data.channelId)).data) &&
+        !('pushNotifiedAt' in request.resource.data) &&
+        (
+          (request.resource.data.senderId == request.auth.uid && (!('isAiResponse' in request.resource.data) || request.resource.data.isAiResponse == false)) ||
+          (request.resource.data.senderId == 'pastor-ai' && request.resource.data.isAiResponse == true)
+        );
+      allow update: if isDocInUserChurch() &&
+        churchIdNotModified() &&
+        canAccessChannelData(get(/databases/$(database)/documents/team_channels/$(resource.data.channelId)).data) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pushNotifiedAt', 'churchId', 'channelId', 'senderId', 'createdAt']) &&
+        (
+          (resource.data.senderId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt', 'reactions', 'widget'])) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'widget'])
+        );
+      allow delete: if isDocInUserChurch() &&
+        canAccessChannelData(get(/databases/$(database)/documents/team_channels/$(resource.data.channelId)).data) &&
+        (resource.data.senderId == request.auth.uid || isChurchAdmin());
+    }
+
+    // ===============================================================
+    // SMS Conversations & Agent Knowledge
+    // ===============================================================
+    match /smsConversations/{conversationId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+
+      match /messages/{messageId} {
+        allow read, write: if isSameChurch(get(/databases/$(database)/documents/smsConversations/$(conversationId)).data.churchId);
+      }
+
+      match /aiSuggestions/{suggestionId} {
+        allow read, write: if isSameChurch(get(/databases/$(database)/documents/smsConversations/$(conversationId)).data.churchId);
+      }
+    }
+
+    match /smsAgentKnowledge/{churchId} {
+      allow read, write: if isSameChurch(churchId);
+    }
+
+    // ===============================================================
+    // Tenant-Scoped Pastoral Care & People Collections
+    // ===============================================================
+    match /pastoral_notes/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /prayer_requests/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /care_followup_log/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /people/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /risk_changes/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /status_changes/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /church_notes/{docId} {
+      allow get: if true;
+      allow list, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /check_ins/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /attendance/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /weather/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    // ===============================================================
+    // Tenant-Scoped Giving & Finance Collections
+    // ===============================================================
+    match /giving/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /detailed_donations/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /giving_batches/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /funds/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /budgets/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /analytics_giving/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    // ===============================================================
+    // Tenant-Scoped Groups, Services, Ministries & Metrics
+    // ===============================================================
+    match /groups/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /teams/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /service_plans/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /sermon_verses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /ministries/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /metric_definitions/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /metric_entries/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /aggregated_stats/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    // ===============================================================
+    // Tenant-Scoped Communications, Registrations, Forms & Polls
+    // ===============================================================
+    match /email_campaigns/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /email_unsubscribes/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /newsletter_widgets/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /newsletter_subscribers/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_registrations/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_registration_attendees/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_registration_campuses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_campuses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_forms/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /pco_form_submissions/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /polls/{docId} {
+      allow get: if true;
+      allow list, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if (isDocInUserChurch() && churchIdNotModified()) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalResponses', 'updatedAt']);
+    }
+
+    match /poll_responses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.pollId is string &&
+        request.resource.data.churchId is string
+      );
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /digital_bulletins/{docId} {
+      allow read: if true;
+      allow delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /people_info_campaigns/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /people_info_sessions/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    // ===============================================================
+    // Outreach & Group Care Sessions
+    // ===============================================================
+    match /outreach_sessions/{docId} {
+      allow get: if true;
+      allow list, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /outreach_slots/{docId} {
+      allow read: if true;
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.sessionId is string &&
+        request.resource.data.sessionId.size() > 0 &&
+        request.resource.data.churchId is string &&
+        request.resource.data.churchId.size() > 0 &&
+        request.resource.data.volunteerPhone is string &&
+        request.resource.data.volunteerPhone.size() > 0 &&
+        request.resource.data.assignedPersonId is string &&
+        request.resource.data.assignedPersonId.size() > 0 &&
+        request.resource.data.status in ['pending', 'contacted', 'no-answer', 'released']
+      );
+      allow update: if (isDocInUserChurch() && churchIdNotModified()) || (
+        churchIdNotModified() &&
+        request.resource.data.sessionId == resource.data.sessionId &&
+        request.resource.data.assignedPersonId == resource.data.assignedPersonId &&
+        request.resource.data.status in ['pending', 'contacted', 'no-answer', 'released']
+      );
+      allow delete: if isDocInUserChurch();
+    }
+
+    match /group_care_sessions/{docId} {
+      allow get: if true;
+      allow list, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /group_care_slots/{docId} {
+      allow read: if true;
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.sessionId is string &&
+        request.resource.data.sessionId.size() > 0 &&
+        request.resource.data.churchId is string &&
+        request.resource.data.churchId.size() > 0 &&
+        request.resource.data.volunteerPhone is string &&
+        request.resource.data.volunteerPhone.size() > 0 &&
+        request.resource.data.assignedPersonId is string &&
+        request.resource.data.assignedPersonId.size() > 0 &&
+        request.resource.data.status in ['pending', 'contacted', 'no-answer', 'released']
+      );
+      allow update: if (isDocInUserChurch() && churchIdNotModified()) || (
+        churchIdNotModified() &&
+        request.resource.data.sessionId == resource.data.sessionId &&
+        request.resource.data.assignedPersonId == resource.data.assignedPersonId &&
+        request.resource.data.status in ['pending', 'contacted', 'no-answer', 'released']
+      );
+      allow delete: if isDocInUserChurch();
+    }
+
+    // ===============================================================
+    // Spiritual Gifts, MBTI & DISC Assessment Responses
+    // ===============================================================
+    match /gifts_test_responses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.churchId is string &&
+        request.resource.data.churchId.size() > 0 &&
+        request.resource.data.submittedAt is number
+      );
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /mbti_test_responses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.churchId is string &&
+        request.resource.data.churchId.size() > 0 &&
+        request.resource.data.submittedAt is number
+      );
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /disc_test_responses/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch() || (
+        request.resource.data.churchId is string &&
+        request.resource.data.churchId.size() > 0 &&
+        request.resource.data.submittedAt is number
+      );
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    // ===============================================================
+    // SMS Marketing, Workflows, Numbers & Tenant Assets
+    // ===============================================================
+    match /smsTags/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsKeywords/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsKeywordSubscriptions/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsWorkflows/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsWorkflowEnrollments/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsOptOuts/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsNumbers/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /twilioNumbers/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsUsageRecords/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /smsCampaigns/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /portingRequests/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /tenantFiles/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /churchVoice/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
+    match /voiceCalls/{callSid} {
+      allow read: if isSameChurch(resource.data.churchId);
+      allow create, update, delete: if false;
+    }
+
+    // ===============================================================
+    // Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

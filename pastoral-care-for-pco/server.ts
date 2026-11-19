@@ -10,6 +10,7 @@ import { createCheckoutSession } from './backend/createCheckoutSession';
 import { cancelSubscription } from './backend/cancelSubscription';
 import { handleStripeWebhook } from './backend/stripeWebhook';
 import { addSmsAddon, removeSmsAddon } from './backend/smsAddon';
+import { addVoiceAddon, removeVoiceAddon } from './backend/voiceAddon';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
@@ -41,7 +42,16 @@ import {
   syncPledgeSubmissionToPco,
   invalidatePledgeCampaignCache
 } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
+import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook, backfillVoiceWebhooks } from './backend/smsProvisioning';
+import {
+    mintVoiceToken,
+    registerVoipDevice,
+    handleVoiceInbound,
+    handleVoiceOutbound,
+    handleVoiceNoAnswer,
+    handleVoiceRecordingStatus,
+    handleVoiceStatus
+} from './backend/voiceWebhooks';
 import { handleInboundSms } from './backend/smsInbound';
 import { fetchSignalWireMedia } from './backend/signalwireClient';
 import { sendIndividual, sendBulk } from './backend/smsSend';
@@ -108,6 +118,8 @@ async function startServer() {
     // SMS add-on purchase/removal (Growth plan)
     app.post('/api/billing/add-sms-addon',    express.json(), addSmsAddon);
     app.post('/api/billing/remove-sms-addon', express.json(), removeSmsAddon);
+    app.post('/api/billing/add-voice-addon',    express.json(), addVoiceAddon);
+    app.post('/api/billing/remove-voice-addon', express.json(), removeVoiceAddon);
     app.get('/api/admin/billing-report', async (req: any, res: any) => {
         try {
             // Note: Secure this endpoint with proper admin check in a real app
@@ -578,6 +590,17 @@ async function startServer() {
     // Sending
     app.post('/api/messaging/send-individual', express.json(), sendIndividual);
     app.post('/api/messaging/send-bulk', express.json(), sendBulk);
+
+    // ─── Voice Calling Endpoints (Optional Paid Add-On) ─────────────────────
+    app.post('/api/voice/token',                express.json(), mintVoiceToken);
+    app.post('/api/voice/register-voip-device', express.json(), registerVoipDevice);
+    app.post('/api/voice/inbound',              express.urlencoded({ extended: false }), express.json(), handleVoiceInbound);
+    app.post('/api/voice/outbound',             express.urlencoded({ extended: false }), express.json(), handleVoiceOutbound);
+    app.post('/api/voice/no-answer',            express.urlencoded({ extended: false }), express.json(), handleVoiceNoAnswer);
+    app.post('/api/voice/recording-status',     express.urlencoded({ extended: false }), express.json(), handleVoiceRecordingStatus);
+    app.post('/api/voice/recording-complete',   express.urlencoded({ extended: false }), express.json(), handleVoiceRecordingStatus);
+    app.post('/api/voice/status',               express.urlencoded({ extended: false }), express.json(), handleVoiceStatus);
+    app.post('/api/admin/backfill-voice-webhooks', express.json(), backfillVoiceWebhooks);
 
     // Quick-send routes used by the NewMessageComposer modal (sends to a PCO List or Group
     // without creating a campaign doc first — delegates to the same bulk-send pipeline).

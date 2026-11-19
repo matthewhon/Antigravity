@@ -112,7 +112,7 @@ class StripeService {
         }
     }
 
-    private async getApiUrl(): Promise<string> {
+    async getApiUrl(): Promise<string> {
         const settings = await firestore.getSystemSettings();
         const url = settings.apiBaseUrl || DEFAULT_API_BASE_URL;
         return url;
@@ -244,6 +244,36 @@ class StripeService {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || `Add-on removal failed (HTTP ${response.status})`);
+        return data;
+    }
+
+    /**
+     * Subscribes the church to the optional paid Voice Calling add-on.
+     */
+    async enableVoiceAddon(churchId: string): Promise<{ enabled: boolean; message: string }> {
+        const baseUrl = await this.getApiUrl();
+        const response = await fetch(`${baseUrl}/api/billing/add-voice-addon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Voice add-on activation failed (HTTP ${response.status})`);
+        return data;
+    }
+
+    /**
+     * Cancels the optional paid Voice Calling add-on for the church.
+     */
+    async disableVoiceAddon(churchId: string): Promise<{ enabled: boolean; message: string }> {
+        const baseUrl = await this.getApiUrl();
+        const response = await fetch(`${baseUrl}/api/billing/remove-voice-addon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Voice add-on removal failed (HTTP ${response.status})`);
         return data;
     }
 }

@@ -15,6 +15,8 @@ export const DEFAULT_SMS_OUTBOUND_COST_USD = 0.0079;
 export const DEFAULT_SMS_INBOUND_COST_USD  = 0.00715;
 export const DEFAULT_MMS_OUTBOUND_COST_USD = 0.0280;
 export const DEFAULT_MMS_INBOUND_COST_USD  = 0.0150;
+export const DEFAULT_VOICE_OUTBOUND_COST_USD = 0.0085;
+export const DEFAULT_VOICE_INBOUND_COST_USD  = 0.0045;
 export const DEFAULT_SMS_MARKUP_PERCENT    = 20;
 export const DEFAULT_EMAIL_BLOCK_PRICE_USD = 3.00;
 
@@ -23,11 +25,15 @@ export interface SmsPricingConfig {
     smsInboundCostUsd: number;
     mmsOutboundCostUsd: number;
     mmsInboundCostUsd: number;
+    voiceOutboundCostUsd: number;
+    voiceInboundCostUsd: number;
     smsMarkupPercent: number;
     smsOutboundPriceUsd: number;
     smsInboundPriceUsd: number;
     mmsOutboundPriceUsd: number;
     mmsInboundPriceUsd: number;
+    voiceOutboundPriceUsd: number;
+    voiceInboundPriceUsd: number;
     emailBlockPriceUsd: number;
 }
 
@@ -49,10 +55,12 @@ export async function getSmsPricingConfig(db: any): Promise<SmsPricingConfig> {
 
     const smsOutboundCostUsd = Number(settings.smsOutboundCostUsd ?? settings.smsSegmentCostUsd ?? DEFAULT_SMS_OUTBOUND_COST_USD);
     const smsInboundCostUsd  = Number(settings.smsInboundCostUsd ?? DEFAULT_SMS_INBOUND_COST_USD);
-    const mmsOutboundCostUsd = Number(settings.mmsOutboundCostUsd ?? settings.smsMmsSegmentCostUsd ?? DEFAULT_MMS_OUTBOUND_COST_USD);
-    const mmsInboundCostUsd  = Number(settings.mmsInboundCostUsd ?? DEFAULT_MMS_INBOUND_COST_USD);
-    const smsMarkupPercent   = Number(settings.smsMarkupPercent ?? DEFAULT_SMS_MARKUP_PERCENT);
-    const emailBlockPriceUsd = Number(settings.emailBlockPriceUsd ?? DEFAULT_EMAIL_BLOCK_PRICE_USD);
+    const mmsOutboundCostUsd   = Number(settings.mmsOutboundCostUsd ?? settings.smsMmsSegmentCostUsd ?? DEFAULT_MMS_OUTBOUND_COST_USD);
+    const mmsInboundCostUsd    = Number(settings.mmsInboundCostUsd ?? DEFAULT_MMS_INBOUND_COST_USD);
+    const voiceOutboundCostUsd = Number(settings.voiceOutboundCostUsd ?? DEFAULT_VOICE_OUTBOUND_COST_USD);
+    const voiceInboundCostUsd  = Number(settings.voiceInboundCostUsd ?? DEFAULT_VOICE_INBOUND_COST_USD);
+    const smsMarkupPercent     = Number(settings.smsMarkupPercent ?? DEFAULT_SMS_MARKUP_PERCENT);
+    const emailBlockPriceUsd   = Number(settings.emailBlockPriceUsd ?? DEFAULT_EMAIL_BLOCK_PRICE_USD);
 
     const multiplier = 1 + (smsMarkupPercent / 100);
     const config: SmsPricingConfig = {
@@ -60,11 +68,15 @@ export async function getSmsPricingConfig(db: any): Promise<SmsPricingConfig> {
         smsInboundCostUsd,
         mmsOutboundCostUsd,
         mmsInboundCostUsd,
+        voiceOutboundCostUsd,
+        voiceInboundCostUsd,
         smsMarkupPercent,
-        smsOutboundPriceUsd: Number((smsOutboundCostUsd * multiplier).toFixed(6)),
-        smsInboundPriceUsd:  Number((smsInboundCostUsd * multiplier).toFixed(6)),
-        mmsOutboundPriceUsd: Number((mmsOutboundCostUsd * multiplier).toFixed(6)),
-        mmsInboundPriceUsd:  Number((mmsInboundCostUsd * multiplier).toFixed(6)),
+        smsOutboundPriceUsd:   Number((smsOutboundCostUsd * multiplier).toFixed(6)),
+        smsInboundPriceUsd:    Number((smsInboundCostUsd * multiplier).toFixed(6)),
+        mmsOutboundPriceUsd:   Number((mmsOutboundCostUsd * multiplier).toFixed(6)),
+        mmsInboundPriceUsd:    Number((mmsInboundCostUsd * multiplier).toFixed(6)),
+        voiceOutboundPriceUsd: Number((voiceOutboundCostUsd * multiplier).toFixed(6)),
+        voiceInboundPriceUsd:  Number((voiceInboundCostUsd * multiplier).toFixed(6)),
         emailBlockPriceUsd,
     };
 

@@ -265,6 +265,23 @@
         { "fieldPath": "emailAddress",  "order": "ASCENDING" },
         { "fieldPath": "status",        "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "voiceCalls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "voiceCalls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "personId",  "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

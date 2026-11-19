@@ -10,7 +10,7 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function resolveWebhookUrls(): Promise<{ inboundUrl: string; inboundFallbackUrl: string; statusCallback: string }> {
+async function resolveWebhookUrls(): Promise<{ inboundUrl: string; inboundFallbackUrl: string; statusCallback: string; voiceUrl: string; voiceFallbackUrl: string }> {
     const baseUrl = await getSmsWebhookBaseUrl();
     if (!baseUrl) {
         throw new Error(
@@ -34,6 +34,8 @@ async function resolveWebhookUrls(): Promise<{ inboundUrl: string; inboundFallba
         inboundUrl:         `${baseUrl}/api/messaging/inbound`,
         inboundFallbackUrl: `${baseUrl}/api/messaging/inbound`,  // Fallback URL per SignalWire best practice
         statusCallback:     `${baseUrl}/api/messaging/status`,
+        voiceUrl:           `${baseUrl}/api/voice/inbound`,
+        voiceFallbackUrl:   `${baseUrl}/api/voice/inbound`,
     };
 }
 
@@ -256,7 +258,7 @@ export const provisionSmsNumber = async (req: any, res: any) => {
         }
         // ─────────────────────────────────────────────────────────────────────
 
-        const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
+        const { inboundUrl, inboundFallbackUrl, statusCallback, voiceUrl, voiceFallbackUrl } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         // Check if number already purchased/ported on the SignalWire project
@@ -272,6 +274,10 @@ export const provisionSmsNumber = async (req: any, res: any) => {
                 smsMethod:            'POST',
                 smsFallbackUrl:       inboundFallbackUrl,
                 smsFallbackMethod:    'POST',
+                voiceUrl,
+                voiceMethod:          'POST',
+                voiceFallbackUrl,
+                voiceFallbackMethod:  'POST',
                 statusCallback,
                 statusCallbackMethod: 'POST',
             });
@@ -284,6 +290,10 @@ export const provisionSmsNumber = async (req: any, res: any) => {
                 smsMethod:            'POST',
                 smsFallbackUrl:       inboundFallbackUrl,
                 smsFallbackMethod:    'POST',
+                voiceUrl,
+                voiceMethod:          'POST',
+                voiceFallbackUrl,
+                voiceFallbackMethod:  'POST',
                 statusCallback,
                 statusCallbackMethod: 'POST',
             });
@@ -308,6 +318,9 @@ export const provisionSmsNumber = async (req: any, res: any) => {
             friendlyLabel:  friendlyLabel || 'Main Line',
             isDefault:      isFirstNumber,
             smsEnabled:     true,
+            voiceEnabled:   false,
+            voicemailEnabled: false,
+            recordCalls:    false,
             allowedUserIds: [],
             webhookUrl:     inboundUrl,
             messageHandler: 'laml_webhooks',  // Explicit record of handler type per SignalWire API
@@ -385,7 +398,7 @@ export const addSmsNumber = async (req: any, res: any) => {
         }
         // ─────────────────────────────────────────────────────────────────────
 
-        const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
+        const { inboundUrl, inboundFallbackUrl, statusCallback, voiceUrl, voiceFallbackUrl } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         // Check if number already purchased/ported on the SignalWire project
@@ -401,6 +414,10 @@ export const addSmsNumber = async (req: any, res: any) => {
                 smsMethod:            'POST',
                 smsFallbackUrl:       inboundFallbackUrl,
                 smsFallbackMethod:    'POST',
+                voiceUrl,
+                voiceMethod:          'POST',
+                voiceFallbackUrl,
+                voiceFallbackMethod:  'POST',
                 statusCallback,
                 statusCallbackMethod: 'POST',
             });
@@ -413,6 +430,10 @@ export const addSmsNumber = async (req: any, res: any) => {
                 smsMethod:            'POST',
                 smsFallbackUrl:       inboundFallbackUrl,
                 smsFallbackMethod:    'POST',
+                voiceUrl,
+                voiceMethod:          'POST',
+                voiceFallbackUrl,
+                voiceFallbackMethod:  'POST',
                 statusCallback,
                 statusCallbackMethod: 'POST',
             });
@@ -436,6 +457,9 @@ export const addSmsNumber = async (req: any, res: any) => {
             friendlyLabel:  friendlyLabel || phoneNumber,
             isDefault:      isFirstNumber,
             smsEnabled:     true,
+            voiceEnabled:   false,
+            voicemailEnabled: false,
+            recordCalls:    false,
             allowedUserIds: [],
             webhookUrl:     inboundUrl,
             messageHandler: 'laml_webhooks',  // Explicit record of handler type per SignalWire API
@@ -547,47 +571,69 @@ export const releaseSpecificNumber = async (req: any, res: any) => {
 export const updateNumberSettings = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const {
-        churchId,
-        smsNumberId,
-        twilioNumberId,
-        friendlyLabel,
-        allowedUserIds,
-        senderName,
-        smsAgentEnabled,
-        executiveAiAgentEnabled,
-        executiveAiAgentKeyword,
-        executiveAiAgentListId,
-        executiveAiAgentListName
-    } = req.body || {};
-    const numberId = smsNumberId || twilioNumberId;
-    if (!churchId || !numberId) {
-        return res.status(400).json({ error: 'Missing churchId or smsNumberId' });
-    }
-
-    const db  = getDb();
-    const log = createServerLogger(db);
-
-    try {
-        // Support both collections during transition
-        let numSnap = await db.collection('smsNumbers').doc(numberId).get();
-        let col = 'smsNumbers';
-        if (!numSnap.exists) {
-            numSnap = await db.collection('twilioNumbers').doc(numberId).get();
-            col = 'twilioNumbers';
+        const {
+            churchId,
+            smsNumberId,
+            twilioNumberId,
+            friendlyLabel,
+            allowedUserIds,
+            senderName,
+            smsAgentEnabled,
+            executiveAiAgentEnabled,
+            executiveAiAgentKeyword,
+            executiveAiAgentListId,
+            executiveAiAgentListName,
+            voiceEnabled,
+            voiceForwardingNumber,
+            voicemailEnabled,
+            voicemailGreetingText,
+            recordCalls
+        } = req.body || {};
+        const numberId = smsNumberId || twilioNumberId;
+        if (!churchId || !numberId) {
+            return res.status(400).json({ error: 'Missing churchId or smsNumberId' });
         }
-        if (!numSnap.exists) return res.status(404).json({ error: 'Number not found' });
-        if (numSnap.data()?.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
 
-        const patch: Record<string, any> = { updatedAt: Date.now() };
-        if (friendlyLabel             !== undefined) patch.friendlyLabel             = friendlyLabel;
-        if (allowedUserIds            !== undefined) patch.allowedUserIds            = allowedUserIds;
-        if (senderName                !== undefined) patch.senderName                = senderName;
-        if (smsAgentEnabled           !== undefined) patch.smsAgentEnabled           = smsAgentEnabled;
-        if (executiveAiAgentEnabled   !== undefined) patch.executiveAiAgentEnabled   = executiveAiAgentEnabled;
-        if (executiveAiAgentKeyword   !== undefined) patch.executiveAiAgentKeyword   = executiveAiAgentKeyword;
-        if (executiveAiAgentListId    !== undefined) patch.executiveAiAgentListId    = executiveAiAgentListId;
-        if (executiveAiAgentListName  !== undefined) patch.executiveAiAgentListName  = executiveAiAgentListName;
+        const db  = getDb();
+        const log = createServerLogger(db);
+
+        try {
+            // Gate voiceEnabled behind the paid Voice Calling add-on (temporarily bypassed for testing)
+            const VOICE_SUBSCRIPTION_BYPASS = true;
+            if (!VOICE_SUBSCRIPTION_BYPASS && voiceEnabled === true) {
+                const churchSnap = await db.collection('churches').doc(churchId).get();
+                const churchData = churchSnap.data() || {};
+                if (!churchData.voiceAddOn?.enabled) {
+                    return res.status(403).json({
+                        error: 'Voice Calling add-on is required before enabling voice on a phone number.'
+                    });
+                }
+            }
+
+            // Support both collections during transition
+            let numSnap = await db.collection('smsNumbers').doc(numberId).get();
+            let col = 'smsNumbers';
+            if (!numSnap.exists) {
+                numSnap = await db.collection('twilioNumbers').doc(numberId).get();
+                col = 'twilioNumbers';
+            }
+            if (!numSnap.exists) return res.status(404).json({ error: 'Number not found' });
+            if (numSnap.data()?.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
+
+            const patch: Record<string, any> = { updatedAt: Date.now() };
+            if (friendlyLabel             !== undefined) patch.friendlyLabel             = friendlyLabel;
+            if (allowedUserIds            !== undefined) patch.allowedUserIds            = allowedUserIds;
+            if (senderName                !== undefined) patch.senderName                = senderName;
+            if (smsAgentEnabled           !== undefined) patch.smsAgentEnabled           = smsAgentEnabled;
+            if (executiveAiAgentEnabled   !== undefined) patch.executiveAiAgentEnabled   = executiveAiAgentEnabled;
+            if (executiveAiAgentKeyword   !== undefined) patch.executiveAiAgentKeyword   = executiveAiAgentKeyword;
+            if (executiveAiAgentListId    !== undefined) patch.executiveAiAgentListId    = executiveAiAgentListId;
+            if (executiveAiAgentListName  !== undefined) patch.executiveAiAgentListName  = executiveAiAgentListName;
+            if (voiceEnabled              !== undefined) patch.voiceEnabled              = Boolean(voiceEnabled);
+            if (voiceForwardingNumber     !== undefined) patch.voiceForwardingNumber     = voiceForwardingNumber;
+            if (voicemailEnabled          !== undefined) patch.voicemailEnabled          = Boolean(voicemailEnabled);
+            if (voicemailGreetingText     !== undefined) patch.voicemailGreetingText     = voicemailGreetingText;
+            if (recordCalls               !== undefined) patch.recordCalls               = Boolean(recordCalls);
 
         await db.collection(col).doc(numberId).update(patch);
         log.info(`[updateNumberSettings] Updated ${numberId} for church ${churchId}`, 'system', { churchId, numberId, patch }, churchId);
@@ -1064,3 +1110,44 @@ export const handleAssignmentStatusWebhook = async (req: any, res: any) => {
         log.error(`[handleAssignmentStatusWebhook] Error processing webhook: ${e.message}`, 'system', { body: req.body }, 'system');
     }
 };
+
+/**
+ * POST /api/admin/backfill-voice-webhooks
+ * Attaches voiceUrl / voiceFallbackUrl to all existing SignalWire numbers in smsNumbers
+ * without enabling voiceEnabled (churches still opt in after subscribing to the Voice add-on).
+ */
+export const backfillVoiceWebhooks = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const db = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { voiceUrl, voiceFallbackUrl } = await resolveWebhookUrls();
+        const client = await getSignalWireClient();
+        const snap = await db.collection('smsNumbers').get();
+
+        let updated = 0;
+        let failed = 0;
+        for (const doc of snap.docs) {
+            const data = doc.data();
+            if (!data.phoneSid) continue;
+            try {
+                await client.incomingPhoneNumbers(data.phoneSid).update({
+                    voiceUrl,
+                    voiceMethod: 'POST',
+                    voiceFallbackUrl,
+                    voiceFallbackMethod: 'POST',
+                });
+                updated++;
+            } catch (err: any) {
+                failed++;
+                log.warn(`[backfillVoiceWebhooks] Failed for ${data.phoneNumber}: ${err.message}`, 'system', { numberId: doc.id }, data.churchId);
+            }
+        }
+
+        return res.json({ success: true, total: snap.size, updated, failed });
+    } catch (e: any) {
+        return res.status(500).json({ error: e.message || 'Backfill failed' });
+    }
+};
+

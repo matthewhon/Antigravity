@@ -864,6 +864,44 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">Default: 20% over SignalWire cost</p>
                                 </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Outbound Voice Cost / Min</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Outbound Voice cost per minute in USD"
+                                            placeholder="0.0085"
+                                            step="0.0005"
+                                            min="0"
+                                            value={settings.voiceOutboundCostUsd ?? 0.0085}
+                                            onChange={e => handleChange('voiceOutboundCostUsd', parseFloat(e.target.value) || 0.0085)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.voiceOutboundCostUsd ?? 0.0085) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(5)}/min
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Inbound Voice Cost / Min</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                        <input
+                                            type="number"
+                                            aria-label="Inbound Voice cost per minute in USD"
+                                            placeholder="0.0045"
+                                            step="0.0005"
+                                            min="0"
+                                            value={settings.voiceInboundCostUsd ?? 0.0045}
+                                            onChange={e => handleChange('voiceInboundCostUsd', parseFloat(e.target.value) || 0.0045)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                                        Customer (+{settings.smsMarkupPercent ?? 20}%): ${((settings.voiceInboundCostUsd ?? 0.0045) * (1 + (settings.smsMarkupPercent ?? 20) / 100)).toFixed(5)}/min
+                                    </p>
+                                </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
@@ -998,6 +1036,19 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <div>
                                     <label className="block text-[11px] font-bold text-slate-500 mb-1">Kingdom Plan</label>
                                     <input type="text" value={settings.stripePriceIds?.kingdom || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, kingdom: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Voice Calling Add-On (Optional Paid)</label>
+                                    <input type="text" value={settings.stripePriceIds?.voiceAddon || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, voiceAddon: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
+                                </div>
+                                <div className="pt-3 border-t border-slate-800 space-y-2">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">iOS PushKit / CallKit VoIP Credentials</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="text" value={settings.apnsKeyId || ''} onChange={e => handleChange('apnsKeyId', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="APNs Key ID" />
+                                        <input type="text" value={settings.apnsTeamId || ''} onChange={e => handleChange('apnsTeamId', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Apple Team ID" />
+                                    </div>
+                                    <input type="text" value={settings.iosBundleId || ''} onChange={e => handleChange('iosBundleId', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="iOS Bundle ID (e.g. com.barnabassoftware.pastoralcaremessaging)" />
+                                    <textarea rows={2} value={settings.apnsAuthKey || ''} onChange={e => handleChange('apnsAuthKey', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 font-mono text-[10px] text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="-----BEGIN PRIVATE KEY----- (APNs .p8 Auth Key)" />
                                 </div>
                             </div>
                             <div className="pt-5 flex justify-end">

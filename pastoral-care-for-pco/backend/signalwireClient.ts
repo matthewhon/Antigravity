@@ -613,3 +613,62 @@ export async function checkAssignmentOrder(campaignId: string, orderId: string):
     return { status, raw: result };
 }
 
+// ─── Voice / Call Fabric WebRTC Helpers ──────────────────────────────────────
+
+/** Base URL for voice webhooks (shares the same public backend base URL as SMS). */
+export async function getVoiceWebhookBaseUrl(): Promise<string | null> {
+    return getSmsWebhookBaseUrl();
+}
+
+/**
+ * Ensures a SignalWire Call Fabric Subscriber exists for a Firebase user and
+ * mints a short-lived WebRTC Subscriber Token for `@signalwire/js`.
+ */
+export async function mintVoiceSubscriberToken(params: {
+    userId: string;
+    churchId: string;
+    displayName?: string;
+    email?: string;
+}): Promise<{ token: string; spaceUrl: string; reference: string }> {
+    const data = await getSystemSettings();
+    const projectId = (data.signalwireProjectId || '').trim();
+    const apiToken  = (data.signalwireApiToken  || '').trim();
+    const spaceUrl  = sanitizeSpaceUrl(data.signalwireSpaceUrl || '');
+
+    if (!projectId || !apiToken || !spaceUrl) {
+        throw new Error('SignalWire credentials are not fully configured in System Settings.');
+    }
+
+    const reference = `church_${params.churchId}_user_${params.userId}`;
+    const tokensUrl = `https://${spaceUrl}/api/fabric/subscribers/tokens`;
+
+    try {
+        const tokenRes = await _httpsRequest(tokensUrl, 'POST', projectId, apiToken, { reference });
+        if (tokenRes?.token) {
+            return { token: tokenRes.token, spaceUrl, reference };
+        }
+    } catch (err: any) {
+        // Subscriber may not exist yet — create it and retry token minting
+        if (!String(err?.message || '').includes('404') && !String(err?.message || '').includes('not found')) {
+            throw err;
+        }
+    }
+
+    const subscribersUrl = `https://${spaceUrl}/api/fabric/subscribers`;
+    await _httpsRequest(subscribersUrl, 'POST', projectId, apiToken, {
+        reference,
+        email: params.email || `${params.userId}@pastoralcare.local`,
+        first_name: params.displayName || 'Staff',
+        last_name: params.churchId
+    }).catch(() => {
+        // Ignore if already exists due to race
+    });
+
+    const tokenRes = await _httpsRequest(tokensUrl, 'POST', projectId, apiToken, { reference });
+    if (!tokenRes?.token) {
+        throw new Error('SignalWire did not return a subscriber token.');
+    }
+    return { token: tokenRes.token, spaceUrl, reference };
+}
+
+

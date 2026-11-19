@@ -29,6 +29,8 @@ import type { SwipeStackHandle } from '../ui/SwipeStack';
 import { SwipeRow } from '../ui/SwipeRow';
 import { ImageViewer } from '../ui/ImageViewer';
 import { isRendered, useBackHandler } from '../ui/backButton';
+import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
+import { VoiceSoftphone } from './VoiceSoftphone';
 
 // --- Constants --------------------------------------------------------------
 
@@ -2811,6 +2813,9 @@ const SmsInbox: React.FC<{
 
     // Toast
     const [inboxToast, setInboxToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    // Temporarily bypass church.voiceAddOn?.enabled for testing
+    const voiceAddonEnabled = true || Boolean((church as any).voiceAddOn?.enabled);
+    const voice = useSignalWireVoice({ churchId: church.id, voiceAddonEnabled, apiBaseUrl: API_BASE });
     const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setInboxToast({ msg, type });
         setTimeout(() => setInboxToast(null), 4000);
@@ -3300,6 +3305,18 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         <div ref={inboxRootRef} className="flex h-full min-h-0">
             {/* Inbox Toast */}
             {inboxToast && <Toast msg={inboxToast.msg} type={inboxToast.type} onClose={() => setInboxToast(null)} />}
+            {/* Voice Softphone HUD */}
+            {voiceAddonEnabled && (
+                <VoiceSoftphone
+                    activeCall={voice.activeCall}
+                    incomingCall={voice.incomingCall}
+                    onAnswer={voice.answer}
+                    onReject={voice.reject}
+                    onHangup={voice.hangup}
+                    onToggleMute={voice.toggleMute}
+                    onSendDtmf={voice.sendDtmf}
+                />
+            )}
             {/* New Message Composer modal */}
             {showComposer && (
                 <NewMessageComposer
@@ -3526,6 +3543,22 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{activeConv.personName || formatPhone(activeConv.phoneNumber)}</p>
                             {activeConv.personName && <p className="text-xs text-slate-400">{formatPhone(activeConv.phoneNumber)}</p>}
                         </div>
+                        {voiceAddonEnabled && (activeNumber as any)?.voiceEnabled && (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await voice.dial(activeConv.phoneNumber, activeNumber!.id);
+                                    } catch (err: any) {
+                                        showInboxToast(err?.message || 'Unable to place call', 'error');
+                                    }
+                                }}
+                                disabled={voice.status !== 'ready' || Boolean(voice.activeCall)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm shrink-0"
+                                title={voice.status === 'ready' ? `Call ${activeConv.phoneNumber}` : 'Connecting voice softphone...'}
+                            >
+                                <Phone size={13} /> Call
+                            </button>
+                        )}
                         {activeConv.isOptedOut && (
                             <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>
                         )}

@@ -16,6 +16,7 @@ const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> = ({ church, onUpdateChurch }) => {
     const [isManaging, setIsManaging] = useState(false);
+    const [isUpdatingVoice, setIsUpdatingVoice] = useState(false);
     const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
     const [showUpgrade, setShowUpgrade] = useState(false);
@@ -596,6 +597,74 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                     </div>
                 </div>
             )}
+
+            {/* ── Optional Paid Voice Calling Add-On ── */}
+            <div className="rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-2xl shrink-0">
+                        📞
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2.5">
+                            <h4 className="text-base font-black text-slate-900 dark:text-white">Voice Calling Add-On (Optional)</h4>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                church.voiceAddOn?.enabled
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>
+                                {church.voiceAddOn?.enabled ? 'Active' : 'Not Subscribed'}
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
+                            Two-way browser & mobile softphone calling on your church phone numbers, with opt-in voicemail, call recording, and native iOS/Android background ringing. Per-minute usage is billed pay-as-you-go on your monthly invoice.
+                        </p>
+                    </div>
+                </div>
+                <div className="shrink-0">
+                    {church.voiceAddOn?.enabled ? (
+                        <button
+                            disabled={isUpdatingVoice || Boolean(church.voiceAddOn?.comped)}
+                            onClick={async () => {
+                                if (!confirm('Disable the Voice Calling add-on? Voice calling will be turned off on all church numbers at the end of this billing cycle.')) return;
+                                setIsUpdatingVoice(true);
+                                setStatusMessage(null);
+                                try {
+                                    const res = await stripeService.disableVoiceAddon(church.id);
+                                    onUpdateChurch({ voiceAddOn: { ...church.voiceAddOn, enabled: false, canceledAt: Date.now() } });
+                                    setStatusMessage({ type: 'success', text: res.message });
+                                } catch (e: any) {
+                                    setStatusMessage({ type: 'error', text: e.message });
+                                } finally {
+                                    setIsUpdatingVoice(false);
+                                }
+                            }}
+                            className="px-5 py-2.5 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50"
+                        >
+                            {isUpdatingVoice ? 'Updating...' : church.voiceAddOn?.comped ? 'Included (Comped)' : 'Remove Voice Add-On'}
+                        </button>
+                    ) : (
+                        <button
+                            disabled={isUpdatingVoice || !currentPlanId}
+                            onClick={async () => {
+                                setIsUpdatingVoice(true);
+                                setStatusMessage(null);
+                                try {
+                                    const res = await stripeService.enableVoiceAddon(church.id);
+                                    onUpdateChurch({ voiceAddOn: { enabled: true, subscribedAt: Date.now() } });
+                                    setStatusMessage({ type: 'success', text: res.message });
+                                } catch (e: any) {
+                                    setStatusMessage({ type: 'error', text: e.message });
+                                } finally {
+                                    setIsUpdatingVoice(false);
+                                }
+                            }}
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm disabled:opacity-50"
+                        >
+                            {isUpdatingVoice ? 'Enabling...' : !currentPlanId ? 'Active Plan Required' : 'Enable Voice Add-On'}
+                        </button>
+                    )}
+                </div>
+            </div>
 
             {/* Active Subscription summary — only shown when upgrade grid is hidden */}
             {currentPlanId && !showUpgrade && (

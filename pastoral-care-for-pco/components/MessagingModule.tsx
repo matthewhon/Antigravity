@@ -31,6 +31,8 @@ import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
 import { SmsEventPickerModal } from './SmsEventPickerModal';
 import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
+import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
+import { VoiceSoftphone } from './VoiceSoftphone';
 
 // --- Constants --------------------------------------------------------------
 
@@ -2749,6 +2751,9 @@ const SmsInbox: React.FC<{
 
     // Toast
     const [inboxToast, setInboxToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    // Temporarily bypass church.voiceAddOn?.enabled for testing
+    const voiceAddonEnabled = true || Boolean(church.voiceAddOn?.enabled);
+    const voice = useSignalWireVoice({ churchId: church.id, voiceAddonEnabled });
     const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setInboxToast({ msg, type });
         setTimeout(() => setInboxToast(null), 4000);
@@ -3320,6 +3325,18 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         <div className="flex h-full min-h-0">
             {/* Inbox Toast */}
             {inboxToast && <Toast msg={inboxToast.msg} type={inboxToast.type} onClose={() => setInboxToast(null)} />}
+            {/* Voice Softphone HUD */}
+            {voiceAddonEnabled && (
+                <VoiceSoftphone
+                    activeCall={voice.activeCall}
+                    incomingCall={voice.incomingCall}
+                    onAnswer={voice.answer}
+                    onReject={voice.reject}
+                    onHangup={voice.hangup}
+                    onToggleMute={voice.toggleMute}
+                    onSendDtmf={voice.sendDtmf}
+                />
+            )}
             {/* New Message Composer modal */}
             {showComposer && (
                 <NewMessageComposer
@@ -3498,6 +3515,22 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{activeConv.personName || formatPhone(activeConv.phoneNumber)}</p>
                             {activeConv.personName && <p className="text-xs text-slate-400">{formatPhone(activeConv.phoneNumber)}</p>}
                         </div>
+                        {voiceAddonEnabled && activeNumber?.voiceEnabled && (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await voice.dial(activeConv.phoneNumber, activeNumber.id);
+                                    } catch (err: any) {
+                                        showInboxToast(err?.message || 'Unable to place call', 'error');
+                                    }
+                                }}
+                                disabled={voice.status !== 'ready' || Boolean(voice.activeCall)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm shrink-0"
+                                title={voice.status === 'ready' ? `Call ${activeConv.phoneNumber}` : 'Connecting voice softphone...'}
+                            >
+                                <Phone size={13} /> Call
+                            </button>
+                        )}
                         {activeConv.isOptedOut && (
                             <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>
                         )}
@@ -5060,6 +5093,118 @@ const SmsKeywordsManager: React.FC<{
                             </span>
                         </div>
                     </div>
+                );
+            })()}
+
+            {/* --- VOICE CALLING (OPT-IN PER NUMBER) ---------------------------- */}
+            {activeNumber && (() => {
+                const voiceAddonActive = true || Boolean(church.voiceAddOn?.enabled);
+                return (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <Phone size={18} />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white">Voice Calling ({activeNumber.friendlyLabel || activeNumber.phoneNumber})</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {voiceAddonActive
+                                        ? 'Opt in to two-way voice calling, voicemail, and call recording for this number.'
+                                        : 'Optional paid add-on. Enable Voice Calling in Subscription Settings to activate.'}
+                                </p>
+                            </div>
+                        </div>
+                        {voiceAddonActive ? (
+                            <button
+                                onClick={async () => {
+                                    await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            churchId,
+                                            smsNumberId: activeNumber.id,
+                                            voiceEnabled: !activeNumber.voiceEnabled,
+                                        }),
+                                    });
+                                }}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                                    activeNumber.voiceEnabled
+                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
+                                }`}
+                            >
+                                {activeNumber.voiceEnabled ? 'Voice Enabled' : 'Enable Voice'}
+                            </button>
+                        ) : (
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-[10px] font-bold uppercase text-slate-500 dark:text-slate-300">
+                                Add-On Required
+                            </span>
+                        )}
+                    </div>
+
+                    {voiceAddonActive && activeNumber.voiceEnabled && (
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">Opt-in Voicemail</span>
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(activeNumber.voicemailEnabled)}
+                                    onChange={async (e) => {
+                                        await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                churchId,
+                                                smsNumberId: activeNumber.id,
+                                                voicemailEnabled: e.target.checked,
+                                            }),
+                                        });
+                                    }}
+                                    className="rounded text-indigo-600"
+                                />
+                            </label>
+                            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">Opt-in Call Recording</span>
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(activeNumber.recordCalls)}
+                                    onChange={async (e) => {
+                                        await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                churchId,
+                                                smsNumberId: activeNumber.id,
+                                                recordCalls: e.target.checked,
+                                            }),
+                                        });
+                                    }}
+                                    className="rounded text-indigo-600"
+                                />
+                            </label>
+                            <div className="md:col-span-2 flex gap-2">
+                                <input
+                                    type="tel"
+                                    defaultValue={activeNumber.voiceForwardingNumber || ''}
+                                    placeholder="Fallback Forwarding Number (e.g. +15551234567)"
+                                    onBlur={async (e) => {
+                                        await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                churchId,
+                                                smsNumberId: activeNumber.id,
+                                                voiceForwardingNumber: e.target.value.trim(),
+                                            }),
+                                        });
+                                    }}
+                                    className="flex-1 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-white"
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
                 );
             })()}
 

@@ -278,6 +278,17 @@ export interface Church {
     };
 
     /**
+     * Optional paid Voice Calling add-on entitlement.
+     */
+    voiceAddOn?: {
+        enabled: boolean;
+        stripeItemId?: string | null;
+        subscribedAt?: number;
+        canceledAt?: number;
+        comped?: boolean;
+    };
+
+    /**
      * @deprecated Legacy SMS add-on subscriptions (replaced by pay-as-you-go usage billing).
      */
     smsAddOns?: {
@@ -1115,7 +1126,14 @@ export interface SystemSettings {
     stripePublishableKey?: string;
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
-    stripePriceIds?: { starter?: string, growth?: string, kingdom?: string };
+    stripePriceIds?: { starter?: string, growth?: string, kingdom?: string, voiceAddon?: string };
+    voiceOutboundCostUsd?: number;
+    voiceInboundCostUsd?: number;
+    // -- Apple PushKit / VoIP Push Credentials (for iOS CallKit background ringing) --
+    apnsKeyId?: string;
+    apnsTeamId?: string;
+    apnsAuthKey?: string;
+    iosBundleId?: string;
     enabledModules?: { pastoral: boolean, people: boolean, groups: boolean, services: boolean, giving: boolean, metrics: boolean, communication: boolean };
     allowSignups?: boolean;
     scheduledSyncTime?: string;
@@ -2214,6 +2232,38 @@ export interface SmsPhoneNumber {
     executiveAiAgentKeyword?: string;
     executiveAiAgentListId?: string;
     executiveAiAgentListName?: string;
+
+    // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
+    voiceEnabled?: boolean;
+    voiceForwardingNumber?: string;
+    voicemailEnabled?: boolean;
+    voicemailGreetingText?: string;
+    recordCalls?: boolean;
+}
+
+export interface VoiceCall {
+    id: string; // SignalWire CallSid
+    churchId: string;
+    smsNumberId: string;
+    personId?: string | null;
+    direction: 'inbound' | 'outbound';
+    from: string;
+    to: string;
+    status: 'initiated' | 'ringing' | 'in-progress' | 'completed' | 'busy' | 'no-answer' | 'failed' | 'canceled';
+    durationSec?: number;
+    recordingUrl?: string | null;
+    handledByUserId?: string | null;
+    createdAt: number;
+    endedAt?: number;
+}
+
+export interface VoipDevice {
+    id: string;
+    platform: 'ios' | 'android';
+    voipToken?: string;
+    fcmToken?: string;
+    churchId: string;
+    updatedAt: number;
 }
 
 /**
@@ -2558,6 +2608,38 @@ export interface TwilioPhoneNumber {
     executiveAiAgentKeyword?: string;
     executiveAiAgentListId?: string;
     executiveAiAgentListName?: string;
+
+    // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
+    voiceEnabled?: boolean;
+    voiceForwardingNumber?: string;
+    voicemailEnabled?: boolean;
+    voicemailGreetingText?: string;
+    recordCalls?: boolean;
+}
+
+export interface VoiceCall {
+    id: string; // SignalWire CallSid
+    churchId: string;
+    smsNumberId: string;
+    personId?: string | null;
+    direction: 'inbound' | 'outbound';
+    from: string;
+    to: string;
+    status: 'initiated' | 'ringing' | 'in-progress' | 'completed' | 'busy' | 'no-answer' | 'failed' | 'canceled';
+    durationSec?: number;
+    recordingUrl?: string | null;
+    handledByUserId?: string | null;
+    createdAt: number;
+    endedAt?: number;
+}
+
+export interface VoipDevice {
+    id: string;
+    platform: 'ios' | 'android';
+    voipToken?: string;
+    fcmToken?: string;
+    churchId: string;
+    updatedAt: number;
 }
 
 // --- Tenant File Storage (GCS) ---

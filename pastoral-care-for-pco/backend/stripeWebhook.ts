@@ -556,6 +556,7 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 }
 
                 const addonPriceId: string = (priceMap.smsAddon || '').trim();
+                const voiceAddonPriceId: string = (priceMap.voiceAddon || '').trim();
                 let resolvedPlanId: string | null = null;
                 let addonQuantity: number = 0;
 
@@ -564,6 +565,8 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                     if (addonPriceId && itemPriceId === addonPriceId) {
                         // This item is the SMS add-on
                         addonQuantity = item.quantity ?? 0;
+                    } else if (voiceAddonPriceId && itemPriceId === voiceAddonPriceId) {
+                        // Handled by syncVoiceAddonFromSubscription below
                     } else if (reversePriceMap[itemPriceId]) {
                         // This item is a plan price
                         resolvedPlanId = reversePriceMap[itemPriceId];
@@ -593,6 +596,8 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 }
 
                 await churchDoc.ref.update(updatePayload);
+                const { syncVoiceAddonFromSubscription } = await import('./voiceAddon.js');
+                await syncVoiceAddonFromSubscription(db, churchDoc.id, subscription);
                 console.log(`[StripeWebhook] Updated subscription for ${churchDoc.id}: status=${subscription.status}, addOns=${addonQuantity}`);
             }
             break;
@@ -612,6 +617,8 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                     'subscription.status':          'canceled',
                     'subscription.currentPeriodEnd': Date.now(),
                 });
+                const { syncVoiceAddonFromSubscription } = await import('./voiceAddon.js');
+                await syncVoiceAddonFromSubscription(db, churchDoc.id, subscription);
                 console.log(`[StripeWebhook] Subscription canceled for church ${churchDoc.id}`);
             }
             break;
