@@ -33,7 +33,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to attach existing photos to messages.</string>
 	<key>NSVoIPUsageDescription</key>
-	<string></string>
+	<string>We use VoIP to receive and place voice calls within the app.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>

@@ -123,6 +123,7 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     public let jsName = "VoipPush"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "register", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "configureAudioSession", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise)
     ]
 
@@ -148,6 +149,25 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
             registry.desiredPushTypes = [.voIP]
             self.pushRegistry = registry
             call.resolve(["registered": true])
+        }
+    }
+
+    @objc func configureAudioSession(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        session.requestRecordPermission { granted in
+            DispatchQueue.main.async {
+                if !granted {
+                    call.reject("Microphone permission is required for voice calls.")
+                    return
+                }
+                do {
+                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
+                    try session.setActive(true)
+                    call.resolve(["granted": true])
+                } catch {
+                    call.reject("Failed to configure audio session: \(error.localizedDescription)")
+                }
+            }
         }
     }
 

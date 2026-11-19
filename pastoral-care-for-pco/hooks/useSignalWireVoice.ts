@@ -26,6 +26,19 @@ interface UseSignalWireVoiceOptions {
     voiceAddonEnabled?: boolean;
 }
 
+function normalizeDialTarget(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return trimmed;
+    if (trimmed.startsWith('/') || trimmed.startsWith('sip:') || trimmed.startsWith('subscriber:') || trimmed.startsWith('+')) {
+        return trimmed;
+    }
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    if (digits.length > 0) return `+${digits}`;
+    return trimmed;
+}
+
 export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWireVoiceOptions) {
     const [status, setStatus] = useState<VoiceConnectionStatus>(voiceAddonEnabled ? 'connecting' : 'disabled');
     const [error, setError] = useState<string | null>(null);
@@ -34,6 +47,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
 
     const clientRef = useRef<SignalWire | null>(null);
     const activeCallRef = useRef<Call | null>(null);
+    const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
     const fetchVoiceToken = useCallback(async () => {
         if (!churchId) throw new Error('Missing churchId');
@@ -155,6 +169,37 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
             startedAt: null,
         });
 
+        if (!remoteAudioRef.current) {
+            const audioEl = new Audio();
+            audioEl.autoplay = true;
+            (audioEl as any).playsInline = true;
+            remoteAudioRef.current = audioEl;
+        }
+
+        const attachRemoteStream = (stream: MediaStream | null | undefined) => {
+            const audioEl = remoteAudioRef.current;
+            if (!audioEl || !stream) return;
+            if (audioEl.srcObject !== stream) {
+                audioEl.srcObject = stream;
+            }
+            audioEl.play().catch(() => {});
+        };
+
+        if ((call as any).remoteStream) {
+            attachRemoteStream((call as any).remoteStream);
+        }
+        const remoteStreamSub = (call as any).remoteStream$?.subscribe?.((stream: MediaStream | null) => {
+            attachRemoteStream(stream);
+        });
+
+        const cleanupAudio = () => {
+            remoteStreamSub?.unsubscribe?.();
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.pause();
+                remoteAudioRef.current.srcObject = null;
+            }
+        };
+
         const stateSub = (call as any).state$?.subscribe?.((nextState: string) => {
             setActiveCallInfo((prev) => {
                 if (!prev) return null;
@@ -166,6 +211,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
                 };
             });
             if (['ended', 'destroy', 'hangup', 'failed'].includes(nextState)) {
+                cleanupAudio();
                 activeCallRef.current = null;
                 setActiveCallInfo(null);
             }
@@ -173,6 +219,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
 
         (call as any).on?.('destroy', () => {
             stateSub?.unsubscribe?.();
+            cleanupAudio();
             activeCallRef.current = null;
             setActiveCallInfo(null);
         });
@@ -182,8 +229,9 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
         if (!clientRef.current || status !== 'ready') {
             throw new Error('Voice softphone is not ready.');
         }
+        const destination = normalizeDialTarget(toNumber);
         try {
-            const call = await clientRef.current.dial(toNumber, {
+            const call = await clientRef.current.dial(destination, {
                 audio: true,
                 video: false,
                 userVariables: {
@@ -192,7 +240,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
                     userId: auth.currentUser?.uid || '',
                 },
             } as any);
-            attachCallListeners(call, toNumber, 'outbound');
+            attachCallListeners(call, destination, 'outbound');
             return call;
         } catch (err: any) {
             const inner = err?.error || err?.cause;
