@@ -106,21 +106,22 @@ async function saveMp3ToVoiceStorage(
     const storagePath = `voiceAudio/${churchId}/${scope}/${audioId}.mp3`;
     const bucket = getStorage().bucket();
     const file = bucket.file(storagePath);
+    const downloadToken = randomUUID();
     await file.save(mp3Buffer, {
         contentType: 'audio/mpeg',
         metadata: {
             cacheControl: 'public, max-age=31536000',
+            metadata: {
+                firebaseStorageDownloadTokens: downloadToken,
+            },
         },
     });
 
-    const [signedUrl] = await file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 1000 * 60 * 60 * 24 * 365 * 10,
-    });
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
     return {
         success: true,
-        url: signedUrl,
+        url,
         storagePath,
         durationSec,
     };
