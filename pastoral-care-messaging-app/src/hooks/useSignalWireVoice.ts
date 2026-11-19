@@ -267,17 +267,24 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         if (!clientRef.current || status !== 'ready') {
             throw new Error('Voice softphone is not ready.');
         }
-        const call = await clientRef.current.dial(toNumber, {
-            audio: true,
-            video: false,
-            userVariables: {
-                churchId,
-                smsNumberId,
-                userId: auth.currentUser?.uid || '',
-            },
-        } as any);
-        attachCallListeners(call, toNumber, 'outbound');
-        return call;
+        try {
+            const call = await clientRef.current.dial(toNumber, {
+                audio: true,
+                video: false,
+                userVariables: {
+                    churchId,
+                    smsNumberId,
+                    userId: auth.currentUser?.uid || '',
+                },
+            } as any);
+            attachCallListeners(call, toNumber, 'outbound');
+            return call;
+        } catch (err: any) {
+            const inner = err?.error || err?.cause;
+            const detail = inner?.message || (typeof inner === 'string' ? inner : inner ? JSON.stringify(inner) : '') || err?.message || 'Call creation failed';
+            console.error('[Voice] dial failed:', err, inner);
+            throw new Error(detail);
+        }
     }, [status, churchId, attachCallListeners]);
 
     const reject = useCallback(async () => {
