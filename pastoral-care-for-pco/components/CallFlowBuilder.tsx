@@ -19,13 +19,14 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
     PhoneIncoming, Clock, Bot, Hash, Users, Voicemail, PhoneForwarded, PhoneOff,
-    Plus, Save, Rocket, Play, Trash2, CheckCircle2, AlertTriangle, X
+    Plus, Save, Rocket, Play, Trash2, CheckCircle2, AlertTriangle, X, Sparkles
 } from 'lucide-react';
 import {
     collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 } from 'firebase/firestore';
 import { db as firebaseDb } from '../services/firebase';
 import { AudioGreetingUploader } from './AudioGreetingUploader';
+import { AICallFlowModal } from './AICallFlowModal';
 import type {
     DayOfWeek, TwilioPhoneNumber, User, VoiceFlow, VoiceFlowGraph, VoiceFlowNode, VoiceNodeType
 } from '../types';
@@ -291,7 +292,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     onNumberFlowAssigned,
 }) => {
     const reactFlowWrapper = useRef<HTMLDivElement | null>(null);
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition, fitView } = useReactFlow();
 
     const [flows, setFlows] = useState<VoiceFlow[]>([]);
     const [activeFlowId, setActiveFlowId] = useState<string>('');
@@ -310,6 +311,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     const [simNodeId, setSimNodeId] = useState<string | null>(null);
     const [simLog, setSimLog] = useState<string[]>([]);
     const [simInput, setSimInput] = useState('');
+    const [aiModalOpen, setAiModalOpen] = useState(false);
 
     useEffect(() => {
         if (!churchId) return;
@@ -662,6 +664,13 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                             {statusMsg.text}
                         </span>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => setAiModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-sm"
+                    >
+                        <Sparkles className="w-3.5 h-3.5" /> Build with AI
+                    </button>
                     {activeFlowId && (
                         <>
                             <button
@@ -1050,6 +1059,57 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                     </div>
                 )}
             </div>
+
+            {aiModalOpen && (
+                <AICallFlowModal
+                    churchId={churchId}
+                    churchTimezone={churchTimezone}
+                    users={users}
+                    numbers={numbers}
+                    hasActiveFlow={Boolean(activeFlowId)}
+                    onClose={() => setAiModalOpen(false)}
+                    onApplyToCurrentDraft={({ name, graph }) => {
+                        setFlowName(name);
+                        setEntryNodeId(graph.entryNodeId || 'node_trigger');
+                        setNodes(toReactFlowNodes(graph));
+                        setEdges(toReactFlowEdges(graph));
+                        setSelectedNodeId(null);
+                        setStatusMsg({ type: 'ok', text: 'AI flow applied to draft. Review & Save when ready.' });
+                        setTimeout(() => fitView({ padding: 0.2 }), 50);
+                    }}
+                    onCreateNewFlow={async ({ name, description, graph, assignNumberId }) => {
+                        const now = Date.now();
+                        const newFlowPayload: Omit<VoiceFlow, 'id'> = {
+                            churchId,
+                            name,
+                            description: description || '',
+                            status: 'draft',
+                            draftGraph: graph,
+                            publishedGraph: null,
+                            publishedAt: null,
+                            createdAt: now,
+                            updatedAt: now,
+                        };
+                        const ref = await addDoc(collection(firebaseDb, 'voiceFlows'), newFlowPayload);
+                        const created: VoiceFlow = { id: ref.id, ...newFlowPayload };
+                        loadFlowIntoCanvas(created);
+                        if (assignNumberId) {
+                            await updateDoc(doc(firebaseDb, 'twilioPhoneNumbers', assignNumberId), {
+                                voiceFlowId: ref.id,
+                                updatedAt: now,
+                            });
+                            onNumberFlowAssigned?.(assignNumberId, ref.id);
+                        }
+                        setStatusMsg({
+                            type: 'ok',
+                            text: assignNumberId
+                                ? 'AI flow created & assigned to number. Publish when ready.'
+                                : 'AI flow created as draft. Publish when ready.',
+                        });
+                        setTimeout(() => fitView({ padding: 0.2 }), 50);
+                    }}
+                />
+            )}
         </div>
     );
 };

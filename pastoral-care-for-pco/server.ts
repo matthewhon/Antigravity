@@ -22,6 +22,7 @@ import { getDb } from './backend/firebase';
 import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { handleCampaignWriter } from './backend/campaignWriter';
+import { handleCallFlowArchitect } from './backend/callFlowArchitect';
 import { handleChurchVoiceLearn } from './backend/churchVoice';
 import { handleContentRecommendations } from './backend/contentRecommender';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
@@ -407,6 +408,8 @@ async function startServer() {
     app.post('/ai/generate', express.json(), handleGeminiProxy);
     // Structured email/SMS/bulletin writer (subject variants, readability checks)
     app.post('/ai/campaign-writer', express.json({ limit: '1mb' }), handleCampaignWriter);
+    // AI Call Flow Architect (interactive Q&A -> validated VoiceFlowGraph)
+    app.post('/ai/call-flow-architect', express.json({ limit: '1mb' }), handleCallFlowArchitect);
     // Proposes a church voice profile from past messages (stateless; browser saves it)
     app.post('/ai/church-voice/learn', express.json({ limit: '1mb' }), handleChurchVoiceLearn);
     // Suggests what events, groups, and registrations to include in campaigns
