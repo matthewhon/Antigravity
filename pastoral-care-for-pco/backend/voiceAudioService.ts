@@ -4,11 +4,127 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Modality, Type } from '@google/genai';
 import { getAuth } from 'firebase-admin/auth';
 import { getDb, getStorage } from './firebase';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+const ALLOWED_TTS_VOICES = new Set([
+    'Kore',
+    'Puck',
+    'Charon',
+    'Fenrir',
+    'Aoede',
+    'Zephyr',
+    'Leda',
+    'Orus',
+]);
+
+async function getGeminiApiKey(): Promise<string | null> {
+    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+    try {
+        const snap = await getDb().doc('system/settings').get();
+        const data = snap.data() || {};
+        if (data.geminiApiKey) apiKey = String(data.geminiApiKey).trim();
+    } catch {
+        // fallback to env
+    }
+    return apiKey ? apiKey.trim() : null;
+}
+
+/** Wraps raw 16-bit signed little-endian mono PCM bytes in a standard 44-byte WAV header. */
+function pcmToWavBuffer(pcmBuffer: Buffer, sampleRate = 24000, channels = 1): Buffer {
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * channels * (bitsPerSample / 8);
+    const blockAlign = channels * (bitsPerSample / 8);
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0);
+    header.writeUInt32LE(36 + pcmBuffer.length, 4);
+    header.write('WAVE', 8);
+    header.write('fmt ', 12);
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20); // PCM
+    header.writeUInt16LE(channels, 22);
+    header.writeUInt32LE(sampleRate, 24);
+    header.writeUInt32LE(byteRate, 28);
+    header.writeUInt16LE(blockAlign, 32);
+    header.writeUInt16LE(bitsPerSample, 34);
+    header.write('data', 36);
+    header.writeUInt32LE(pcmBuffer.length, 40);
+    return Buffer.concat([header, pcmBuffer]);
+}
+
+async function verifyChurchAudioAuth(
+    req: any,
+    res: any
+): Promise<{ uid: string; churchId: string; scope: 'user_greeting' | 'flow_prompt' } | null> {
+    res.set('Access-Control-Allow-Origin', '*');
+    const authHeader = String(req.headers.authorization || '');
+    if (!authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return null;
+    }
+    let uid = '';
+    try {
+        const decoded = await getAuth().verifyIdToken(authHeader.slice(7).trim());
+        uid = decoded.uid;
+    } catch {
+        res.status(401).json({ error: 'Unauthorized' });
+        return null;
+    }
+
+    const { churchId, scope = 'flow_prompt' } = req.body || {};
+    if (!churchId) {
+        res.status(400).json({ error: 'Missing churchId' });
+        return null;
+    }
+    if (scope !== 'user_greeting' && scope !== 'flow_prompt') {
+        res.status(400).json({ error: 'Invalid scope' });
+        return null;
+    }
+
+    const db = getDb();
+    const userSnap = await db.collection('users').doc(uid).get();
+    const userData = userSnap.data() || {};
+    if (userData.churchId && userData.churchId !== churchId && !userData.roles?.includes('System Administration')) {
+        res.status(403).json({ error: 'Forbidden' });
+        return null;
+    }
+
+    return { uid, churchId: String(churchId), scope };
+}
+
+async function saveMp3ToVoiceStorage(
+    churchId: string,
+    scope: 'user_greeting' | 'flow_prompt',
+    uid: string,
+    mp3Buffer: Buffer,
+    durationSec: number
+) {
+    const audioId = `${scope === 'user_greeting' ? `${uid}_` : ''}${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const storagePath = `voiceAudio/${churchId}/${scope}/${audioId}.mp3`;
+    const bucket = getStorage().bucket();
+    const file = bucket.file(storagePath);
+    await file.save(mp3Buffer, {
+        contentType: 'audio/mpeg',
+        metadata: {
+            cacheControl: 'public, max-age=31536000',
+        },
+    });
+
+    const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 1000 * 60 * 60 * 24 * 365 * 10,
+    });
+
+    return {
+        success: true,
+        url: signedUrl,
+        storagePath,
+        durationSec,
+    };
+}
 
 function extFromMime(mimeType: string, fileName?: string): string {
     const lower = String(mimeType || '').toLowerCase();
@@ -66,14 +182,7 @@ export async function transcribeVoicemailWithGemini(
     audioBuffer: Buffer,
     mimeType = 'audio/mpeg'
 ): Promise<{ transcript: string; summary: string; urgent: boolean } | null> {
-    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    try {
-        const snap = await getDb().doc('system/settings').get();
-        const data = snap.data() || {};
-        if (data.geminiApiKey) apiKey = String(data.geminiApiKey).trim();
-    } catch {
-        // fallback to env
-    }
+    const apiKey = await getGeminiApiKey();
     if (!apiKey) return null;
 
     try {
@@ -118,35 +227,15 @@ export async function transcribeVoicemailWithGemini(
 }
 
 export const handleUploadVoiceAudio = async (req: any, res: any) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    const authHeader = String(req.headers.authorization || '');
-    if (!authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-    let uid = '';
-    try {
-        const decoded = await getAuth().verifyIdToken(authHeader.slice(7).trim());
-        uid = decoded.uid;
-    } catch {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const authCtx = await verifyChurchAudioAuth(req, res);
+    if (!authCtx) return;
 
-    const { churchId, scope = 'flow_prompt', fileName, mimeType = 'audio/webm', dataBase64 } = req.body || {};
-    if (!churchId || !dataBase64) {
-        return res.status(400).json({ error: 'Missing churchId or dataBase64' });
-    }
-    if (scope !== 'user_greeting' && scope !== 'flow_prompt') {
-        return res.status(400).json({ error: 'Invalid scope' });
+    const { fileName, mimeType = 'audio/webm', dataBase64 } = req.body || {};
+    if (!dataBase64) {
+        return res.status(400).json({ error: 'Missing dataBase64' });
     }
 
     try {
-        const db = getDb();
-        const userSnap = await db.collection('users').doc(uid).get();
-        const userData = userSnap.data() || {};
-        if (userData.churchId && userData.churchId !== churchId && !userData.roles?.includes('System Administration')) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-
         const cleanBase64 = String(dataBase64).replace(/^data:[^;]+;base64,/, '');
         const rawBuffer = Buffer.from(cleanBase64, 'base64');
         if (rawBuffer.length === 0 || rawBuffer.length > 15 * 1024 * 1024) {
@@ -154,31 +243,89 @@ export const handleUploadVoiceAudio = async (req: any, res: any) => {
         }
 
         const { mp3Buffer, durationSec } = await transcodeToMp3(rawBuffer, mimeType, fileName);
-
-        const audioId = `${scope === 'user_greeting' ? `${uid}_` : ''}${Date.now()}_${randomUUID().slice(0, 8)}`;
-        const storagePath = `voiceAudio/${churchId}/${scope}/${audioId}.mp3`;
-        const bucket = getStorage().bucket();
-        const file = bucket.file(storagePath);
-        await file.save(mp3Buffer, {
-            contentType: 'audio/mpeg',
-            metadata: {
-                cacheControl: 'public, max-age=31536000',
-            },
-        });
-
-        const [signedUrl] = await file.getSignedUrl({
-            action: 'read',
-            expires: Date.now() + 1000 * 60 * 60 * 24 * 365 * 10,
-        });
-
-        return res.json({
-            success: true,
-            url: signedUrl,
-            storagePath,
-            durationSec,
-        });
+        const result = await saveMp3ToVoiceStorage(
+            authCtx.churchId,
+            authCtx.scope,
+            authCtx.uid,
+            mp3Buffer,
+            durationSec
+        );
+        return res.json(result);
     } catch (e: any) {
         console.error('[handleUploadVoiceAudio] Error:', e);
         return res.status(500).json({ error: e.message || 'Failed to process audio upload' });
+    }
+};
+
+/**
+ * Generates a spoken MP3 audio file from text using Gemini TTS (`gemini-2.5-flash-preview-tts`),
+ * stores it in Firebase Storage, and returns a signed URL for SignalWire `<Play>`.
+ */
+export const handleGenerateVoiceAudio = async (req: any, res: any) => {
+    const authCtx = await verifyChurchAudioAuth(req, res);
+    if (!authCtx) return;
+
+    const cleanText = String(req.body?.text || '').trim();
+    if (!cleanText) {
+        return res.status(400).json({ error: 'Please enter the text message to convert to voice.' });
+    }
+    if (cleanText.length > 2000) {
+        return res.status(400).json({ error: 'Message text must be 2,000 characters or fewer.' });
+    }
+
+    const requestedVoice = String(req.body?.voiceName || 'Kore').trim();
+    const voiceName = ALLOWED_TTS_VOICES.has(requestedVoice) ? requestedVoice : 'Kore';
+
+    const apiKey = await getGeminiApiKey();
+    if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key is not configured.' });
+    }
+
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-tts',
+            contents: [{ parts: [{ text: cleanText }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName },
+                    },
+                },
+            },
+        });
+
+        const parts = response.candidates?.[0]?.content?.parts || [];
+        const audioPart = parts.find((p: any) => p?.inlineData?.data);
+        const inlineData = audioPart?.inlineData;
+        if (!inlineData?.data) {
+            return res.status(502).json({ error: 'Gemini did not return audio data.' });
+        }
+
+        const rawAudioBuffer = Buffer.from(inlineData.data, 'base64');
+        const rawMime = String(inlineData.mimeType || 'audio/L16;rate=24000').toLowerCase();
+
+        let transcodeInput = rawAudioBuffer;
+        let transcodeMime = rawMime;
+        if (rawMime.includes('l16') || rawMime.includes('pcm')) {
+            const rateMatch = /rate=(\d+)/i.exec(rawMime);
+            const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
+            transcodeInput = pcmToWavBuffer(rawAudioBuffer, sampleRate, 1);
+            transcodeMime = 'audio/wav';
+        }
+
+        const { mp3Buffer, durationSec } = await transcodeToMp3(transcodeInput, transcodeMime, 'gemini_tts.wav');
+        const result = await saveMp3ToVoiceStorage(
+            authCtx.churchId,
+            authCtx.scope,
+            authCtx.uid,
+            mp3Buffer,
+            durationSec
+        );
+        return res.json(result);
+    } catch (e: any) {
+        console.error('[handleGenerateVoiceAudio] Error:', e);
+        return res.status(500).json({ error: e.message || 'Failed to generate voice audio' });
     }
 };
