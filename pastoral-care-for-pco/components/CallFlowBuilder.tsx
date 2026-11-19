@@ -19,7 +19,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
     PhoneIncoming, Clock, Bot, Hash, Users, Voicemail, PhoneForwarded, PhoneOff,
-    Plus, Save, Rocket, Play, Trash2, CheckCircle2, AlertTriangle, X, Sparkles
+    Plus, Save, Rocket, Play, Trash2, CheckCircle2, AlertTriangle, X, Sparkles, MessageSquare
 } from 'lucide-react';
 import {
     collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
@@ -83,6 +83,12 @@ const NODE_META: Record<VoiceNodeType, { title: string; color: string; icon: Rea
         icon: <PhoneForwarded className="w-3.5 h-3.5" />,
         desc: 'Forward to external number',
     },
+    send_sms: {
+        title: 'Send Text / Link',
+        color: 'bg-fuchsia-600',
+        icon: <MessageSquare className="w-3.5 h-3.5" />,
+        desc: 'Text caller a website, map, or link',
+    },
     hangup: {
         title: 'Message & Hangup',
         color: 'bg-slate-700',
@@ -120,6 +126,8 @@ function getOutputHandles(type: VoiceNodeType, data: Record<string, any>): { id:
             ];
         case 'forward_number':
             return [{ id: 'no_answer', label: 'No Answer' }];
+        case 'send_sms':
+            return [{ id: 'default', label: 'Next' }];
         case 'voicemail':
         case 'hangup':
         default:
@@ -178,6 +186,11 @@ const FlowNodeCard: React.FC<NodeProps> = ({ data, selected }) => {
                 {nodeType === 'voicemail' && (
                     <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
                         Mode: {nodeData.mode || 'context_user'}
+                    </p>
+                )}
+                {nodeType === 'send_sms' && (
+                    <p className="text-[10px] font-bold text-fuchsia-600 dark:text-fuchsia-400 truncate">
+                        {nodeData.message ? String(nodeData.message) : 'Set text message'}
                     </p>
                 )}
             </div>
@@ -438,6 +451,8 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                     ? { userIds: [], strategy: 'simultaneous', timeoutSec: 20 }
                     : type === 'voicemail'
                     ? { mode: 'context_user' }
+                    : type === 'send_sms'
+                    ? { message: '', ttsText: 'We have just texted that information to your phone.' }
                     : type === 'hours_check'
                     ? {
                           timezone: churchTimezone,
@@ -502,6 +517,9 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
             }
             if (n.type === 'forward_number' && !String(n.data?.phoneNumber || '').trim()) {
                 errs.push(`"${n.label}" requires a destination phone number.`);
+            }
+            if (n.type === 'send_sms' && !String(n.data?.message || '').trim()) {
+                errs.push(`"${n.label}" requires a text message to send.`);
             }
         }
         return errs;
@@ -871,7 +889,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                             />
                         </div>
 
-                        {(selectedType === 'voice_agent' || selectedType === 'extension_lookup' || selectedType === 'hangup') && (
+                        {(selectedType === 'voice_agent' || selectedType === 'extension_lookup' || selectedType === 'hangup' || selectedType === 'send_sms') && (
                             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <AudioGreetingUploader
                                     churchId={churchId}
@@ -1033,6 +1051,50 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                             </div>
                         )}
 
+                        {selectedType === 'send_sms' && (
+                            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-500">Quick Link Templates</label>
+                                    <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {[
+                                            { label: '+ Website', text: 'Visit our website: https://yourchurch.org' },
+                                            { label: '+ Google Maps', text: 'Get directions here: https://maps.google.com/?q=Your+Church' },
+                                            { label: '+ Facebook', text: 'Follow us on Facebook: https://facebook.com/yourchurch' },
+                                        ].map((preset) => (
+                                            <button
+                                                key={preset.label}
+                                                type="button"
+                                                onClick={() => {
+                                                    const curr = String(selectedData.message || '').trim();
+                                                    const next = curr ? `${curr}\n${preset.text}` : preset.text;
+                                                    updateSelectedNode({ nodeData: { message: next } });
+                                                }}
+                                                className="px-2 py-1 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-300 text-[10px] font-bold hover:bg-fuchsia-100"
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[11px] font-bold text-slate-500">Text Message to Caller</label>
+                                        <span className="text-[10px] text-slate-400">{String(selectedData.message || '').length} chars</span>
+                                    </div>
+                                    <textarea
+                                        rows={4}
+                                        value={selectedData.message || ''}
+                                        onChange={(e) => updateSelectedNode({ nodeData: { message: e.target.value } })}
+                                        placeholder="Hi {callerName}! Here is our website: https://..."
+                                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        Tip: Use <code>{'{callerName}'}</code> to personalize when the caller is in People.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {selectedType === 'forward_number' && (
                             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                                 <div>
@@ -1094,7 +1156,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                         const created: VoiceFlow = { id: ref.id, ...newFlowPayload };
                         loadFlowIntoCanvas(created);
                         if (assignNumberId) {
-                            await updateDoc(doc(firebaseDb, 'twilioPhoneNumbers', assignNumberId), {
+                            await updateDoc(doc(firebaseDb, 'twilioNumbers', assignNumberId), {
                                 voiceFlowId: ref.id,
                                 updatedAt: now,
                             });
