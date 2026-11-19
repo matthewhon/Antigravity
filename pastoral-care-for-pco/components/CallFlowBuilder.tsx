@@ -1156,7 +1156,7 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                         const created: VoiceFlow = { id: ref.id, ...newFlowPayload };
                         loadFlowIntoCanvas(created);
                         if (assignNumberId) {
-                            await updateDoc(doc(firebaseDb, 'twilioNumbers', assignNumberId), {
+                            await updateDoc(doc(firebaseDb, 'smsNumbers', assignNumberId), {
                                 voiceFlowId: ref.id,
                                 updatedAt: now,
                             });
