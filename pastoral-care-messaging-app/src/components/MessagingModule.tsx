@@ -3547,15 +3547,23 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         {voiceAddonEnabled && (activeNumber as any)?.voiceEnabled && (
                             <button
                                 onClick={async () => {
+                                    if (voice.status !== 'ready') {
+                                        showInboxToast(voice.error || `Voice softphone is ${voice.status}. Please wait a moment and try again.`, 'error');
+                                        return;
+                                    }
                                     try {
                                         await voice.dial(activeConv.phoneNumber, activeNumber!.id);
                                     } catch (err: any) {
                                         showInboxToast(err?.message || 'Unable to place call', 'error');
                                     }
                                 }}
-                                disabled={voice.status !== 'ready' || Boolean(voice.activeCall)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm shrink-0"
-                                title={voice.status === 'ready' ? `Call ${activeConv.phoneNumber}` : 'Connecting voice softphone...'}
+                                disabled={Boolean(voice.activeCall)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 ${
+                                    voice.status === 'ready'
+                                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                                        : 'bg-emerald-600/60 hover:bg-emerald-600/80'
+                                } disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm shrink-0`}
+                                title={voice.status === 'ready' ? `Call ${activeConv.phoneNumber}` : (voice.error || 'Connecting voice softphone...')}
                             >
                                 <Phone size={13} /> Call
                             </button>
