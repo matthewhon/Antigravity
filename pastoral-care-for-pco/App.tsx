@@ -172,6 +172,7 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/sms/permissions')) return 'tools-sms-permissions';
      if (path.startsWith('/tools/sms/agent')) return 'tools-sms-agent';
      if (path.startsWith('/tools/church-helper')) return 'tools-church-helper';
+     if (path.startsWith('/tools/voice')) return 'tools-voice';
      if (path.startsWith('/tools/sms')) return 'tools-sms-inbox';
      if (path.startsWith('/tools')) return 'tools';
      return 'dashboard';
@@ -667,7 +668,7 @@ const App: React.FC = () => {
       let resolvedView = newView;
       
       if (newView === 'tools') {
-          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-files', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers', 'tools-forms', 'tools-bulletin'];
+          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-voice', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-files', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers', 'tools-forms', 'tools-bulletin'];
           const availableTool = toolViews.find(tv => hasPermission(tv));
           resolvedView = availableTool || 'dashboard';
       }
@@ -724,6 +725,7 @@ const App: React.FC = () => {
               'tools-sms-analytics': '/tools/sms/analytics',
               'tools-sms-agent': '/tools/sms/agent',
               'tools-sms-permissions': '/tools/sms/permissions',
+              'tools-voice': '/tools/voice',
               'tools-workflows': '/tools/workflows',
               'tools-polls': '/tools/polls',
               'tools-notes': '/tools/notes',
@@ -1407,6 +1409,7 @@ const App: React.FC = () => {
                 <Route path="/tools/files" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="files" />} />
                 <Route path="/tools/forms" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="forms" />} />
                 <Route path="/tools/church-helper" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="church-helper" />} />
+                <Route path="/tools/voice" element={hasPermission('tools-voice') ? <ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="voice" /> : <Navigate to="/" replace />} />
                 <Route path="/tools/workflows" element={<SmsWorkflowsManager churchId={church!.id} />} />
                 <Route path="/tools/sms/*" element={
                     <ToolsView 

@@ -306,6 +306,13 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 }),
                 VoipPush.addListener?.('callEnded', () => {
                     hangup().catch(() => {});
+                }),
+                VoipPush.addListener?.('callMuted', (ev: { muted?: boolean }) => {
+                    const muted = Boolean(ev?.muted);
+                    setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: muted } : null));
+                    if (activeCallRef.current) {
+                        applyLocalMuteState(activeCallRef.current, muted).catch(() => {});
+                    }
                 })
             );
         } else if (platform === 'android') {
@@ -496,23 +503,46 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         await (call as any).hangup?.();
     }, [incomingCall]);
 
+    const applyLocalMuteState = useCallback(async (call: any, muted: boolean) => {
+        if (call?.self) {
+            try {
+                if (muted) {
+                    await call.self.mute?.();
+                } else {
+                    await call.self.unmute?.();
+                }
+                return;
+            } catch (err) {
+                console.warn('[Voice] call.self mute/unmute failed, falling back to local tracks:', err);
+            }
+        }
+        const localStream: MediaStream | null | undefined = call?.localStream;
+        localStream?.getAudioTracks?.().forEach((track) => {
+            track.enabled = !muted;
+        });
+        const pc: RTCPeerConnection | undefined = call?.rtcPeerConnection;
+        pc?.getSenders?.().forEach((sender) => {
+            if (sender.track?.kind === 'audio') {
+                sender.track.enabled = !muted;
+            }
+        });
+    }, []);
+
     const toggleMute = useCallback(async () => {
         const call = activeCallRef.current as any;
         if (!call || !activeCallInfo) return;
         const nextMuted = !activeCallInfo.isMuted;
-        if (nextMuted) {
-            await call.audioMute?.();
-        } else {
-            await call.audioUnmute?.();
-        }
         setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: nextMuted } : null));
-    }, [activeCallInfo]);
+        await applyLocalMuteState(call, nextMuted);
+    }, [activeCallInfo, applyLocalMuteState]);
 
     const toggleSpeaker = useCallback(async () => {
         const next = !isSpeakerOn;
         setIsSpeakerOn(next);
         if (Capacitor.getPlatform() === 'ios') {
-            await VoipPush.setSpeakerphone?.({ enabled: next }).catch(() => {});
+            await VoipPush.setSpeakerphone?.({ enabled: next }).catch((err: any) => {
+                console.warn('[Voice] setSpeakerphone failed:', err);
+            });
         }
     }, [isSpeakerOn]);
 

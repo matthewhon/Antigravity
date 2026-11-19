@@ -185,7 +185,6 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                 onHangup={voice.hangup}
                 onToggleMute={voice.toggleMute}
                 onToggleSpeaker={voice.toggleSpeaker}
-                onSendDtmf={voice.sendDtmf}
             />
 
             {/* Top Bar: Caller ID & Connection Status */}
@@ -348,7 +347,12 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                         {DIALPAD_KEYS.map(({ digit, sub }) => (
                             <button
                                 key={digit}
-                                onClick={() => setDialInput((prev) => prev + digit)}
+                                onClick={() => {
+                                    if (voice.activeCall) {
+                                        voice.sendDtmf(digit).catch(() => {});
+                                    }
+                                    setDialInput((prev) => prev + digit);
+                                }}
                                 onContextMenu={(e) => {
                                     if (digit === '0') {
                                         e.preventDefault();

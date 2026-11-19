@@ -11,7 +11,7 @@ interface VoiceSoftphoneProps {
     onHangup: () => void;
     onToggleMute: () => void;
     onToggleSpeaker?: () => void;
-    onSendDtmf: (digit: string) => void;
+    onSendDtmf?: (digit: string) => void;
 }
 
 const DTMF_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
@@ -87,7 +87,7 @@ export const VoiceSoftphone: React.FC<VoiceSoftphoneProps> = ({
                         </span>
                     </div>
 
-                    {showKeypad && (
+                    {showKeypad && onSendDtmf && (
                         <div className="grid grid-cols-3 gap-1.5 mb-3 bg-slate-800/70 p-2 rounded-xl">
                             {DTMF_KEYS.map((key) => (
                                 <button
@@ -123,13 +123,15 @@ export const VoiceSoftphone: React.FC<VoiceSoftphoneProps> = ({
                                 Speaker
                             </button>
                         )}
-                        <button
-                            onClick={() => setShowKeypad((v) => !v)}
-                            aria-label="Toggle Keypad"
-                            className={`px-3 py-2.5 rounded-xl text-xs font-bold ${showKeypad ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}
-                        >
-                            <Grid className="w-4 h-4" />
-                        </button>
+                        {onSendDtmf && (
+                            <button
+                                onClick={() => setShowKeypad((v) => !v)}
+                                aria-label="Toggle Keypad"
+                                className={`px-3 py-2.5 rounded-xl text-xs font-bold ${showKeypad ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}
+                            >
+                                <Grid className="w-4 h-4" />
+                            </button>
+                        )}
                         <button onClick={onHangup} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold">
                             <PhoneOff className="w-4 h-4" /> End
                         </button>

@@ -68,6 +68,7 @@ const MODULE_ROLE_MAP: Record<string, string> = {
     'tools-sms-analytics': 'Messaging',
     'tools-sms-agent': 'Messaging',
     'tools-sms-permissions': 'Messaging',
+    'tools-voice': 'Messaging',
     'tools-emails': 'Email',
     'tools-polls': 'Polls',
     'tools-workflows': 'Workflows',

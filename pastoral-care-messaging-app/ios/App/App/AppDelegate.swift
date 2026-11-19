@@ -132,6 +132,9 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     private var provider: CXProvider?
     private let callController = CXCallController()
     private var activeCallUUID: UUID?
+    private var isSpeakerEnabled = false
+    private var isAudioSessionActive = false
+    private var routeChangeObserver: NSObjectProtocol?
 
     override public func load() {
         let config = CXProviderConfiguration(localizedName: "Pastoral Care")
@@ -141,6 +144,48 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
         let cxProvider = CXProvider(configuration: config)
         cxProvider.setDelegate(self, queue: nil)
         self.provider = cxProvider
+
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self, self.isAudioSessionActive else { return }
+            guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue),
+                  reason == .categoryChange || reason == .override else {
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            let wantsSpeaker = self.isSpeakerEnabled
+            let hasSpeakerOption = session.categoryOptions.contains(.defaultToSpeaker)
+            let isOutputSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+            let hasExternalOutput = session.currentRoute.outputs.contains {
+                $0.portType != .builtInReceiver && $0.portType != .builtInSpeaker
+            }
+            if session.category != .playAndRecord ||
+                session.mode != .voiceChat ||
+                hasSpeakerOption != wantsSpeaker ||
+                (wantsSpeaker && !hasExternalOutput && !isOutputSpeaker) {
+                try? self.applyAudioRoute(speaker: wantsSpeaker)
+            }
+        }
+    }
+
+    deinit {
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func applyAudioRoute(speaker: Bool) throws {
+        let session = AVAudioSession.sharedInstance()
+        let options: AVAudioSession.CategoryOptions = speaker
+            ? [.allowBluetooth, .defaultToSpeaker]
+            : [.allowBluetooth]
+        try session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
+        try session.setActive(true)
+        try session.overrideOutputAudioPort(speaker ? .speaker : .none)
     }
 
     @objc func register(_ call: CAPPluginCall) {
@@ -162,9 +207,9 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
                     return
                 }
                 do {
-                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-                    try session.overrideOutputAudioPort(.none)
-                    try session.setActive(true)
+                    self.isSpeakerEnabled = false
+                    self.isAudioSessionActive = true
+                    try self.applyAudioRoute(speaker: false)
                     call.resolve(["granted": true])
                 } catch {
                     call.reject("Failed to configure audio session: \(error.localizedDescription)")
@@ -176,9 +221,10 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     @objc func setSpeakerphone(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? false
         DispatchQueue.main.async {
-            let session = AVAudioSession.sharedInstance()
             do {
-                try session.overrideOutputAudioPort(enabled ? .speaker : .none)
+                self.isSpeakerEnabled = enabled
+                self.isAudioSessionActive = true
+                try self.applyAudioRoute(speaker: enabled)
                 call.resolve(["speaker": enabled])
             } catch {
                 call.reject("Failed to switch audio route: \(error.localizedDescription)")
@@ -187,9 +233,13 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     }
 
     @objc func endCall(_ call: CAPPluginCall) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.overrideOutputAudioPort(.none)
-        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        DispatchQueue.main.async {
+            self.isSpeakerEnabled = false
+            self.isAudioSessionActive = false
+            let session = AVAudioSession.sharedInstance()
+            try? session.overrideOutputAudioPort(.none)
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        }
         guard let uuid = activeCallUUID else {
             call.resolve()
             return
@@ -252,15 +302,16 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     }
 
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-        try? session.overrideOutputAudioPort(.none)
-        try? session.setActive(true)
+        self.isSpeakerEnabled = false
+        self.isAudioSessionActive = true
+        try? self.applyAudioRoute(speaker: false)
         notifyListeners("callAnswered", data: [:])
         action.fulfill()
     }
 
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        self.isSpeakerEnabled = false
+        self.isAudioSessionActive = false
         let session = AVAudioSession.sharedInstance()
         try? session.overrideOutputAudioPort(.none)
         try? session.setActive(false, options: .notifyOthersOnDeactivation)

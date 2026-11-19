@@ -21,6 +21,8 @@ import { FormsManager } from './FormsManager';
 import { BulletinManager } from './BulletinManager';
 import { ChurchHelperView } from './ChurchHelperView';
 import { NewsletterWidgetManager } from './NewsletterWidgetManager';
+import { VoiceToolView } from './VoiceToolView';
+import { hasModuleAccess } from '../services/permissionService';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess, TenantFile } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, UserMinus, Search, Copy, BarChart2, MessageSquare, Phone,
@@ -1841,7 +1843,7 @@ export const QuickSendModal: React.FC<{
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
 currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
-activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper';
+activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'voice' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper';
 /** When activePage='messaging', this controls the active SMS sub-tab */
 smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
 /** When provided, shows an "Open Mobile App" banner in the SMS tab */
@@ -1850,7 +1852,7 @@ activeNumberId?: string | null;
 onActiveNumberIdChange?: (id: string | null) => void;
 }> = ({ churchId, church, currentUserId,
 currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, onActiveNumberIdChange }) => {
-  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper'>('emails');
+  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'voice' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [emailSection, setEmailSection] = useState<'campaigns' | 'newsletter'>('campaigns');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
@@ -2189,6 +2191,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
         const EmailsIcon = TOOL_META.emails.icon;
         const PollsIcon = TOOL_META.polls.icon;
         const SmsIcon = TOOL_META.sms.icon;
+        const VoiceIcon = TOOL_META.voice.icon;
         const UnsubIcon = TOOL_META.unsubscribers.icon;
         const QrIcon = TOOL_META.qrcodes.icon;
         const FilesIcon = TOOL_META.files.icon;
@@ -2209,6 +2212,11 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
         <button onClick={() => setActiveTab('messaging')} className={tabClass(effectiveTab === 'messaging')}>
           <SmsIcon size={14} aria-hidden="true" /> SMS
         </button>
+        {hasModuleAccess(currentUser || null, 'tools-voice') && (
+          <button onClick={() => setActiveTab('voice')} className={tabClass(effectiveTab === 'voice')}>
+            <VoiceIcon size={14} aria-hidden="true" /> Voice
+          </button>
+        )}
         <button onClick={() => setActiveTab('unsubscribers')} className={tabClass(effectiveTab === 'unsubscribers')}>
           <UnsubIcon size={14} aria-hidden="true" /> Unsubscribers
           {unsubscribers.length > 0 && (
@@ -2476,6 +2484,11 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
         );
       })()}
 
+
+      {/* ─── Voice Tab ────────────────────────────────────────────────── */}
+      {effectiveTab === 'voice' && (
+        <VoiceToolView churchId={churchId} church={church} currentUser={currentUser} />
+      )}
 
       {/* ─── Polls Tab ────────────────────────────────────────────────── */}
       {effectiveTab === 'polls' && (

@@ -1,6 +1,6 @@
 import {
   Mail, MessageSquareText, MessagesSquare, UserMinus, Newspaper, FormInput, Vote,
-  StickyNote, AppWindow, QrCode, Workflow, Sparkles, FolderOpen,
+  StickyNote, AppWindow, QrCode, Workflow, Sparkles, FolderOpen, PhoneCall,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -12,7 +12,7 @@ import {
 export type ToolCategory = 'communicate' | 'create' | 'automate' | 'library';
 
 export type ToolId =
-  | 'emails' | 'sms' | 'team-chat' | 'unsubscribers'
+  | 'emails' | 'sms' | 'voice' | 'team-chat' | 'unsubscribers'
   | 'bulletin' | 'forms' | 'polls' | 'notes' | 'website' | 'qrcodes'
   | 'workflows' | 'church-helper'
   | 'files';
@@ -31,6 +31,7 @@ export const TOOL_META: Record<ToolId, ToolMeta> = {
   // Communicate
   emails:          { id: 'emails',        label: 'Emails',        icon: Mail,              category: 'communicate', view: 'tools-emails',        description: 'Create and send emails to your Planning Center audience' },
   sms:             { id: 'sms',           label: 'SMS',           icon: MessageSquareText, category: 'communicate', view: 'tools-sms-inbox',     description: 'Two-way texting, broadcasts and keyword replies' },
+  voice:           { id: 'voice',         label: 'Voice',         icon: PhoneCall,         category: 'communicate', view: 'tools-voice',         description: 'Visual call flows, voice agents, and phone routing' },
   'team-chat':     { id: 'team-chat',     label: 'Team Chat',     icon: MessagesSquare,    category: 'communicate', view: 'tools-team-chat',     description: 'Internal channels for your staff and volunteers' },
   unsubscribers:   { id: 'unsubscribers', label: 'Unsubscribers', icon: UserMinus,         category: 'communicate', view: 'tools-unsubscribers', description: 'People who opted out are automatically excluded from future sends' },
   // Create & publish

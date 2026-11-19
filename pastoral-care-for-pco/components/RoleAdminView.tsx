@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole, PortingRequest, VoiceFlow } from '../types';
 import { CreateUserModal } from './CreateUserModal';
-import { CallFlowBuilder } from './CallFlowBuilder';
 import { CallingPreferencesPanel } from './CallingPreferencesPanel';
 import { firestore } from '../services/firestoreService';
 import { useTenantData } from '../contexts/TenantDataContext';
@@ -1074,7 +1073,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   // Phone Numbers panel state (SMS → Numbers tab)
   const [smsNumbers, setSmsNumbers] = useState<any[]>([]);
   const [voiceFlows, setVoiceFlows] = useState<VoiceFlow[]>([]);
-  const [showCallFlowBuilder, setShowCallFlowBuilder] = useState(false);
   const [editingCallingUser, setEditingCallingUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -4857,12 +4855,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => setShowCallFlowBuilder(true)}
-                                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-sm"
-                                            >
-                                                Visual Call Flows
-                                            </button>
-                                            <button
                                                 onClick={handleCheckRegistrationStatus}
                                                 disabled={isCheckingStatus}
                                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] uppercase tracking-wide hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
@@ -5881,23 +5873,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
         )}
         </div>
-
-        {showCallFlowBuilder && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="w-full max-w-7xl">
-                    <CallFlowBuilder
-                        churchId={churchId}
-                        churchTimezone={church?.timezone || 'America/Chicago'}
-                        users={users}
-                        numbers={smsNumbers}
-                        onClose={() => setShowCallFlowBuilder(false)}
-                        onNumberFlowAssigned={(numberId, flowId) => {
-                            setSmsNumbers((prev: any[]) => prev.map((n) => (n.id === numberId ? { ...n, voiceFlowId: flowId } : n)));
-                        }}
-                    />
-                </div>
-            </div>
-        )}
 
         {editingCallingUser && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">

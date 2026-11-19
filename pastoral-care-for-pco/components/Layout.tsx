@@ -261,6 +261,7 @@ const Layout: React.FC<LayoutProps> = ({
         { view: 'tools-team-chat',     ...tool('team-chat')     },
         { view: 'tools-emails',        ...tool('emails')        },
         { view: 'tools-sms-inbox',     ...tool('sms'),          activeMatch: (v: string) => v.startsWith('tools-sms') },
+        { view: 'tools-voice',         ...tool('voice')         },
         { view: 'tools-workflows',     ...tool('workflows')     },
         { view: 'tools-polls',         ...tool('polls')         },
         { view: 'tools-bulletin',      ...tool('bulletin')      },
