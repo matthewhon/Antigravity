@@ -154,7 +154,7 @@ async function dispatchVoipPushes(params: {
         const keyId = (settings.apnsKeyId || process.env.APNS_KEY_ID || '').trim();
         const teamId = (settings.apnsTeamId || process.env.APNS_TEAM_ID || '').trim();
         const authKey = (settings.apnsAuthKey || process.env.APNS_AUTH_KEY || '').trim();
-        const bundleId = (settings.iosBundleId || process.env.IOS_BUNDLE_ID || 'com.barnabassoftware.pastoralcaremessaging').trim();
+        const bundleId = (settings.iosBundleId || process.env.IOS_BUNDLE_ID || 'com.barnabassoftware.pcmessaging').trim();
 
         if (keyId && teamId && authKey) {
             const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: keyId })).toString('base64url');
