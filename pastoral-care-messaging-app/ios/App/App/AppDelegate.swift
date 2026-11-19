@@ -135,6 +135,8 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
     private var isSpeakerEnabled = false
     private var isAudioSessionActive = false
     private var routeChangeObserver: NSObjectProtocol?
+    private var pendingCallAction: String?
+    private var pendingCallActionAt: Date?
 
     override public func load() {
         let config = CXProviderConfiguration(localizedName: "Pastoral Care")
@@ -190,11 +192,24 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
 
     @objc func register(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let registry = PKPushRegistry(queue: DispatchQueue.main)
-            registry.delegate = self
-            registry.desiredPushTypes = [.voIP]
-            self.pushRegistry = registry
-            call.resolve(["registered": true])
+            if self.pushRegistry == nil {
+                let registry = PKPushRegistry(queue: DispatchQueue.main)
+                registry.delegate = self
+                registry.desiredPushTypes = [.voIP]
+                self.pushRegistry = registry
+            }
+            var pending: String? = nil
+            if let action = self.pendingCallAction, let at = self.pendingCallActionAt,
+               Date().timeIntervalSince(at) < 15 {
+                pending = action
+            }
+            self.pendingCallAction = nil
+            self.pendingCallActionAt = nil
+            var result: [String: Any] = ["registered": true]
+            if let pending = pending {
+                result["pendingAction"] = pending
+            }
+            call.resolve(result)
         }
     }
 
@@ -305,6 +320,8 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
         self.isSpeakerEnabled = false
         self.isAudioSessionActive = true
         try? self.applyAudioRoute(speaker: false)
+        self.pendingCallAction = "answered"
+        self.pendingCallActionAt = Date()
         notifyListeners("callAnswered", data: [:])
         action.fulfill()
     }
@@ -316,6 +333,8 @@ public class VoipPushPlugin: CAPPlugin, CAPBridgedPlugin, PKPushRegistryDelegate
         try? session.overrideOutputAudioPort(.none)
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         activeCallUUID = nil
+        self.pendingCallAction = "ended"
+        self.pendingCallActionAt = Date()
         notifyListeners("callEnded", data: [:])
         action.fulfill()
     }

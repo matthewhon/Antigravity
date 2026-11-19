@@ -154,9 +154,13 @@ export function usePushNotifications(user: User | null) {
             showInAppToast(title, body, data?.type === 'team-chat' ? () => navigateToTeamChat(data) : undefined);
         });
 
-        // User tapped a notification → deep-link into the inbox, Team Chat, or Today's Celebrations.
+        // User tapped a notification → deep-link into the inbox, Team Chat, Voice, or Today's Celebrations.
         const actionListener = PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
             const data = action.notification.data as Record<string, string> | undefined;
+            if (data?.type === 'incoming_call') {
+                window.dispatchEvent(new CustomEvent('voice:answerPendingCall'));
+                return;
+            }
             if (data?.tag === 'daily-celebrations' || data?.type === 'celebrations') {
                 window.dispatchEvent(new CustomEvent('openCelebrationsModal'));
                 return;

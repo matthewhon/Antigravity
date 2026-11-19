@@ -230,7 +230,7 @@ async function dispatchVoipPushes(params: {
                                 churchId,
                                 from: fromPhone,
                                 to: toPhone,
-                                callerName: fromPhone,
+                                callerName: displayCaller,
                             }));
                             req.end();
                         })

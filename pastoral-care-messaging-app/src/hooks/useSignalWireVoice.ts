@@ -56,6 +56,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
     const incomingCallRef = useRef<IncomingCallInfo | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
     const cancelPendingDialRef = useRef(false);
+    const pendingNativeActionRef = useRef<{ action: 'answer' | 'decline'; at: number } | null>(null);
     const activeCallLogMetaRef = useRef<{ callId: string; smsNumberId?: string; to?: string; from?: string; direction: 'inbound' | 'outbound'; startedAt: number | null } | null>(null);
 
     useEffect(() => {
@@ -220,17 +221,22 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         });
     }, [logCallToServer]);
 
-    const answer = useCallback(async () => {
-        const inc = incomingCallRef.current;
-        if (!inc) return;
+    const answerCallObject = useCallback(async (callObj: Call, callerNumber: string) => {
         setIncomingCall(null);
         setIsSpeakerOn(false);
         if (Capacitor.getPlatform() === 'ios') {
             await VoipPush.configureAudioSession?.().catch(() => {});
         }
-        await (inc.call as any).answer?.({ audio: true, video: false });
-        attachCallListeners(inc.call, inc.callerNumber, 'inbound');
+        await (callObj as any).answer?.({ audio: true, video: false });
+        attachCallListeners(callObj, callerNumber, 'inbound');
     }, [attachCallListeners]);
+
+    const answer = useCallback(async () => {
+        const inc = incomingCallRef.current;
+        if (!inc) return;
+        pendingNativeActionRef.current = null;
+        await answerCallObject(inc.call, inc.callerNumber);
+    }, [answerCallObject]);
 
     const hangup = useCallback(async () => {
         cancelPendingDialRef.current = true;
@@ -295,18 +301,49 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             } catch {}
         };
 
+        const handleNativeAnswer = () => {
+            if (incomingCallRef.current) {
+                answer().catch(() => {});
+            } else {
+                pendingNativeActionRef.current = { action: 'answer', at: Date.now() };
+                const client = clientRef.current;
+                if (client && !client.isConnected) {
+                    setStatus('connecting');
+                    client.connect().catch(() => {});
+                }
+            }
+        };
+
+        const handleNativeEnd = () => {
+            if (activeCallRef.current) {
+                hangup().catch(() => {});
+            } else if (incomingCallRef.current) {
+                const inc = incomingCallRef.current;
+                setIncomingCall(null);
+                (inc.call as any).reject?.().catch(() => {});
+                if (platform === 'ios') VoipPush.endCall?.().catch(() => {});
+                if (platform === 'android') VoipCall.endCall?.().catch(() => {});
+            } else {
+                pendingNativeActionRef.current = { action: 'decline', at: Date.now() };
+            }
+        };
+
+        const onVoiceAnswerPending = () => handleNativeAnswer();
+        window.addEventListener('voice:answerPendingCall', onVoiceAnswerPending);
+
         if (platform === 'ios') {
-            VoipPush.register?.().catch(() => {});
+            VoipPush.register?.()
+                .then((res: { pendingAction?: string } | undefined) => {
+                    if (res?.pendingAction === 'answered') handleNativeAnswer();
+                    else if (res?.pendingAction === 'ended') handleNativeEnd();
+                })
+                .catch(() => {});
             listeners.push(
                 VoipPush.addListener?.('voipToken', (ev: { token: string }) => {
                     if (ev?.token) registerDeviceToken({ voipToken: ev.token });
                 }),
-                VoipPush.addListener?.('callAnswered', () => {
-                    answer().catch(() => {});
-                }),
-                VoipPush.addListener?.('callEnded', () => {
-                    hangup().catch(() => {});
-                }),
+                VoipPush.addListener?.('callAnswered', handleNativeAnswer),
+                VoipPush.addListener?.('callEnded', handleNativeEnd),
                 VoipPush.addListener?.('callMuted', (ev: { muted?: boolean }) => {
                     const muted = Boolean(ev?.muted);
                     setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: muted } : null));
@@ -317,16 +354,13 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             );
         } else if (platform === 'android') {
             listeners.push(
-                VoipCall.addListener?.('callAnswered', () => {
-                    answer().catch(() => {});
-                }),
-                VoipCall.addListener?.('callEnded', () => {
-                    hangup().catch(() => {});
-                })
+                VoipCall.addListener?.('callAnswered', handleNativeAnswer),
+                VoipCall.addListener?.('callEnded', handleNativeEnd)
             );
         }
 
         return () => {
+            window.removeEventListener('voice:answerPendingCall', onVoiceAnswerPending);
             listeners.forEach((l) => l?.remove?.());
         };
     }, [churchId, voiceAddonEnabled, apiBaseUrl, answer, hangup]);
@@ -388,9 +422,22 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                             incomingSub = client.session.incomingCalls$.subscribe((calls: Call[]) => {
                                 if (calls.length > 0 && !activeCallRef.current) {
                                     const incoming = calls[0];
+                                    const callerNumber = (incoming as any).callerIdNumber || (incoming as any).from || 'Unknown Caller';
+                                    const pending = pendingNativeActionRef.current;
+                                    if (pending && Date.now() - pending.at < 15000) {
+                                        pendingNativeActionRef.current = null;
+                                        if (pending.action === 'answer') {
+                                            answerCallObject(incoming, callerNumber).catch(() => {});
+                                            return;
+                                        }
+                                        if (pending.action === 'decline') {
+                                            (incoming as any).reject?.().catch(() => {});
+                                            return;
+                                        }
+                                    }
                                     setIncomingCall({
                                         id: incoming.id || `in_${Date.now()}`,
-                                        callerNumber: (incoming as any).callerIdNumber || (incoming as any).from || 'Unknown Caller',
+                                        callerNumber,
                                         callerName: (incoming as any).callerIdName,
                                         call: incoming,
                                     });
