@@ -33,6 +33,7 @@ import { SmsEventPickerModal } from './SmsEventPickerModal';
 import { ToolPage, ToolHeader, ToolTabs, ToolButton, ToolEmptyState } from './tool-shell';
 import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
 import { VoiceSoftphone } from './VoiceSoftphone';
+import { VoiceDialerView } from './VoiceDialerView';
 
 // --- Constants --------------------------------------------------------------
 
@@ -12119,7 +12120,7 @@ interface MessagingModuleProps {
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
-    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files' | 'settings';
+    type Tab = 'campaigns' | 'inbox' | 'phone' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files' | 'settings';
     const [activeTab, setActiveTab] = useState<Tab>('inbox');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
@@ -12502,6 +12503,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 { key: 'agent', label: 'AI Agent', icon: Sparkles, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
+                                .concat((Boolean(church.voiceAddOn?.enabled) || visibleNumbers.some(n => n.voiceEnabled)) ? [{ key: 'phone', label: 'Phone', icon: Phone, perm: 'inboxUserIds' } as any] : [])
                                 .concat([{ key: 'settings', label: 'Settings', icon: Settings, perm: 'broadcastUserIds' } as any])
                                 .concat((currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: Shield, perm: 'broadcastUserIds' } as any] : [])
                                 .map(t => ({ value: t.key as string, label: t.label, icon: t.icon }))}
@@ -12615,6 +12617,17 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 )}
 
                 {/* Keywords tab */}
+                {effectiveTab === 'phone' && (
+                    <div className="h-full min-h-0">
+                        <VoiceDialerView
+                            churchId={churchId}
+                            church={church}
+                            activeNumber={activeNumber}
+                            visibleNumbers={visibleNumbers}
+                        />
+                    </div>
+                )}
+
                 {effectiveTab === 'keywords' && (
                     <div className="h-full overflow-y-auto">
                         {!canUserUseFeature(activeNumber, currentUser, 'keywordsUserIds') ? (

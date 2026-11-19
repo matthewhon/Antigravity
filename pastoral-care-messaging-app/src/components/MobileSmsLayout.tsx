@@ -47,7 +47,7 @@ const safeJson = async (res: Response): Promise<any> => {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SmsTab = 'inbox' | 'team' | 'campaigns' | 'workflows' | 'keywords' | 'agent' | 'files' | 'analytics' | 'permissions';
+type SmsTab = 'inbox' | 'phone' | 'team' | 'campaigns' | 'workflows' | 'keywords' | 'agent' | 'files' | 'analytics' | 'permissions';
 
 interface MobileSmsLayoutProps {
     churchId: string;
@@ -86,6 +86,11 @@ const TABS: { id: SmsTab; label: string; icon: React.ReactNode; activeIcon: Reac
         id: 'inbox', label: 'Inbox', perm: 'inboxUserIds',
         icon:       <Inbox size={24} strokeWidth={1.6} />,
         activeIcon: <Inbox size={24} strokeWidth={2.5} />,
+    },
+    {
+        id: 'phone', label: 'Phone', perm: 'voice',
+        icon:       <Phone size={24} strokeWidth={1.6} />,
+        activeIcon: <Phone size={24} strokeWidth={2.5} />,
     },
     {
         id: 'team', label: 'Team', perm: 'teamChat',
@@ -324,11 +329,14 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     
     const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
     
+    const hasVoiceEnabled = Boolean((church as any).voiceAddOn?.enabled) || visibleNumbers.some((n: any) => n.voiceEnabled);
+
     // Tabs the user may open at all
     const visibleTabs = TABS.filter(t => {
         if (t.id === 'team') return teamEnabled;
         // Chat-only staff (no Messaging role) only get Team Chat
         if (!canUseMessaging) return false;
+        if (t.id === 'phone') return hasVoiceEnabled;
         if (!isTablet && ['workflows', 'keywords', 'agent', 'permissions'].includes(t.id)) {
             return false;
         }

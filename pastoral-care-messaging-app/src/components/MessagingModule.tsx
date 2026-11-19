@@ -31,6 +31,7 @@ import { ImageViewer } from '../ui/ImageViewer';
 import { isRendered, useBackHandler } from '../ui/backButton';
 import { useSignalWireVoice } from '../hooks/useSignalWireVoice';
 import { VoiceSoftphone } from './VoiceSoftphone';
+import { VoiceDialerView } from './VoiceDialerView';
 
 // --- Constants --------------------------------------------------------------
 
@@ -9768,7 +9769,7 @@ interface MessagingModuleProps {
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
-    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
+    controlledTab?: 'campaigns' | 'inbox' | 'phone' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
     /** Pre-selected phone number ID supplied by a parent (e.g. MobileSmsLayout). */
     initialNumberId?: string | null;
     /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
@@ -9784,7 +9785,7 @@ interface MessagingModuleProps {
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange, deepLinkConversationId, onDeepLinkConversationOpened }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
-    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
+    type Tab = 'campaigns' | 'inbox' | 'phone' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
     const [activeTab, setActiveTab] = useState<Tab>('inbox');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
@@ -10266,6 +10267,19 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 onDeepLinkConversationOpened={onDeepLinkConversationOpened}
                             />
                         )}
+                    </div>
+                )}
+
+                {/* Phone Dialer tab */}
+                {effectiveTab === 'phone' && (
+                    <div className="h-full min-h-0">
+                        <VoiceDialerView
+                            churchId={churchId}
+                            church={church}
+                            activeNumber={activeNumber}
+                            visibleNumbers={visibleNumbers}
+                            apiBaseUrl={API_BASE}
+                        />
                     </div>
                 )}
 
