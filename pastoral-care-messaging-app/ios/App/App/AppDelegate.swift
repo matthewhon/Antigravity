@@ -16,7 +16,7 @@ public class CelebrationNotificationsPlugin: CAPPlugin, CAPBridgedPlugin, Notifi
         bridge?.notificationRouter.localNotificationHandler = self
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error = error {
                 call.reject(error.localizedDescription)
