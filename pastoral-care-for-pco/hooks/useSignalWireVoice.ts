@@ -70,9 +70,11 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
         }
 
         let cancelled = false;
-        let sub: { unsubscribe: () => void } | null = null;
+        let readySub: { unsubscribe: () => void } | null = null;
+        let errorSub: { unsubscribe: () => void } | null = null;
+        let incomingSub: { unsubscribe: () => void } | null = null;
 
-        const init = async () => {
+        const init = () => {
             setStatus('connecting');
             setError(null);
             try {
@@ -80,6 +82,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
                     authenticate: fetchVoiceToken,
                     refresh: fetchVoiceToken,
                 };
+                // SignalWire constructor automatically resolves credentials, connects, and registers.
                 const client = new SignalWire(credentialProvider);
                 if (cancelled) {
                     client.disconnect();
@@ -87,23 +90,34 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
                 }
                 clientRef.current = client;
 
-                await client.connect();
-                await client.register();
-                if (cancelled) return;
+                errorSub = client.errors$.subscribe((err: Error) => {
+                    if (cancelled) return;
+                    setStatus('error');
+                    setError(err?.message || 'Failed to connect voice client');
+                });
 
-                setStatus('ready');
-
-                sub = client.session.incomingCalls$.subscribe((calls: Call[]) => {
-                    if (calls.length > 0 && !activeCallRef.current) {
-                        const incoming = calls[0];
-                        setIncomingCall({
-                            id: incoming.id || `in_${Date.now()}`,
-                            callerNumber: (incoming as any).callerIdNumber || (incoming as any).from || 'Unknown Caller',
-                            callerName: (incoming as any).callerIdName,
-                            call: incoming,
-                        });
-                    } else if (calls.length === 0) {
-                        setIncomingCall(null);
+                readySub = client.ready$.subscribe((isReady: boolean) => {
+                    if (cancelled) return;
+                    if (isReady) {
+                        setStatus('ready');
+                        setError(null);
+                        if (!incomingSub && client.session?.incomingCalls$) {
+                            incomingSub = client.session.incomingCalls$.subscribe((calls: Call[]) => {
+                                if (calls.length > 0 && !activeCallRef.current) {
+                                    const incoming = calls[0];
+                                    setIncomingCall({
+                                        id: incoming.id || `in_${Date.now()}`,
+                                        callerNumber: (incoming as any).callerIdNumber || (incoming as any).from || 'Unknown Caller',
+                                        callerName: (incoming as any).callerIdName,
+                                        call: incoming,
+                                    });
+                                } else if (calls.length === 0) {
+                                    setIncomingCall(null);
+                                }
+                            });
+                        }
+                    } else {
+                        setStatus((prev) => (prev === 'error' ? 'error' : 'connecting'));
                     }
                 });
             } catch (err: any) {
@@ -118,7 +132,9 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled }: UseSignalWir
 
         return () => {
             cancelled = true;
-            if (sub) sub.unsubscribe();
+            readySub?.unsubscribe();
+            errorSub?.unsubscribe();
+            incomingSub?.unsubscribe();
             if (clientRef.current) {
                 try {
                     clientRef.current.disconnect();
