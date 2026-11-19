@@ -100,7 +100,14 @@ export const AudioGreetingUploader: React.FC<AudioGreetingUploaderProps> = ({
         setError(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
+            const mimeCandidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+            const preferredMime =
+                typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function'
+                    ? mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m))
+                    : undefined;
+            const recorder = preferredMime
+                ? new MediaRecorder(stream, { mimeType: preferredMime })
+                : new MediaRecorder(stream);
             chunksRef.current = [];
             recorder.ondataavailable = (ev) => {
                 if (ev.data.size > 0) chunksRef.current.push(ev.data);
@@ -109,13 +116,17 @@ export const AudioGreetingUploader: React.FC<AudioGreetingUploaderProps> = ({
                 stream.getTracks().forEach((t) => t.stop());
                 if (timerRef.current) window.clearInterval(timerRef.current);
                 setRecording(false);
-                const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-                if (blob.size > 0) {
-                    await uploadBlob(blob, `recording_${Date.now()}.webm`);
+                const actualMime = recorder.mimeType || preferredMime || 'audio/webm';
+                const ext = actualMime.includes('mp4') || actualMime.includes('aac') ? 'm4a' : 'webm';
+                const blob = new Blob(chunksRef.current, { type: actualMime });
+                if (blob.size < 100) {
+                    setError('Recording was empty or too short. Please try again.');
+                    return;
                 }
+                await uploadBlob(blob, `recording_${Date.now()}.${ext}`);
             };
             mediaRecorderRef.current = recorder;
-            recorder.start();
+            recorder.start(250);
             setRecordSec(0);
             setRecording(true);
             timerRef.current = window.setInterval(() => {

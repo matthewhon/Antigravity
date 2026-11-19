@@ -127,12 +127,48 @@ async function saveMp3ToVoiceStorage(
     };
 }
 
-function extFromMime(mimeType: string, fileName?: string): string {
+function detectAudioExtFromBuffer(buf: Buffer): string | null {
+    if (buf.length < 12) return null;
+    // RIFF....WAVE
+    if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WAVE') {
+        return 'wav';
+    }
+    // OggS
+    if (buf.subarray(0, 4).toString('ascii') === 'OggS') {
+        return 'ogg';
+    }
+    // EBML / WebM / Matroska
+    if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+        return 'webm';
+    }
+    // MP4 / M4A ('ftyp' box at offset 4)
+    if (buf.subarray(4, 8).toString('ascii') === 'ftyp') {
+        return 'm4a';
+    }
+    // ID3 tag (MP3)
+    if (buf.subarray(0, 3).toString('ascii') === 'ID3') {
+        return 'mp3';
+    }
+    // ADTS AAC sync word (0xFFF0 with layer 00)
+    if (buf[0] === 0xff && (buf[1] & 0xf6) === 0xf0) {
+        return 'aac';
+    }
+    // MP3 frame sync
+    if (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) {
+        return 'mp3';
+    }
+    return null;
+}
+
+function extFromMime(mimeType: string, fileName?: string, inputBuffer?: Buffer): string {
+    const sniffed = inputBuffer ? detectAudioExtFromBuffer(inputBuffer) : null;
+    if (sniffed) return sniffed;
     const lower = String(mimeType || '').toLowerCase();
     if (lower.includes('webm')) return 'webm';
     if (lower.includes('ogg')) return 'ogg';
     if (lower.includes('wav')) return 'wav';
-    if (lower.includes('mp4') || lower.includes('m4a') || lower.includes('aac')) return 'm4a';
+    if (lower.includes('aac')) return 'aac';
+    if (lower.includes('mp4') || lower.includes('m4a')) return 'm4a';
     if (lower.includes('mpeg') || lower.includes('mp3')) return 'mp3';
     const fromName = path.extname(fileName || '').replace(/^\./, '').toLowerCase();
     return fromName || 'webm';
@@ -143,9 +179,12 @@ export async function transcodeToMp3(
     mimeType = 'audio/webm',
     fileName?: string
 ): Promise<{ mp3Buffer: Buffer; durationSec: number }> {
+    if (!inputBuffer || inputBuffer.length < 64) {
+        throw new Error('Audio recording is empty or too short. Please try recording again.');
+    }
     const id = randomUUID();
     const tmpDir = os.tmpdir();
-    const inputExt = extFromMime(mimeType, fileName);
+    const inputExt = extFromMime(mimeType, fileName, inputBuffer);
     const inputPath = path.join(tmpDir, `voice_in_${id}.${inputExt}`);
     const outputPath = path.join(tmpDir, `voice_out_${id}.mp3`);
 

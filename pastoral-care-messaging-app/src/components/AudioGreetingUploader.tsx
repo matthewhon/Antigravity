@@ -106,12 +106,14 @@ export const AudioGreetingUploader: React.FC<AudioGreetingUploaderProps> = ({
                 const actualMime = recorder.mimeType || preferredMime || 'audio/mp4';
                 const ext = actualMime.includes('mp4') || actualMime.includes('aac') ? 'm4a' : 'webm';
                 const blob = new Blob(chunksRef.current, { type: actualMime });
-                if (blob.size > 0) {
-                    await uploadBlob(blob, `greeting_${Date.now()}.${ext}`);
+                if (blob.size < 100) {
+                    setError('Recording was empty or too short. Please try again.');
+                    return;
                 }
+                await uploadBlob(blob, `greeting_${Date.now()}.${ext}`);
             };
             mediaRecorderRef.current = recorder;
-            recorder.start();
+            recorder.start(250);
             setRecordSec(0);
             setRecording(true);
             timerRef.current = window.setInterval(() => {
