@@ -80,15 +80,27 @@ async function runTests() {
                 label: 'On-Call Cell',
                 data: { phoneNumber: '+15551234567', callScreening: true },
             },
+            {
+                id: 'sms_node',
+                type: 'send_sms',
+                position: { x: 400, y: 450 },
+                label: 'Send Maps Link',
+                data: {
+                    message: 'Hi {callerName}, directions: https://maps.google.com/?q=Grace+Church',
+                    ttsText: 'We just texted you our Google Maps link.',
+                },
+            },
         ],
         edges: [
             { id: 'e1', source: 'trig', target: 'agent' },
             { id: 'e2', source: 'agent', sourceHandle: 'digit_1', target: 'route_u1' },
             { id: 'e3', source: 'agent', sourceHandle: 'digit_2', target: 'ext' },
             { id: 'e4', source: 'agent', sourceHandle: 'digit_3', target: 'fwd' },
+            { id: 'e5', source: 'agent', sourceHandle: 'digit_4', target: 'sms_node' },
         ],
     };
 
+    const sentMessages: string[] = [];
     const ctx = {
         db,
         churchId: 'c1',
@@ -103,6 +115,9 @@ async function runTests() {
         callerName: 'Alice',
         baseUrl: 'https://app.example.com',
         pushDispatcher: async () => {},
+        smsSender: async (msg: string) => {
+            sentMessages.push(msg);
+        },
     };
 
     // 1. Entry -> Voice Agent with <Play> inside <Gather> (barge-in)
@@ -122,6 +137,12 @@ async function runTests() {
     // 4. Pressing 3 -> forward_number with callScreening whisper
     const fwdLaml = await executeFlowNode(ctx, 'agent', { digits: '3' });
     assert.ok(fwdLaml.includes('url="https://app.example.com/api/voice/whisper?callerName=Alice"'), 'Should include whisper url');
+
+    // 5. Pressing 4 -> send_sms sends personalized link and plays confirmation
+    const smsLaml = await executeFlowNode(ctx, 'agent', { digits: '4' });
+    assert.equal(sentMessages.length, 1, 'Should send 1 SMS');
+    assert.ok(sentMessages[0].includes('Hi Alice, directions: https://maps.google.com'), 'Should personalize SMS');
+    assert.ok(smsLaml.includes('We just texted you our Google Maps link.'), 'Should speak confirmation');
 
     console.log('All voiceFlowEngine tests passed!');
 }

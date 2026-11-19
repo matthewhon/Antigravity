@@ -68,6 +68,7 @@ export interface FlowExecutionContext {
     callerName?: string | null;
     baseUrl: string;
     pushDispatcher: (targetUids: string[]) => Promise<void>;
+    smsSender?: (message: string) => Promise<void>;
 }
 
 export async function renderUserVoicemailLaml(params: {
@@ -490,6 +491,26 @@ export async function executeFlowNode(
                     : '';
 
             return `<Dial timeout="${timeoutSec}" action="${escapeXml(actionUrl)}"><Number${whisperAttr}>${escapeXml(targetPhone)}</Number></Dial>`;
+        }
+
+        case 'send_sms': {
+            const rawMsg = String(data.message || '').trim();
+            if (rawMsg && ctx.fromPhone && ctx.smsSender) {
+                const personalized = rawMsg.replace(/\{callerName\}/gi, ctx.callerName || 'there');
+                await ctx.smsSender(personalized).catch((err: any) => {
+                    console.warn('[voiceFlowEngine] send_sms failed:', err?.message || err);
+                });
+            }
+            const confirmXml = renderPromptXml(
+                data,
+                rawMsg ? 'We have just sent that information to your phone via text message.' : ''
+            );
+            const nextId = findNextNodeId(ctx.graph, node.id);
+            if (nextId) {
+                const nextXml = await executeFlowNode(ctx, nextId, { ...stepState, depth: depth + 1 });
+                return `${confirmXml}${nextXml}`;
+            }
+            return `${confirmXml}<Hangup/>`;
         }
 
         case 'hangup': {

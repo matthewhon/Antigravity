@@ -86,6 +86,7 @@ export type VoiceNodeType =
     | 'route_user'
     | 'voicemail'
     | 'forward_number'
+    | 'send_sms'
     | 'hangup';
 
 export interface VoiceFlowNode {

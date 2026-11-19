@@ -11,7 +11,7 @@ import {
     getVoiceWebhookBaseUrl,
     mintVoiceSubscriberToken
 } from './signalwireClient';
-import { getSmsPricingConfig } from './smsSend';
+import { getSmsPricingConfig, sendIndividualInternal } from './smsSend';
 import { sendPushToChurch } from './webPushService';
 import { evaluateUserAvailability } from './voiceAvailability';
 import { executeFlowNode, renderUserVoicemailLaml } from './voiceFlowEngine';
@@ -419,6 +419,21 @@ export const handleVoiceInbound = async (req: any, res: any) => {
                                 toPhone,
                                 explicitTargetUids: targetUids,
                                 callerName: personMatch?.callerName,
+                            });
+                        },
+                        smsSender: async (message: string) => {
+                            await sendIndividualInternal({
+                                db,
+                                log,
+                                churchId,
+                                toPhone: fromPhone,
+                                body: message,
+                                smsNumberId,
+                                sentBy: 'voice_flow',
+                                sentByName: 'Voice Call Flow',
+                                personId: personMatch?.personId || null,
+                                personName: personMatch?.callerName || null,
+                                preventIdentityOverwrite: true,
                             });
                         },
                     },
@@ -938,6 +953,23 @@ export const handleVoiceFlowStep = async (req: any, res: any) => {
                         toPhone: callData.to || '',
                         explicitTargetUids: targetUids,
                         callerName: callData.callerName,
+                    });
+                },
+                smsSender: async (message: string) => {
+                    const callerPhone = callData.from || normaliseE164(body.From || '');
+                    if (!callerPhone || !smsNumberId) return;
+                    await sendIndividualInternal({
+                        db,
+                        log,
+                        churchId,
+                        toPhone: callerPhone,
+                        body: message,
+                        smsNumberId,
+                        sentBy: 'voice_flow',
+                        sentByName: 'Voice Call Flow',
+                        personId: callData.personId || null,
+                        personName: callData.callerName || null,
+                        preventIdentityOverwrite: true,
                     });
                 },
             },
