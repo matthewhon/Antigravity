@@ -1156,6 +1156,156 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                                         ))}
                                     </select>
                                 )}
+
+                                {selectedData.mode === 'church_general' && (
+                                    <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => updateSelectedNode({ nodeData: { greetingType: 'tts' } })}
+                                                className={`flex-1 py-1.5 rounded-xl text-xs font-bold border ${
+                                                    (selectedData.greetingType || 'tts') === 'tts'
+                                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                                        : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            >
+                                                Text-to-Speech
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateSelectedNode({ nodeData: { greetingType: 'audio' } })}
+                                                className={`flex-1 py-1.5 rounded-xl text-xs font-bold border ${
+                                                    selectedData.greetingType === 'audio'
+                                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                                        : 'bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            >
+                                                Record / Upload
+                                            </button>
+                                        </div>
+
+                                        {selectedData.greetingType === 'audio' ? (
+                                            <AudioGreetingUploader
+                                                churchId={churchId}
+                                                scope="flow_prompt"
+                                                currentUrl={selectedData.greetingAudioUrl}
+                                                label="General / After-Hours Greeting"
+                                                onUploaded={(url) =>
+                                                    updateSelectedNode({
+                                                        nodeData: { greetingType: 'audio', greetingAudioUrl: url },
+                                                    })
+                                                }
+                                                onClear={() =>
+                                                    updateSelectedNode({ nodeData: { greetingAudioUrl: undefined } })
+                                                }
+                                            />
+                                        ) : (
+                                            <div>
+                                                <label className="text-[11px] font-bold text-slate-500">Voicemail Greeting Text</label>
+                                                <textarea
+                                                    rows={3}
+                                                    value={selectedData.greetingText || ''}
+                                                    onChange={(e) => updateSelectedNode({ nodeData: { greetingText: e.target.value } })}
+                                                    placeholder="Thank you for calling. Our office is currently closed. Please leave a message after the tone..."
+                                                    className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {selectedType === 'hours_check' && (
+                            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-500">Timezone</label>
+                                    <select
+                                        value={selectedData.timezone || churchTimezone}
+                                        onChange={(e) => updateSelectedNode({ nodeData: { timezone: e.target.value } })}
+                                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-bold"
+                                    >
+                                        {[
+                                            'America/New_York',
+                                            'America/Chicago',
+                                            'America/Denver',
+                                            'America/Phoenix',
+                                            'America/Los_Angeles',
+                                            'America/Anchorage',
+                                            'Pacific/Honolulu',
+                                            'UTC',
+                                        ].map((tz) => (
+                                            <option key={tz} value={tz}>{tz}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-slate-500">Open Hours (Closed routes to After-Hours)</label>
+                                    {(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as DayOfWeek[]).map((day) => {
+                                        const sched = selectedData.schedule || {};
+                                        const dayCfg = sched[day] || { enabled: day !== 'sun' && day !== 'sat', windows: [{ start: '09:00', end: '17:00' }] };
+                                        const win = dayCfg.windows?.[0] || { start: '09:00', end: '17:00' };
+                                        return (
+                                            <div key={day} className="flex items-center gap-1.5 text-xs bg-white dark:bg-slate-800 px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <label className="w-12 flex items-center gap-1.5 font-bold uppercase text-[10px] cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Boolean(dayCfg.enabled)}
+                                                        onChange={(e) =>
+                                                            updateSelectedNode({
+                                                                nodeData: {
+                                                                    schedule: {
+                                                                        ...sched,
+                                                                        [day]: { ...dayCfg, enabled: e.target.checked, windows: dayCfg.windows?.length ? dayCfg.windows : [win] },
+                                                                    },
+                                                                },
+                                                            })
+                                                        }
+                                                        className="rounded text-indigo-600"
+                                                    />
+                                                    {day}
+                                                </label>
+                                                {dayCfg.enabled ? (
+                                                    <div className="flex items-center gap-1 flex-1">
+                                                        <input
+                                                            type="time"
+                                                            value={win.start}
+                                                            onChange={(e) =>
+                                                                updateSelectedNode({
+                                                                    nodeData: {
+                                                                        schedule: {
+                                                                            ...sched,
+                                                                            [day]: { ...dayCfg, windows: [{ ...win, start: e.target.value }] },
+                                                                        },
+                                                                    },
+                                                                })
+                                                            }
+                                                            className="w-24 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 text-[11px]"
+                                                        />
+                                                        <span className="text-slate-400 text-[10px]">–</span>
+                                                        <input
+                                                            type="time"
+                                                            value={win.end}
+                                                            onChange={(e) =>
+                                                                updateSelectedNode({
+                                                                    nodeData: {
+                                                                        schedule: {
+                                                                            ...sched,
+                                                                            [day]: { ...dayCfg, windows: [{ ...win, end: e.target.value }] },
+                                                                        },
+                                                                    },
+                                                                })
+                                                            }
+                                                            className="w-24 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 text-[11px]"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[11px] text-slate-400 italic">Closed</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
 
