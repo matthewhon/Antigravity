@@ -11968,146 +11968,6 @@ Write the reply:`;
     );
 };
 
-// --- Messaging Settings Tab ---------------------------------------------------
-
-const SmsSettingsTab: React.FC<{
-    churchId: string;
-    church: Church;
-    activeNumber?: TwilioPhoneNumber | null;
-    onToast?: (msg: string, type?: 'success' | 'error') => void;
-}> = ({ churchId, church, activeNumber, onToast }) => {
-    const [saving, setSaving] = useState(false);
-    const voiceAddonActive = true || Boolean(church.voiceAddOn?.enabled);
-
-    const updateVoiceSettings = async (patch: {
-        voiceEnabled?: boolean;
-        voicemailEnabled?: boolean;
-        recordCalls?: boolean;
-        voiceForwardingNumber?: string;
-    }) => {
-        if (!activeNumber) return;
-        setSaving(true);
-        try {
-            const res = await fetch(`${API_BASE}/api/messaging/number-settings`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    churchId,
-                    smsNumberId: activeNumber.id,
-                    ...patch,
-                }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Failed to update voice settings');
-            }
-            onToast?.('Voice settings updated', 'success');
-        } catch (err: any) {
-            onToast?.(err?.message || 'Failed to update voice settings', 'error');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div className="p-6 max-w-4xl mx-auto space-y-6">
-            <div>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white">Messaging Settings</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Configure voice calling and number-level options for your active phone number.
-                </p>
-            </div>
-
-            {!activeNumber ? (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 text-center">
-                    <Phone size={24} className="mx-auto text-slate-400 mb-2" />
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No phone number selected</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Provision or select a phone number above to configure Voice Calling settings.
-                    </p>
-                </div>
-            ) : (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                                <Phone size={18} />
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white">
-                                    Voice Calling ({activeNumber.friendlyLabel || activeNumber.phoneNumber})
-                                </h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    {voiceAddonActive
-                                        ? 'Opt in to two-way voice calling, voicemail, and call recording for this number.'
-                                        : 'Optional paid add-on. Enable Voice Calling in Subscription Settings to activate.'}
-                                </p>
-                            </div>
-                        </div>
-                        {voiceAddonActive ? (
-                            <button
-                                disabled={saving}
-                                onClick={() => updateVoiceSettings({ voiceEnabled: !activeNumber.voiceEnabled })}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${
-                                    activeNumber.voiceEnabled
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
-                                }`}
-                            >
-                                {activeNumber.voiceEnabled ? 'Voice Enabled' : 'Enable Voice'}
-                            </button>
-                        ) : (
-                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-[10px] font-bold uppercase text-slate-500 dark:text-slate-300">
-                                Add-On Required
-                            </span>
-                        )}
-                    </div>
-
-                    {voiceAddonActive && activeNumber.voiceEnabled && (
-                        <div className="pt-3 border-t border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                                <span className="font-semibold text-slate-700 dark:text-slate-200">Opt-in Voicemail</span>
-                                <input
-                                    type="checkbox"
-                                    disabled={saving}
-                                    checked={Boolean(activeNumber.voicemailEnabled)}
-                                    onChange={(e) => updateVoiceSettings({ voicemailEnabled: e.target.checked })}
-                                    className="rounded text-indigo-600"
-                                />
-                            </label>
-                            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                                <span className="font-semibold text-slate-700 dark:text-slate-200">Opt-in Call Recording</span>
-                                <input
-                                    type="checkbox"
-                                    disabled={saving}
-                                    checked={Boolean(activeNumber.recordCalls)}
-                                    onChange={(e) => updateVoiceSettings({ recordCalls: e.target.checked })}
-                                    className="rounded text-indigo-600"
-                                />
-                            </label>
-                            <div className="md:col-span-2 flex gap-2">
-                                <input
-                                    type="tel"
-                                    key={activeNumber.id}
-                                    defaultValue={activeNumber.voiceForwardingNumber || ''}
-                                    placeholder="Fallback Forwarding Number (e.g. +15551234567)"
-                                    onBlur={(e) => {
-                                        const next = e.target.value.trim();
-                                        if (next !== (activeNumber.voiceForwardingNumber || '')) {
-                                            updateVoiceSettings({ voiceForwardingNumber: next });
-                                        }
-                                    }}
-                                    className="flex-1 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-white"
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
 // --- Main MessagingModule -----------------------------------------------------
 
 interface MessagingModuleProps {
@@ -12116,7 +11976,7 @@ interface MessagingModuleProps {
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
-    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files' | 'settings';
+    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
     /** Pre-selected phone number ID supplied by a parent (e.g. MobileSmsLayout). */
     initialNumberId?: string | null;
     /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
@@ -12128,7 +11988,7 @@ interface MessagingModuleProps {
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
-    type Tab = 'campaigns' | 'inbox' | 'phone' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files' | 'settings';
+    type Tab = 'campaigns' | 'inbox' | 'phone' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
     const [activeTab, setActiveTab] = useState<Tab>('inbox');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
@@ -12208,8 +12068,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             { key: 'analytics', perm: 'analyticsUserIds' },
             { key: 'agent', perm: 'aiAgentUserIds' },
         ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any)) as any;
-
-        allowedTabs.push({ key: 'settings', perm: 'broadcastUserIds' });
 
         if (currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) {
             allowedTabs.push({ key: 'permissions', perm: 'broadcastUserIds' });
@@ -12512,7 +12370,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
                                 .concat((Boolean(church.voiceAddOn?.enabled) || visibleNumbers.some(n => n.voiceEnabled)) ? [{ key: 'phone', label: 'Phone', icon: Phone, perm: 'inboxUserIds' } as any] : [])
-                                .concat([{ key: 'settings', label: 'Settings', icon: Settings, perm: 'broadcastUserIds' } as any])
                                 .concat((currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: Shield, perm: 'broadcastUserIds' } as any] : [])
                                 .map(t => ({ value: t.key as string, label: t.label, icon: t.icon }))}
                         />
@@ -12700,18 +12557,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             churchId={churchId}
                             currentUser={currentUser}
                             church={church}
-                        />
-                    </div>
-                )}
-
-                {/* Settings tab */}
-                {effectiveTab === 'settings' && (
-                    <div className="h-full overflow-y-auto">
-                        <SmsSettingsTab
-                            churchId={churchId}
-                            church={church}
-                            activeNumber={activeNumber}
-                            onToast={showToast}
                         />
                     </div>
                 )}

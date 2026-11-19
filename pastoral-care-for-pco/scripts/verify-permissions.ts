@@ -35,7 +35,7 @@ const oldHasPermission = (user: User | null, v: string, isStarterPlan: boolean, 
         'finance': 'Finance', 'metrics': 'Metrics', 'metrics-input': 'Metrics', 'metrics-settings': 'Metrics',
         'messaging': 'Messaging', 'tools-sms': 'Messaging', 'tools-sms-inbox': 'Messaging',
         'tools-sms-campaigns': 'Messaging', 'tools-sms-workflows': 'Messaging', 'tools-sms-keywords': 'Messaging',
-        'tools-sms-analytics': 'Messaging', 'tools-sms-agent': 'Messaging', 'tools-sms-permissions': 'Messaging', 'tools-sms-settings': 'Messaging',
+        'tools-sms-analytics': 'Messaging', 'tools-sms-agent': 'Messaging', 'tools-sms-permissions': 'Messaging',
         'tools-emails': 'Email', 'tools-polls': 'Polls', 'tools-workflows': 'Workflows',
         'tools-notes': 'Notes', 'tools-files': 'Files', 'tools-forms': 'People',
     };
@@ -54,7 +54,7 @@ const VIEWS = ['dashboard','settings','communication','pastoral','pastoral-membe
     'services-attendance','services-teams','services-plans','services-reminders','services-reports','giving',
     'giving-donor','giving-consistency','giving-budgets','giving-donations','giving-reports','finance','metrics','metrics-input',
     'metrics-settings','messaging','tools','tools-sms','tools-sms-inbox','tools-sms-campaigns','tools-sms-workflows',
-    'tools-sms-keywords','tools-sms-analytics','tools-sms-agent','tools-sms-permissions','tools-sms-settings','tools-emails','tools-polls',
+    'tools-sms-keywords','tools-sms-analytics','tools-sms-agent','tools-sms-permissions','tools-emails','tools-polls',
     'tools-workflows','tools-notes','tools-files','tools-forms','tools-bulletin','tools-website','tools-qrcodes',
     'tools-unsubscribers','tools-church-helper','unknown-view'];
 

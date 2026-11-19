@@ -1843,7 +1843,7 @@ currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<C
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
 activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files' | 'forms' | 'bulletin' | 'church-helper';
 /** When activePage='messaging', this controls the active SMS sub-tab */
-smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'settings';
+smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
 /** When provided, shows an "Open Mobile App" banner in the SMS tab */
 mobileSmsUrl?: string;
 activeNumberId?: string | null;

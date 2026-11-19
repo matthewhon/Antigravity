@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Inbox, Megaphone, KeyRound, ChartColumn, Sparkles, ShieldCheck, Settings } from 'lucide-react';
+import { Inbox, Megaphone, KeyRound, ChartColumn, Sparkles, ShieldCheck } from 'lucide-react';
 import { firestore } from './services/firestoreService';
 import { DashboardPage } from './components/pages/DashboardPage';
 import { PeoplePage } from './components/pages/PeoplePage';
@@ -170,7 +170,6 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/sms/keywords')) return 'tools-sms-keywords';
      if (path.startsWith('/tools/sms/analytics')) return 'tools-sms-analytics';
      if (path.startsWith('/tools/sms/permissions')) return 'tools-sms-permissions';
-     if (path.startsWith('/tools/sms/settings')) return 'tools-sms-settings';
      if (path.startsWith('/tools/sms/agent')) return 'tools-sms-agent';
      if (path.startsWith('/tools/church-helper')) return 'tools-church-helper';
      if (path.startsWith('/tools/sms')) return 'tools-sms-inbox';
@@ -725,7 +724,6 @@ const App: React.FC = () => {
               'tools-sms-analytics': '/tools/sms/analytics',
               'tools-sms-agent': '/tools/sms/agent',
               'tools-sms-permissions': '/tools/sms/permissions',
-              'tools-sms-settings': '/tools/sms/settings',
               'tools-workflows': '/tools/workflows',
               'tools-polls': '/tools/polls',
               'tools-notes': '/tools/notes',
@@ -1280,7 +1278,6 @@ const App: React.FC = () => {
                     (user && canUserUseFeature(activeNumber, user, 'keywordsUserIds')) ? { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <KeyRound size={14} aria-hidden="true" /> } : null,
                     (user && canUserUseFeature(activeNumber, user, 'analyticsUserIds')) ? { label: 'Analytics', view: 'tools-sms-analytics', icon: <ChartColumn size={14} aria-hidden="true" /> } : null,
                     (user && canUserUseFeature(activeNumber, user, 'aiAgentUserIds')) ? { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <Sparkles size={14} aria-hidden="true" /> } : null,
-                    { label: 'Settings', view: 'tools-sms-settings', icon: <Settings size={14} aria-hidden="true" /> },
                     (user && (user.roles.includes('Church Admin') || user.roles.includes('System Administration'))) ? { label: 'Permissions', view: 'tools-sms-permissions', icon: <ShieldCheck size={14} aria-hidden="true" /> } : null
                 ].filter(Boolean) as any : undefined}
             >
@@ -1425,7 +1422,6 @@ const App: React.FC = () => {
                             view === 'tools-sms-keywords'  ? 'keywords'  :
                             view === 'tools-sms-analytics' ? 'analytics' :
                             view === 'tools-sms-permissions' ? 'permissions' :
-                            view === 'tools-sms-settings'    ? 'settings'    :
                             view === 'tools-sms-agent'     ? 'agent'     : 'inbox'
                         }
                         mobileSmsUrl={`${window.location.protocol}//${window.location.host}/mobile/sms`}
