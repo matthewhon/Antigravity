@@ -314,13 +314,20 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     useEffect(() => {
         if (!churchId) return;
         const q = query(collection(firebaseDb, 'voiceFlows'), where('churchId', '==', churchId));
-        const unsub = onSnapshot(q, (snap) => {
-            const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as VoiceFlow[];
-            setFlows(list);
-            if (!activeFlowId && list.length > 0) {
-                loadFlowIntoCanvas(list[0]);
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as VoiceFlow[];
+                setFlows(list);
+                if (!activeFlowId && list.length > 0) {
+                    loadFlowIntoCanvas(list[0]);
+                }
+            },
+            (err) => {
+                console.error('[CallFlowBuilder] Failed to load voiceFlows:', err);
+                setStatusMsg({ type: 'err', text: err?.message || 'Unable to load call flows.' });
             }
-        });
+        );
         return () => unsub();
     }, [churchId]);
 
@@ -335,31 +342,54 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
     };
 
     const handleCreateFlow = async () => {
-        const g = createDefaultGraph();
-        const now = Date.now();
-        const docRef = await addDoc(collection(firebaseDb, 'voiceFlows'), {
-            churchId,
-            name: `Call Flow ${flows.length + 1}`,
-            status: 'draft',
-            draftGraph: g,
-            publishedGraph: null,
-            createdAt: now,
-            updatedAt: now,
-        });
-        setActiveFlowId(docRef.id);
-        setFlowName(`Call Flow ${flows.length + 1}`);
-        setEntryNodeId(g.entryNodeId);
-        setNodes(toReactFlowNodes(g));
-        setEdges(toReactFlowEdges(g));
+        if (!churchId) {
+            setStatusMsg({ type: 'err', text: 'Missing churchId.' });
+            return;
+        }
+        setSaving(true);
+        setStatusMsg(null);
+        try {
+            const g = createDefaultGraph();
+            const now = Date.now();
+            const newName = `Call Flow ${flows.length + 1}`;
+            const docRef = await addDoc(collection(firebaseDb, 'voiceFlows'), {
+                churchId,
+                name: newName,
+                status: 'draft',
+                draftGraph: g,
+                publishedGraph: null,
+                createdAt: now,
+                updatedAt: now,
+            });
+            setActiveFlowId(docRef.id);
+            setFlowName(newName);
+            setEntryNodeId(g.entryNodeId);
+            setNodes(toReactFlowNodes(g));
+            setEdges(toReactFlowEdges(g));
+            setStatusMsg({ type: 'ok', text: 'New call flow created.' });
+        } catch (err: any) {
+            console.error('[CallFlowBuilder] handleCreateFlow error:', err);
+            setStatusMsg({ type: 'err', text: err?.message || 'Failed to create call flow.' });
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDeleteFlow = async () => {
         if (!activeFlowId) return;
         if (!window.confirm('Delete this call flow? Numbers using it will fall back to standard ringing.')) return;
-        await deleteDoc(doc(firebaseDb, 'voiceFlows', activeFlowId));
-        setActiveFlowId('');
-        setNodes([]);
-        setEdges([]);
+        setSaving(true);
+        setStatusMsg(null);
+        try {
+            await deleteDoc(doc(firebaseDb, 'voiceFlows', activeFlowId));
+            setActiveFlowId('');
+            setNodes([]);
+            setEdges([]);
+        } catch (err: any) {
+            setStatusMsg({ type: 'err', text: err?.message || 'Failed to delete call flow.' });
+        } finally {
+            setSaving(false);
+        }
     };
 
     const onConnect = useCallback(
@@ -735,10 +765,11 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                             </p>
                             <button
                                 type="button"
+                                disabled={saving}
                                 onClick={handleCreateFlow}
-                                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black hover:bg-indigo-700"
+                                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black hover:bg-indigo-700 disabled:opacity-50"
                             >
-                                Create First Call Flow
+                                {saving ? 'Creating...' : 'Create First Call Flow'}
                             </button>
                         </div>
                     ) : (
