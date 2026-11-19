@@ -25,6 +25,11 @@ interface ArchitectContext {
     } | null;
     numbers?: Array<{ id: string; friendlyLabel?: string; phoneNumber?: string }>;
     users?: Array<{ id: string; name: string; roles?: string[]; extension?: string }>;
+    currentFlow?: {
+        name?: string;
+        description?: string;
+        graph: VoiceFlowGraph;
+    } | null;
 }
 
 const resolveApiKey = async (): Promise<string | undefined> => {
@@ -106,6 +111,7 @@ const architectResponseSchema = {
                                     'route_user',
                                     'voicemail',
                                     'forward_number',
+                                    'send_sms',
                                     'hangup',
                                 ],
                             },
@@ -161,15 +167,23 @@ AVAILABLE NODE TYPES & THEIR EXACT DATA FIELDS (for dataJson, which MUST be a va
 7. "forward_number" — Forward to an external phone number (E.164).
    - Output handles: "no_answer"
    - dataJson: {"phoneNumber":"+16155550100","timeoutSec":20,"callScreening":false}
-8. "hangup" — Play closing message & end call.
+8. "send_sms" — Send an SMS text message to the caller (e.g., church website link, service times, giving link), speak an optional confirmation message, then continue via "default" or hang up if no outgoing edge.
+   - Output handles: "default" (optional)
+   - dataJson: {"message":"Here is our church website: https://example.org","ttsText":"We just texted you a link to our church website. Goodbye!"}
+9. "hangup" — Play closing message & end call.
    - Output handles: (none, terminal)
    - dataJson: {"ttsText":"Our office is currently closed. Please call back during office hours."}
 
 RULES:
-- On the first turn (or if key routing details are still ambiguous and forceBuild is false), return status="needs_info" with 2 to 4 crisp questions.
+- When CURRENT FLOW is provided in Church Context and the user asks to edit, update, or add to their existing flow (for example, adding a menu option to text a website link):
+  - Preserve existing node IDs, labels, audioUrl fields, schedules, and unrelated edges!
+  - Only add, modify, or rewire the specific nodes/edges needed for the requested change (e.g., add the new digit to an existing voice_agent's menuDigits, update its ttsText to mention the new option, and connect that digit handle to a new send_sms or other target node).
+  - If the user's edit request is already clear and has all needed details (or forceBuild=true), return status="ready" immediately with the updated full graph; only ask 1-2 crisp questions if a key detail (like a website URL or destination) is missing.
+- When creating a new flow from scratch (no CURRENT FLOW provided):
+  - On the first turn (or if key routing details are still ambiguous and forceBuild is false), return status="needs_info" with 2 to 4 crisp questions.
 - Each question should include 2-4 clickable "options" chips when helpful (e.g., ["Office hours + after-hours voicemail", "24/7 direct ring", "IVR menu with extensions"]).
 - Never ask for staff names, extensions, or phone numbers that are already listed in the Church Context—reference them directly!
-- Once you have enough information (usually after 1-2 user replies) OR when forceBuild=true, return status="ready" with a complete, connected "graph", a clear "flowName", "flowDescription", and a plain-English "assistantMessage" explaining the flow.
+- Once you have enough information (usually after 1-2 user replies) OR when forceBuild=true, return status="ready" with a complete, connected "graph", a clear "flowName", "flowDescription", and a plain-English "assistantMessage" explaining the flow (or summarizing the edits made).
 - Every edge's sourceHandle MUST match the allowed handles for its source node type.`;
 
 export async function handleCallFlowArchitect(req: any, res: any) {
@@ -213,6 +227,25 @@ export async function handleCallFlowArchitect(req: any, res: any) {
                       .join('\n')}`
                 : 'No staff users provided.',
             knowledge ? `Church Knowledge:\n${knowledge}` : '',
+            context.currentFlow?.graph
+                ? `CURRENT FLOW TO EDIT:\nName: ${context.currentFlow.name || 'Untitled Flow'}\n${
+                      context.currentFlow.description ? `Description: ${context.currentFlow.description}\n` : ''
+                  }Graph JSON:\n${JSON.stringify({
+                      entryNodeId: context.currentFlow.graph.entryNodeId,
+                      nodes: (context.currentFlow.graph.nodes || []).map((n) => ({
+                          id: n.id,
+                          type: n.type,
+                          label: n.label,
+                          data: n.data || {},
+                      })),
+                      edges: (context.currentFlow.graph.edges || []).map((e) => ({
+                          id: e.id,
+                          source: e.source,
+                          sourceHandle: e.sourceHandle || 'default',
+                          target: e.target,
+                      })),
+                  })}`
+                : '',
             forceBuild ? 'IMPORTANT: The user clicked Build Flow Now. You MUST return status="ready" with a complete graph now using sensible defaults for any unspecified details.' : '',
         ]
             .filter(Boolean)

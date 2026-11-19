@@ -30,6 +30,7 @@ interface AICallFlowModalProps {
     users: User[];
     numbers: TwilioPhoneNumber[];
     hasActiveFlow: boolean;
+    currentFlow?: { name: string; graph: VoiceFlowGraph } | null;
     onClose: () => void;
     onApplyToCurrentDraft: (payload: { name: string; description?: string; graph: VoiceFlowGraph }) => void;
     onCreateNewFlow: (payload: {
@@ -46,10 +47,12 @@ export const AICallFlowModal: React.FC<AICallFlowModalProps> = ({
     users,
     numbers,
     hasActiveFlow,
+    currentFlow = null,
     onClose,
     onApplyToCurrentDraft,
     onCreateNewFlow,
 }) => {
+    const [mode, setMode] = useState<'edit' | 'create'>(currentFlow ? 'edit' : 'create');
     const [selectedNumberId, setSelectedNumberId] = useState<string>(numbers[0]?.id || '');
     const [initialGoal, setInitialGoal] = useState<string>('');
     const [started, setStarted] = useState(false);
@@ -99,6 +102,7 @@ export const AICallFlowModal: React.FC<AICallFlowModalProps> = ({
                             roles: u.roles || [],
                             extension: u.callingPreferences?.extension || undefined,
                         })),
+                        currentFlow: mode === 'edit' && currentFlow ? currentFlow : null,
                     },
                 }),
             });
@@ -249,28 +253,83 @@ export const AICallFlowModal: React.FC<AICallFlowModalProps> = ({
 
                     {!started && (
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                                    Which phone number is this flow for?
-                                </label>
-                                <select
-                                    value={selectedNumberId}
-                                    onChange={(e) => setSelectedNumberId(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
-                                >
-                                    <option value="">General / Unassigned Flow</option>
-                                    {numbers.map((n) => (
-                                        <option key={n.id} value={n.id}>
-                                            {n.friendlyLabel || 'Phone Line'} ({n.phoneNumber})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {currentFlow && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode('edit')}
+                                        className={`px-3 py-2 rounded-xl text-xs font-bold border text-left transition ${
+                                            mode === 'edit'
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        Edit Current Flow
+                                        <span className={`block text-[11px] font-normal mt-0.5 ${mode === 'edit' ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                            {currentFlow.name} ({currentFlow.graph.nodes.length} blocks)
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode('create')}
+                                        className={`px-3 py-2 rounded-xl text-xs font-bold border text-left transition ${
+                                            mode === 'create'
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        Create New Flow
+                                        <span className={`block text-[11px] font-normal mt-0.5 ${mode === 'create' ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                            Start fresh from scratch
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {mode === 'create' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Which phone number is this flow for?
+                                    </label>
+                                    <select
+                                        value={selectedNumberId}
+                                        onChange={(e) => setSelectedNumberId(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                                    >
+                                        <option value="">General / Unassigned Flow</option>
+                                        {numbers.map((n) => (
+                                            <option key={n.id} value={n.id}>
+                                                {n.friendlyLabel || 'Phone Line'} ({n.phoneNumber})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                                    What should happen when someone calls this number? (optional)
+                                    {mode === 'edit'
+                                        ? 'What would you like to change or add to this flow?'
+                                        : 'What should happen when someone calls this number? (optional)'}
                                 </label>
+                                {mode === 'edit' && (
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {[
+                                            'Add a menu option to text callers a link to our church website',
+                                            'Add after-hours schedule routing',
+                                            'Add a staff extension directory option',
+                                        ].map((suggestion) => (
+                                            <button
+                                                key={suggestion}
+                                                type="button"
+                                                onClick={() => setInitialGoal(suggestion)}
+                                                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
+                                            >
+                                                + {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <textarea
                                     rows={3}
                                     value={initialGoal}
@@ -466,23 +525,31 @@ export const AICallFlowModal: React.FC<AICallFlowModalProps> = ({
                                             });
                                             onClose();
                                         }}
-                                        className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold hover:bg-slate-100"
+                                        className={
+                                            mode === 'edit'
+                                                ? 'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black'
+                                                : 'px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold hover:bg-slate-100'
+                                        }
                                     >
-                                        Apply to Current Draft
+                                        {mode === 'edit' ? 'Apply Changes to Current Draft' : 'Apply to Current Draft'}
                                     </button>
                                 )}
                                 <button
                                     type="button"
                                     disabled={applying}
                                     onClick={handleCreateNew}
-                                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black"
+                                    className={
+                                        mode === 'edit' && hasActiveFlow
+                                            ? 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold hover:bg-slate-100'
+                                            : 'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black'
+                                    }
                                 >
                                     {applying ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                     ) : (
                                         <ArrowRight className="w-3.5 h-3.5" />
                                     )}
-                                    Create New Flow
+                                    {mode === 'edit' && hasActiveFlow ? 'Save as New Flow' : 'Create New Flow'}
                                 </button>
                             </div>
                         )}

@@ -482,10 +482,11 @@ export const handleVoiceInbound = async (req: any, res: any) => {
                 callerName: personMatch?.callerName,
             }).catch((err) => log.warn(`[voiceInbound] Push dispatch error: ${err.message}`, 'system', { callSid }, churchId));
 
+            const ringTimeout = Math.max(6, Math.min(60, Number(numData.voiceRingTimeoutSec || 24)));
             const clientsXml = availableUids
                 .map((uid) => `<Client>church_${escapeXml(churchId)}_user_${escapeXml(uid)}</Client>`)
                 .join('');
-            return sendLaml(res, `<Dial timeout="25"${dialAction}${recordAttr}${recordingCb}>${clientsXml}</Dial>`);
+            return sendLaml(res, `<Dial timeout="${ringTimeout}"${dialAction}${recordAttr}${recordingCb}>${clientsXml}</Dial>`);
         }
 
         // All targeted users are outside calling hours or on DND -> immediate fallback

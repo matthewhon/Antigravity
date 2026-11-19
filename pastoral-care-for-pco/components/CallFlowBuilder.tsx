@@ -177,9 +177,9 @@ const FlowNodeCard: React.FC<NodeProps> = ({ data, selected }) => {
                 {nodeType === 'route_user' && (
                     <p className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
                         {(nodeData.userIds?.length || 0) > 0
-                            ? `${nodeData.userIds.length} user(s) · ${nodeData.strategy || 'simultaneous'}`
+                            ? `${nodeData.userIds.length} user(s) · ${nodeData.strategy || 'simultaneous'} · ${Math.round((Number(nodeData.timeoutSec) || 24) / 6)} rings`
                             : nodeData.role
-                            ? `Role: ${nodeData.role}`
+                            ? `Role: ${nodeData.role} · ${Math.round((Number(nodeData.timeoutSec) || 24) / 6)} rings`
                             : 'Select staff'}
                     </p>
                 )}
@@ -1018,6 +1018,46 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                                     />
                                     Urgent Branch (Allow Emergency Bypass)
                                 </label>
+
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-500">Rings Before Voicemail / Next</label>
+                                    <select
+                                        value={Math.round((Number(selectedData.timeoutSec) || 24) / 6)}
+                                        onChange={(e) => {
+                                            const rings = Number(e.target.value);
+                                            updateSelectedNode({ nodeData: { rings, timeoutSec: rings * 6 } });
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-bold"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 8, 10].map((r) => (
+                                            <option key={r} value={r}>
+                                                {r} {r === 1 ? 'ring' : 'rings'} (~{r * 6}s)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedType === 'extension_lookup' && (
+                            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-500">Rings Before Voicemail</label>
+                                    <select
+                                        value={Math.round((Number(selectedData.timeoutSec) || 24) / 6)}
+                                        onChange={(e) => {
+                                            const rings = Number(e.target.value);
+                                            updateSelectedNode({ nodeData: { rings, timeoutSec: rings * 6 } });
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-bold"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 8, 10].map((r) => (
+                                            <option key={r} value={r}>
+                                                {r} {r === 1 ? 'ring' : 'rings'} (~{r * 6}s)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
 
@@ -1107,6 +1147,23 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                                         className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-bold"
                                     />
                                 </div>
+                                <div>
+                                    <label className="text-[11px] font-bold text-slate-500">Rings Before Fallback</label>
+                                    <select
+                                        value={Math.round((Number(selectedData.timeoutSec) || 24) / 6)}
+                                        onChange={(e) => {
+                                            const rings = Number(e.target.value);
+                                            updateSelectedNode({ nodeData: { rings, timeoutSec: rings * 6 } });
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-bold"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 8, 10].map((r) => (
+                                            <option key={r} value={r}>
+                                                {r} {r === 1 ? 'ring' : 'rings'} (~{r * 6}s)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -1129,6 +1186,11 @@ const CallFlowBuilderInner: React.FC<CallFlowBuilderProps> = ({
                     users={users}
                     numbers={numbers}
                     hasActiveFlow={Boolean(activeFlowId)}
+                    currentFlow={
+                        activeFlowId && nodes.length > 0
+                            ? { name: flowName, graph: fromReactFlow(nodes, edges, entryNodeId) }
+                            : null
+                    }
                     onClose={() => setAiModalOpen(false)}
                     onApplyToCurrentDraft={({ name, graph }) => {
                         setFlowName(name);

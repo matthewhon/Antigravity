@@ -8,6 +8,7 @@ export const VALID_VOICE_NODE_TYPES: ReadonlySet<VoiceNodeType> = new Set([
     'route_user',
     'voicemail',
     'forward_number',
+    'send_sms',
     'hangup',
 ]);
 
@@ -73,6 +74,8 @@ export function getAllowedOutputHandles(type: VoiceNodeType, data: Record<string
             return ['no_answer', 'unavailable'];
         case 'forward_number':
             return ['no_answer'];
+        case 'send_sms':
+            return ['default'];
         case 'voicemail':
         case 'hangup':
         default:
@@ -160,6 +163,11 @@ export function validateAndLayoutCallFlowGraph(
                 : 'context_user';
             const ml = Number(data.maxLengthSec);
             data.maxLengthSec = Number.isFinite(ml) ? Math.min(300, Math.max(15, Math.round(ml))) : 120;
+        } else if (type === 'send_sms') {
+            data.message = String(data.message || '').trim();
+            if (!data.message) {
+                warnings.push(`"${rn.label || 'Send SMS'}" has an empty SMS message — fill in the text to send.`);
+            }
         }
 
         nodes.push({

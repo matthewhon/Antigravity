@@ -205,7 +205,8 @@ export async function executeFlowNode(
                             (u) => String(u.data.callingPreferences?.extension || '').trim() === digits
                         );
                         if (matched) {
-                            return dialSingleUserWithFallback(ctx, matched.id, matched.data, node.id, depth + 1);
+                            const ringTimeout = Math.max(6, Math.min(60, Number(data.timeoutSec || (data.rings ? Number(data.rings) * 6 : 24))));
+                            return dialSingleUserWithFallback(ctx, matched.id, matched.data, node.id, depth + 1, ringTimeout);
                         }
                     }
 
@@ -296,7 +297,8 @@ export async function executeFlowNode(
                     (u) => String(u.data.callingPreferences?.extension || '').trim() === digits
                 );
                 if (matched) {
-                    return dialSingleUserWithFallback(ctx, matched.id, matched.data, node.id, depth + 1);
+                    const ringTimeout = Math.max(6, Math.min(60, Number(data.timeoutSec || (data.rings ? Number(data.rings) * 6 : 24))));
+                    return dialSingleUserWithFallback(ctx, matched.id, matched.data, node.id, depth + 1, ringTimeout);
                 }
 
                 if (attempt < 2) {
@@ -329,7 +331,7 @@ export async function executeFlowNode(
 
         case 'route_user': {
             const strategy: 'simultaneous' | 'sequential' | 'round_robin' = data.strategy || 'simultaneous';
-            const timeoutSec = Number(data.timeoutSec || 20);
+            const timeoutSec = Math.max(6, Math.min(60, Number(data.timeoutSec || (data.rings ? Number(data.rings) * 6 : 24))));
             const emergencyBypass = Boolean(data.emergencyBypass);
 
             // Resolve candidate user IDs
@@ -375,7 +377,7 @@ export async function executeFlowNode(
                             targetUserId: target.id,
                         });
                         const recordAttr = ctx.numData.recordCalls ? ' record="record-from-answer"' : '';
-                        return `<Dial timeout="${Math.min(timeoutSec, 15)}" action="${escapeXml(actionUrl)}"${recordAttr}><Client>church_${escapeXml(ctx.churchId)}_user_${escapeXml(target.id)}</Client></Dial>`;
+                        return `<Dial timeout="${timeoutSec}" action="${escapeXml(actionUrl)}"${recordAttr}><Client>church_${escapeXml(ctx.churchId)}_user_${escapeXml(target.id)}</Client></Dial>`;
                     }
                 }
 
@@ -528,7 +530,8 @@ async function dialSingleUserWithFallback(
     userId: string,
     userData: any,
     sourceNodeId: string,
-    depth: number
+    depth: number,
+    timeoutSec = 24
 ): Promise<string> {
     const avail = evaluateUserAvailability(userData, ctx.churchTimezone, Date.now());
     if (!avail.available) {
@@ -548,5 +551,5 @@ async function dialSingleUserWithFallback(
     await ctx.pushDispatcher([userId]).catch(() => {});
     const vmFallbackUrl = `${ctx.baseUrl}/api/voice/no-answer?numberId=${encodeURIComponent(ctx.smsNumberId)}&targetUserId=${encodeURIComponent(userId)}`;
     const recordAttr = ctx.numData.recordCalls ? ' record="record-from-answer"' : '';
-    return `<Dial timeout="22" action="${escapeXml(vmFallbackUrl)}"${recordAttr}><Client>church_${escapeXml(ctx.churchId)}_user_${escapeXml(userId)}</Client></Dial>`;
+    return `<Dial timeout="${timeoutSec}" action="${escapeXml(vmFallbackUrl)}"${recordAttr}><Client>church_${escapeXml(ctx.churchId)}_user_${escapeXml(userId)}</Client></Dial>`;
 }

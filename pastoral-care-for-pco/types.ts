@@ -2332,6 +2332,7 @@ export interface SmsPhoneNumber {
     // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
     voiceEnabled?: boolean;
     voiceFlowId?: string | null;
+    voiceRingTimeoutSec?: number;
     voiceForwardingNumber?: string;
     voicemailEnabled?: boolean;
     voicemailGreetingText?: string;
@@ -2717,6 +2718,7 @@ export interface TwilioPhoneNumber {
     // -- Voice Calling (opt-in per number; requires Church.voiceAddOn.enabled) --
     voiceEnabled?: boolean;
     voiceFlowId?: string | null;
+    voiceRingTimeoutSec?: number;
     voiceForwardingNumber?: string;
     voicemailEnabled?: boolean;
     voicemailGreetingText?: string;

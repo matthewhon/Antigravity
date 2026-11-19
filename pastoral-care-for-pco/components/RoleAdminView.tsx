@@ -4817,6 +4817,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             patch: {
                                 voiceEnabled?: boolean;
                                 voiceFlowId?: string | null;
+                                voiceRingTimeoutSec?: number;
                                 voicemailEnabled?: boolean;
                                 recordCalls?: boolean;
                                 voiceForwardingNumber?: string;
@@ -5195,6 +5196,18 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                     }}
                                                                                     className="flex-1 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-900 dark:text-white"
                                                                                 />
+                                                                                <select
+                                                                                    value={Math.round((Number(num.voiceRingTimeoutSec) || 24) / 6)}
+                                                                                    onChange={(e) => handleUpdateVoiceSettings(num.id, { voiceRingTimeoutSec: Number(e.target.value) * 6 })}
+                                                                                    className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-900 dark:text-white"
+                                                                                    title="Rings before Voicemail (when not using a Call Flow)"
+                                                                                >
+                                                                                    {[2, 3, 4, 5, 6, 8].map((r) => (
+                                                                                        <option key={r} value={r}>
+                                                                                            {r} rings (~{r * 6}s)
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
                                                                                 <select
                                                                                     value={num.voiceFlowId || ''}
                                                                                     onChange={(e) => handleUpdateVoiceSettings(num.id, { voiceFlowId: e.target.value || null })}

@@ -585,6 +585,7 @@ export const updateNumberSettings = async (req: any, res: any) => {
             executiveAiAgentListName,
             voiceEnabled,
             voiceFlowId,
+            voiceRingTimeoutSec,
             voiceForwardingNumber,
             voicemailEnabled,
             voicemailGreetingText,
@@ -632,6 +633,7 @@ export const updateNumberSettings = async (req: any, res: any) => {
             if (executiveAiAgentListName  !== undefined) patch.executiveAiAgentListName  = executiveAiAgentListName;
             if (voiceEnabled              !== undefined) patch.voiceEnabled              = Boolean(voiceEnabled);
             if (voiceFlowId               !== undefined) patch.voiceFlowId               = voiceFlowId || null;
+            if (voiceRingTimeoutSec       !== undefined) patch.voiceRingTimeoutSec       = Math.max(6, Math.min(60, Number(voiceRingTimeoutSec) || 24));
             if (voiceForwardingNumber     !== undefined) patch.voiceForwardingNumber     = voiceForwardingNumber;
             if (voicemailEnabled          !== undefined) patch.voicemailEnabled          = Boolean(voicemailEnabled);
             if (voicemailGreetingText     !== undefined) patch.voicemailGreetingText     = voicemailGreetingText;
