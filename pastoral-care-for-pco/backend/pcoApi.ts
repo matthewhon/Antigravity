@@ -1,5 +1,9 @@
 import { getDb } from './firebase.js';
 
+// Per-churchId in-flight refresh promise so concurrent 401s or near-expiry calls
+// share a single PCO OAuth refresh (PCO uses rotating refresh tokens).
+const refreshInFlight = new Map<string, Promise<string>>();
+
 /**
  * Ensures the church has a valid, unexpired PCO access token, refreshing it if needed.
  */
@@ -16,33 +20,57 @@ export async function getFreshPcoToken(churchId: string, forceRefresh = false): 
 
   // If forceRefresh is requested or token is expired / within 5 minutes of expiring, refresh it
   if (refreshToken && (forceRefresh || Date.now() >= tokenExpiry - 5 * 60 * 1000)) {
-    const settingsDoc = await db.doc('system/settings').get();
-    const settings = settingsDoc.data() || {};
-    const clientId = (settings.pcoClientId || '').trim();
-    const clientSecret = (settings.pcoClientSecret || '').trim();
+    const existing = refreshInFlight.get(churchId);
+    if (existing) {
+      return existing;
+    }
 
-    if (clientId && clientSecret) {
+    const refreshPromise = (async () => {
+      const settingsDoc = await db.doc('system/settings').get();
+      const settings = settingsDoc.data() || {};
+      const clientId = (settings.pcoClientId || '').trim();
+      const clientSecret = (settings.pcoClientSecret || '').trim();
+
+      if (!clientId || !clientSecret) {
+        throw new Error('System missing PCO Credentials');
+      }
+
+      // Re-read the latest refresh token in case another instance just rotated it
+      const latestSnap = await db.collection('churches').doc(churchId).get();
+      const latestRefreshToken = latestSnap.data()?.pcoRefreshToken || refreshToken;
+
       const refreshParams = new URLSearchParams();
       refreshParams.append('grant_type', 'refresh_token');
-      refreshParams.append('refresh_token', refreshToken);
+      refreshParams.append('refresh_token', latestRefreshToken);
       refreshParams.append('client_id', clientId);
       refreshParams.append('client_secret', clientSecret);
 
       const refreshRes = await fetch('https://api.planningcenteronline.com/oauth/token', {
         method: 'POST',
+        headers: { 'Connection': 'close' },
         body: refreshParams
       });
 
-      if (refreshRes.ok) {
-        const tokenData = await refreshRes.json();
-        accessToken = tokenData.access_token;
-        await db.collection('churches').doc(churchId).update({
-          pcoAccessToken: accessToken,
-          pcoRefreshToken: tokenData.refresh_token,
-          pcoTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
-        });
+      if (!refreshRes.ok) {
+        const errText = await refreshRes.text();
+        throw new Error(`PCO token refresh failed (${refreshRes.status}): ${errText}`);
       }
-    }
+
+      const tokenData = await refreshRes.json();
+      const newAccessToken: string = tokenData.access_token;
+      await db.collection('churches').doc(churchId).update({
+        pcoConnected: true,
+        pcoAccessToken: newAccessToken,
+        pcoRefreshToken: tokenData.refresh_token,
+        pcoTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
+      });
+      return newAccessToken;
+    })().finally(() => {
+      refreshInFlight.delete(churchId);
+    });
+
+    refreshInFlight.set(churchId, refreshPromise);
+    return refreshPromise;
   }
 
   return accessToken;

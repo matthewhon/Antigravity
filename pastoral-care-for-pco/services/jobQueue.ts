@@ -1,22 +1,36 @@
-import { Queue, Worker, ConnectionOptions } from 'bullmq';
+import type { ConnectionOptions } from 'bullmq';
 
-const connection: ConnectionOptions = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-};
+const hasRedis = Boolean(process.env.REDIS_HOST);
 
-export const pastoralJourneyQueue = new Queue('pastoral-journeys', { connection });
+function createQueueWrapper(name: string, inProcessHandler?: (data: any) => Promise<void>) {
+  if (hasRedis) {
+    // Lazy-require bullmq only when Redis is explicitly configured
+    const { Queue, Worker } = require('bullmq');
+    const connection: ConnectionOptions = {
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    };
+    const queue = new Queue(name, { connection });
+    if (inProcessHandler) {
+      new Worker(name, inProcessHandler, { connection });
+    }
+    return queue;
+  }
 
-export const pastoralJourneyWorker = new Worker('pastoral-journeys', async (job) => {
-  console.log(`Processing job ${job.id}:`, job.data);
-  // Logic for multi-step emails/SMS and snoozing
-}, { connection });
-
-export const videoProcessingQueue = new Queue('video-processing', { connection });
-
-// Note: Ensure the worker runs only on the server, not in Vite client build.
-if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-  import('../backend/videoProcessor.js').then(({ processVideoJob }) => {
-    new Worker('video-processing', processVideoJob, { connection });
-  }).catch(e => console.error('Failed to load videoProcessor', e));
+  return {
+    async add(_jobName: string, data: any) {
+      if (inProcessHandler) {
+        await inProcessHandler({ data });
+      } else {
+        console.warn(`[JobQueue] Redis not configured; skipping "${name}" job.`);
+      }
+    },
+  };
 }
+
+export const pastoralJourneyQueue = createQueueWrapper('pastoral-journeys');
+
+export const videoProcessingQueue = createQueueWrapper('video-processing', async (job: any) => {
+  const { processVideoJob } = await import('../backend/videoProcessor.js');
+  await processVideoJob(job);
+});

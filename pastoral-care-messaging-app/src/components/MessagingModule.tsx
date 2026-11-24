@@ -94,6 +94,7 @@ const compressSmsImage = (file: File): Promise<Blob | File> => {
             }, 'image/jpeg', 0.85);
         };
         img.onerror = () => {
+            URL.revokeObjectURL(img.src);
             resolve(file);
         };
     });
@@ -197,9 +198,13 @@ async function shortenSms(messageBody: string, churchId?: string): Promise<strin
     } catch {
         // Fallback to direct /ai/generate proxy
     }
+    const { getAuth } = await import('firebase/auth');
+    const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const res = await fetch(`${API_BASE}/ai/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
             model: 'gemini-2.5-flash',
             prompt: `You are an SMS copywriting expert for a church. 
@@ -266,9 +271,13 @@ Guidelines:
 User's workflow request:
 ${prompt}`;
 
+    const { getAuth } = await import('firebase/auth');
+    const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const res = await fetch(`${API_BASE}/ai/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
     });
     if (!res.ok) throw new Error('AI request failed');
@@ -2815,7 +2824,8 @@ const SmsInbox: React.FC<{
     // Toast
     const [inboxToast, setInboxToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     // Temporarily bypass church.voiceAddOn?.enabled for testing
-    const voiceAddonEnabled = true || Boolean((church as any).voiceAddOn?.enabled);
+    const forceVoiceAddonForTesting = true;
+    const voiceAddonEnabled = forceVoiceAddonForTesting || Boolean(church.voiceAddOn?.enabled);
     const voice = useSignalWireVoice({ churchId: church.id, voiceAddonEnabled, apiBaseUrl: API_BASE });
     const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setInboxToast({ msg, type });
@@ -3063,9 +3073,13 @@ Do not make up information. Only use the church facts provided.
 
 CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
+            const { getAuth } = await import('firebase/auth');
+            const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (idToken) headers.Authorization = `Bearer ${idToken}`;
             const res = await fetch(`${API_BASE}/ai/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     prompt: `Conversation:\n${recent}\n\nWrite a helpful SMS reply from the church staff:`,
                     systemInstruction,
@@ -3086,9 +3100,13 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         if (!replyBody.trim() || aiGenerating) return;
         setAiGenerating(true);
         try {
+            const { getAuth } = await import('firebase/auth');
+            const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (idToken) headers.Authorization = `Bearer ${idToken}`;
             const res = await fetch(`${API_BASE}/ai/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     prompt: `Shorten this SMS reply to under 160 characters while keeping the same meaning, warmth, and tone. Return ONLY the shortened text ... no explanation:\n\n${replyBody}`,
                     model: 'gemini-2.5-flash',
@@ -4240,6 +4258,9 @@ const SmsKeywordsManager: React.FC<{
     const [tagDetectionNumberIds, setTagDetectionNumberIds] = useState<string[]>([]); // empty = all numbers
     const [tagBusy, setTagBusy] = useState(false);
     const [activeSection, setActiveSection] = useState<'keywords' | 'tags'>('keywords');
+    const [draftReply, setDraftReply] = useState(church.smsSettings?.prayerClarifyingReply || '');
+    const [prayerSaving, setPrayerSaving] = useState(false);
+    const [agentSaving, setAgentSaving] = useState(false);
 
     // Phone numbers ... used to restrict auto-detection per line
     const { numbers: allSmsNumbers } = useTwilioNumbers(churchId);
@@ -4655,8 +4676,6 @@ const SmsKeywordsManager: React.FC<{
             {(() => {
                 const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
                 const prayerEnabled = !!(church.smsSettings?.prayerDetectionEnabled);
-                const [draftReply, setDraftReply] = React.useState(church.smsSettings?.prayerClarifyingReply || '');
-                const [prayerSaving, setPrayerSaving] = React.useState(false);
 
                 const handleTogglePrayer = async () => {
                     if (!onUpdateChurch) return;
@@ -4814,7 +4833,6 @@ const SmsKeywordsManager: React.FC<{
                 const agentOn = activeNumber
                     ? (activeNumber.smsAgentEnabled !== undefined ? activeNumber.smsAgentEnabled : !!(church.smsSettings?.smsAgentEnabled))
                     : !!(church.smsSettings?.smsAgentEnabled);
-                const [agentSaving, setAgentSaving] = React.useState(false);
 
                 const handleToggleAgent = async () => {
                     setAgentSaving(true);
@@ -9416,9 +9434,13 @@ INCOMING MESSAGE:
 "${testInput}"
 
 Write the reply:`;
+            const { getAuth } = await import('firebase/auth');
+            const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (idToken) headers.Authorization = `Bearer ${idToken}`;
             const res = await fetch(`${API_BASE}/ai/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
             });
             const data = await safeJson(res);

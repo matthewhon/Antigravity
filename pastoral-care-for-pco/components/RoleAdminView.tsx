@@ -483,9 +483,10 @@ const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }
     const handleAreaSync = async (area: SyncArea) => {
         setAreaStatus(prev => ({ ...prev, [area.key]: { state: 'running' } }));
         try {
+            const { getAuthJsonHeaders } = await import('../services/authHeaders');
             const res = await fetch('/pco/sync', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await getAuthJsonHeaders(),
                 body: JSON.stringify({ churchId, area: area.key }),
             });
             if (!res.ok) {

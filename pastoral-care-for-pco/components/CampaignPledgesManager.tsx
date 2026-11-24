@@ -162,9 +162,10 @@ export const CampaignPledgesManager: React.FC<CampaignPledgesManagerProps> = ({ 
   const handleSync = async () => {
     setIsSyncing(true);
     try {
+      const { getAuthJsonHeaders } = await import('../services/authHeaders');
       const res = await fetch(`${apiBaseUrl}/pco/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({ churchId, area: 'pledges' })
       });
       const data = await res.json();

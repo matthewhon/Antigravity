@@ -18,7 +18,7 @@ import { executeFlowNode, renderUserVoicemailLaml } from './voiceFlowEngine';
 import { transcribeVoicemailWithGemini } from './voiceAudioService';
 
 // Temporarily bypass paid add-on subscription check for testing (set to false before production billing)
-const VOICE_SUBSCRIPTION_BYPASS = true;
+const VOICE_SUBSCRIPTION_BYPASS = false;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

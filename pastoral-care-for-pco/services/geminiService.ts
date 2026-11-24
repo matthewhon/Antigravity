@@ -65,9 +65,10 @@ const callGemini = async (payload: GeminiProxyPayload): Promise<GeminiProxyRespo
         }
     }
 
+    const { getAuthJsonHeaders } = await import('./authHeaders');
     const res = await fetch('/ai/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify(payload),
     });
     if (!res.ok) {

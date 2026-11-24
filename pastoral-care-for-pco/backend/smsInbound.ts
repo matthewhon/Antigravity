@@ -201,41 +201,12 @@ INCOMING MESSAGE:
 
 Write the reply:`;
 
-        // Call the Gemini proxy endpoint on the same server
-        const postBody = JSON.stringify({
+        const { generateGeminiContent } = await import('./geminiProxy');
+        const result = await generateGeminiContent({
             model: 'gemini-2.5-flash',
             prompt: systemPrompt,
         });
-
-        const suggestedBody: string = await new Promise((resolve, reject) => {
-            const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
-            const urlObj = new URL('/ai/generate', apiBaseUrl);
-            const options = {
-                hostname: urlObj.hostname,
-                port: urlObj.port || 80,
-                path: urlObj.pathname,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(postBody),
-                },
-            };
-            const req = http.request(options, (res) => {
-                let data = '';
-                res.on('data', (chunk) => { data += chunk; });
-                res.on('end', () => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        resolve((parsed.text || '').trim());
-                    } catch {
-                        reject(new Error('Failed to parse Gemini response'));
-                    }
-                });
-            });
-            req.on('error', reject);
-            req.write(postBody);
-            req.end();
-        });
+        const suggestedBody = (result.text || '').trim();
 
         if (!suggestedBody) return; // Nothing to save
 

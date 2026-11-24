@@ -1,4 +1,3 @@
-import { automationService } from './services/automationService';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -13,12 +12,15 @@ import { addSmsAddon, removeSmsAddon } from './backend/smsAddon';
 import { addVoiceAddon, removeVoiceAddon } from './backend/voiceAddon';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
+import { pcoRequest } from './backend/pcoApi';
+(globalThis as any).__pcoServerRequest = pcoRequest;
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
 import { sendEmail, getEmailStats, pickWinnerAndSendRemainder } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
 import { startBillingScheduler } from './backend/billingScheduler';
 import { getDb } from './backend/firebase';
+import { requireAuth, requireSystemAdmin, requireChurchMember } from './backend/authMiddleware';
 import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { handleCampaignWriter } from './backend/campaignWriter';
@@ -100,8 +102,27 @@ async function startServer() {
     const PORT = Number(process.env.PORT) || 8080;
 
     // 1. Middlewares FIRST (must come before all routes)
+    const allowedOrigins = new Set([
+      'https://pastoralcare.barnabassoftware.com',
+      'https://pastoral-care-for-pco.web.app',
+      'https://pastoral-care-for-pco.firebaseapp.com',
+      'capacitor://localhost',
+      'http://localhost',
+      'https://localhost',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:8080',
+      ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : []),
+    ]);
+
     app.use(cors({
-      origin: '*',
+      origin: (origin, callback) => {
+        // Allow requests with no Origin header (server-to-server, webhooks, native mobile)
+        if (!origin || allowedOrigins.has(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+      },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     }));
@@ -126,10 +147,8 @@ async function startServer() {
     app.post('/api/billing/remove-sms-addon', express.json(), removeSmsAddon);
     app.post('/api/billing/add-voice-addon',    express.json(), addVoiceAddon);
     app.post('/api/billing/remove-voice-addon', express.json(), removeVoiceAddon);
-    app.get('/api/admin/billing-report', async (req: any, res: any) => {
+    app.get('/api/admin/billing-report', requireSystemAdmin, async (req: any, res: any) => {
         try {
-            // Note: Secure this endpoint with proper admin check in a real app
-            // For now, it will fetch the report for the provided period
             const period = req.query.period || (() => {
                 const d = new Date();
                 return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -153,14 +172,14 @@ async function startServer() {
     app.post('/pco/token', express.json(), pcoTokenExchange);
 
     // PCO Proxy
-    app.post('/pco/proxy', express.json(), pcoProxy);
+    app.post('/pco/proxy', express.json(), requireChurchMember, pcoProxy);
 
     // PCO Sync — trigger a full or per-area sync from the UI
-    app.post('/pco/sync', express.json(), async (req: any, res: any) => {
+    app.post('/pco/sync', express.json(), requireChurchMember, async (req: any, res: any) => {
       const { churchId, area } = req.body || {};
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
 
-      if (churchId === 'c1') {
+      if (process.env.NODE_ENV !== 'production' && churchId === 'c1') {
         await new Promise(resolve => setTimeout(resolve, 1500)); // simulate sync latency
         return res.json({ success: true, area: area || 'all' });
       }
@@ -404,8 +423,8 @@ async function startServer() {
       }
     });
 
-        // Gemini AI Proxy (key stays server-side)
-    app.post('/ai/generate', express.json(), handleGeminiProxy);
+    // Gemini AI Proxy (key stays server-side)
+    app.post('/ai/generate', express.json(), requireAuth, handleGeminiProxy);
     // Structured email/SMS/bulletin writer (subject variants, readability checks)
     app.post('/ai/campaign-writer', express.json({ limit: '1mb' }), handleCampaignWriter);
     // AI Call Flow Architect (interactive Q&A -> validated VoiceFlowGraph)

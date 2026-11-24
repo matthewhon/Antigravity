@@ -8,6 +8,7 @@
  */
 
 import { createServerLogger } from '../logService';
+import { getAuthJsonHeaders } from '../authHeaders';
 
 // Server-side logger — only initialised when running in Node.js.
 let serverLogger: any = null;
@@ -63,18 +64,51 @@ export const pcoFetch = async (
     method = 'GET',
     body: any = null
 ): Promise<any> => {
-    const proxyUrl = await getProxyUrl();
     const fullUrl = endpoint.startsWith('http')
         ? endpoint
         : `https://api.planningcenteronline.com/${endpoint.startsWith('/') ? endpoint.substring(1) : endpoint}`;
 
+    // Direct in-process call when running on the Node server (avoids HTTP loopback + redundant Firestore reads)
+    if (typeof window === 'undefined' && typeof (globalThis as any).__pcoServerRequest === 'function') {
+        try {
+            console.log(`[SyncService] Fetching ${method} ${fullUrl} for church ${churchId}`);
+            return await (globalThis as any).__pcoServerRequest(churchId, fullUrl, method, body);
+        } catch (err: any) {
+            const msg = String(err?.message || '');
+            if (msg.includes('404')) {
+                logger.warn(`PCO API Resource Not Found (404)`, 'sync', { endpoint }, churchId);
+                return null;
+            }
+            if (msg.includes('429')) {
+                if (retryCount < 5) {
+                    const waitTime = 2000 * Math.pow(2, retryCount) + Math.random() * 500;
+                    logger.warn(`PCO Rate Limit 429 — retrying`, 'sync', { endpoint, retryCount, waitTimeMs: Math.round(waitTime) }, churchId);
+                    await delay(waitTime);
+                    return pcoFetch(churchId, endpoint, retryCount + 1, method, body);
+                }
+                logger.error('PCO API Rate Limit Exceeded: Max retries reached', 'sync', { endpoint }, churchId);
+                throw new Error('PCO API Rate Limit Exceeded: Max retries reached.');
+            }
+            throw err;
+        }
+    }
+
+    const proxyUrl = await getProxyUrl();
+
     try {
+        const headers = typeof window === 'undefined'
+            ? {
+                'Content-Type': 'application/json',
+                'Connection': 'close',
+                ...((globalThis as any).__internalSyncToken
+                    ? { 'x-internal-sync': (globalThis as any).__internalSyncToken }
+                    : {}),
+            }
+            : await getAuthJsonHeaders({ 'Connection': 'close' });
+
         const response = await fetch(proxyUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'close'
-            },
+            headers,
             body: JSON.stringify({ churchId, url: fullUrl, method, body })
         });
 
@@ -149,7 +183,7 @@ export const fetchAllPages = async (
             const data = await pcoFetch(churchId, relativeUrl);
             if (data && data.data) {
                 const mapped = data.data.map((item: any) => mapFn(item, data.included));
-                allItems = [...allItems, ...mapped.flat()];
+                allItems.push(...mapped.flat());
             }
             nextUrl = data?.links?.next;
             pageCount++;

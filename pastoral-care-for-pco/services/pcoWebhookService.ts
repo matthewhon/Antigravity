@@ -16,10 +16,11 @@ const getProxyUrl = async () => {
 async function pcoFetch(churchId: string, endpoint: string, method: string = 'GET', body?: any) {
     const proxyUrl = await getProxyUrl();
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    const { getAuthJsonHeaders } = await import('./authHeaders');
 
     const response = await fetch(proxyUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({
             churchId,
             url: `https://api.planningcenteronline.com/${cleanEndpoint}`,

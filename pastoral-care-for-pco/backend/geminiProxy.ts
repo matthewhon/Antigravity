@@ -20,18 +20,22 @@ import { getDb } from './firebase';
  *   candidates?: any[]   (present when caller needs groundingMetadata, e.g. Maps)
  * }
  */
-export const handleGeminiProxy = async (req: any, res: any) => {
-    const {
-        model = 'gemini-2.5-flash',
-        prompt,
-        systemInstruction,
-        config,
-    } = req.body || {};
+export interface GeminiGenerateParams {
+    model?: string;
+    prompt: string;
+    systemInstruction?: string;
+    config?: Record<string, any>;
+}
 
-    if (!prompt) {
-        return res.status(400).json({ error: 'prompt is required' });
-    }
-
+/**
+ * Shared server-side helper for calling Gemini directly without an HTTP roundtrip.
+ */
+export async function generateGeminiContent({
+    model = 'gemini-2.5-flash',
+    prompt,
+    systemInstruction,
+    config,
+}: GeminiGenerateParams): Promise<{ text: string; candidates: any[] }> {
     let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     try {
         const snap = await getDb().doc('system/settings').get();
@@ -45,29 +49,45 @@ export const handleGeminiProxy = async (req: any, res: any) => {
 
     if (!apiKey) {
         console.error('[GeminiProxy] GEMINI_API_KEY is not set on the server or in System Settings.');
-        return res.status(500).json({ error: 'AI service is not configured. Contact your administrator.' });
+        throw new Error('AI service is not configured. Contact your administrator.');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const mergedConfig: Record<string, any> = { ...(config || {}) };
+    if (systemInstruction) {
+        mergedConfig.systemInstruction = systemInstruction;
+    }
+
+    const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        ...(Object.keys(mergedConfig).length > 0 ? { config: mergedConfig } : {}),
+    });
+
+    return {
+        text: response.text || '',
+        candidates: response.candidates || [],
+    };
+}
+
+export const handleGeminiProxy = async (req: any, res: any) => {
+    const {
+        model = 'gemini-2.5-flash',
+        prompt,
+        systemInstruction,
+        config,
+    } = req.body || {};
+
+    if (!prompt) {
+        return res.status(400).json({ error: 'prompt is required' });
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey });
-
-        const mergedConfig: Record<string, any> = { ...(config || {}) };
-        if (systemInstruction) {
-            mergedConfig.systemInstruction = systemInstruction;
-        }
-
-        const response = await ai.models.generateContent({
-            model,
-            contents: prompt,
-            ...(Object.keys(mergedConfig).length > 0 ? { config: mergedConfig } : {}),
-        });
-
-        res.json({
-            text: response.text || '',
-            candidates: response.candidates || [],
-        });
+        const result = await generateGeminiContent({ model, prompt, systemInstruction, config });
+        res.json(result);
     } catch (e: any) {
         console.error('[GeminiProxy] Gemini API error:', e?.message || e);
-        res.status(500).json({ error: e?.message || 'Gemini API error' });
+        const status = e?.message?.includes('not configured') ? 500 : 500;
+        res.status(status).json({ error: e?.message || 'Gemini API error' });
     }
 };

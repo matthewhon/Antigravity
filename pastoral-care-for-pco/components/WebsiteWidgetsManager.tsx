@@ -300,9 +300,10 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
         ? 'https://pastoralcare.barnabassoftware.com' 
         : 'http://localhost:8080';
         
+      const { getAuthJsonHeaders } = await import('../services/authHeaders');
       const res = await fetch(`${apiBaseUrl}/pco/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({
           churchId,
           area:

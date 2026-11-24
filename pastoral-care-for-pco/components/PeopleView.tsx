@@ -172,11 +172,15 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
       ? `${apiBaseUrl}/pco/sync`
       : '/pco/sync'; // local dev fallback
 
-    fetch(syncUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ churchId, area: 'registrations' }),
-    })
+    import('../services/authHeaders')
+      .then(({ getAuthJsonHeaders }) => getAuthJsonHeaders())
+      .then(headers =>
+        fetch(syncUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ churchId, area: 'registrations' }),
+        })
+      )
       .then(res => {
         if (res.ok) {
           // Refresh the widget from Firestore now that the sync has written fresh data

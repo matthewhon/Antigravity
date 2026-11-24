@@ -1,17 +1,13 @@
 
-import admin from 'firebase-admin';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { getFreshPcoToken } from './pcoApi';
 
 export const pcoProxy = async (req: any, res: any) => {
     const db = getDb();
     const log = createServerLogger(db);
 
-    // Enable CORS
-    res.set('Access-Control-Allow-Origin', '*');
     if (req.method === 'OPTIONS') {
-        res.set('Access-Control-Allow-Methods', 'POST');
-        res.set('Access-Control-Allow-Headers', 'Content-Type');
         res.status(204).send('');
         return;
     }
@@ -27,21 +23,19 @@ export const pcoProxy = async (req: any, res: any) => {
             return;
         }
 
-        // 1. Get Church Credentials
-        const churchDoc = await db.collection('churches').doc(churchId).get();
-        if (!churchDoc.exists) {
-            log.warn('Church not found in proxy', 'proxy', { churchId }, churchId);
-            res.status(404).json({ error: 'Church not found' });
-            return;
-        }
-
-        const churchData = churchDoc.data();
-        let accessToken = churchData?.pcoAccessToken;
-        const refreshToken = churchData?.pcoRefreshToken;
-
-        if (!accessToken || !refreshToken) {
-            log.warn('Missing PCO tokens for church', 'proxy', { churchId }, churchId);
-            res.status(401).json({ error: 'Church not authenticated with PCO' });
+        // 1. Get valid PCO token (uses shared per-churchId refresh mutex)
+        let accessToken: string;
+        try {
+            accessToken = await getFreshPcoToken(churchId);
+        } catch (tokenErr: any) {
+            const msg = tokenErr?.message || '';
+            if (msg.includes('not found')) {
+                res.status(404).json({ error: 'Church not found' });
+            } else if (msg.includes('No PCO access token')) {
+                res.status(401).json({ error: 'Church not authenticated with PCO' });
+            } else {
+                res.status(500).json({ error: msg || 'Failed to get PCO token' });
+            }
             return;
         }
 
@@ -65,58 +59,18 @@ export const pcoProxy = async (req: any, res: any) => {
 
         let response = await performRequest(accessToken);
 
-        // 3. Handle Token Expiry (401)
+        // 3. Handle Token Expiry (401) via shared per-churchId mutex
         if (response.status === 401) {
             log.warn('PCO access token expired — refreshing', 'proxy', { churchId }, churchId);
-            
-            // Get Client Credentials
-            const settingsDoc = await db.doc('system/settings').get();
-            const settings = settingsDoc.data() || {};
-            
-            const clientId = (settings.pcoClientId || '').trim();
-            const clientSecret = (settings.pcoClientSecret || '').trim();
-
-            if (!clientId || !clientSecret) {
-                log.error('System missing PCO credentials for token refresh', 'proxy', { churchId }, churchId);
-                res.status(500).json({ error: "System missing PCO Credentials" });
-                return;
-            }
-
-            const refreshParams = new URLSearchParams();
-            refreshParams.append('grant_type', 'refresh_token');
-            refreshParams.append('refresh_token', refreshToken);
-            refreshParams.append('client_id', clientId);
-            refreshParams.append('client_secret', clientSecret);
-
-            const refreshRes = await fetch('https://api.planningcenteronline.com/oauth/token', {
-                method: 'POST',
-                headers: { 'Connection': 'close' },
-                body: refreshParams
-            });
-
-            if (!refreshRes.ok) {
-                const errText = await refreshRes.text();
-                log.error('PCO token refresh failed', 'proxy', { churchId, status: refreshRes.status, error: errText }, churchId);
+            try {
+                const newAccessToken = await getFreshPcoToken(churchId, true);
+                log.info('PCO token refreshed successfully', 'proxy', { churchId }, churchId);
+                response = await performRequest(newAccessToken);
+            } catch (refreshErr: any) {
+                log.error('PCO token refresh failed', 'proxy', { churchId, error: refreshErr?.message }, churchId);
                 res.status(401).json({ error: 'Session expired. Please reconnect PCO.' });
                 return;
             }
-
-            const tokenData = await refreshRes.json();
-            const newAccessToken = tokenData.access_token;
-            const newRefreshToken = tokenData.refresh_token;
-
-            // Save new tokens
-            await db.collection('churches').doc(churchId).update({
-                pcoConnected: true,
-                pcoAccessToken: newAccessToken,
-                pcoRefreshToken: newRefreshToken,
-                pcoTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
-            });
-
-            log.info('PCO token refreshed successfully', 'proxy', { churchId }, churchId);
-
-            // Retry Request
-            response = await performRequest(newAccessToken);
         }
 
         // 4. Return Response

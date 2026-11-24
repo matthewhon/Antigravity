@@ -19,6 +19,7 @@
 
 import type { Firestore } from 'firebase-admin/firestore';
 import { updatePcoSubscriptionField } from './pcoFieldData';
+import { acquireDistributedLock } from './schedulerLock';
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -239,11 +240,13 @@ export function startSyncScheduler(db: Firestore): void {
 
                 if (normalizedSchedule !== currentTime) continue;
 
-                // Only fire once per UTC day per church
+                // Only fire once per UTC day per church (guarded locally + via distributed Firestore lock)
                 const alreadySyncedKey = `${churchId}_${currentDayKey}`;
                 if (syncedToday.has(alreadySyncedKey)) continue;
 
                 syncedToday.set(alreadySyncedKey, currentTime);
+                const gotLock = await acquireDistributedLock(db, `sync_${alreadySyncedKey}`, 24 * 60 * 60 * 1000);
+                if (!gotLock) continue;
 
                 console.log(`[SyncScheduler] Match! Firing sync for ${churchId} at UTC ${currentTime}`);
 

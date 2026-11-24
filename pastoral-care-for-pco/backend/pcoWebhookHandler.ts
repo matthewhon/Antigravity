@@ -46,9 +46,11 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         const hmac = crypto.createHmac('sha256', secret);
         const digest = hmac.update(payloadString).digest('hex');
 
-        if (digest !== signature) {
-            log.warn('Webhook signature mismatch — proceeding (dev mode)', 'webhook', { churchId });
-            // return res.status(403).send('Invalid Signature'); // Uncomment for strict security
+        const sigBuf = Buffer.from(signature, 'utf8');
+        const digestBuf = Buffer.from(digest, 'utf8');
+        if (sigBuf.length !== digestBuf.length || !crypto.timingSafeEqual(sigBuf, digestBuf)) {
+            log.warn('Webhook signature mismatch — rejecting request', 'webhook', { churchId });
+            return res.status(403).send('Invalid Signature');
         }
 
         if (!payloadString) {

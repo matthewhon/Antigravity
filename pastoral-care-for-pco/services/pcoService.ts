@@ -122,11 +122,10 @@ async function fetchWithPcoCache<T>(key: string, fetcher: () => Promise<T>, ttlM
 }
 
 const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any = null, retriesLeft = 2): Promise<any> => {
+    const { getAuthJsonHeaders } = await import('./authHeaders');
     const response = await fetch(getProxyUrl(), {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json'
-        },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({ churchId, url, method, body })
     });
     if (!response.ok) {

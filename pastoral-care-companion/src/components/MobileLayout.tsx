@@ -180,9 +180,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
     try {
       const sysSettings = await firestore.getSystemSettings();
       const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
+      const { getAuth } = await import('firebase/auth');
+      const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
+      const syncHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (idToken) syncHeaders.Authorization = `Bearer ${idToken}`;
       const res = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/pco/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: syncHeaders,
         body: JSON.stringify({ churchId: church.id }),
       });
       if (res.ok) {

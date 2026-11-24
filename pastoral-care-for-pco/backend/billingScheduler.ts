@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { getStorage } from './firebase.js';
+import { acquireDistributedLock } from './schedulerLock';
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 const processedToday = new Set<string>();
@@ -62,6 +63,8 @@ export function startBillingScheduler(db: Firestore): void {
                     if (processedToday.has(churchId)) continue;
                     
                     processedToday.add(churchId);
+                    const gotLock = await acquireDistributedLock(db, `billing_storage_${churchId}_${currentDayKey}`, 24 * 60 * 60 * 1000);
+                    if (!gotLock) continue;
                     
                     // Fire without awaiting to not block the loop
                     aggregateStorageForTenant(churchId, db, currentDayKey).catch((e) => {

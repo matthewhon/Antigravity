@@ -288,9 +288,10 @@ Guidelines:
 User's workflow request:
 ${prompt}`;
 
+    const { getAuthJsonHeaders } = await import('../services/authHeaders');
     const res = await fetch('/ai/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
     });
     if (!res.ok) throw new Error('AI request failed');
@@ -373,9 +374,10 @@ ${ctx.eventType === 'registration' && isInvite ? '- This is an event invitation 
 - For email steps, write a compelling emailSubject and a warm, 2-3 paragraph emailBody with greeting, body, and sign-off. Use {firstName}.
 - The name should reference the event and the goal (e.g. "${ctx.eventName} — ${isInvite ? 'Invitation' : 'Reminders'}"). The description should be 1-2 sentences.`;
 
+    const { getAuthJsonHeaders } = await import('../services/authHeaders');
     const res = await fetch('/ai/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthJsonHeaders(),
         body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
     });
     if (!res.ok) throw new Error('AI request failed');
@@ -3084,9 +3086,10 @@ Do not make up information. Only use the church facts provided.
 
 CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
+            const { getAuthJsonHeaders } = await import('../services/authHeaders');
             const res = await fetch('/ai/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await getAuthJsonHeaders(),
                 body: JSON.stringify({
                     prompt: `Conversation:\n${recent}\n\nWrite a helpful SMS reply from the church staff:`,
                     systemInstruction,
@@ -11611,9 +11614,10 @@ INCOMING MESSAGE:
 "${testInput}"
 
 Write the reply:`;
+            const { getAuthJsonHeaders } = await import('../services/authHeaders');
             const res = await fetch('/ai/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await getAuthJsonHeaders(),
                 body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
             });
             const data = await res.json();
