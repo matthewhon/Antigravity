@@ -18,6 +18,7 @@ import { ToolPage, ToolTabs, ToolButton, ToolEmptyState } from '../tool-shell';
 import { SmsAnalytics } from './SmsAnalytics';
 import { SmsEventPickerModal } from '../SmsEventPickerModal';
 import { SimpleRichTextEditor } from '../SimpleRichTextEditor';
+import { VariablePicker } from '../VariablePicker';
 import { formatPhone } from './smsUtils';
 import {
     compressSmsImage, STATUS_LABELS, SEGMENT_NOTE, ALL_MERGE_TAGS,
@@ -1207,9 +1208,12 @@ export const CampaignComposer: React.FC<ComposerProps> = ({
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Merge Tags</label>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Merge Tags</label>
+                                <VariablePicker churchId={churchId} church={church} onInsert={insertAtCursor} buttonLabel="All & Custom Variables" />
+                            </div>
                             <div className="flex flex-wrap gap-2">
-                                {ALL_MERGE_TAGS.map(({ tag, label }) => (
+                                {ALL_MERGE_TAGS.slice(0, 12).map(({ tag, label }) => (
                                     <button
                                         key={tag}
                                         title={`Insert ${label} merge tag`}
@@ -2162,9 +2166,12 @@ export const NewMessageComposer: React.FC<{
                         {/* Merge tags hint */}
                         {mode !== 'individual' && (
                             <div className="mt-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Merge Tags</p>
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Merge Tags</p>
+                                    <VariablePicker churchId={churchId} church={church} onInsert={insertAtCursorNM} buttonLabel="All & Custom Variables" />
+                                </div>
                                 <div className="flex flex-wrap gap-1.5">
-                                    {ALL_MERGE_TAGS.map(({ tag, label }) => (
+                                    {ALL_MERGE_TAGS.slice(0, 10).map(({ tag, label }) => (
                                         <button key={tag} type="button" title={`Insert ${label}`}
                                             onClick={() => insertAtCursorNM(tag)}
                                             className="px-2 py-1 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"

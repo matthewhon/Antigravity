@@ -1,17 +1,21 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import {
     BarChart3,
     CheckCircle,
     Clock,
     FormInput,
+    Globe2,
     Loader2,
     Search,
     Sparkles,
+    Trash2,
     X,
     Zap,
 } from 'lucide-react';
 import { ALL_RECIPES } from '../data/recipeCatalog';
-import { importAnyRecipe } from '../services/recipeImportService';
+import { auth, db } from '../services/firebase';
+import { deleteSharedRecipe, importAnyRecipe } from '../services/recipeImportService';
 import { Recipe, RecipeCategory, RecipeKind } from '../types';
 
 interface RecipeLibraryModalProps {
@@ -59,13 +63,46 @@ export const RecipeLibraryModal: React.FC<RecipeLibraryModalProps> = ({
     const [kindFilter, setKindFilter] = useState<RecipeKind | 'all'>(initialKind);
     const [category, setCategory] = useState<'All' | RecipeCategory>('All');
     const [search, setSearch] = useState('');
+    const [sharedRecipes, setSharedRecipes] = useState<Recipe[]>([]);
+    const [isSystemAdmin, setIsSystemAdmin] = useState(false);
     const [importingId, setImportingId] = useState<string | null>(null);
     const [importedIds, setImportedIds] = useState<Record<string, boolean>>({});
     const [error, setError] = useState<string | null>(null);
 
+    useEffect(() => {
+        const unsub = onSnapshot(
+            collection(db, 'shared_recipes'),
+            snap => {
+                const list = snap.docs
+                    .map(d => ({ ...(d.data() as Recipe), id: d.id, isShared: true }))
+                    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                setSharedRecipes(list);
+            },
+            () => setSharedRecipes([])
+        );
+        return unsub;
+    }, []);
+
+    useEffect(() => {
+        const u = auth.currentUser;
+        if (!u) return;
+        if (u.email === 'matthew@chill.dev') {
+            setIsSystemAdmin(true);
+            return;
+        }
+        getDoc(doc(db, 'users', u.uid))
+            .then(snap => {
+                const roles: string[] = snap.data()?.roles || [];
+                if (roles.includes('System Administration')) setIsSystemAdmin(true);
+            })
+            .catch(() => {});
+    }, []);
+
+    const allRecipes = useMemo(() => [...sharedRecipes, ...ALL_RECIPES], [sharedRecipes]);
+
     const filteredRecipes = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return ALL_RECIPES.filter(r => {
+        return allRecipes.filter(r => {
             if (kindFilter !== 'all' && r.kind !== kindFilter) return false;
             if (category !== 'All' && r.category !== category) return false;
             if (!q) return true;
@@ -75,7 +112,7 @@ export const RecipeLibraryModal: React.FC<RecipeLibraryModalProps> = ({
                 r.highlights.some(h => h.toLowerCase().includes(q))
             );
         });
-    }, [kindFilter, category, search]);
+    }, [allRecipes, kindFilter, category, search]);
 
     const handleImport = async (recipe: Recipe) => {
         if (importingId) return;
@@ -89,6 +126,15 @@ export const RecipeLibraryModal: React.FC<RecipeLibraryModalProps> = ({
             setError(err?.message || 'Failed to import recipe.');
         } finally {
             setImportingId(null);
+        }
+    };
+
+    const handleDeleteShared = async (recipe: Recipe) => {
+        if (!window.confirm(`Remove "${recipe.title}" from shared recipes for all tenants?`)) return;
+        try {
+            await deleteSharedRecipe(recipe.id);
+        } catch (err: any) {
+            setError(err?.message || 'Failed to delete shared recipe.');
         }
     };
 
@@ -108,7 +154,7 @@ export const RecipeLibraryModal: React.FC<RecipeLibraryModalProps> = ({
                             <Sparkles size={20} />
                         </div>
                         <div>
-                            <h2 className="text-lg font-black">Church Recipe Library</h2>
+                            <h2 className="text-lg font-black">Care &amp; Messaging Recipe Library</h2>
                             <p className="text-xs text-indigo-100">
                                 1-click templates for Workflows, Care Forms, and PCO Custom Reports
                             </p>
@@ -206,13 +252,32 @@ export const RecipeLibraryModal: React.FC<RecipeLibraryModalProps> = ({
                                     >
                                         <div className="space-y-3">
                                             <div className="flex items-start justify-between gap-2">
-                                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${meta.badge}`}>
-                                                    <KindIcon size={11} />
-                                                    {meta.label}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                                                    <Clock size={10} /> {recipe.estimatedSetupMinutes}m setup
-                                                </span>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${meta.badge}`}>
+                                                        <KindIcon size={11} />
+                                                        {meta.label}
+                                                    </span>
+                                                    {recipe.isShared && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300">
+                                                            <Globe2 size={10} /> Shared
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                                                        <Clock size={10} /> {recipe.estimatedSetupMinutes}m setup
+                                                    </span>
+                                                    {recipe.isShared && isSystemAdmin && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteShared(recipe)}
+                                                            title="Remove from shared recipes"
+                                                            className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div>

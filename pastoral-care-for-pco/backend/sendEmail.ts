@@ -3,6 +3,7 @@ import { createServerLogger } from '../services/logService';
 import { refreshCampaignBlocks } from './emailScheduler';
 import { fireAndForgetEmailNote } from './pcoNotes';
 import { resolveEmailProvider, recordEmailUsage } from './emailProvider.js';
+import { resolveMergeTags } from './mergeTags';
 
 // ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
 // We use fetch() directly instead of @sendgrid/mail so we can set the
@@ -1290,7 +1291,7 @@ interface PersonInfo {
     personId?: string | null;
 }
 
-function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
+function _legacyUnusedResolveMergeTags(body: string, person: PersonInfo, church?: any): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';

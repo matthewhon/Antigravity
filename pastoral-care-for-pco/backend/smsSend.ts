@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService';
 import { getSignalWireClient, getSmsWebhookBaseUrl } from './signalwireClient';
 import { fireAndForgetSmsNote } from './pcoNotes';
+import { resolveMergeTags } from './mergeTags';
 
 
 // ─── Default SignalWire Cost & Customer Markup Constants ──────────────────────
@@ -146,37 +147,6 @@ export interface PersonInfo {
     /** PCO People person ID — used to write notes back to Planning Center after send. */
     pcoPersonId?: string | null;
     avatar?:      string | null;
-}
-
-/** Replace merge tags with person-specific values. */
-function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
-    const parts = (person.personName || '').split(' ');
-    const firstName = parts[0] || '';
-    const lastName  = parts.slice(1).join(' ') || '';
-    const rawPhone = (person.phone || '').replace(/^\+1/, '');
-    const formattedPhone = rawPhone.length === 10
-        ? `(${rawPhone.slice(0,3)}) ${rawPhone.slice(3,6)}-${rawPhone.slice(6)}`
-        : rawPhone;
-
-    const rawChurchPhone = (church?.phone || '').replace(/^\+1/, '');
-    const formattedChurchPhone = rawChurchPhone.length === 10
-        ? `(${rawChurchPhone.slice(0,3)}) ${rawChurchPhone.slice(3,6)}-${rawChurchPhone.slice(6)}`
-        : rawChurchPhone;
-
-    return body
-        .replace(/\{contact\.firstName\}|\{firstName\}|\{first_name\}|\{first name\}/gi,   firstName || 'Friend')
-        .replace(/\{contact\.lastName\}|\{lastName\}|\{last_name\}|\{last name\}/gi,    lastName)
-        .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}|\{full_name\}|\{name\}/gi,    person.personName || firstName || 'Friend')
-        .replace(/\{contact\.email\}|\{email\}/gi,       person.email      || '')
-        .replace(/\{contact\.phone\}|\{phone\}/gi,       formattedPhone)
-        .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
-        .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
-        .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
-        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '')
-        .replace(/\{church\.name\}|\{churchName\}|\{church_name\}/gi,       church?.name || '')
-        .replace(/\{church\.phone\}|\{churchPhone\}|\{church_phone\}/gi,       formattedChurchPhone)
-        .replace(/\{church\.address\}|\{churchAddress\}|\{church_address\}/gi,   church?.address || '')
-        .replace(/\{church\.website\}|\{churchWebsite\}|\{church_website\}/gi,   church?.website || '');
 }
 
 async function resolveDefaultNumberId(db: any, churchId: string): Promise<string | null> {

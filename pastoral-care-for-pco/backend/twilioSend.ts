@@ -2,6 +2,7 @@ import twilio from 'twilio';
 import { getDb } from './firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService';
+import { resolveMergeTags } from './mergeTags';
 
 // ─── Master credentials helper ────────────────────────────────────────────────
 // All Twilio operations use the master account acting on behalf of the
@@ -68,31 +69,6 @@ export interface PersonInfo {
     anniversary?: string; // e.g. "Jun 10"
     city?:       string;
     state?:      string;
-}
-
-/** Replace merge tags with person-specific values. */
-function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
-    const parts = (person.personName || '').split(' ');
-    const firstName = parts[0] || '';
-    const lastName  = parts.slice(1).join(' ') || '';
-    const rawChurchPhone = (church?.phone || '').replace(/^\+1/, '');
-    const formattedChurchPhone = rawChurchPhone.length === 10
-        ? `(${rawChurchPhone.slice(0,3)}) ${rawChurchPhone.slice(3,6)}-${rawChurchPhone.slice(6)}`
-        : rawChurchPhone;
-    return body
-        .replace(/\{firstName\}/gi,   firstName)
-        .replace(/\{lastName\}/gi,    lastName)
-        .replace(/\{fullName\}/gi,    person.personName || '')
-        .replace(/\{email\}/gi,       person.email      || '')
-        .replace(/\{phone\}/gi,       person.phone      || '')
-        .replace(/\{birthday\}/gi,    person.birthday   || '')
-        .replace(/\{anniversary\}/gi, person.anniversary || '')
-        .replace(/\{city\}/gi,        person.city       || '')
-        .replace(/\{state\}/gi,       person.state      || '')
-        .replace(/\{church\.name\}|\{churchName\}/gi,       church?.name || '')
-        .replace(/\{church\.phone\}|\{churchPhone\}/gi,       formattedChurchPhone)
-        .replace(/\{church\.address\}|\{churchAddress\}/gi,   church?.address || '')
-        .replace(/\{church\.website\}|\{churchWebsite\}/gi,   church?.website || '');
 }
 
 /** Get the public base URL for webhooks from Firestore system settings or env. */

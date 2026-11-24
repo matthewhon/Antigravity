@@ -13,6 +13,8 @@ import { pcoService } from '../services/pcoService';
 import { generateCampaignContent, CampaignWriterResult, fetchContentRecommendations, RecommendedContentItem, CampaignWriterItem } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CanvaPickerModal } from './CanvaPickerModal';
+import { GLOBAL_VARIABLES } from '../constants/globalVariables';
+import { VariablePicker } from './VariablePicker';
 import { Poll, ChurchNote } from '../types';
 import {
   Type, Heading as HeadingIcon, Image as ImageIcon, MousePointerClick, File,
@@ -697,17 +699,9 @@ const InsertResourceModal: React.FC<{
 
 // ─── Inline text editor (embedded Tiptap) ─────────────────────────────────────
 
-const ALL_MERGE_TAGS = [
-  { tag: '{firstName}', label: 'First Name' },
-  { tag: '{lastName}', label: 'Last Name' },
-  { tag: '{fullName}', label: 'Full Name' },
-  { tag: '{email}', label: 'Email' },
-  { tag: '{phone}', label: 'Phone' },
-  { tag: '{city}', label: 'City' },
-  { tag: '{state}', label: 'State' },
-  { tag: '{birthday}', label: 'Birthday' },
-  { tag: '{anniversary}', label: 'Anniversary' },
-];
+const ALL_MERGE_TAGS = GLOBAL_VARIABLES.filter(
+  v => v.category === 'Contact' || v.category === 'Church'
+).slice(0, 12);
 
 const InlineTextEditor: React.FC<{
   block: EmailBlock;
@@ -906,7 +900,8 @@ const InlineTextEditor: React.FC<{
         </div>
       )}
       <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5 items-center">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Merge Tags:</span>
+        <VariablePicker churchId={churchId} onInsert={handleInsertMergeTag} buttonLabel="All Variables" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Quick:</span>
         {ALL_MERGE_TAGS.map(({ tag, label }) => (
           <button
             key={tag}

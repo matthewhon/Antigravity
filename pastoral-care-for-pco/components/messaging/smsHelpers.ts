@@ -58,21 +58,12 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 export const SEGMENT_NOTE = 'SMS segments: 1 segment = 160 chars. Merge tags like {firstName} count toward length.';
 
-export const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
-    { tag: '{firstName}', label: 'First Name' },
-    { tag: '{lastName}', label: 'Last Name' },
-    { tag: '{fullName}', label: 'Full Name' },
-    { tag: '{email}', label: 'Email' },
-    { tag: '{phone}', label: 'Phone' },
-    { tag: '{city}', label: 'City' },
-    { tag: '{state}', label: 'State' },
-    { tag: '{birthday}', label: 'Birthday' },
-    { tag: '{anniversary}', label: 'Anniversary' },
-    { tag: '{church.name}', label: 'Church Name' },
-    { tag: '{church.phone}', label: 'Church Phone' },
-    { tag: '{church.address}', label: 'Church Address' },
-    { tag: '{church.website}', label: 'Church Website' },
-];
+import { GLOBAL_VARIABLES } from '../../constants/globalVariables';
+
+export const ALL_MERGE_TAGS: { tag: string; label: string }[] = GLOBAL_VARIABLES.map(v => ({
+    tag: v.tag,
+    label: v.label,
+}));
 
 export const COMMON_EMOJIS = [
     '👋', '🙏', '❤️', '😊', '👍', '🎉', '🙌', '✨', '🔥', '💡',

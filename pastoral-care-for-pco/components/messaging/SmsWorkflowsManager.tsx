@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db as firebaseDb, storage } from '../../services/firebase';
+import { auth, db as firebaseDb, storage } from '../../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-    query, where, orderBy, limit, getDocs, setDoc
+    query, where, orderBy, limit, getDocs, getDoc, setDoc
 } from 'firebase/firestore';
 import { pcoService } from '../../services/pcoService';
 import {
     SmsKeyword, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag,
     WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode,
-    WorkflowBranchNode, TwilioPhoneNumber
+    WorkflowBranchNode, TwilioPhoneNumber, RecipeCategory
 } from '../../types';
 import {
     MessageSquare, Users, Plus, ArrowLeft, Trash2, Pencil, ChevronDown,
@@ -18,10 +18,12 @@ import {
     ChevronRight, RotateCcw, Mail, Tag, Upload, GitBranch, Info, ListPlus,
     Play, Beaker, Hand, ClipboardList, Cake, Gem, Ticket, Lightbulb,
     User as UserIcon, CircleCheck, Ban, Megaphone, Bell, Target, CalendarDays,
-    MailOpen, StickyNote, Timer, CalendarClock, Cog
+    MailOpen, StickyNote, Timer, CalendarClock, Cog, Globe2
 } from 'lucide-react';
 import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from '../tool-shell';
 import { RecipeLibraryModal } from '../RecipeLibraryModal';
+import { VariablePicker } from '../VariablePicker';
+import { publishWorkflowAsSharedRecipe } from '../../services/recipeImportService';
 import { useTwilioNumbers } from './NumberManager';
 import { formatPhone } from './smsUtils';
 import {
@@ -1043,7 +1045,8 @@ const ActionNodeCard: React.FC<{
                                 </div>
                             )}
                         </div>
-                        {ALL_MERGE_TAGS.map(({ tag }) => (
+                        <VariablePicker churchId={churchId} onInsert={tag => insertAtCursor(tag, 'message')} buttonLabel="Variables" />
+                        {ALL_MERGE_TAGS.slice(0, 8).map(({ tag }) => (
                             <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'message')}
                                 className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition"
                             >{tag}</button>
@@ -1111,7 +1114,8 @@ const ActionNodeCard: React.FC<{
                                     </div>
                                 )}
                             </div>
-                            {ALL_MERGE_TAGS.map(({ tag }) => (
+                            <VariablePicker churchId={churchId} onInsert={tag => insertAtCursor(tag, 'message')} buttonLabel="Variables" />
+                            {ALL_MERGE_TAGS.slice(0, 8).map(({ tag }) => (
                                 <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'message')}
                                     className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition"
                                 >{tag}</button>
@@ -1175,7 +1179,8 @@ const ActionNodeCard: React.FC<{
                                     </div>
                                 )}
                             </div>
-                            {ALL_MERGE_TAGS.map(({ tag }) => (
+                            <VariablePicker churchId={churchId} onInsert={tag => insertAtCursor(tag, 'emailBody')} buttonLabel="Variables" />
+                            {ALL_MERGE_TAGS.slice(0, 8).map(({ tag }) => (
                                 <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'emailBody')}
                                     className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition"
                                 >{tag}</button>
@@ -2271,8 +2276,9 @@ const WorkflowEditor: React.FC<{
     twilioNumbers: TwilioPhoneNumber[];
     onSave: (wf: SmsWorkflow) => Promise<void>;
     onBack: () => void;
+    onPushToRecipes?: (wf: SmsWorkflow) => void;
     isBusy: boolean;
-}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, twilioNumbers, onSave, onBack, isBusy }) => {
+}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, twilioNumbers, onSave, onBack, onPushToRecipes, isBusy }) => {
 
     const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
         const nodes: WorkflowNode[] = [];
@@ -2588,6 +2594,15 @@ const WorkflowEditor: React.FC<{
                     >
                         <Beaker size={12} /> Test Simulator
                     </button>
+                    {onPushToRecipes && (
+                        <button
+                            onClick={() => onPushToRecipes({ ...wf, nodes, steps: nodesToSteps(nodes) })}
+                            title="Push to Care & Messaging Recipes for all tenants"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition"
+                        >
+                            <Globe2 size={12} /> Push to Recipes
+                        </button>
+                    )}
                     <button
                         onClick={() => patch({ isActive: !wf.isActive })}
                         className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl border transition ${wf.isActive ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-300 dark:border-slate-600 text-slate-500'}`}
@@ -4010,6 +4025,134 @@ const WorkflowEnrollmentsModal: React.FC<{
     );
 };
 
+const PushWorkflowToRecipesModal: React.FC<{
+    workflow: SmsWorkflow;
+    onClose: () => void;
+    onPublished: (title: string) => void;
+}> = ({ workflow, onClose, onPublished }) => {
+    const [title, setTitle] = useState(workflow.name || 'Untitled Workflow');
+    const [subtitle, setSubtitle] = useState(workflow.description || '');
+    const [category, setCategory] = useState<RecipeCategory>('Assimilation');
+    const [churchSizeFit, setChurchSizeFit] = useState<'Small (<150)' | 'All Churches'>('All Churches');
+    const [publishing, setPublishing] = useState(false);
+    const [error, setError] = useState('');
+
+    const handlePublish = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title.trim()) {
+            setError('Recipe title is required.');
+            return;
+        }
+        setError('');
+        setPublishing(true);
+        try {
+            const u = auth.currentUser;
+            await publishWorkflowAsSharedRecipe(workflow, {
+                title,
+                subtitle,
+                category,
+                churchSizeFit,
+                publishedByUid: u?.uid,
+                publishedByName: u?.displayName || u?.email || undefined,
+            });
+            onPublished(title.trim());
+        } catch (err: any) {
+            setError(err?.message || 'Failed to publish shared recipe.');
+        } finally {
+            setPublishing(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+            <form
+                onSubmit={handlePublish}
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+            >
+                <div className="px-6 py-4 bg-gradient-to-r from-teal-600 to-indigo-600 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <Globe2 size={18} />
+                        <div>
+                            <h3 className="text-sm font-black">Push to Care &amp; Messaging Recipes</h3>
+                            <p className="text-[11px] text-teal-100">Make this workflow available for all tenants to import &amp; edit</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/20 transition">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Recipe Title</label>
+                        <input
+                            type="text"
+                            required
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Description</label>
+                        <textarea
+                            rows={3}
+                            value={subtitle}
+                            onChange={e => setSubtitle(e.target.value)}
+                            placeholder="Describe when a church should use this workflow..."
+                            className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Category</label>
+                            <select
+                                value={category}
+                                onChange={e => setCategory(e.target.value as RecipeCategory)}
+                                className="w-full text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                            >
+                                <option value="Assimilation">Assimilation</option>
+                                <option value="Pastoral Care">Pastoral Care</option>
+                                <option value="Retention">Retention</option>
+                                <option value="Volunteers">Volunteers</option>
+                                <option value="Data Health">Data Health</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Church Size Fit</label>
+                            <select
+                                value={churchSizeFit}
+                                onChange={e => setChurchSizeFit(e.target.value as 'Small (<150)' | 'All Churches')}
+                                className="w-full text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                            >
+                                <option value="All Churches">All Churches</option>
+                                <option value="Small (<150)">Small (&lt;150)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3 leading-relaxed">
+                        Church-specific PCO lists, tags, phone numbers, and staff recipient lists are automatically stripped so every tenant gets a clean, editable copy.
+                    </p>
+                    {error && (
+                        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+                    )}
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700">Cancel</button>
+                        <button
+                            type="submit"
+                            disabled={publishing}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-black transition"
+                        >
+                            {publishing ? <><Loader2 size={13} className="animate-spin" /> Publishing...</> : <><Globe2 size={13} /> Publish to All Tenants</>}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    );
+};
+
 export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const { numbers: twilioNumbers } = useTwilioNumbers(churchId);
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
@@ -4022,6 +4165,24 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [editing, setEditing] = useState<SmsWorkflow | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
     const [showRecipes, setShowRecipes] = useState(false);
+    const [pushRecipeTarget, setPushRecipeTarget] = useState<SmsWorkflow | null>(null);
+    const [publishNotice, setPublishNotice] = useState<string | null>(null);
+    const [isSystemAdmin, setIsSystemAdmin] = useState(false);
+
+    useEffect(() => {
+        const u = auth.currentUser;
+        if (!u) return;
+        if (u.email === 'matthew@chill.dev') {
+            setIsSystemAdmin(true);
+            return;
+        }
+        getDoc(doc(firebaseDb, 'users', u.uid))
+            .then(snap => {
+                const roles: string[] = snap.data()?.roles || [];
+                if (roles.includes('System Administration')) setIsSystemAdmin(true);
+            })
+            .catch(() => {});
+    }, []);
     const [isBusy, setIsBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
@@ -4175,12 +4336,24 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     twilioNumbers={twilioNumbers}
                     onSave={handleSave}
                     onBack={() => { setViewMode('list'); setSaveError(null); }}
+                    onPushToRecipes={isSystemAdmin ? (w => setPushRecipeTarget(w)) : undefined}
                     isBusy={isBusy}
                 />
                 {saveError && (
                     <div className="shrink-0 mx-6 mb-4 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
                         <span className="font-bold">Save failed:</span> {saveError}
                     </div>
+                )}
+                {pushRecipeTarget && (
+                    <PushWorkflowToRecipesModal
+                        workflow={pushRecipeTarget}
+                        onClose={() => setPushRecipeTarget(null)}
+                        onPublished={title => {
+                            setPushRecipeTarget(null);
+                            setPublishNotice(`"${title}" pushed to Care & Messaging Recipes for all tenants.`);
+                            setTimeout(() => setPublishNotice(null), 6000);
+                        }}
+                    />
                 )}
             </div>
         );
@@ -4360,6 +4533,15 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                     <Users size={14} />
                                                 </button>
                                             )}
+                                            {isSystemAdmin && (
+                                                <button
+                                                    onClick={() => setPushRecipeTarget(wf)}
+                                                    className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                                    title="Push to Care & Messaging Recipes (all tenants)"
+                                                >
+                                                    <Globe2 size={14} />
+                                                </button>
+                                            )}
                                             <button onClick={() => openEdit(wf)} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
                                                 <Pencil size={14} />
                                             </button>
@@ -4464,6 +4646,13 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                 />
             )}
 
+            {publishNotice && (
+                <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 text-xs font-bold text-teal-700 dark:text-teal-300">
+                    <span className="flex items-center gap-2"><Globe2 size={14} /> {publishNotice}</span>
+                    <button type="button" onClick={() => setPublishNotice(null)} className="text-teal-500 hover:text-teal-700"><X size={14} /></button>
+                </div>
+            )}
+
             {showRecipes && (
                 <RecipeLibraryModal
                     churchId={churchId}
@@ -4476,6 +4665,18 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                             setSaveError(null);
                             setViewMode('editor');
                         }
+                    }}
+                />
+            )}
+
+            {pushRecipeTarget && (
+                <PushWorkflowToRecipesModal
+                    workflow={pushRecipeTarget}
+                    onClose={() => setPushRecipeTarget(null)}
+                    onPublished={title => {
+                        setPushRecipeTarget(null);
+                        setPublishNotice(`"${title}" pushed to Care & Messaging Recipes for all tenants.`);
+                        setTimeout(() => setPublishNotice(null), 6000);
                     }}
                 />
             )}

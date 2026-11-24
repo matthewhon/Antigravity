@@ -497,6 +497,11 @@ service cloud.firestore {
       allow update: if isDocInUserChurch() && churchIdNotModified();
     }
 
+    match /shared_recipes/{recipeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSystemAdmin();
+    }
+
     match /polls/{docId} {
       allow get: if true;
       allow list, delete: if isDocInUserChurch();

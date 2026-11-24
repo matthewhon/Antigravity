@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import {
     CustomReportDefinition,
@@ -6,6 +6,7 @@ import {
     FormRecipe,
     PcoPerson,
     Recipe,
+    RecipeCategory,
     ReportRecipe,
     SmsWorkflow,
     SmsWorkflowStep,
@@ -197,6 +198,134 @@ export async function importAnyRecipe(churchId: string, recipe: Recipe): Promise
     if (recipe.kind === 'workflow') return importWorkflowRecipe(churchId, recipe);
     if (recipe.kind === 'form') return importFormRecipe(churchId, recipe);
     return importReportRecipe(churchId, recipe);
+}
+
+/**
+ * Sanitize and publish a tenant's workflow to the global `shared_recipes` collection
+ * so all tenants can 1-click import, edit, and use it.
+ */
+export async function publishWorkflowAsSharedRecipe(
+    wf: SmsWorkflow,
+    meta: {
+        title: string;
+        subtitle: string;
+        category: RecipeCategory;
+        churchSizeFit: 'Small (<150)' | 'All Churches';
+        publishedByUid?: string;
+        publishedByName?: string;
+    }
+): Promise<WorkflowRecipe> {
+    const now = Date.now();
+    const recipeId = `shared_wf_${now}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Build nodes from wf.nodes if present, otherwise convert legacy steps
+    const rawNodes: WorkflowNode[] =
+        wf.nodes && wf.nodes.length > 0
+            ? wf.nodes
+            : (wf.steps || []).flatMap((s, i) => {
+                  const arr: WorkflowNode[] = [];
+                  if (i > 0 && (s.delayDays > 0 || (s.delayHours && s.delayHours > 0) || s.scheduleType !== undefined)) {
+                      arr.push({
+                          nodeType: 'delay',
+                          id: uid(),
+                          order: arr.length,
+                          delayDays: s.delayDays ?? 1,
+                          delayHours: s.delayHours ?? 0,
+                          scheduleType: s.scheduleType,
+                          scheduleDayOfWeek: s.scheduleDayOfWeek,
+                          scheduleDayOfMonth: s.scheduleDayOfMonth,
+                          scheduleDate: s.scheduleDate,
+                          scheduleTime: s.scheduleTime,
+                      });
+                  }
+                  arr.push({
+                      nodeType: 'action',
+                      id: uid(),
+                      order: arr.length,
+                      channelType: s.channelType ?? 'sms',
+                      message: s.message || '',
+                      mediaUrls: s.mediaUrls,
+                      emailSubject: s.emailSubject,
+                      emailBody: s.emailBody,
+                  });
+                  return arr;
+              });
+
+    // Strip church-specific PCO/Twilio IDs from action & branch nodes
+    const sanitizeAction = (an: WorkflowActionNode): WorkflowActionNode => ({
+        ...an,
+        id: uid(),
+        staffListId: null,
+        staffListName: null,
+        staffGroupId: null,
+        staffGroupName: null,
+        ...(an.channelType === 'staff_sms' || an.channelType === 'staff_email'
+            ? { staffTargetType: 'individuals' as const, staffRecipients: [] }
+            : {}),
+    });
+
+    const sanitizedNodes: WorkflowNode[] = rawNodes.map((n, idx) => {
+        if (n.nodeType === 'action') return { ...sanitizeAction(n), order: idx };
+        if (n.nodeType === 'branch') {
+            return {
+                ...n,
+                id: uid(),
+                order: idx,
+                conditionTagId: null,
+                conditionTagName: null,
+                thenNodes: n.thenNodes.map((tn, ti) => ({ ...sanitizeAction(tn), order: ti })),
+                elseNodes: n.elseNodes.map((en, ei) => ({ ...sanitizeAction(en), order: ei })),
+            };
+        }
+        return { ...n, id: uid(), order: idx };
+    });
+
+    const actionCount = sanitizedNodes.filter(n => n.nodeType === 'action').length;
+    const triggerLabelMap: Record<string, string> = {
+        manual: 'Manual Trigger',
+        keyword: 'Keyword Trigger',
+        list_add: 'PCO List Trigger',
+        birthday: 'Birthday Trigger',
+        anniversary: 'Anniversary Trigger',
+        event_registration: 'Event Trigger',
+    };
+
+    // Keep date-based triggers as-is; convert church-specific list/keyword/event triggers to 'manual'
+    // so other tenants don't inherit broken IDs and can assign their own trigger after importing.
+    const portableTrigger =
+        wf.trigger === 'birthday' || wf.trigger === 'anniversary' ? wf.trigger : 'manual';
+
+    const recipe: WorkflowRecipe = {
+        id: recipeId,
+        kind: 'workflow',
+        title: meta.title.trim(),
+        subtitle: meta.subtitle.trim() || `${actionCount}-step workflow shared for all churches.`,
+        category: meta.category,
+        churchSizeFit: meta.churchSizeFit,
+        estimatedSetupMinutes: Math.max(1, Math.min(5, actionCount)),
+        highlights: [
+            `${actionCount} Step${actionCount !== 1 ? 's' : ''}`,
+            triggerLabelMap[portableTrigger] || 'Manual Trigger',
+            'Shared Recipe',
+        ],
+        trigger: portableTrigger,
+        allowReentry: !!wf.allowReentry,
+        triggerDayOffset: wf.triggerDayOffset ?? 0,
+        triggerTime: wf.triggerTime ?? '09:00',
+        nodes: sanitizedNodes,
+        isShared: true,
+        publishedByUid: meta.publishedByUid,
+        publishedByName: meta.publishedByName,
+        sourceChurchId: wf.churchId,
+        createdAt: now,
+    };
+
+    await setDoc(doc(db, 'shared_recipes', recipeId), stripUndefined(recipe));
+    return recipe;
+}
+
+export async function deleteSharedRecipe(recipeId: string): Promise<void> {
+    await deleteDoc(doc(db, 'shared_recipes', recipeId));
 }
 
 /** Evaluate a CustomReportDefinition's filters & sort against synced PCO people. */

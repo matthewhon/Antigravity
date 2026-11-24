@@ -320,10 +320,27 @@ export interface CommunityLocation {
     isDefault: boolean;
 }
 
+export interface TenantVariable {
+    id: string;
+    /** Normalized lowercase snake_case key (stored without `custom.` prefix, referenced as `{custom.<key>}`). */
+    key: string;
+    label: string;
+    value: string;
+    description?: string;
+    updatedAt: number;
+    updatedBy?: string;
+}
+
 export interface Church {
     id: string;
     name: string;
     subdomain: string;
+    pastorName?: string;
+    serviceTimes?: string;
+    givingUrl?: string;
+    connectUrl?: string;
+    /** Tenant-created custom variables referenced as `{custom.<key>}` — never conflicts with global variables. */
+    customVariables?: TenantVariable[];
     pcoConnected: boolean;
     multiCampusEnabled?: boolean;
     givingCampusTrackingEnabled?: boolean;
@@ -3530,6 +3547,11 @@ export interface RecipeBase {
     churchSizeFit: 'Small (<150)' | 'All Churches';
     estimatedSetupMinutes: number;
     highlights: string[];
+    isShared?: boolean;
+    publishedByUid?: string;
+    publishedByName?: string;
+    sourceChurchId?: string;
+    createdAt?: number;
 }
 
 export interface WorkflowRecipe extends RecipeBase {
