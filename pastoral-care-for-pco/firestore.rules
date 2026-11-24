@@ -491,6 +491,12 @@ service cloud.firestore {
       allow update: if isDocInUserChurch() && churchIdNotModified();
     }
 
+    match /pco_custom_reports/{docId} {
+      allow read, delete: if isDocInUserChurch();
+      allow create: if isNewDocInUserChurch();
+      allow update: if isDocInUserChurch() && churchIdNotModified();
+    }
+
     match /polls/{docId} {
       allow get: if true;
       allow list, delete: if isDocInUserChurch();

@@ -10,9 +10,10 @@ import {
   Settings, Eye, FormInput, Palette, ArrowLeft, Calendar, User, Check,
   Globe, FileText, QrCode, Download, MoveUp, MoveDown, Grab, 
   AlignLeft, CheckSquare, Square, FileUp, ChevronDown, Heading, 
-  TextCursorInput, List, X
+  TextCursorInput, List, X, Sparkles
 } from 'lucide-react';
 import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from './tool-shell';
+import { RecipeLibraryModal } from './RecipeLibraryModal';
 
 interface FormsManagerProps {
   churchId: string;
@@ -218,6 +219,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   // UI state helpers
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showRecipes, setShowRecipes] = useState(false);
   const [syncAllState, setSyncAllState] = useState<{
     loading: boolean;
     result: { synced: number; failed: number; total: number } | null;
@@ -846,9 +848,14 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
           tool="forms"
           description="Create visitor cards and connect forms that directly create or overwrite member profiles in PCO."
           actions={
-            <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
-              Create New Form
-            </ToolButton>
+            <div className="flex items-center gap-2">
+              <ToolButton variant="secondary" icon={Sparkles} onClick={() => setShowRecipes(true)}>
+                Browse Recipes
+              </ToolButton>
+              <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
+                Create New Form
+              </ToolButton>
+            </div>
           }
         />
       )}
@@ -861,9 +868,14 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
             title="No forms created yet"
             description="Create custom contact cards for check-ins, visitor collections, and database cleanups."
             action={
-              <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
-                Get Started
-              </ToolButton>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <ToolButton variant="secondary" icon={Sparkles} onClick={() => setShowRecipes(true)}>
+                  Use a Care Form Recipe
+                </ToolButton>
+                <ToolButton variant="primary" icon={Plus} onClick={handleCreateClick}>
+                  Get Started
+                </ToolButton>
+              </div>
             }
           />
         ) : (
@@ -1856,6 +1868,17 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
             </div>
           )}
         </div>
+      )}
+      {showRecipes && (
+        <RecipeLibraryModal
+          churchId={churchId}
+          initialKind="form"
+          onClose={() => setShowRecipes(false)}
+          onImported={() => {
+            loadForms();
+            setShowRecipes(false);
+          }}
+        />
       )}
     </ToolPage>
   );

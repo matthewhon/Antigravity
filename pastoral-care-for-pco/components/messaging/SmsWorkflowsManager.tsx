@@ -21,6 +21,7 @@ import {
     MailOpen, StickyNote, Timer, CalendarClock, Cog
 } from 'lucide-react';
 import { ToolPage, ToolHeader, ToolButton, ToolEmptyState } from '../tool-shell';
+import { RecipeLibraryModal } from '../RecipeLibraryModal';
 import { useTwilioNumbers } from './NumberManager';
 import { formatPhone } from './smsUtils';
 import {
@@ -4020,6 +4021,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [isLoading, setIsLoading] = useState(true);
     const [editing, setEditing] = useState<SmsWorkflow | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
+    const [showRecipes, setShowRecipes] = useState(false);
     const [isBusy, setIsBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
@@ -4191,9 +4193,14 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                 tool="workflows"
                 description="Automated drip sequences — the right message at the right time."
                 actions={
-                    <ToolButton variant="primary" icon={Plus} onClick={openNew}>
-                        New Workflow
-                    </ToolButton>
+                    <div className="flex items-center gap-2">
+                        <ToolButton variant="secondary" icon={Sparkles} onClick={() => setShowRecipes(true)}>
+                            Browse Recipes
+                        </ToolButton>
+                        <ToolButton variant="primary" icon={Plus} onClick={openNew}>
+                            New Workflow
+                        </ToolButton>
+                    </div>
                 }
             />
 
@@ -4213,11 +4220,16 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                 <ToolEmptyState
                     icon={Zap}
                     title="No workflows yet"
-                    description="Build your first automated text sequence."
+                    description="Build your first automated text sequence or import a ready-made church recipe in 1 click."
                     action={
-                        <ToolButton variant="primary" icon={Plus} onClick={openNew}>
-                            New Workflow
-                        </ToolButton>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                            <ToolButton variant="secondary" icon={Sparkles} onClick={() => setShowRecipes(true)}>
+                                Browse Recipes
+                            </ToolButton>
+                            <ToolButton variant="primary" icon={Plus} onClick={openNew}>
+                                New Workflow
+                            </ToolButton>
+                        </div>
                     }
                 />
             ) : (
@@ -4449,6 +4461,22 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     workflow={viewingEnrollments}
                     churchId={churchId}
                     onClose={() => setViewingEnrollments(null)}
+                />
+            )}
+
+            {showRecipes && (
+                <RecipeLibraryModal
+                    churchId={churchId}
+                    initialKind="workflow"
+                    onClose={() => setShowRecipes(false)}
+                    onImported={(recipe, created) => {
+                        setShowRecipes(false);
+                        if (recipe.kind === 'workflow' && created) {
+                            setEditing(created);
+                            setSaveError(null);
+                            setViewMode('editor');
+                        }
+                    }}
                 />
             )}
             </ToolPage>

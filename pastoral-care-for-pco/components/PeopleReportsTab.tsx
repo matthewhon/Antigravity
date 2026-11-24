@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { NextGenReportsSection } from './NextGenReportsSection';
 import { ProfileCompletenessReport } from './ProfileCompletenessReport';
+import { CustomReportsPanel } from './CustomReportsPanel';
 
 interface PeopleReportsTabProps {
   data: PeopleDashboardData;
@@ -47,7 +48,7 @@ const MEMBERSHIP_COLORS: Record<string, string> = {
   'Unknown': '#94a3b8',
 };
 
-type ReportSubTab = 'overview' | 'nextgen' | 'lifecycle' | 'demographics' | 'risk' | 'membership' | 'data_health';
+type ReportSubTab = 'overview' | 'custom' | 'nextgen' | 'lifecycle' | 'demographics' | 'risk' | 'membership' | 'data_health';
 
 export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data, groups, churchId, pcoConnected }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('12_months');
@@ -336,6 +337,7 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data, groups
         <div className="bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-xl flex flex-wrap gap-1 border border-slate-200 dark:border-slate-700/60">
           {[
             { id: 'overview', label: '📊 Overview' },
+            { id: 'custom', label: '✨ Custom Reports' },
             { id: 'nextgen', label: '👶 NextGen Ministry' },
             { id: 'lifecycle', label: '📈 Lifecycle Status' },
             { id: 'demographics', label: '🎂 Age Demographics' },
@@ -357,7 +359,7 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data, groups
           ))}
         </div>
 
-        {activeReportTab !== 'nextgen' && activeReportTab !== 'data_health' && (
+        {activeReportTab !== 'nextgen' && activeReportTab !== 'data_health' && activeReportTab !== 'custom' && (
           <div className="flex items-center gap-2 px-2">
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time Range:</span>
             <select
@@ -373,6 +375,14 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data, groups
           </div>
         )}
       </div>
+
+      {/* ── Custom Reports Tab ───────────────────────────────────────────────── */}
+      {activeReportTab === 'custom' && (
+        <CustomReportsPanel
+          churchId={churchId}
+          people={data.allPeople || []}
+        />
+      )}
 
       {/* ── Profile Completeness Tab ─────────────────────────────────────────── */}
       {activeReportTab === 'data_health' && (

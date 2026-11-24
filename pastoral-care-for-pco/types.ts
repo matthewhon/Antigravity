@@ -3477,3 +3477,98 @@ export interface TeamMessage {
     pushNotifiedAt?: number;
 }
 
+// --- Recipe Library (1-Click Importable Workflows, Care Forms, Custom Reports) -
+
+export type RecipeKind = 'workflow' | 'form' | 'report';
+
+export type RecipeCategory = 'Assimilation' | 'Pastoral Care' | 'Retention' | 'Volunteers' | 'Data Health';
+
+export interface CustomReportFilter {
+    statusIn?: string[];
+    membershipIn?: string[];
+    riskCategoryIn?: string[];
+    createdWithinDays?: number;
+    notAttendedInDays?: number;
+    noGroup?: boolean;
+    missingAnyOf?: ('phone' | 'email' | 'birthdate')[];
+    adultsOnly?: boolean;
+}
+
+export type CustomReportColumnKey =
+    | 'name'
+    | 'phone'
+    | 'email'
+    | 'membership'
+    | 'status'
+    | 'riskCategory'
+    | 'lastAttended'
+    | 'groupCount'
+    | 'birthdate'
+    | 'createdAt';
+
+export interface CustomReportDefinition {
+    id: string;
+    churchId: string;
+    name: string;
+    description?: string;
+    category?: RecipeCategory;
+    filters: CustomReportFilter;
+    columns: CustomReportColumnKey[];
+    sortBy: 'name' | 'createdAt' | 'lastAttended' | 'riskCategory';
+    sortDir: 'asc' | 'desc';
+    recipeId?: string;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface RecipeBase {
+    id: string;
+    kind: RecipeKind;
+    title: string;
+    subtitle: string;
+    category: RecipeCategory;
+    churchSizeFit: 'Small (<150)' | 'All Churches';
+    estimatedSetupMinutes: number;
+    highlights: string[];
+}
+
+export interface WorkflowRecipe extends RecipeBase {
+    kind: 'workflow';
+    trigger: SmsWorkflowTrigger;
+    allowReentry?: boolean;
+    triggerDayOffset?: number;
+    triggerTime?: string;
+    nodes: WorkflowNode[];
+}
+
+export interface FormRecipeField {
+    id: string;
+    type: 'text' | 'paragraph' | 'checkboxes' | 'checkbox_single' | 'date' | 'select' | 'section_heading' | 'text_block';
+    label: string;
+    required: boolean;
+    mapToPco: string;
+    placeholder?: string;
+    options?: string[];
+}
+
+export interface FormRecipe extends RecipeBase {
+    kind: 'form';
+    formName: string;
+    formDescription: string;
+    customFields: FormRecipeField[];
+    syncToPco: boolean;
+    primaryColor?: string;
+}
+
+export interface ReportRecipe extends RecipeBase {
+    kind: 'report';
+    reportName: string;
+    reportDescription: string;
+    filters: CustomReportFilter;
+    columns: CustomReportColumnKey[];
+    sortBy: CustomReportDefinition['sortBy'];
+    sortDir: CustomReportDefinition['sortDir'];
+}
+
+export type Recipe = WorkflowRecipe | FormRecipe | ReportRecipe;
+
