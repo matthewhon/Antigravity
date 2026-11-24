@@ -5,7 +5,8 @@ import { SmsCampaign } from '../../types';
 import {
     MessageSquare, Send, CheckCircle, Loader2,
     BarChart3, MessageCircle, TrendingUp, TrendingDown,
-    Activity, UserX, AlertTriangle
+    Activity, UserX, AlertTriangle, ArrowLeft, ChevronRight,
+    Users, Clock, DollarSign
 } from 'lucide-react';
 import { ToolPage, ToolTabs } from '../tool-shell';
 
@@ -67,7 +68,13 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
     </div>
 );
 
-export const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNumberId?: string | null }> = ({ churchId, campaigns, smsNumberId }) => {
+export const SmsAnalytics: React.FC<{
+    churchId: string;
+    campaigns: SmsCampaign[];
+    smsNumberId?: string | null;
+    onSelectCampaign?: (campaign: SmsCampaign) => void;
+    embedded?: boolean;
+}> = ({ churchId, campaigns, smsNumberId, onSelectCampaign, embedded = false }) => {
     const [summary, setSummary] = useState<UsageSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [, setOptOuts] = useState(0);
@@ -184,26 +191,45 @@ export const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]
         );
     }
 
+    const Wrapper = embedded ? 'div' : ToolPage;
+
     return (
-        <ToolPage className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        <BarChart3 size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> Analytics
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Message performance, delivery rates, and usage overview</p>
+        <Wrapper className="space-y-6">
+            {!embedded && (
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <BarChart3 size={18} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> Analytics
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Message performance, delivery rates, and usage overview</p>
+                    </div>
+                    <ToolTabs
+                        ariaLabel="Analytics period"
+                        value={period}
+                        onChange={setPeriod}
+                        tabs={[
+                            { value: '30d', label: 'Last 30d' },
+                            { value: '90d', label: 'Last 90d' },
+                            { value: 'all', label: 'All time' },
+                        ]}
+                    />
                 </div>
-                <ToolTabs
-                    ariaLabel="Analytics period"
-                    value={period}
-                    onChange={setPeriod}
-                    tabs={[
-                        { value: '30d', label: 'Last 30d' },
-                        { value: '90d', label: 'Last 90d' },
-                        { value: 'all', label: 'All time' },
-                    ]}
-                />
-            </div>
+            )}
+            {embedded && (
+                <div className="flex items-center justify-between gap-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Message performance, delivery rates, and usage overview</p>
+                    <ToolTabs
+                        ariaLabel="Analytics period"
+                        value={period}
+                        onChange={setPeriod}
+                        tabs={[
+                            { value: '30d', label: 'Last 30d' },
+                            { value: '90d', label: 'Last 90d' },
+                            { value: 'all', label: 'All time' },
+                        ]}
+                    />
+                </div>
+            )}
 
             {summary && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -311,7 +337,11 @@ export const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]
                                 const failed = c.failedCount ?? 0;
                                 const rate = total > 0 ? Math.round((delivered / total) * 100) : 0;
                                 return (
-                                    <div key={c.id} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                                    <div
+                                        key={c.id}
+                                        onClick={onSelectCampaign ? () => onSelectCampaign(c) : undefined}
+                                        className={`px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition ${onSelectCampaign ? 'cursor-pointer' : ''}`}
+                                    >
                                         <div className="flex items-start justify-between gap-4 mb-2">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{c.name}</p>
@@ -340,6 +370,9 @@ export const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]
                                                     <p className={`text-sm font-black ${rate >= 90 ? 'text-emerald-600' : rate >= 70 ? 'text-amber-600' : 'text-red-500'}`}>{rate}%</p>
                                                     <MiniBar pct={rate} color={rate >= 90 ? 'bg-emerald-500' : rate >= 70 ? 'bg-amber-400' : 'bg-red-500'} />
                                                 </div>
+                                                {onSelectCampaign && (
+                                                    <ChevronRight size={15} className="text-slate-400 shrink-0" />
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -406,6 +439,243 @@ export const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]
                     </div>
                 </div>
             </div>
-        </ToolPage>
+        </Wrapper>
+    );
+};
+
+export const BroadcastAnalyticsDetail: React.FC<{
+    churchId: string;
+    campaign: SmsCampaign;
+    onBack: () => void;
+    onOpenBroadcast?: () => void;
+}> = ({ churchId, campaign, onBack, onOpenBroadcast }) => {
+    const [usageCostUsd, setUsageCostUsd] = useState<number | null>(null);
+    const [totalSegments, setTotalSegments] = useState<number | null>(null);
+    const [loadingUsage, setLoadingUsage] = useState(true);
+
+    useEffect(() => {
+        let active = true;
+        setLoadingUsage(true);
+        getDocs(
+            query(
+                collection(firebaseDb, 'smsUsageRecords'),
+                where('churchId', '==', churchId),
+                orderBy('createdAt', 'desc'),
+                limit(5000)
+            )
+        )
+            .then(snap => {
+                if (!active) return;
+                const records = snap.docs
+                    .map(d => d.data())
+                    .filter(r => r.campaignId === campaign.id);
+                if (records.length > 0) {
+                    const cost = records.reduce(
+                        (s, r) => s + (typeof r.customerChargeUsd === 'number' ? r.customerChargeUsd : (r.costUsd ?? 0) * 1.2),
+                        0
+                    );
+                    const segs = records.reduce((s, r) => s + (r.segments ?? 1), 0);
+                    setUsageCostUsd(cost);
+                    setTotalSegments(segs);
+                } else {
+                    setUsageCostUsd(null);
+                    setTotalSegments(null);
+                }
+            })
+            .catch(e => {
+                console.error('[BroadcastAnalyticsDetail] failed to load usage records', e);
+            })
+            .finally(() => {
+                if (active) setLoadingUsage(false);
+            });
+        return () => { active = false; };
+    }, [churchId, campaign.id]);
+
+    const totalSent = campaign.recipientCount ?? 0;
+    const delivered = campaign.deliveredCount ?? 0;
+    const failed = campaign.failedCount ?? 0;
+    const optOuts = campaign.optOutCount ?? 0;
+    const deliveryRate = totalSent > 0 ? Math.round((delivered / totalSent) * 100) : 0;
+    const failRate = totalSent > 0 ? Math.round((failed / totalSent) * 100) : 0;
+    const optOutRate = totalSent > 0 ? Math.round((optOuts / totalSent) * 100) : 0;
+
+    const audienceLabel = campaign.toGroupName
+        ? `Group: ${campaign.toGroupName}`
+        : campaign.toListName
+            ? `List: ${campaign.toListName}`
+            : campaign.toPhones?.length
+                ? `${campaign.toPhones.length} phone number${campaign.toPhones.length !== 1 ? 's' : ''}`
+                : 'Congregation';
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                    <button
+                        onClick={onBack}
+                        title="Back to Broadcasts"
+                        className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">{campaign.name}</h2>
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
+                                Sent
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {campaign.sentAt
+                                ? new Date(campaign.sentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                : 'Sent'}
+                            {' • '}
+                            {audienceLabel}
+                            {campaign.sentByName ? ` • Sent by ${campaign.sentByName}` : ''}
+                        </p>
+                    </div>
+                </div>
+                {onOpenBroadcast && (
+                    <button
+                        onClick={onOpenBroadcast}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                    >
+                        Open Broadcast
+                    </button>
+                )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+                <ToolPage className="space-y-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCard
+                            label="Total Recipients"
+                            value={totalSent.toLocaleString()}
+                            sub={audienceLabel}
+                            icon={<Users size={18} />}
+                            color="violet"
+                        />
+                        <StatCard
+                            label="Delivered"
+                            value={delivered.toLocaleString()}
+                            sub={`${deliveryRate}% delivery rate`}
+                            icon={<CheckCircle size={18} />}
+                            color={deliveryRate >= 90 ? 'emerald' : deliveryRate >= 70 ? 'amber' : 'red'}
+                            trend={deliveryRate >= 90 ? 'up' : deliveryRate < 70 ? 'down' : 'neutral'}
+                        />
+                        <StatCard
+                            label="Failed"
+                            value={failed.toLocaleString()}
+                            sub={totalSent > 0 ? `${((failed / totalSent) * 100).toFixed(1)}% failure rate` : '0%'}
+                            icon={<AlertTriangle size={18} />}
+                            color={failed > 0 ? 'red' : 'slate'}
+                        />
+                        <StatCard
+                            label="Opt-Outs"
+                            value={optOuts.toLocaleString()}
+                            sub={totalSent > 0 ? `${((optOuts / totalSent) * 100).toFixed(1)}% opt-out rate` : '0%'}
+                            icon={<UserX size={18} />}
+                            color={optOuts > 0 ? 'amber' : 'emerald'}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-4">Delivery &amp; Compliance Health</p>
+                            <div className="space-y-3">
+                                {[
+                                    {
+                                        label: 'Delivery rate',
+                                        pct: deliveryRate,
+                                        color: deliveryRate >= 90 ? 'bg-emerald-500' : deliveryRate >= 70 ? 'bg-amber-400' : 'bg-red-500',
+                                        note: totalSent > 0 ? `${deliveryRate}% (${delivered.toLocaleString()} of ${totalSent.toLocaleString()})` : 'No data',
+                                    },
+                                    {
+                                        label: 'Opt-out rate',
+                                        pct: optOutRate,
+                                        color: 'bg-amber-400',
+                                        note: totalSent > 0 ? `${((optOuts / totalSent) * 100).toFixed(1)}%` : 'No data',
+                                    },
+                                    {
+                                        label: 'Failed rate',
+                                        pct: failRate,
+                                        color: 'bg-red-400',
+                                        note: totalSent > 0 ? `${((failed / totalSent) * 100).toFixed(1)}%` : 'No data',
+                                    },
+                                ].map(row => (
+                                    <div key={row.label}>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{row.label}</span>
+                                            <span className="text-slate-400">{row.note}</span>
+                                        </div>
+                                        <MiniBar pct={row.pct} color={row.color} />
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-4 flex items-start gap-2 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-2.5">
+                                <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+                                <span>Carriers may filter messages if opt-out rates exceed 1% or delivery rates fall below 85%.</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-4">Broadcast Details &amp; Usage</p>
+                            <div className="space-y-3">
+                                {[
+                                    {
+                                        label: 'Channel',
+                                        value: campaign.channelType === 'email'
+                                            ? 'Email'
+                                            : (campaign.mediaUrls && campaign.mediaUrls.length > 0) ? 'MMS' : 'SMS',
+                                    },
+                                    {
+                                        label: 'Sent at',
+                                        value: campaign.sentAt
+                                            ? new Date(campaign.sentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                            : '—',
+                                    },
+                                    {
+                                        label: 'Total segments',
+                                        value: loadingUsage ? 'Loading...' : (totalSegments !== null ? totalSegments.toLocaleString() : '—'),
+                                    },
+                                    {
+                                        label: 'Estimated cost',
+                                        value: loadingUsage ? 'Loading...' : (usageCostUsd !== null ? `$${usageCostUsd.toFixed(4)}` : '—'),
+                                    },
+                                    {
+                                        label: 'Cost per delivered msg',
+                                        value: loadingUsage
+                                            ? 'Loading...'
+                                            : (usageCostUsd !== null && delivered > 0 ? `$${(usageCostUsd / delivered).toFixed(4)}` : '—'),
+                                    },
+                                ].map(row => (
+                                    <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">{row.label}</span>
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">{row.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">Message Content</p>
+                        {campaign.channelType === 'email' && campaign.emailSubject && (
+                            <p className="text-sm font-bold text-slate-900 dark:text-white mb-2">
+                                Subject: {campaign.emailSubject}
+                            </p>
+                        )}
+                        <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-100 dark:border-slate-700/60">
+                            {campaign.body || 'No message content'}
+                        </div>
+                        {campaign.mediaUrls && campaign.mediaUrls.length > 0 && (
+                            <p className="text-xs text-slate-400 mt-2">
+                                {campaign.mediaUrls.length} media attachment{campaign.mediaUrls.length !== 1 ? 's' : ''}
+                            </p>
+                        )}
+                    </div>
+                </ToolPage>
+            </div>
+        </div>
     );
 };

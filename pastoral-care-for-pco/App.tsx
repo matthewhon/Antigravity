@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Inbox, Megaphone, KeyRound, ChartColumn, Sparkles, ShieldCheck } from 'lucide-react';
+import { Inbox, Megaphone, KeyRound, Sparkles, ShieldCheck } from 'lucide-react';
 import { firestore } from './services/firestoreService';
 import { DashboardPage } from './components/pages/DashboardPage';
 import { PeoplePage } from './components/pages/PeoplePage';
@@ -1278,7 +1278,6 @@ const App: React.FC = () => {
                     { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <Inbox size={14} aria-hidden="true" /> },
                     (user && canUserUseFeature(activeNumber, user, 'broadcastUserIds')) ? { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <Megaphone size={14} aria-hidden="true" /> } : null,
                     (user && canUserUseFeature(activeNumber, user, 'keywordsUserIds')) ? { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <KeyRound size={14} aria-hidden="true" /> } : null,
-                    (user && canUserUseFeature(activeNumber, user, 'analyticsUserIds')) ? { label: 'Analytics', view: 'tools-sms-analytics', icon: <ChartColumn size={14} aria-hidden="true" /> } : null,
                     (user && canUserUseFeature(activeNumber, user, 'aiAgentUserIds')) ? { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <Sparkles size={14} aria-hidden="true" /> } : null,
                     (user && (user.roles.includes('Church Admin') || user.roles.includes('System Administration'))) ? { label: 'Permissions', view: 'tools-sms-permissions', icon: <ShieldCheck size={14} aria-hidden="true" /> } : null
                 ].filter(Boolean) as any : undefined}

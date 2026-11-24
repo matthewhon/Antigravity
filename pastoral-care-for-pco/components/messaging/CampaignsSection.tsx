@@ -12,9 +12,10 @@ import {
     ChevronDown, CheckCircle, Loader2, X, Calendar, Phone, Search,
     AlertTriangle, Copy, Mail, Smile, Image as ImageIcon, Link,
     Sparkles, ChevronRight, RotateCcw, Contact, Upload, FileText,
-    Folder, Link2, Camera, Edit3, UserCheck, List, Layers
+    Folder, Link2, Camera, Edit3, UserCheck, List, Layers, BarChart3
 } from 'lucide-react';
 import { ToolPage, ToolTabs, ToolButton, ToolEmptyState } from '../tool-shell';
+import { SmsAnalytics } from './SmsAnalytics';
 import { SmsEventPickerModal } from '../SmsEventPickerModal';
 import { SimpleRichTextEditor } from '../SimpleRichTextEditor';
 import { formatPhone } from './smsUtils';
@@ -378,11 +379,12 @@ interface ComposerProps {
     onSend: (campaign: SmsCampaign) => void;
     onSchedule: (campaign: SmsCampaign, scheduledAt: number, freq?: 'daily' | 'weekly' | 'monthly') => void;
     onCancelSchedule?: () => void;
+    onViewAnalytics?: () => void;
     isSending: boolean;
 }
 
 export const CampaignComposer: React.FC<ComposerProps> = ({
-    campaign, churchId, church, currentUser, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
+    campaign, churchId, church, currentUser, onBack, onSave, onSend, onSchedule, onCancelSchedule, onViewAnalytics, isSending,
 }) => {
     const [local, setLocal] = useState<SmsCampaign>(campaign);
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
@@ -596,6 +598,14 @@ export const CampaignComposer: React.FC<ComposerProps> = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                    {local.status === 'sent' && onViewAnalytics && (
+                        <button
+                            onClick={onViewAnalytics}
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                        >
+                            <BarChart3 size={14} /> View Analytics
+                        </button>
+                    )}
                     {local.status === 'scheduled' && onCancelSchedule && (
                         <button
                             onClick={onCancelSchedule}
@@ -781,6 +791,15 @@ export const CampaignComposer: React.FC<ComposerProps> = ({
                                     </div>
                                 ))}
                             </div>
+                            {onViewAnalytics && (
+                                <button
+                                    type="button"
+                                    onClick={onViewAnalytics}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"
+                                >
+                                    <BarChart3 size={13} /> View Broadcast Analytics
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1288,12 +1307,22 @@ export const CampaignComposer: React.FC<ComposerProps> = ({
 export const CampaignList: React.FC<{
     campaigns: SmsCampaign[];
     isLoading: boolean;
+    churchId?: string;
+    smsNumberId?: string | null;
+    canViewAnalytics?: boolean;
+    initialTab?: 'all' | 'draft' | 'scheduled' | 'sent' | 'analytics';
     onOpen: (c: SmsCampaign) => void;
     onDelete: (id: string) => void;
     onDuplicate: (c: SmsCampaign) => void;
     onCreate: () => void;
-}> = ({ campaigns, isLoading, onOpen, onDelete, onDuplicate, onCreate }) => {
-    const [tab, setTab] = useState<'all' | 'draft' | 'scheduled' | 'sent'>('all');
+    onViewAnalytics?: (c: SmsCampaign) => void;
+}> = ({ campaigns, isLoading, churchId, smsNumberId, canViewAnalytics = false, initialTab, onOpen, onDelete, onDuplicate, onCreate, onViewAnalytics }) => {
+    const [tab, setTab] = useState<'all' | 'draft' | 'scheduled' | 'sent' | 'analytics'>(initialTab || 'all');
+
+    useEffect(() => {
+        if (initialTab) setTab(initialTab);
+    }, [initialTab]);
+
     const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
     const counts = {
         all: campaigns.length,
@@ -1301,6 +1330,16 @@ export const CampaignList: React.FC<{
         scheduled: campaigns.filter(c => c.status === 'scheduled').length,
         sent: campaigns.filter(c => c.status === 'sent').length,
     };
+
+    const tabItems: { value: 'all' | 'draft' | 'scheduled' | 'sent' | 'analytics'; label: string; count?: number; icon?: any }[] = [
+        { value: 'all', label: 'All', count: counts.all },
+        { value: 'draft', label: 'Drafts', count: counts.draft },
+        { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
+        { value: 'sent', label: 'Sent', count: counts.sent },
+    ];
+    if (canViewAnalytics && churchId) {
+        tabItems.push({ value: 'analytics', label: 'Analytics', icon: BarChart3 });
+    }
 
     return (
         <ToolPage>
@@ -1323,16 +1362,19 @@ export const CampaignList: React.FC<{
                 className="mb-5"
                 value={tab}
                 onChange={setTab}
-                tabs={[
-                    { value: 'all', label: 'All', count: counts.all },
-                    { value: 'draft', label: 'Drafts', count: counts.draft },
-                    { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
-                    { value: 'sent', label: 'Sent', count: counts.sent },
-                ]}
+                tabs={tabItems}
             />
 
-            {/* List */}
-            {isLoading ? (
+            {/* Content */}
+            {tab === 'analytics' && churchId ? (
+                <SmsAnalytics
+                    churchId={churchId}
+                    campaigns={campaigns}
+                    smsNumberId={smsNumberId}
+                    onSelectCampaign={onViewAnalytics}
+                    embedded
+                />
+            ) : isLoading ? (
                 <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaigns...</div>
             ) : filtered.length === 0 ? (
                 <ToolEmptyState
@@ -1367,8 +1409,19 @@ export const CampaignList: React.FC<{
                                             {(c.toListId && c.toListName) && <div>List: {c.toListName}</div>}
                                             {(c.toGroupId && c.toGroupName) && <div>Group: {c.toGroupName}</div>}
                                             {c.status === 'sent' && c.sentAt && (
-                                                <div className="text-emerald-600 dark:text-emerald-400">
-                                                    Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-emerald-600 dark:text-emerald-400">
+                                                        Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
+                                                    </span>
+                                                    {canViewAnalytics && onViewAnalytics && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={e => { e.stopPropagation(); onViewAnalytics(c); }}
+                                                            className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold hover:underline"
+                                                        >
+                                                            <BarChart3 size={12} /> View Analytics
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                             {c.status === 'scheduled' && c.scheduledAt && (

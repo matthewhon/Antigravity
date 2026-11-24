@@ -7,14 +7,14 @@ import {
 import { SmsCampaign, Church, User } from '../types';
 import {
     MessageSquare, ArrowLeft, X, Phone, Settings, Key,
-    Inbox, BarChart3, Zap, Sparkles, Shield, PlusCircle,
+    Inbox, Zap, Sparkles, Shield, PlusCircle,
     ChevronRight, ChevronDown, ScrollText
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
 import { ToolTabs } from './tool-shell';
 import { VoiceDialerView } from './VoiceDialerView';
-import { SmsAnalytics } from './messaging/SmsAnalytics';
+import { BroadcastAnalyticsDetail } from './messaging/SmsAnalytics';
 import { formatPhone } from './messaging/smsUtils';
 import { Toast } from './messaging/Toast';
 import { SmsSetupBanner, SmsSetupWizard } from './messaging/SmsSetupWizard';
@@ -54,6 +54,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeCampaign, setActiveCampaign] = useState<SmsCampaign | null>(null);
+    const [analyticsCampaign, setAnalyticsCampaign] = useState<SmsCampaign | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [showSetup, setShowSetup] = useState(false);
@@ -118,7 +119,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             { key: 'workflows', perm: 'broadcastUserIds' },
             { key: 'inbox', perm: 'inboxUserIds' },
             { key: 'keywords', perm: 'keywordsUserIds' },
-            { key: 'analytics', perm: 'analyticsUserIds' },
             { key: 'agent', perm: 'aiAgentUserIds' },
         ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any)) as any;
 
@@ -382,8 +382,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
     const hasPillNav = !controlledTab;
     const hasNumberSelector = !hideNumberSelector && smsEnabled && visibleNumbers.length > 0;
-    const hasFallbackBadge = !!(!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber);
-    const showTopSection = !activeCampaign && (hasPillNav || hasNumberSelector || hasFallbackBadge);
+    const hasFallbackBadge = !!(!activeCampaign && !analyticsCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber);
+    const showTopSection = !activeCampaign && !analyticsCampaign && (hasPillNav || hasNumberSelector || hasFallbackBadge);
 
     return (
         <div className="flex flex-col h-full">
@@ -396,13 +396,12 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             ariaLabel="SMS sections"
                             className="w-full md:w-auto"
                             value={effectiveTab as string}
-                            onChange={key => setActiveTab(key as any)}
+                            onChange={key => { setActiveTab(key as any); setAnalyticsCampaign(null); }}
                             tabs={([
                                 { key: 'campaigns', label: 'Broadcast', icon: MessageSquare, perm: 'broadcastUserIds' },
                                 { key: 'workflows', label: 'Workflows', icon: Zap, perm: 'broadcastUserIds' },
                                 { key: 'inbox', label: 'Inbox', icon: Inbox, perm: 'inboxUserIds' },
                                 { key: 'keywords', label: 'Keywords', icon: Key, perm: 'keywordsUserIds' },
-                                { key: 'analytics', label: 'Analytics', icon: BarChart3, perm: 'analyticsUserIds' },
                                 { key: 'agent', label: 'AI Agent', icon: Sparkles, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
@@ -456,18 +455,41 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             )}
 
             <div className="flex-1 overflow-hidden">
-                {effectiveTab === 'campaigns' && !activeCampaign && (
+                {(effectiveTab === 'campaigns' || effectiveTab === 'analytics') && !activeCampaign && !analyticsCampaign && (
                     <div className="h-full overflow-y-auto">
-                        {!canUserUseFeature(activeNumber, currentUser, 'broadcastUserIds') ? (
+                        {!canUserUseFeature(activeNumber, currentUser, 'broadcastUserIds') && !(effectiveTab === 'analytics' && canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds')) ? (
                             <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
                         ) : (
                             <CampaignList
                                 campaigns={filteredCampaigns}
                                 isLoading={isLoading}
-                                onOpen={c => setActiveCampaign(c)}
+                                churchId={churchId}
+                                smsNumberId={activeNumberId}
+                                canViewAnalytics={canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds')}
+                                initialTab={effectiveTab === 'analytics' ? 'analytics' : undefined}
+                                onOpen={c => { setAnalyticsCampaign(null); setActiveCampaign(c); }}
                                 onDelete={handleDelete}
                                 onDuplicate={handleDuplicate}
                                 onCreate={handleCreate}
+                                onViewAnalytics={c => { setActiveCampaign(null); setAnalyticsCampaign(c); }}
+                            />
+                        )}
+                    </div>
+                )}
+
+                {(effectiveTab === 'campaigns' || effectiveTab === 'analytics') && analyticsCampaign && !activeCampaign && (
+                    <div className="h-full">
+                        {!canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <BroadcastAnalyticsDetail
+                                churchId={churchId}
+                                campaign={analyticsCampaign}
+                                onBack={() => setAnalyticsCampaign(null)}
+                                onOpenBroadcast={() => {
+                                    setActiveCampaign(analyticsCampaign);
+                                    setAnalyticsCampaign(null);
+                                }}
                             />
                         )}
                     </div>
@@ -489,6 +511,14 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 onSend={handleSendNow}
                                 onSchedule={handleSchedule}
                                 onCancelSchedule={handleCancelSchedule}
+                                onViewAnalytics={
+                                    activeCampaign.status === 'sent' && canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds')
+                                        ? () => {
+                                            setAnalyticsCampaign(activeCampaign);
+                                            setActiveCampaign(null);
+                                        }
+                                        : undefined
+                                }
                                 isSending={isSending}
                             />
                         )}
@@ -548,16 +578,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
                         ) : (
                             <SmsWorkflowsManager churchId={churchId} />
-                        )}
-                    </div>
-                )}
-
-                {effectiveTab === 'analytics' && (
-                    <div className="h-full overflow-y-auto">
-                        {!canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds') ? (
-                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
-                        ) : (
-                            <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} smsNumberId={activeNumberId} />
                         )}
                     </div>
                 )}

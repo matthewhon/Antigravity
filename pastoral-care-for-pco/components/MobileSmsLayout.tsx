@@ -28,7 +28,7 @@ async function getApiBase(): Promise<string> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SmsTab = 'inbox' | 'campaigns' | 'files' | 'analytics';
+type SmsTab = 'inbox' | 'campaigns' | 'files';
 
 interface MobileSmsLayoutProps {
     churchId: string;
@@ -71,11 +71,6 @@ const TABS: { id: SmsTab; label: string; icon: React.ReactNode; activeIcon: Reac
         id: 'files', label: 'Files', perm: '',
         icon:       <Folder size={24} strokeWidth={1.6} />,
         activeIcon: <Folder size={24} strokeWidth={2.5} />,
-    },
-    {
-        id: 'analytics', label: 'Analytics', perm: 'analyticsUserIds',
-        icon:       <BarChart3 size={24} strokeWidth={1.6} />,
-        activeIcon: <BarChart3 size={24} strokeWidth={2.5} />,
     },
 ];
 
