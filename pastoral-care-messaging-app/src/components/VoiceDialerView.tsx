@@ -27,6 +27,7 @@ interface PersonMatch {
     id: string;
     name: string;
     phone: string;
+    avatar?: string | null;
 }
 
 interface VoiceDialerViewProps {
@@ -80,7 +81,13 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     const [voicemails, setVoicemails] = useState<any[]>([]);
     const [currentUserDoc, setCurrentUserDoc] = useState<User | null>(null);
     const [dialError, setDialError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails' | 'settings'>('keypad');
+    const [viewMode, setViewMode] = useState<'keypad' | 'recents' | 'voicemails' | 'settings'>(() => {
+        const hashQ = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+        const params = new URLSearchParams(hashQ || window.location.search);
+        const v = params.get('view');
+        if (v === 'recents' || v === 'voicemails' || v === 'settings') return v;
+        return 'keypad';
+    });
     const [vmFilter, setVmFilter] = useState<'all' | 'unread' | 'urgent'>('all');
 
     useEffect(() => {
@@ -90,7 +97,8 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
     }, [defaultCallerId, selectedNumberId]);
 
     // Temporarily bypass church.voiceAddOn?.enabled for testing
-    const voiceAddonEnabled = true || Boolean((church as any).voiceAddOn?.enabled);
+    const forceVoiceAddonForTesting = true;
+    const voiceAddonEnabled = forceVoiceAddonForTesting || Boolean(church.voiceAddOn?.enabled);
     const voice = useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl });
 
     // Load recent calls
@@ -144,13 +152,34 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                 snap.docs.forEach((d) => {
                     const data = d.data() as any;
                     if (data.phone) {
-                        list.push({ id: d.id, name: data.name || 'Unnamed', phone: data.phone });
+                        list.push({
+                            id: d.id,
+                            name: data.name || 'Unnamed',
+                            phone: data.phone,
+                            avatar: data.avatar || data.photoUrl || null,
+                        });
                     }
                 });
                 setPeople(list);
             })
             .catch(() => {});
     }, [churchId]);
+
+    const personByPhone = React.useMemo(() => {
+        const map = new Map<string, PersonMatch>();
+        people.forEach((p) => {
+            const digits = (p.phone || '').replace(/\D/g, '');
+            const key = digits.length >= 10 ? digits.slice(-10) : digits;
+            if (key && !map.has(key)) map.set(key, p);
+        });
+        return map;
+    }, [people]);
+
+    const lookupPerson = (phone: string): PersonMatch | undefined => {
+        const digits = (phone || '').replace(/\D/g, '');
+        const key = digits.length >= 10 ? digits.slice(-10) : digits;
+        return key ? personByPhone.get(key) : undefined;
+    };
 
     const matchingPeople = searchQuery.trim().length >= 2
         ? people.filter((p) => {
@@ -222,7 +251,7 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
             </div>
 
             {/* Sub-tabs: Keypad vs Recents */}
-            <div className="px-4 pt-3 flex gap-2 justify-center">
+            <div className="px-4 pt-3 flex flex-wrap gap-2 justify-center">
                 <button
                     onClick={() => setViewMode('keypad')}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
@@ -303,7 +332,7 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                 </div>
             )}
 
-            {viewMode === 'keypad' ? (
+            {viewMode === 'keypad' && (
                 <div className="flex-1 flex flex-col items-center justify-between max-w-sm w-full mx-auto px-5 py-4 gap-4">
                     {/* Member Search */}
                     <div className="w-full relative">
@@ -401,7 +430,9 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                         </button>
                     )}
                 </div>
-            ) : (
+            )}
+
+            {viewMode === 'recents' && (
                 <div className="max-w-xl w-full mx-auto p-4 space-y-2">
                     {recentCalls.length === 0 ? (
                         <div className="text-center py-12 text-xs text-slate-400 font-semibold">
@@ -411,6 +442,8 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                         recentCalls.map((call) => {
                             const isMissed = ['no-answer', 'busy', 'failed'].includes(call.status);
                             const remotePhone = call.direction === 'outbound' ? call.to : call.from;
+                            const matched = lookupPerson(remotePhone);
+                            const displayName = matched?.name || (call as any).callerName || null;
                             return (
                                 <div
                                     key={call.id}
@@ -418,18 +451,37 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                                                isMissed
-                                                    ? 'bg-rose-50 text-rose-500 dark:bg-rose-900/30'
-                                                    : call.direction === 'inbound'
-                                                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30'
-                                                    : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30'
-                                            }`}>
-                                                {isMissed ? <PhoneMissed size={16} /> : call.direction === 'inbound' ? <PhoneIncoming size={16} /> : <PhoneOutgoing size={16} />}
-                                            </div>
+                                            {matched?.avatar ? (
+                                                <div className="relative w-10 h-10 shrink-0">
+                                                    <img
+                                                        src={matched.avatar}
+                                                        alt={displayName || remotePhone}
+                                                        className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                                                    />
+                                                    <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-900 ${
+                                                        isMissed
+                                                            ? 'bg-rose-500 text-white'
+                                                            : call.direction === 'inbound'
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : 'bg-indigo-500 text-white'
+                                                    }`}>
+                                                        {isMissed ? <PhoneMissed size={9} /> : call.direction === 'inbound' ? <PhoneIncoming size={9} /> : <PhoneOutgoing size={9} />}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                                    isMissed
+                                                        ? 'bg-rose-50 text-rose-500 dark:bg-rose-900/30'
+                                                        : call.direction === 'inbound'
+                                                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30'
+                                                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30'
+                                                }`}>
+                                                    {isMissed ? <PhoneMissed size={16} /> : call.direction === 'inbound' ? <PhoneIncoming size={16} /> : <PhoneOutgoing size={16} />}
+                                                </div>
+                                            )}
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                                    {formatPhoneDisplay(remotePhone)}
+                                                    {displayName ? `${displayName} · ${formatPhoneDisplay(remotePhone)}` : formatPhoneDisplay(remotePhone)}
                                                 </p>
                                                 <p className="text-[11px] text-slate-400">
                                                     {call.direction === 'inbound' ? 'Incoming' : 'Outgoing'} · {call.status}
@@ -497,6 +549,8 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                         body: JSON.stringify({ voicemailId: vm.id }),
                                     }).catch(() => {});
                                 };
+                                const vmMatched = lookupPerson(vm.from);
+                                const vmName = vm.callerName || vmMatched?.name || null;
                                 return (
                             <div
                                 key={vm.id}
@@ -505,11 +559,19 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                 }`}
                             >
                                 <div className="flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                                {vm.callerName ? `${vm.callerName} (${formatPhoneDisplay(vm.from)})` : formatPhoneDisplay(vm.from)}
-                                            </p>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        {vmMatched?.avatar && (
+                                            <img
+                                                src={vmMatched.avatar}
+                                                alt={vmName || vm.from}
+                                                className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                            />
+                                        )}
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                    {vmName ? `${vmName} · ${formatPhoneDisplay(vm.from)}` : formatPhoneDisplay(vm.from)}
+                                                </p>
                                             {!vm.listenedAt && <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black">NEW</span>}
                                             {vm.urgent && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">URGENT</span>}
                                         </div>
@@ -517,6 +579,7 @@ export const VoiceDialerView: React.FC<VoiceDialerViewProps> = ({
                                             {vm.durationSec ? `${vm.durationSec}s · ` : ''}
                                             {new Date(vm.createdAt).toLocaleString()}
                                         </p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         {!vm.listenedAt && (

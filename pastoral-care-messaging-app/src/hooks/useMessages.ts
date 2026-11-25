@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { SmsMessage } from '../types';
 
@@ -85,6 +85,7 @@ export function useMessages(churchId: string, conversationId: string) {
         // was incorrect — that collection does not exist.
         const q = query(
             collection(db, 'smsConversations', conversationId, 'messages'),
+            where('churchId', '==', churchId),
             orderBy('createdAt', 'desc'),
             limit(100) // load last 100 messages for mobile perf
         );
@@ -96,6 +97,9 @@ export function useMessages(churchId: string, conversationId: string) {
             setLoading(false);
             // Persist so next time this thread is opened it renders instantly
             writeCache(churchId, conversationId, fresh);
+        }, err => {
+            console.error('[useMessages] onSnapshot error:', err);
+            setLoading(false);
         });
 
         return unsub;

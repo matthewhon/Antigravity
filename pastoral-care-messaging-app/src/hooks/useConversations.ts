@@ -94,21 +94,36 @@ export function useConversations(churchId: string, twilioNumberId: string | null
 
         let snapA: SmsConversation[] = [];
         let snapB: SmsConversation[] = [];
+        let hasSnapA = false;
+        let hasSnapB = false;
+
+        const commit = () => {
+            const fresh = merge(snapA, snapB);
+            setConversations(fresh);
+            if (hasSnapA && hasSnapB) {
+                setLoading(false);
+                writeCache(churchId, twilioNumberId, fresh);
+            }
+        };
 
         const unsubA = onSnapshot(qByTwilio, snap => {
             snapA = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-            const fresh = merge(snapA, snapB);
-            setConversations(fresh);
+            hasSnapA = true;
+            commit();
+        }, err => {
+            console.error('[useConversations] qByTwilio error:', err);
+            hasSnapA = true;
             setLoading(false);
-            writeCache(churchId, twilioNumberId, fresh);
         });
 
         const unsubB = onSnapshot(qBySms, snap => {
             snapB = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-            const fresh = merge(snapA, snapB);
-            setConversations(fresh);
+            hasSnapB = true;
+            commit();
+        }, err => {
+            console.error('[useConversations] qBySms error:', err);
+            hasSnapB = true;
             setLoading(false);
-            writeCache(churchId, twilioNumberId, fresh);
         });
 
         return () => { unsubA(); unsubB(); };

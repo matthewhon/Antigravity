@@ -10,11 +10,13 @@ import {
   updateDoc, 
   deleteDoc, 
   limit, 
+  startAfter,
   writeBatch,
   orderBy,
-  deleteField
+  deleteField,
+  type QueryDocumentSnapshot
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import { Capacitor } from '@capacitor/core';
 import { 
     AttendanceRecord, GivingRecord, Church, User, UserRole, DetailedDonation, 
@@ -306,9 +308,12 @@ class FirestoreService {
           ? 'https://pastoralcare.barnabassoftware.com' 
           : '';
       const apiBase = (settings.apiBaseUrl || defaultBase).replace(/\/$/, '');
+      const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (idToken) headers.Authorization = `Bearer ${idToken}`;
       const res = await fetch(`${apiBase}/user/create`, {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body:    JSON.stringify({
               churchId,
               name:     userData.name,
@@ -430,11 +435,47 @@ class FirestoreService {
 
   // --- Data Accessors ---
 
-  async getPeople(churchId: string): Promise<PcoPerson[]> {
+  async getPeoplePage(
+      churchId: string,
+      pageSize = 250,
+      cursor?: QueryDocumentSnapshot
+  ): Promise<{ people: PcoPerson[]; nextCursor: QueryDocumentSnapshot | null }> {
       try {
-          const q = query(collection(db, 'people'), where('churchId', '==', churchId));
+          const constraints: any[] = [
+              where('churchId', '==', churchId),
+              limit(pageSize),
+          ];
+          if (cursor) constraints.push(startAfter(cursor));
+          const q = query(collection(db, 'people'), ...constraints);
           const snapshot = await getDocs(q);
-          return snapshot.docs.map(d => d.data() as PcoPerson);
+          const nextCursor = snapshot.docs.length === pageSize
+              ? snapshot.docs[snapshot.docs.length - 1]
+              : null;
+          return {
+              people: snapshot.docs.map(d => d.data() as PcoPerson),
+              nextCursor,
+          };
+      } catch (e) {
+          return { people: [], nextCursor: null };
+      }
+  }
+
+  async getPeople(churchId: string, maxTotal = 5000): Promise<PcoPerson[]> {
+      try {
+          const all: PcoPerson[] = [];
+          let cursor: QueryDocumentSnapshot | undefined;
+          const PAGE_SIZE = 500;
+          while (all.length < maxTotal) {
+              const { people, nextCursor } = await this.getPeoplePage(
+                  churchId,
+                  Math.min(PAGE_SIZE, maxTotal - all.length),
+                  cursor
+              );
+              all.push(...people);
+              if (!nextCursor) break;
+              cursor = nextCursor;
+          }
+          return all;
       } catch (e) { return []; }
   }
 

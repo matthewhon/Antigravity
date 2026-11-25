@@ -86,7 +86,8 @@ body {
   box-sizing: border-box;
 }
 
-html.platform-android #root {
+html.platform-android #root,
+html.platform-ios #root {
   width: 100% !important;
   border-inline: none !important;
 }

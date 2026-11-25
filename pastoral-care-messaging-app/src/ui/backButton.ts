@@ -46,7 +46,9 @@ export function runBackHandlers(): boolean {
  */
 export function useBackHandler(active: boolean, onBack: () => boolean | void): void {
     const ref = useRef(onBack);
-    ref.current = onBack;
+    useEffect(() => {
+        ref.current = onBack;
+    }, [onBack]);
     useEffect(() => {
         if (!active) return;
         return pushBackHandler(() => ref.current() !== false);

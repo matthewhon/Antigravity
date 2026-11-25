@@ -175,7 +175,7 @@ export const TeamComposer: React.FC<TeamComposerProps> = ({
                 activeWidgetsContext: widgets.length ? widgetContextForAi(widgets) : undefined,
             });
             await sendTeamMessage({
-                id: `msg_${Date.now()}_ai`,
+                id: newMessageId(channel.id),
                 channelId: channel.id,
                 churchId: church.id,
                 senderId: 'pastor-ai',
@@ -225,20 +225,36 @@ export const TeamComposer: React.FC<TeamComposerProps> = ({
                 ...(mentionedUserIds.length ? { mentionedUserIds } : {}),
             };
 
-            // Clear immediately for a snappy feel
+            // Snapshot draft so it can be restored if sendTeamMessage fails
+            const draftText = text;
+            const draftPeople = stagedPeople;
+            const draftUploads = uploads;
+
+            // Clear immediately for a snappy feel (revoke preview URLs only after send succeeds)
             setText('');
             setStagedPeople([]);
-            uploads.forEach(u => u.previewUrl && URL.revokeObjectURL(u.previewUrl));
             setUploads([]);
-            onCancelReply();
             setTrigger(null);
             requestAnimationFrame(autoGrow);
 
-            await sendTeamMessage(msg);
+            try {
+                await sendTeamMessage(msg);
+            } catch (sendErr) {
+                setText(draftText);
+                setStagedPeople(draftPeople);
+                setUploads(draftUploads);
+                requestAnimationFrame(autoGrow);
+                throw sendErr;
+            }
+
+            onCancelReply();
+            draftUploads.forEach(u => u.previewUrl && URL.revokeObjectURL(u.previewUrl));
             notifyTeamChatPush(msg.id);
             onSent();
 
-            if (/@pastorai\b/i.test(trimmed)) await triggerPastorAi(trimmed);
+            if (/@pastorai\b/i.test(trimmed)) {
+                triggerPastorAi(trimmed).catch(err => console.warn('[TeamChat] @PastorAI failed:', err));
+            }
         } catch (e) {
             console.error('[TeamChat] send failed', e);
             alert('Message could not be sent. Please check your connection and try again.');

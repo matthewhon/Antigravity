@@ -56,6 +56,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
     const incomingCallRef = useRef<IncomingCallInfo | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
     const cancelPendingDialRef = useRef(false);
+    const isMutedRef = useRef(false);
     const pendingNativeActionRef = useRef<{ action: 'answer' | 'decline'; at: number } | null>(null);
     const activeCallLogMetaRef = useRef<{ callId: string; smsNumberId?: string; to?: string; from?: string; direction: 'inbound' | 'outbound'; startedAt: number | null } | null>(null);
 
@@ -104,9 +105,16 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch voice token');
+        let expiryAt = Date.now() + 3000 * 1000;
+        try {
+            const payload = JSON.parse(atob(String(data.token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (typeof payload.exp === 'number') {
+                expiryAt = Math.max(Date.now() + 60_000, payload.exp * 1000 - 60_000);
+            }
+        } catch { /* fall back to default 50m */ }
         return {
             token: data.token as string,
-            expiry_at: Date.now() + 3000 * 1000,
+            expiry_at: expiryAt,
         };
     }, [churchId, apiBaseUrl]);
 
@@ -127,7 +135,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             remoteNumber,
             direction,
             state: 'connecting',
-            isMuted: false,
+            isMuted: isMutedRef.current,
             startedAt: null,
         });
 
@@ -141,9 +149,11 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         });
 
         if (!remoteAudioRef.current) {
-            const audioEl = new Audio();
+            const audioEl = document.createElement('audio');
             audioEl.autoplay = true;
             (audioEl as any).playsInline = true;
+            audioEl.style.display = 'none';
+            document.body.appendChild(audioEl);
             remoteAudioRef.current = audioEl;
         }
 
@@ -153,7 +163,9 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             if (audioEl.srcObject !== stream) {
                 audioEl.srcObject = stream;
             }
-            audioEl.play().catch(() => {});
+            audioEl.play().catch((err) => {
+                console.warn('[Voice] remote audio play() rejected:', err);
+            });
         };
 
         if ((call as any).remoteStream) {
@@ -163,8 +175,37 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             attachRemoteStream(stream);
         });
 
+        const applyLocalMute = (muted: boolean) => {
+            const localStream: MediaStream | null | undefined = (call as any)?.localStream;
+            localStream?.getAudioTracks?.().forEach((track) => {
+                track.enabled = !muted;
+            });
+            const pc: RTCPeerConnection | undefined = (call as any)?.rtcPeerConnection;
+            pc?.getSenders?.().forEach((sender) => {
+                if (sender.track?.kind === 'audio') {
+                    sender.track.enabled = !muted;
+                }
+            });
+            pc?.getTransceivers?.().forEach((t) => {
+                if (t.sender?.track?.kind === 'audio') {
+                    t.sender.track.enabled = !muted;
+                }
+            });
+        };
+
+        if (isMutedRef.current) {
+            applyLocalMute(true);
+        }
+
+        const localStreamSub = (call as any).localStream$?.subscribe?.(() => {
+            if (isMutedRef.current) {
+                applyLocalMute(true);
+            }
+        });
+
         const cleanupAudio = () => {
             remoteStreamSub?.unsubscribe?.();
+            localStreamSub?.unsubscribe?.();
             if (remoteAudioRef.current) {
                 remoteAudioRef.current.pause();
                 remoteAudioRef.current.srcObject = null;
@@ -204,6 +245,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 finalizeCallLog(nextState === 'failed' ? 'failed' : 'completed');
                 cleanupAudio();
                 activeCallRef.current = null;
+                isMutedRef.current = false;
                 setActiveCallInfo(null);
                 setIsSpeakerOn(false);
                 if (Capacitor.getPlatform() === 'ios') VoipPush.endCall?.().catch(() => {});
@@ -216,6 +258,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             finalizeCallLog('completed');
             cleanupAudio();
             activeCallRef.current = null;
+            isMutedRef.current = false;
             setActiveCallInfo(null);
             setIsSpeakerOn(false);
         });
@@ -223,9 +266,12 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
 
     const answerCallObject = useCallback(async (callObj: Call, callerNumber: string) => {
         setIncomingCall(null);
+        isMutedRef.current = false;
         setIsSpeakerOn(false);
         if (Capacitor.getPlatform() === 'ios') {
             await VoipPush.configureAudioSession?.().catch(() => {});
+        } else if (Capacitor.getPlatform() === 'android') {
+            await VoipCall.configureAudioSession?.().catch(() => {});
         }
         await (callObj as any).answer?.({ audio: true, video: false });
         attachCallListeners(callObj, callerNumber, 'inbound');
@@ -267,6 +313,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 remoteAudioRef.current.srcObject = null;
             }
             activeCallRef.current = null;
+            isMutedRef.current = false;
             setActiveCallInfo(null);
             setIsSpeakerOn(false);
             if (Capacitor.getPlatform() === 'ios') VoipPush.endCall?.().catch(() => {});
@@ -346,6 +393,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 VoipPush.addListener?.('callEnded', handleNativeEnd),
                 VoipPush.addListener?.('callMuted', (ev: { muted?: boolean }) => {
                     const muted = Boolean(ev?.muted);
+                    isMutedRef.current = muted;
                     setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: muted } : null));
                     if (activeCallRef.current) {
                         applyLocalMuteState(activeCallRef.current, muted).catch(() => {});
@@ -353,9 +401,27 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 })
             );
         } else if (platform === 'android') {
+            VoipCall.register?.()
+                .then((res: { fcmToken?: string; pendingAction?: string } | undefined) => {
+                    if (res?.fcmToken) registerDeviceToken({ fcmToken: res.fcmToken });
+                    if (res?.pendingAction === 'answered') handleNativeAnswer();
+                    else if (res?.pendingAction === 'rejected' || res?.pendingAction === 'ended') handleNativeEnd();
+                })
+                .catch(() => {});
             listeners.push(
+                VoipCall.addListener?.('voipToken', (ev: { token: string }) => {
+                    if (ev?.token) registerDeviceToken({ fcmToken: ev.token });
+                }),
                 VoipCall.addListener?.('callAnswered', handleNativeAnswer),
-                VoipCall.addListener?.('callEnded', handleNativeEnd)
+                VoipCall.addListener?.('callEnded', handleNativeEnd),
+                VoipCall.addListener?.('callMuted', (ev: { muted?: boolean }) => {
+                    const muted = Boolean(ev?.muted);
+                    isMutedRef.current = muted;
+                    setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: muted } : null));
+                    if (activeCallRef.current) {
+                        applyLocalMuteState(activeCallRef.current, muted).catch(() => {});
+                    }
+                })
             );
         }
 
@@ -481,6 +547,23 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
             readySub?.unsubscribe();
             errorSub?.unsubscribe();
             incomingSub?.unsubscribe();
+            if (activeCallRef.current) {
+                try {
+                    (activeCallRef.current as any).hangup?.().catch?.(() => {});
+                } catch {}
+                activeCallRef.current = null;
+            }
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.pause();
+                remoteAudioRef.current.srcObject = null;
+                remoteAudioRef.current.remove();
+                remoteAudioRef.current = null;
+            }
+            if (Capacitor.getPlatform() === 'ios') {
+                VoipPush.endCall?.().catch?.(() => {});
+            } else if (Capacitor.getPlatform() === 'android') {
+                VoipCall.endCall?.().catch?.(() => {});
+            }
             if (clientRef.current) {
                 try {
                     clientRef.current.disconnect();
@@ -497,6 +580,7 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         const destination = normalizeDialTarget(toNumber);
         const tempId = `call_${Date.now()}`;
         cancelPendingDialRef.current = false;
+        isMutedRef.current = false;
         setIsSpeakerOn(false);
         activeCallLogMetaRef.current = {
             callId: tempId,
@@ -516,6 +600,8 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         try {
             if (Capacitor.getPlatform() === 'ios') {
                 await VoipPush.configureAudioSession?.();
+            } else if (Capacitor.getPlatform() === 'android') {
+                await VoipCall.configureAudioSession?.();
             }
             const call = await clientRef.current.dial(destination, {
                 audio: true,
@@ -546,23 +632,17 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
     const reject = useCallback(async () => {
         if (!incomingCall) return;
         const call = incomingCall.call;
+        pendingNativeActionRef.current = null;
         setIncomingCall(null);
-        await (call as any).hangup?.();
+        await ((call as any).reject?.() ?? (call as any).hangup?.())?.catch?.(() => {});
+        if (Capacitor.getPlatform() === 'ios') {
+            await VoipPush.endCall?.().catch?.(() => {});
+        } else if (Capacitor.getPlatform() === 'android') {
+            await VoipCall.endCall?.().catch?.(() => {});
+        }
     }, [incomingCall]);
 
     const applyLocalMuteState = useCallback(async (call: any, muted: boolean) => {
-        if (call?.self) {
-            try {
-                if (muted) {
-                    await call.self.mute?.();
-                } else {
-                    await call.self.unmute?.();
-                }
-                return;
-            } catch (err) {
-                console.warn('[Voice] call.self mute/unmute failed, falling back to local tracks:', err);
-            }
-        }
         const localStream: MediaStream | null | undefined = call?.localStream;
         localStream?.getAudioTracks?.().forEach((track) => {
             track.enabled = !muted;
@@ -573,14 +653,21 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
                 sender.track.enabled = !muted;
             }
         });
+        pc?.getTransceivers?.().forEach((t) => {
+            if (t.sender?.track?.kind === 'audio') {
+                t.sender.track.enabled = !muted;
+            }
+        });
     }, []);
 
     const toggleMute = useCallback(async () => {
-        const call = activeCallRef.current as any;
-        if (!call || !activeCallInfo) return;
+        if (!activeCallInfo) return;
         const nextMuted = !activeCallInfo.isMuted;
+        isMutedRef.current = nextMuted;
         setActiveCallInfo((prev) => (prev ? { ...prev, isMuted: nextMuted } : null));
-        await applyLocalMuteState(call, nextMuted);
+        if (activeCallRef.current) {
+            await applyLocalMuteState(activeCallRef.current, nextMuted);
+        }
     }, [activeCallInfo, applyLocalMuteState]);
 
     const toggleSpeaker = useCallback(async () => {
@@ -588,6 +675,10 @@ export function useSignalWireVoice({ churchId, voiceAddonEnabled, apiBaseUrl }: 
         setIsSpeakerOn(next);
         if (Capacitor.getPlatform() === 'ios') {
             await VoipPush.setSpeakerphone?.({ enabled: next }).catch((err: any) => {
+                console.warn('[Voice] setSpeakerphone failed:', err);
+            });
+        } else if (Capacitor.getPlatform() === 'android') {
+            await VoipCall.setSpeakerphone?.({ enabled: next }).catch((err: any) => {
                 console.warn('[Voice] setSpeakerphone failed:', err);
             });
         }

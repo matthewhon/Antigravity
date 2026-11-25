@@ -2,16 +2,14 @@
 # Capacitor / Cordova bridge
 # ──────────────────────────────────────────────────────────────────────────────
 -keep class com.getcapacitor.** { *; }
--keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }
--keep class com.pastoralcaremessaging.** { *; }
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Firebase & Google Play Services
-# ──────────────────────────────────────────────────────────────────────────────
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
+-keep @com.getcapacitor.annotation.CapacitorPlugin class * {
+    @com.getcapacitor.PluginMethod <methods>;
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+    @com.getcapacitor.annotation.ActivityCallback <methods>;
+}
+-keepclassmembers class * extends com.getcapacitor.Plugin {
+    <init>();
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # WebView JavaScript interface
@@ -20,12 +18,6 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 -keepattributes JavascriptInterface
-
-# ──────────────────────────────────────────────────────────────────────────────
-# AndroidX / AppCompat
-# ──────────────────────────────────────────────────────────────────────────────
--keep class androidx.** { *; }
--dontwarn androidx.**
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Preserve line numbers for readable crash stack traces

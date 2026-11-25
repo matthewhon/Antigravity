@@ -27,12 +27,18 @@ export function useTwilioNumbers(churchId: string) {
             });
             setNumbers(list);
             setLoading(false);
+        }, (err) => {
+            console.error('[useTwilioNumbers] onSnapshot error:', err);
+            setLoading(false);
         });
         return unsub;
     }, [churchId]);
 
     return { numbers, loading };
 }
+
+const isAdminUser = (user: User): boolean =>
+    Boolean(user.roles?.includes('System Administration') || user.roles?.includes('Church Admin') || (user as any).role === 'admin' || (user as any).role === 'super_admin');
 
 /**
  * Returns true if the given user is allowed to see / use a particular phone number.
@@ -41,16 +47,19 @@ export function useTwilioNumbers(churchId: string) {
  * - Otherwise the user must be in the allowedUserIds list.
  */
 export function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
+    if (isAdminUser(user)) return true;
     return !num.allowedUserIds || num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
 }
 
 /**
  * Returns true if the given user is allowed to access a specific feature on a phone number.
+ * - Church Admins and System Admins always have access.
  * - Must have visibility to the number first (allowedUserIds).
  * - Empty permissions array for a feature means open to all visible users.
  */
 export function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User, featureKey: keyof NonNullable<TwilioPhoneNumber['permissions']>): boolean {
     if (!num) return false;
+    if (isAdminUser(user)) return true;
     
     // If restricted visibility, user must be in the visibility list
     if (num.allowedUserIds && num.allowedUserIds.length > 0 && !num.allowedUserIds.includes(user.id)) return false;

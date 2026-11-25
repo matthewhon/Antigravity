@@ -72,8 +72,8 @@ export const ChannelThread: React.FC<{
         return () => document.removeEventListener('visibilitychange', onVis);
     }, []);
     useEffect(() => {
-        if (isActive && appVisible && loaded) markTeamChannelRead(channel.id, currentUser.id);
-    }, [isActive, appVisible, loaded, messages.length, channel.id, currentUser.id]);
+        if (isActive && appVisible && loaded) markTeamChannelRead(channel.id, currentUser.id, channel.lastMessageAt);
+    }, [isActive, appVisible, loaded, messages.length, channel.id, channel.lastMessageAt, currentUser.id]);
 
     // Stick to the bottom: first load, own sends, and new messages while at the bottom
     const scrollToBottom = useCallback((smooth = false) => {
@@ -107,13 +107,16 @@ export const ChannelThread: React.FC<{
     };
 
     const mentionTokens = useMemo(() => [
-        ...churchUsers.map(u => `@${u.name}`),
-        ...messages.flatMap(m => (m.mentionedPeople || []).map(p => `#${p.name}`)),
+        ...churchUsers.filter(u => u.name?.trim()).map(u => `@${u.name.trim()}`),
+        ...messages.flatMap(m => (m.mentionedPeople || []).filter(p => p.name?.trim()).map(p => `#${p.name.trim()}`)),
     ], [churchUsers, messages]);
 
+    const toastTimerRef = useRef<number | undefined>(undefined);
+    useEffect(() => () => window.clearTimeout(toastTimerRef.current), []);
     const showToast = (text: string) => {
+        window.clearTimeout(toastTimerRef.current);
         setToast(text);
-        window.setTimeout(() => setToast(null), 2500);
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 2500);
     };
 
     const handleToggleClaim = (msg: TeamMessage, item: ChatWidgetSnapshotItem) => {

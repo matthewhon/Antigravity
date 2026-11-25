@@ -20,6 +20,7 @@ export function useAiSuggestions(churchId: string, conversationId: string) {
         // We query the subcollection: smsConversations/{convId}/aiSuggestions
         const q = query(
             collection(db, `smsConversations/${conversationId}/aiSuggestions`),
+            where('churchId', '==', churchId),
             where('status', '==', 'pending'),
             orderBy('createdAt', 'desc')
         );
@@ -32,6 +33,8 @@ export function useAiSuggestions(churchId: string, conversationId: string) {
             } else {
                 setSuggestion(null);
             }
+        }, err => {
+            console.error('[useAiSuggestions] onSnapshot error:', err);
         });
         
         return unsub;

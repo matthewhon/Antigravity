@@ -16,7 +16,9 @@ export const AndroidBackButton: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const pathRef = useRef(location.pathname);
-    pathRef.current = location.pathname;
+    useEffect(() => {
+        pathRef.current = location.pathname;
+    }, [location.pathname]);
 
     useEffect(() => {
         if (Capacitor.getPlatform() !== 'android') return;

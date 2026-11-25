@@ -9,12 +9,18 @@ import { WidgetSnapshotCard } from './WidgetSnapshotCard';
 function useLongPress(onLongPress: () => void, ms = 420) {
     const timer = useRef<number | undefined>(undefined);
     const start = useRef<{ x: number; y: number } | null>(null);
+    const fired = useRef(false);
     const clear = () => { window.clearTimeout(timer.current); start.current = null; };
     return {
         onPointerDown: (e: React.PointerEvent) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
+            fired.current = false;
             start.current = { x: e.clientX, y: e.clientY };
-            timer.current = window.setTimeout(() => { clear(); onLongPress(); }, ms);
+            timer.current = window.setTimeout(() => {
+                clear();
+                fired.current = true;
+                onLongPress();
+            }, ms);
         },
         onPointerMove: (e: React.PointerEvent) => {
             if (!start.current) return;
@@ -22,6 +28,13 @@ function useLongPress(onLongPress: () => void, ms = 420) {
         },
         onPointerUp: clear,
         onPointerCancel: clear,
+        onClickCapture: (e: React.MouseEvent) => {
+            if (fired.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                fired.current = false;
+            }
+        },
         onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); clear(); onLongPress(); },
     };
 }

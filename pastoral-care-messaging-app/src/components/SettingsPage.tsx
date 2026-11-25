@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Church, User } from '../types';
 import {
     ChevronLeft, Sun, Moon, Smartphone,
-    RefreshCw, LogOut, Loader2, Cake, Bell, Clock, BarChart3, ChevronRight,
+    RefreshCw, LogOut, Loader2, Cake, Bell, Clock, BarChart3, ChevronRight, Phone,
 } from 'lucide-react';
 import { hasMessagingAccess } from '../services/chatPermissions';
 import { Capacitor } from '@capacitor/core';
@@ -87,7 +87,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     const APPEARANCE_OPTS: { id: AppearancePref; label: string; icon: React.ReactNode; desc: string }[] = [
         { id: 'light',  label: 'Light',  desc: 'Always light',         icon: <Sun size={20} /> },
         { id: 'dark',   label: 'Dark',   desc: 'Always dark',          icon: <Moon size={20} /> },
-        { id: 'system', label: 'System', desc: 'Follows iPhone setting', icon: <Smartphone size={20} /> },
+        { id: 'system', label: 'System', desc: Capacitor.getPlatform() === 'ios' ? 'Follows iPhone setting' : 'Follows device setting', icon: <Smartphone size={20} /> },
     ];
 
     return (
@@ -279,13 +279,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     </section>
                 )}
 
-                {/* ── Tools (Analytics moved here from the phone tab bar) ─────── */}
+                {/* ── Tools (Analytics & Calling moved here for quick access) ── */}
                 {hasMessagingAccess(currentUser) && (
                     <section>
                         <p className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest px-1 mb-2">
                             Tools
                         </p>
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/?tab=phone&view=settings')}
+                                className="w-full flex items-center gap-4 px-4 py-3.5 active:bg-slate-50 dark:active:bg-slate-800 transition text-left"
+                            >
+                                <span className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
+                                    <Phone size={18} />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[16px] font-medium text-slate-900 dark:text-white">Calling &amp; Voicemail</p>
+                                    <p className="text-[13px] text-slate-400">Calling hours, DND, extension, and greeting</p>
+                                </div>
+                                <ChevronRight size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => navigate('/?tab=analytics')}

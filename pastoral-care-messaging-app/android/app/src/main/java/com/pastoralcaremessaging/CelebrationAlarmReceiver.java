@@ -25,6 +25,16 @@ public class CelebrationAlarmReceiver extends BroadcastReceiver {
 
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
+        if (Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !nm.areNotificationsEnabled()) {
+            return;
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -48,7 +58,7 @@ public class CelebrationAlarmReceiver extends BroadcastReceiver {
         PendingIntent contentIntent = PendingIntent.getActivity(context, notifId, tapIntent, flags);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(context.getApplicationInfo().icon)
+            .setSmallIcon(R.drawable.ic_stat_notification)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))

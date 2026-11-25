@@ -98,7 +98,7 @@
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   overscroll-behavior: auto;
-  overscroll-behavior: chain;
+  overscroll-behavior-x: contain;
 }
 .SwipeRow::-webkit-scrollbar { display: none; }
 .SwipeRow.has-leading { grid-template-columns: max-content 100% max-content; }

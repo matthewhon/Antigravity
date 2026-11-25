@@ -8,9 +8,13 @@
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-    <uses-feature android:name="android.hardware.faketouch" android:required="true" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <supports-screens
         android:smallScreens="true"
@@ -39,6 +43,8 @@
             android:launchMode="singleTask"
             android:exported="true"
             android:resizeableActivity="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -65,9 +71,27 @@
             android:name="com.pastoralcaremessaging.CelebrationAlarmReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name="com.pastoralcaremessaging.CelebrationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="com.pastoralcaremessaging.VoipFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter android:priority="100">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <service
             android:name="com.pastoralcaremessaging.VoiceConnectionService"
             android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+            android:foregroundServiceType="phoneCall|microphone"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.telecom.ConnectionService" />

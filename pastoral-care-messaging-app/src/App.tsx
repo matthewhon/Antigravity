@@ -63,7 +63,13 @@ const App: React.FC = () => {
     firestore.getPeople(church.id).then(fresh => {
       setPeople(fresh);
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(fresh));
+        const serialized = JSON.stringify(fresh);
+        // Bound localStorage cache to ~1.5MB; Firestore persistentLocalCache handles larger datasets in IndexedDB
+        if (serialized.length <= 1_500_000) {
+          localStorage.setItem(cacheKey, serialized);
+        } else {
+          localStorage.removeItem(cacheKey);
+        }
       } catch {
         // ignore quota errors
       }
@@ -139,16 +145,16 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    console.log("App useEffect mounted, registering onAuthStateChanged");
+    let active = true;
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      console.log("onAuthStateChanged triggered, authUser:", authUser ? authUser.uid : "null");
+      if (!active) return;
       if (authUser) {
         try {
-          console.log("Fetching user profile for:", authUser.uid);
           const userProfile = await firestore.getUserProfile(authUser.uid);
-          console.log("User profile fetched:", userProfile);
+          if (!active) return;
           // Load the church up front: Team Chat access depends on the church plan.
           const churchProfile = userProfile?.churchId ? await firestore.getChurch(userProfile.churchId) : null;
+          if (!active) return;
           // Messaging/Admin users get the full app; any other staff can sign in for Team Chat.
           const allowed = !!userProfile && (hasMessagingAccess(userProfile) || hasTeamChatAccess(userProfile, churchProfile));
           if (userProfile && allowed) {
@@ -156,30 +162,39 @@ const App: React.FC = () => {
             if (authUser.email && authUser.email.toLowerCase() !== userProfile.email.toLowerCase()) {
               const updatedProfile = { ...userProfile, email: authUser.email.toLowerCase() };
               await firestore.createUserProfile(updatedProfile);
+              if (!active) return;
               setUser(updatedProfile);
             } else {
               setUser(userProfile);
             }
             if (churchProfile) {
-              console.log("Church profile fetched:", churchProfile);
               setChurch(churchProfile);
             }
           } else {
-            console.warn("User does not have messaging or team chat access");
             setUser(null);
           }
         } catch (e) {
           console.error("Error fetching user profile", e);
         }
       } else {
-        console.log("No authenticated user, clearing state");
         setUser(null);
         setChurch(null);
+        // Clear cached pastoral SMS PII on sign-out
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('conversations_cache_') || k.startsWith('messages_cache_'))) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch { /* ignore */ }
       }
-      console.log("Setting loading to false");
-      setLoading(false);
+      if (active) setLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   // ── Appearance management ────────────────────────────────────────────────
@@ -221,9 +236,12 @@ const App: React.FC = () => {
     try {
       const sysSettings = await firestore.getSystemSettings();
       const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
+      const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (idToken) headers.Authorization = `Bearer ${idToken}`;
       await fetch(`${apiBaseUrl}/pco/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ churchId: church.id }),
       });
       const fresh = await firestore.getPeople(church.id);
@@ -242,7 +260,7 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="flex h-[100dvh] w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
         <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
       </div>
     );

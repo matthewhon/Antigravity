@@ -135,11 +135,12 @@ const getProxyUrl = async (): Promise<string> => {
 
 const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any = null, retriesLeft = 2): Promise<any> => {
     const proxyUrl = await getProxyUrl();
+    const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const response = await fetch(proxyUrl, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ churchId, url, method, body })
     });
     if (!response.ok) {

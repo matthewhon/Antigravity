@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useNavigate } from 'react-router-dom';
 import { Church, User, TwilioPhoneNumber } from '../types';
 import MessagingModule from './MessagingModule';
@@ -499,8 +500,8 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                             </button>
                         )}
 
-                        {/* Push notification bell */}
-                        {'Notification' in window && (
+                        {/* Push notification bell (web only; native uses FCM/APNs) */}
+                        {!Capacitor.isNativePlatform() && 'Notification' in window && (
                             <button
                                 onClick={togglePushNotifications}
                                 disabled={pushLoading}

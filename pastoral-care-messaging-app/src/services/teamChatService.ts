@@ -98,10 +98,11 @@ export async function findOrCreateDirectChannel(churchId: string, currentUser: U
     return channel;
 }
 
-export async function markTeamChannelRead(channelId: string, userId: string): Promise<void> {
+export async function markTeamChannelRead(channelId: string, userId: string, lastMessageAt?: number): Promise<void> {
     if (!channelId || !userId) return;
     try {
-        await updateDoc(doc(db, CHANNELS, channelId), { [`lastReadAt.${userId}`]: Date.now() });
+        const readAt = Math.max(Date.now(), lastMessageAt || 0);
+        await updateDoc(doc(db, CHANNELS, channelId), { [`lastReadAt.${userId}`]: readAt });
     } catch { /* non-fatal */ }
 }
 
@@ -118,7 +119,7 @@ export function subscribeToTeamMessages(churchId: string, channelId: string, onU
     const q = query(collection(db, MESSAGES), where('churchId', '==', churchId), where('channelId', '==', channelId));
     return onSnapshot(q, snap => {
         const msgs = snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }) as TeamMessage);
-        msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || a.id.localeCompare(b.id));
         onUpdate(msgs);
     }, err => console.warn('[TeamChat] subscribeToTeamMessages error:', err));
 }
@@ -155,16 +156,11 @@ export async function toggleTeamMessageReaction(messageId: string, emoji: string
     const ref = doc(db, MESSAGES, messageId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return;
-    const reactions = { ...((snap.data() as TeamMessage).reactions || {}) };
-    const current = reactions[emoji] || [];
-    if (current.includes(userId)) {
-        const next = current.filter(id => id !== userId);
-        if (next.length === 0) delete reactions[emoji];
-        else reactions[emoji] = next;
-    } else {
-        reactions[emoji] = [...current, userId];
-    }
-    await updateDoc(ref, { reactions });
+    const current = (snap.data() as TeamMessage).reactions?.[emoji] || [];
+    const reacted = current.includes(userId);
+    await updateDoc(ref, {
+        [`reactions.${emoji}`]: reacted ? arrayRemove(userId) : arrayUnion(userId),
+    });
 }
 
 export async function claimWidgetItemInMessage(messageId: string, itemId: string, claim: ChatWidgetItemClaim | null): Promise<void> {
@@ -250,7 +246,10 @@ function compressImage(file: File): Promise<File> {
                 resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
             }, 'image/jpeg', 0.85);
         };
-        img.onerror = () => resolve(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(img.src);
+            resolve(file);
+        };
     });
 }
 
@@ -282,7 +281,7 @@ export async function uploadChatAttachment(
     const task = uploadBytesResumable(sRef, data, { contentType: processed.type || 'application/octet-stream' });
     await new Promise<void>((resolve, reject) => {
         task.on('state_changed',
-            s => onProgress?.(Math.round((s.bytesTransferred / s.totalBytes) * 100)),
+            s => onProgress?.(s.totalBytes > 0 ? Math.round((s.bytesTransferred / s.totalBytes) * 100) : 0),
             reject,
             () => resolve());
     });
@@ -333,9 +332,12 @@ Staff Member (${params.senderName}) asks @PastorAI:
 
     try {
         const base = await getApiBase();
+        const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (idToken) headers.Authorization = `Bearer ${idToken}`;
         const res = await fetch(`${base}/ai/generate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ model: 'gemini-2.5-flash', prompt, systemInstruction }),
         });
         if (!res.ok) throw new Error(`AI request failed (${res.status})`);

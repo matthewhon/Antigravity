@@ -55,7 +55,7 @@ function renderInline(text: string, tokenRe: RegExp | null, mine: boolean, keyBa
 export function renderRichText(text: string, opts: { mine?: boolean; tokens?: string[] } = {}): React.ReactNode {
     const { mine = false, tokens = [] } = opts;
     const uniq = Array.from(new Set(['@PastorAI', ...tokens].filter(Boolean))).sort((a, b) => b.length - a.length);
-    const tokenRe = uniq.length ? new RegExp(`(${uniq.map(escapeRegExp).join('|')})`, 'gi') : null;
+    const tokenRe = uniq.length ? new RegExp(`((?<![\\p{L}\\p{N}_])(?:${uniq.map(escapeRegExp).join('|')})(?![\\p{L}\\p{N}_]))`, 'giu') : null;
 
     const lines = text.split('\n');
     const blocks: React.ReactNode[] = [];

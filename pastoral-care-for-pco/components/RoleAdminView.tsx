@@ -14,6 +14,7 @@ import GroupRiskSettingsView from './GroupRiskSettingsView';
 import DonorLifecycleSettingsView from './DonorLifecycleSettingsView';
 import NeedsAttentionSettingsView from './NeedsAttentionSettingsView';
 import { SubscriptionSettingsView } from './SubscriptionSettingsView';
+import { TenantVariablesPanel } from './TenantVariablesManager';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS, stripeService } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
@@ -988,7 +989,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const { campuses } = useTenantData();
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Dashboard' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'Voip / Messaging' | 'Grow Integration' | 'Canva'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Dashboard' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'Voip / Messaging' | 'Variables' | 'Grow Integration' | 'Canva'>('Team');
 
   // Delete Organization modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1014,8 +1015,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [mailDiagChecks, setMailDiagChecks] = useState<{ label: string; status: 'pass' | 'fail' | 'warn'; detail: string }[] | null>(null);
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
-  // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'first-message' | 'compliance' | 'numbers'>('setup');
+  // SMS & VoIP Settings state
+  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'numbers' | 'compliance' | 'extensions'>('setup');
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [isUpdatingVoice, setIsUpdatingVoice] = useState(false);
   const [voiceStatusMessage, setVoiceStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPortInModal, setShowPortInModal] = useState(false);
@@ -1099,8 +1101,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [addNumLabel, setAddNumLabel] = useState('');
   const [addNumSender, setAddNumSender] = useState(church.name || '');
   const [addNumBusy, setAddNumBusy] = useState(false);
-  // Per-number access management panel
+  // Per-number access & voice drawers
   const [expandedNumId, setExpandedNumId] = useState<string | null>(null);
+  const [expandedVoiceNumId, setExpandedVoiceNumId] = useState<string | null>(null);
   const [numPermSaving, setNumPermSaving] = useState(false);
   const [numPermToast, setNumPermToast] = useState<{id: string; text: string} | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1814,7 +1817,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'Voip / Messaging', 'Grow Integration', 'Canva', 'Dashboard', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'Voip / Messaging', 'Variables', 'Grow Integration', 'Canva', 'Dashboard', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -3770,9 +3773,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 dark:text-white">Voip / Messaging Settings</h3>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">VoIP &amp; Messaging Settings</h3>
                                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1">
-                                    Messaging Compliance &amp; Setup
+                                    Channels, Numbers, Compliance &amp; Team Extensions
                                 </p>
                             </div>
                             <div className="flex items-center gap-3 flex-wrap">
@@ -3800,24 +3803,30 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {/* Sub-tab switcher */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit flex-wrap">
-                            {(['setup', 'first-message', 'compliance', 'numbers'] as const).map(st => (
+                            {(['setup', 'numbers', 'compliance', 'extensions'] as const).map(st => (
                                 <button
                                     key={st}
-                                    onClick={() => setSmsSubTab(st as any)}
+                                    onClick={() => setSmsSubTab(st)}
                                     className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${
                                         smsSubTab === st
                                             ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300'
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'first-message' ? '💬 First Message' : st === 'compliance' ? '⚖️ Compliance & Sender' : '📱 Phone Numbers'}
+                                    {st === 'setup'
+                                        ? '⚡ Overview & Channels'
+                                        : st === 'numbers'
+                                            ? '📱 Phone Numbers'
+                                            : st === 'compliance'
+                                                ? '⚖️ Compliance & Messaging'
+                                                : '☎️ Team & Extensions'}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* ── SMS Setup Sub-tab ─────────────────────────────────────────── */}
-                    {(smsSubTab === 'setup' || smsSubTab === 'a2p') && (
+                    {/* ── Overview & Channels Sub-tab ─────────────────────────────────── */}
+                    {smsSubTab === 'setup' && (
                         <div className="space-y-6">
 
                             {/* Enable SMS */}
@@ -3929,11 +3938,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 );
                             })()}
 
-                            {/* Sender Name */}
+                            {/* Sender Identity & Global Defaults */}
                             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-5">
                                 <div>
-                                    <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Display Name</h4>
-                                    <p className="text-[11px] text-slate-400">Shown as the sender name in outbound message logs. Does not change the phone number displayed to recipients.</p>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Identity &amp; Defaults</h4>
+                                    <p className="text-[11px] text-slate-400">Controls how your church identifies itself in outbound messages.</p>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Church / Sender Name</label>
@@ -3944,6 +3953,36 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="Grace Community Church"
                                     />
+                                    <p className="text-[11px] text-slate-400 mt-1.5">Shown in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number.</p>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-900 dark:text-white">Prefix Messages with Church Name</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS.</p>
+                                    </div>
+                                    <button
+                                        role="switch"
+                                        aria-checked={smsForm.prefixMessagesWithName ? 'true' : 'false'}
+                                        aria-label="Prefix Messages with Church Name"
+                                        title="Prefix Messages with Church Name"
+                                        onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
+                                        className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                    >
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${smsForm.prefixMessagesWithName ? 'translate-x-6' : ''}`} />
+                                    </button>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">
+                                        Message Footer <span className="normal-case font-normal text-slate-400">(appended to every message)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={smsForm.messageFooter || ''}
+                                        onChange={e => handleSmsChange('messageFooter', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Reply STOP to unsubscribe"
+                                    />
+                                    <p className="text-[11px] text-slate-400 mt-1.5">TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
                                 </div>
                             </div>
 
@@ -4017,21 +4056,32 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
                             </div>
 
-                            {/* How it works */}
-                            <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-8 rounded-[2rem]">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-xl shrink-0">📡</div>
-                                    <div>
-                                        <h4 className="text-sm font-black text-indigo-900 dark:text-indigo-100 mb-2">How SMS Works for Tenants</h4>
-                                        <ul className="space-y-2 text-[11px] text-indigo-800 dark:text-indigo-200 leading-relaxed">
-                                            <li>✓ <strong>No SignalWire account needed</strong> — your church is provisioned under the Barnabas Software project.</li>
-                                            <li>✓ <strong>Provision a number</strong> in the Phone Numbers tab below — search by area code or city/state.</li>
-                                            <li>✓ <strong>Inbound messages</strong> are routed to your inbox automatically via the shared webhook.</li>
-                                            <li>✓ <strong>Outbound messages</strong> send from your provisioned number with your sender name.</li>
-                                            <li>✓ <strong>STOP / START</strong> compliance is handled automatically at the carrier level.</li>
-                                        </ul>
+                            {/* How it works (collapsible once numbers are provisioned) */}
+                            <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-6 rounded-[2rem]">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowHowItWorks(prev => !prev)}
+                                    className="w-full flex items-center justify-between gap-4 text-left"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-lg shrink-0">📡</div>
+                                        <div>
+                                            <h4 className="text-sm font-black text-indigo-900 dark:text-indigo-100">How SMS &amp; Voice Work</h4>
+                                            <p className="text-[11px] text-indigo-700/70 dark:text-indigo-300/70">Quick overview of number provisioning, routing, and carrier compliance</p>
+                                        </div>
                                     </div>
-                                </div>
+                                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300 shrink-0">
+                                        {(showHowItWorks || smsNumbers.length === 0) ? '▲ Hide' : '▼ Show'}
+                                    </span>
+                                </button>
+                                {(showHowItWorks || smsNumbers.length === 0) && (
+                                    <ul className="mt-4 pt-4 border-t border-indigo-200/60 dark:border-indigo-800/60 space-y-2 text-[11px] text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                                        <li>✓ <strong>No separate carrier account needed</strong> — your church is provisioned under the Barnabas Software project.</li>
+                                        <li>✓ <strong>Provision or port a number</strong> in the Phone Numbers tab, then configure per-number Voice, Call Flows, and Team Access.</li>
+                                        <li>✓ <strong>Inbound messages &amp; calls</strong> route automatically to your inbox, browser/mobile softphone, or assigned Call Flow.</li>
+                                        <li>✓ <strong>STOP / START</strong> compliance is handled automatically at the carrier level.</li>
+                                    </ul>
+                                )}
                             </div>
 
 
@@ -4078,58 +4128,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                     )}
 
-                    {smsSubTab === 'first-message' && (
-                        <div className="space-y-6">
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">First Message Confirmation</h4>
-                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">
-                                    Configure the automated message sent to new contacts the first time you message them.
-                                </p>
-
-                                <div className="space-y-5">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">FIRST MSG</span>
-                                            <label className={labelCn + ' mb-0'}>First Message Confirmation <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
-                                        </div>
-                                        <textarea
-                                            title="First Message Confirmation"
-                                            placeholder={`You'll now receive communications from ${church.name || 'our church'} (frequency varies). Msg & data rates may apply. Reply STOP to cancel or HELP for help.`}
-                                            value={smsForm.firstMessageConfirmation || ''}
-                                            onChange={e => handleSmsChange('firstMessageConfirmation', e.target.value)}
-                                            rows={4}
-                                            className={inputCn + ' resize-none'}
-                                        />
-                                        <p className="text-[11px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Required by TCPA for new contacts receiving marketing messages.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Save button */}
-                            {smsMessage && (
-                                <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                                    smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
-                                }`}>
-                                    <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
-                                    {smsMessage.text}
-                                </div>
-                            )}
-                            <div className="flex justify-end">
-                                <button
-                                    onClick={handleSmsSave}
-                                    disabled={isSmsSaving}
-                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
-                                >
-                                    {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-
-                    {/* placeholder so closing brace below still resolves — DO NOT REMOVE */}
-
-                    {/* ── Compliance Sub-tab ─────────────────────────────────────────── */}
+                    {/* ── Compliance & Messaging Sub-tab ────────────────────────────────── */}
                     {smsSubTab === 'compliance' && (
                         <div className="space-y-6">
                             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
@@ -4582,46 +4581,44 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             </div>
 
-                            {/* Sender Identity */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Identity</h4>
-                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">Controls how your church identifies itself in outbound messages.</p>
-
-                                <div className="space-y-5">
-                                    <div>
-                                        <label className={labelCn}>Sender / Display Name</label>
-                                        <input type="text" value={smsForm.senderName || ''}
-                                            onChange={e => handleSmsChange('senderName', e.target.value)}
-                                            className={inputCn} placeholder="Grace Church"
-                                        />
-                                        <p className="text-[11px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
+                            {/* First Message Confirmation */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-5">
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">First Message Confirmation</h4>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                                        Automated TCPA confirmation sent once to new contacts the first time your church texts them.
+                                    </p>
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">FIRST MSG</span>
+                                        <label className={labelCn + ' mb-0'}>Confirmation Message <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
                                     </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Prefix Messages with Church Name</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS. Helps recipients immediately recognize who is texting them.</p>
-                                        </div>
-                                        <button
-                                            role="switch"
-                                            aria-checked={smsForm.prefixMessagesWithName ? 'true' : 'false'}
-                                            aria-label="Prefix Messages with Church Name"
-                                            title="Prefix Messages with Church Name"
-                                            onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
-                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${smsForm.prefixMessagesWithName ? 'translate-x-6' : ''}`} />
-                                        </button>
+                                    <textarea
+                                        title="First Message Confirmation"
+                                        placeholder={`You'll now receive communications from ${church.name || 'our church'} (frequency varies). Msg & data rates may apply. Reply STOP to cancel or HELP for help.`}
+                                        value={smsForm.firstMessageConfirmation || ''}
+                                        onChange={e => handleSmsChange('firstMessageConfirmation', e.target.value)}
+                                        rows={3}
+                                        className={inputCn + ' resize-none'}
+                                    />
+                                </div>
+                                {smsMessage && (
+                                    <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                        smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                                    }`}>
+                                        <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                                        {smsMessage.text}
                                     </div>
-
-                                    <div>
-                                        <label className={labelCn}>Message Footer <span className="normal-case font-normal text-slate-400">(appended to every message)</span></label>
-                                        <input type="text" value={smsForm.messageFooter || ''}
-                                            onChange={e => handleSmsChange('messageFooter', e.target.value)}
-                                            className={inputCn} placeholder="Reply STOP to unsubscribe"
-                                        />
-                                        <p className="text-[11px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
-                                    </div>
+                                )}
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={handleSmsSave}
+                                        disabled={isSmsSaving}
+                                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
+                                    >
+                                        {isSmsSaving ? 'Saving…' : 'Save First Message'}
+                                    </button>
                                 </div>
                             </div>
 
@@ -4910,6 +4907,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div className="space-y-3">
                                             {smsNumbers.map((num: any) => {
                                                 const isExpanded = expandedNumId === num.id;
+                                                const isVoiceExpanded = expandedVoiceNumId === num.id;
                                                 const perms = num.permissions || {};
                                                 const allUserIds = users.map((u: any) => u.id);
 
@@ -5031,6 +5029,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                             Default
                                                                         </span>
                                                                     )}
+                                                                    {num.voiceEnabled && (
+                                                                        <span className="text-[11px] font-bold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full">
+                                                                            📞 Voice
+                                                                        </span>
+                                                                    )}
                                                                     {isRestricted && (
                                                                         <span className="text-[11px] font-bold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">
                                                                             🔒 {restrictedToIds.length} user{restrictedToIds.length !== 1 ? 's' : ''}
@@ -5096,16 +5099,32 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                 })()}
                                                             </div>
                                                             {/* Actions */}
-                                                            <div className="flex items-center gap-2 shrink-0">
+                                                            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                                                                 <button
-                                                                    onClick={() => setExpandedNumId(isExpanded ? null : num.id)}
+                                                                    onClick={() => {
+                                                                        setExpandedVoiceNumId(isVoiceExpanded ? null : num.id);
+                                                                        if (!isVoiceExpanded) setExpandedNumId(null);
+                                                                    }}
+                                                                    className={`text-[10px] font-black uppercase tracking-wide px-3 py-1.5 rounded-full border transition-all ${
+                                                                        isVoiceExpanded
+                                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                                                                            : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400'
+                                                                    }`}
+                                                                >
+                                                                    {isVoiceExpanded ? '▲ Voice' : '📞 Voice & Routing'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setExpandedNumId(isExpanded ? null : num.id);
+                                                                        if (!isExpanded) setExpandedVoiceNumId(null);
+                                                                    }}
                                                                     className={`text-[10px] font-black uppercase tracking-wide px-3 py-1.5 rounded-full border transition-all ${
                                                                         isExpanded
                                                                             ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
                                                                             : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
                                                                     }`}
                                                                 >
-                                                                    {isExpanded ? '▲ Access' : '▼ Manage Access'}
+                                                                    {isExpanded ? '▲ Access' : '▼ Access'}
                                                                 </button>
                                                                 {!num.isDefault && (
                                                                     <button
@@ -5128,8 +5147,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             </div>
                                                         </div>
 
-                                                        {/* ── Per-number VoIP / Voice Calling Settings ── */}
-                                                        {(() => {
+                                                        {/* ── Per-number VoIP / Voice Calling Drawer ── */}
+                                                        {isVoiceExpanded && (() => {
                                                             const voiceAddonActive = true || Boolean(church.voiceAddOn?.enabled);
                                                             return (
                                                                 <div className="border-t border-slate-200/70 dark:border-slate-700/70 mx-4 mb-4 pt-3 space-y-3">
@@ -5560,6 +5579,77 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         );
                     })()}
 
+                    {/* ── Team & Extensions Sub-tab ──────────────────────── */}
+                    {smsSubTab === 'extensions' && (
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">Team Extensions &amp; Calling Hours</h4>
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            Assign internal extensions, calling schedules, Do Not Disturb, and personal voicemail greetings for your team.
+                                        </p>
+                                    </div>
+                                    <span className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 shrink-0">
+                                        {users.filter((u: any) => u.callingPreferences?.extension).length} of {users.length} assigned
+                                    </span>
+                                </div>
+
+                                {users.length === 0 ? (
+                                    <p className="text-xs text-slate-400 py-6 text-center">No team members found.</p>
+                                ) : (
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                                        {users.map((u: any) => {
+                                            const cp = u.callingPreferences;
+                                            const dndActive = Boolean(cp?.dndOverride?.active && (!cp.dndOverride.until || cp.dndOverride.until > Date.now()));
+                                            return (
+                                                <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{u.name}</p>
+                                                            {cp?.extension ? (
+                                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300">
+                                                                    Ext {cp.extension}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400">
+                                                                    No Ext
+                                                                </span>
+                                                            )}
+                                                            {dndActive && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                                                    DND Active
+                                                                </span>
+                                                            )}
+                                                            {cp?.callingHoursEnabled && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">
+                                                                    Scheduled Hours
+                                                                </span>
+                                                            )}
+                                                            {cp?.voicemail?.enabled !== false && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                                                    Voicemail On
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{u.email}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingCallingUser(u)}
+                                                        className="shrink-0 px-4 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                                                    >
+                                                        Edit Calling &amp; Voicemail
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── Port-In Request Modal overlay ───────────────────── */}
                     {showPortInModal && (
                         <PortInRequestModal
@@ -5800,6 +5890,22 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }}
                 onCancel={() => setShowTermsModal(false)}
             />
+        )}
+        {activeTab === 'Variables' && (
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+                <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Variables &amp; Merge Tags</h3>
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
+                        Create custom variables for your church ({'{custom.*}'}) and preview global merge tags across SMS, Email, and Workflows.
+                    </p>
+                </div>
+                <TenantVariablesPanel
+                    churchId={churchId}
+                    church={church}
+                    onUpdateChurch={onUpdateChurch}
+                    currentUserId={currentUser?.id}
+                />
+            </div>
         )}
         {activeTab === 'Canva' && (
             <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm max-w-4xl mx-auto space-y-8 animate-fade-in-up">

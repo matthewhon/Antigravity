@@ -160,10 +160,19 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ church, currentUser,
         setNotes(freshNotes);
         setGroups(freshGroups);
 
-        // Update local caches
-        localStorage.setItem(peopleCacheKey, JSON.stringify(freshPeople));
-        localStorage.setItem(notesCacheKey, JSON.stringify(freshNotes));
-        localStorage.setItem(groupsCacheKey, JSON.stringify(freshGroups));
+        // Update local caches safely (bound people cache to ~1.5MB; IndexedDB persistentLocalCache handles larger datasets)
+        try {
+          const serializedPeople = JSON.stringify(freshPeople);
+          if (serializedPeople.length <= 1_500_000) {
+            localStorage.setItem(peopleCacheKey, serializedPeople);
+          } else {
+            localStorage.removeItem(peopleCacheKey);
+          }
+          localStorage.setItem(notesCacheKey, JSON.stringify(freshNotes));
+          localStorage.setItem(groupsCacheKey, JSON.stringify(freshGroups));
+        } catch {
+          // ignore quota errors
+        }
       } catch (e) {
         console.error("Failed to load fresh data from Firestore:", e);
       } finally {

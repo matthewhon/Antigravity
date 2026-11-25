@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "postbuild": "node postbuild.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "ios:build": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme \"Pastoral Care Messaging\" -sdk iphonesimulator -configuration Debug",

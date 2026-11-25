@@ -71,6 +71,8 @@ export const CallingPreferencesPanel: React.FC<CallingPreferencesPanelProps> = (
     apiBaseUrl,
     onSaved,
 }) => {
+    const [newOverrideDate, setNewOverrideDate] = useState('');
+    const [newOverrideLabel, setNewOverrideLabel] = useState('');
     const [prefs, setPrefs] = useState<UserCallingPreferences>(() => {
         const def = buildDefaultPrefs(churchTimezone);
         const existing = user.callingPreferences;
@@ -278,18 +280,38 @@ export const CallingPreferencesPanel: React.FC<CallingPreferencesPanelProps> = (
                         />
                     </div>
                     {dndActive && (
-                        <input
-                            type="text"
-                            value={prefs.dndOverride?.reason || ''}
-                            onChange={(e) =>
-                                setPrefs((p) => ({
-                                    ...p,
-                                    dndOverride: { ...p.dndOverride, active: true, reason: e.target.value },
-                                }))
-                            }
-                            placeholder="Reason (optional, e.g. In a meeting)"
-                            className="w-full rounded-xl border border-rose-200 dark:border-rose-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs"
-                        />
+                        <div className="space-y-2">
+                            <select
+                                value={prefs.dndOverride?.until ? 'timed' : 'indefinite'}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setPrefs((p) => ({
+                                        ...p,
+                                        dndOverride: {
+                                            ...p.dndOverride,
+                                            active: true,
+                                            until: val === 'indefinite' ? null : Date.now() + 60 * 60 * 1000,
+                                        },
+                                    }));
+                                }}
+                                className="w-full rounded-xl border border-rose-200 dark:border-rose-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold"
+                            >
+                                <option value="indefinite">Until I turn it off</option>
+                                <option value="timed">For 1 hour</option>
+                            </select>
+                            <input
+                                type="text"
+                                value={prefs.dndOverride?.reason || ''}
+                                onChange={(e) =>
+                                    setPrefs((p) => ({
+                                        ...p,
+                                        dndOverride: { ...p.dndOverride, active: true, reason: e.target.value },
+                                    }))
+                                }
+                                placeholder="Reason (optional, e.g. In a meeting)"
+                                className="w-full rounded-xl border border-rose-200 dark:border-rose-800 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs"
+                            />
+                        </div>
                     )}
                 </div>
             </div>
@@ -323,6 +345,16 @@ export const CallingPreferencesPanel: React.FC<CallingPreferencesPanelProps> = (
                                 <option key={tz} value={tz}>{tz}</option>
                             ))}
                         </select>
+
+                        <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(prefs.allowEmergencyBypass)}
+                                onChange={(e) => setPrefs((p) => ({ ...p, allowEmergencyBypass: e.target.checked }))}
+                                className="rounded text-violet-600"
+                            />
+                            Allow Urgent/Emergency IVR Bypass
+                        </label>
 
                         {DAYS.map(({ key, label }) => {
                             const dayCfg = prefs.schedule[key];
@@ -387,6 +419,65 @@ export const CallingPreferencesPanel: React.FC<CallingPreferencesPanelProps> = (
                                 </div>
                             );
                         })}
+
+                        {/* Date Overrides (Holidays / Vacation) */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Date Overrides (Days Off / Holidays)</p>
+                            <div className="flex flex-wrap gap-2">
+                                <input
+                                    type="date"
+                                    value={newOverrideDate}
+                                    onChange={(e) => setNewOverrideDate(e.target.value)}
+                                    className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 text-xs"
+                                />
+                                <input
+                                    type="text"
+                                    value={newOverrideLabel}
+                                    onChange={(e) => setNewOverrideLabel(e.target.value)}
+                                    placeholder="Label (e.g. Vacation)"
+                                    className="flex-1 min-w-[120px] rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 text-xs"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!newOverrideDate) return;
+                                        setPrefs((p) => ({
+                                            ...p,
+                                            dateOverrides: [
+                                                ...(p.dateOverrides || []).filter((o) => o.date !== newOverrideDate),
+                                                { date: newOverrideDate, label: newOverrideLabel || 'Day Off', available: false },
+                                            ],
+                                        }));
+                                        setNewOverrideDate('');
+                                        setNewOverrideLabel('');
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold"
+                                >
+                                    Add Day Off
+                                </button>
+                            </div>
+                            {(prefs.dateOverrides || []).length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(prefs.dateOverrides || []).map((o) => (
+                                        <span key={o.date} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-800 dark:text-amber-200">
+                                            {o.date} {o.label ? `· ${o.label}` : ''}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setPrefs((p) => ({
+                                                        ...p,
+                                                        dateOverrides: (p.dateOverrides || []).filter((x) => x.date !== o.date),
+                                                    }))
+                                                }
+                                                className="hover:text-rose-600"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

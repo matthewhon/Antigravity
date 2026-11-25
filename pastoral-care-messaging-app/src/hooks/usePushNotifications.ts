@@ -100,24 +100,53 @@ export function usePushNotifications(user: User | null) {
     // Keep a stable ref to the latest user so listeners don't go stale
     const userRef = useRef(user);
     userRef.current = user;
+    const registeredTokenRef = useRef<string | null>(null);
+    const prevUserIdRef = useRef<string | null>(null);
 
     useEffect(() => {
+        const prevUid = prevUserIdRef.current;
+        const nextUid = user?.id ?? null;
+        prevUserIdRef.current = nextUid;
+
+        // Remove the registered push token from the previous user on logout/switch
+        if (prevUid && prevUid !== nextUid && registeredTokenRef.current) {
+            const staleToken = registeredTokenRef.current;
+            registeredTokenRef.current = null;
+            import('firebase/firestore').then(({ arrayRemove }) =>
+                updateDoc(doc(db, 'users', prevUid), { fcmTokens: arrayRemove(staleToken) })
+            ).catch(() => {});
+        }
+
         if (!user || !Capacitor.isNativePlatform()) {
             return;
         }
 
+        let cancelled = false;
+
         const registerPush = async () => {
             let permStatus = await PushNotifications.checkPermissions();
+            if (cancelled) return;
 
             if (permStatus.receive === 'prompt') {
                 permStatus = await PushNotifications.requestPermissions();
             }
 
-            if (permStatus.receive !== 'granted') {
+            if (cancelled || permStatus.receive !== 'granted') {
                 return;
             }
 
-            // Register with Google (FCM)
+            if (Capacitor.getPlatform() === 'android') {
+                await PushNotifications.createChannel({
+                    id: 'pc_messages_channel',
+                    name: 'Messages & Team Chat',
+                    description: 'Incoming SMS, MMS, and Team Chat notifications',
+                    importance: 4,
+                    visibility: 1,
+                    sound: 'default',
+                }).catch(() => {});
+            }
+
+            // Register with Google (FCM) / APNs
             await PushNotifications.register();
         };
 
@@ -126,6 +155,7 @@ export function usePushNotifications(user: User | null) {
         const registrationListener = PushNotifications.addListener('registration', async (token) => {
             const currentUser = userRef.current;
             if (!currentUser) return;
+            registeredTokenRef.current = token.value;
             try {
                 const userDocRef = doc(db, 'users', currentUser.id);
                 await updateDoc(userDocRef, {
@@ -147,6 +177,7 @@ export function usePushNotifications(user: User | null) {
         // Notification received while app is in the foreground → show in-app toast.
         const foregroundListener = PushNotifications.addListener('pushNotificationReceived', (notification) => {
             const data = notification.data as Record<string, string> | undefined;
+            if (data?.type === 'incoming_call') return;
             // Team chat: no toast for the thread the user is already reading
             if (data?.type === 'team-chat' && data.channelId && data.channelId === activeTeamChat.channelId) return;
             const title = notification.title || 'New Message';
@@ -175,10 +206,11 @@ export function usePushNotifications(user: User | null) {
         registerPush();
 
         return () => {
+            cancelled = true;
             registrationListener.then(l => l.remove());
             errorListener.then(l => l.remove());
             foregroundListener.then(l => l.remove());
             actionListener.then(l => l.remove());
         };
-    }, [user]);
+    }, [user?.id]);
 }
